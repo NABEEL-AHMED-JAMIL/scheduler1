@@ -4,14 +4,13 @@ import { API_SUCCESS } from '../../../core/api/api.config';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { FormDialog } from '../../../shared/ui/form-dialog';
 import { Field } from '../../../shared/ui/field';
-import { Combobox, ComboboxOption } from '../../../shared/ui/combobox';
 import { AUTH_FIELDS, CollectionRow, SENSITIVITIES, authLabel, holdsReference, sensitivityLabel, sensitivityWord } from './api-collections.model';
 import { ApiCollectionsApi } from './api-collections.service';
 
 export interface CollectionDialogData {
   collection?: CollectionRow;
-  /** A platform administrator's workspaces: a new collection names the one it is for. */
-  tenants?: ComboboxOption[];
+  /** The workspace a platform administrator picked on the page; none for a workspace's people (their own). */
+  tenantId?: number | null;
 }
 
 type AuthBlocks = Record<string, Record<string, string>>;
@@ -23,18 +22,13 @@ type AuthBlocks = Record<string, Record<string, string>>;
  */
 @Component({
   selector: 'app-collection-dialog',
-  imports: [FormDialog, Field, Combobox],
+  imports: [FormDialog, Field],
   template: `
     <app-form-dialog [heading]="isEdit() ? 'Edit collection' : 'New API collection'"
                      [subtitle]="isEdit() ? data.collection!.name : 'A set of APIs, with the auth they share and the environments they run in.'"
                      [confirmLabel]="isEdit() ? 'Save changes' : 'Create'" [saving]="saving()"
                      (confirmed)="save()" (cancelled)="ref.close(null)">
       <div class="form-stack">
-        @if (data.tenants && !isEdit()) {
-          <app-field label="Workspace" for="acTenant" [required]="true" hint="A collection belongs to one workspace; only its pipelines can use it.">
-            <app-combobox id="acTenant" [selected]="tenantId()" (selectedChange)="tenantId.set($event || null)" [options]="data.tenants" [allowClear]="false" placeholder="Search workspaces…" />
-          </app-field>
-        }
         <div class="form-grid">
           <app-field label="Name" for="acName" [required]="true">
             <input id="acName" class="input" [value]="name()" (input)="name.set($any($event.target).value)" placeholder="Orders APIs" />
@@ -97,7 +91,6 @@ export class CollectionDialog {
   /** The word the collection was given -- what a save sends back; the service reads the level from it (MIG-243). */
   readonly sensitivity = signal(this.data.collection ? sensitivityWord(this.data.collection) ?? '' : '');
   readonly status = signal(this.data.collection?.status ?? 'Active');
-  readonly tenantId = signal<string | null>(null);
   readonly authType = signal('NONE');
   /** Every scheme's block as read, so an imported collection's other schemes survive an edit of one. */
   private readonly blocks = signal<AuthBlocks>({});
@@ -167,7 +160,6 @@ export class CollectionDialog {
     this.error.set('');
     const name = this.name().trim();
     if (!name) { this.error.set('Give the collection a name.'); return; }
-    if (this.data.tenants && !this.isEdit() && !this.tenantId()) { this.error.set('Choose the workspace the collection is for.'); return; }
     const auth = this.authBody();
     if ('error' in auth) { this.error.set(auth.error); return; }
     const body: Record<string, unknown> = {
@@ -178,9 +170,8 @@ export class CollectionDialog {
       status: this.status(),
       defaultAuth: auth.auth,
     };
-    if (this.tenantId() && !this.isEdit()) body['tenantId'] = Number(this.tenantId());
     this.saving.set(true);
-    this.api.saveCollection(body).subscribe({
+    this.api.saveCollection(body, this.data.tenantId).subscribe({
       next: r => {
         this.saving.set(false);
         if (r.status !== API_SUCCESS) { this.error.set(r.message); return; }

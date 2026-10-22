@@ -171,26 +171,23 @@ describe('Administration › Data policies -- as a member', () => {
   });
 });
 
-describe('Administration › Data policies -- as a platform administrator', () => {
-  it('reads nothing until a workspace is picked, then reads and saves that one', () => {
-    const { el, api, refresh, page } = render('PLATFORM_ADMIN');
+describe('Administration › Data policies -- as a platform administrator\'s own sign-in (ZT-A12 follow-up)', () => {
+  it('reads no workspace\'s policy or retention, and says to open the workspace with Work in this workspace', () => {
+    const { el, api, retention, refresh, page } = render('PLATFORM_ADMIN');
     expect(api.get).not.toHaveBeenCalled();
+    expect(retention.view).not.toHaveBeenCalled();
     expect(el.querySelector('[data-level]')).toBeNull();
+    expect(el.querySelector('[data-test="needs-workspace"]')?.textContent).toContain("A data policy is a workspace's");
+    expect(el.querySelector('app-workspace-select')).toBeNull();
+    // A workspace remembered from elsewhere, or picked by hand, still reads nothing.
     page.pickWorkspace('2924');
     refresh();
-    expect(api.get).toHaveBeenCalledWith(2924);
-    page.setRetention(1, '7');
-    page.save();
-    expect(api.save).toHaveBeenCalledWith(expect.objectContaining({ tenantId: 2924 }));
+    expect(api.get).not.toHaveBeenCalled();
+    expect(retention.view).not.toHaveBeenCalled();
   });
 
-  it('shows that workspace\'s retention below the levels (MIG-354)', () => {
-    const { el, retention, refresh, page } = render('PLATFORM_ADMIN');
-    expect(retention.view).not.toHaveBeenCalled();
-    page.pickWorkspace('2924');
-    refresh();
-    expect(retention.view).toHaveBeenCalledWith(2924);
-    expect(el.querySelector('[data-retention]')).not.toBeNull();
-    expect(el.querySelectorAll('[data-retention-table] tbody tr').length).toBe(RETENTION_VIEW.classes.length);
+  it('keeps the platform\'s retention minimums, for every workspace', () => {
+    const { el } = render('PLATFORM_ADMIN');
+    expect(el.querySelector('[data-retention-platform]')?.textContent).toContain('Platform minimums');
   });
 });

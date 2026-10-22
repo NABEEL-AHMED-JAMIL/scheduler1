@@ -245,7 +245,7 @@ test('nothing on an open board overflows its card, and the page never scrolls si
     expect(sideways, 'the page body scrolls horizontally').toBe(false);
   });
 
-test('an open report has the whole width, and All dashboards goes back to the cards', async ({ page }) => {
+test('an open report has the whole width, and the breadcrumb\'s Dashboards goes back to the cards', async ({ page }) => {
   // The redesign of 2026-09-28: no list kept beside the board. The board is the page, its first
   // tile is in the first screenful, and the cards are one link (or Back) away.
   await openLibrary(page);
@@ -260,7 +260,8 @@ test('an open report has the whole width, and All dashboards goes back to the ca
   await page.reload();
   await expect(page.getByRole('heading', { level: 1, name: '01 Overall KPI summary' })).toBeVisible();
 
-  await page.getByRole('link', { name: /All dashboards/ }).click();
+  // The way back is the breadcrumb (UX review 2026-10-12, A2): See results › Dashboards › the board.
+  await page.getByRole('navigation', { name: 'Breadcrumb' }).getByRole('link', { name: 'Dashboards', exact: true }).click();
   await expect(page).not.toHaveURL(/board=/);
   await expect(boardCard(page, '01 Overall KPI summary')).toBeVisible();
 });

@@ -35,6 +35,9 @@ export interface InboxTask {
   overdue?: boolean;
   /** Set on Mine when the task is someone else's and the reader stands in for them today. */
   standingInFor?: number | null;
+  /** ZT-W2: in a managed session, an approval nobody but its requester could decide -- the platform administrator's -- and why. */
+  onlyTheRequesterCould?: boolean;
+  managedNote?: string | null;
 }
 
 export interface HistoryEvent {
@@ -55,10 +58,14 @@ export interface TaskDetail extends InboxTask {
     comment?: string | null }[];
 }
 
-export interface Colleague { userId: number; fullName?: string | null; username: string; }
+/** A person of the workspace; canAct is false for someone who cannot open the inbox, so cannot be handed a task (2026-10-21). */
+export interface Colleague { userId: number; fullName?: string | null; username: string; canAct?: boolean; }
 
-/** The tabs' totals: open in Mine and My groups (total is the two, the menu's badge), overdue, Done and My requests. */
-export interface TaskCount { mine: number; groups: number; total: number; overdue: number; done?: number; requests?: number; }
+/** Why a person is listed but cannot be picked to act on a task. */
+export const CANNOT_ACT = 'Cannot open Approvals';
+
+/** The tabs' totals: open in Mine and My teams (total is the two, the menu's badge), overdue, Done and My requests. */
+export interface TaskCount { mine: number; teams: number; total: number; overdue: number; done?: number; requests?: number; }
 
 /** Which page of an inbox list to read: after a cursor, how many (1..200, the service's default 100), and a search. */
 export interface InboxQuery { cursor?: string | null; limit?: number; q?: string | null; }
@@ -117,15 +124,17 @@ export class WorkflowsApi {
   private readonly workflows = `${API_BASE}/workflow.json`;
 
   mine(page: InboxQuery = {}): Observable<InboxPage<InboxTask>> { return this.page<InboxTask>('mine', page); }
-  groups(page: InboxQuery = {}): Observable<InboxPage<InboxTask>> { return this.page<InboxTask>('groups', page); }
+  teams(page: InboxQuery = {}): Observable<InboxPage<InboxTask>> { return this.page<InboxTask>('teams', page); }
   done(page: InboxQuery = {}): Observable<InboxPage<InboxTask>> { return this.page<InboxTask>('done', page); }
   count(): Observable<ApiResponse<TaskCount>> { return this.http.get<ApiResponse<TaskCount>>(`${this.inbox}/count`); }
-  /** UX review 2026-10-12: the reader's open tasks about one subject ("pipeline-run:8214"), Mine's and My groups'. */
-  forSubject(subjectId: string): Observable<ApiResponse<(InboxTask & { list?: 'mine' | 'groups' })[]>> {
-    return this.http.get<ApiResponse<(InboxTask & { list?: 'mine' | 'groups' })[]>>(`${this.inbox}/forSubject`, { params: { subjectId } });
+  /** UX review 2026-10-12: the reader's open tasks about one subject ("pipeline-run:8214"), Mine's and My teams'. */
+  forSubject(subjectId: string): Observable<ApiResponse<(InboxTask & { list?: 'mine' | 'teams' })[]>> {
+    return this.http.get<ApiResponse<(InboxTask & { list?: 'mine' | 'teams' })[]>>(`${this.inbox}/forSubject`, { params: { subjectId } });
   }
     task(id: number): Observable<ApiResponse<TaskDetail>> { return this.http.get<ApiResponse<TaskDetail>>(`${this.inbox}/task`, { params: { id } }); }
-  colleagues(): Observable<ApiResponse<Colleague[]>> { return this.http.get<ApiResponse<Colleague[]>>(`${this.inbox}/colleagues`); }
+  colleagues(tenantId?: number | null): Observable<ApiResponse<Colleague[]>> {
+    return this.http.get<ApiResponse<Colleague[]>>(`${this.inbox}/colleagues`, { params: tenantId ? { tenantId } : {} });
+  }
 
   /** A decision, keyed so a double click or a retry decides once. */
   act(taskId: number, action: Decision, comment: string | null, key: string): Observable<ApiResponse<RequestRow>> {
@@ -160,7 +169,7 @@ export class WorkflowsApi {
   requests(page: InboxQuery = {}): Observable<InboxPage<RequestRow>> { return this.page<RequestRow>('requests', page); }
 
   /** One page of an inbox list; only what is asked goes on the URL. */
-  private page<T>(list: 'mine' | 'groups' | 'done' | 'requests', page: InboxQuery): Observable<InboxPage<T>> {
+  private page<T>(list: 'mine' | 'teams' | 'done' | 'requests', page: InboxQuery): Observable<InboxPage<T>> {
     const params: Record<string, string | number> = {};
     if (page.cursor) params['cursor'] = page.cursor;
     if (page.limit) params['limit'] = page.limit;

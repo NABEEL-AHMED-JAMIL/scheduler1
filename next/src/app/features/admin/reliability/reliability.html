@@ -2,22 +2,24 @@
   <app-page-header>
     <div class="page-head">
       <div>
-        <h1 class="page-title">Reliability</h1>
-        <p class="page-subtitle">Every service's health and the platform's alerts, then pipeline execution and billing against their 99.99% targets.</p>
+        <h1 class="page-title">Service health</h1>
+        <p class="page-subtitle">Each service's status, version, restarts and error rate, the background checks and the platform's alerts; then pipeline execution and billing against their 99.99% targets. Heap, CPU and request history are CloudWatch's.</p>
       </div>
       <div class="flex items-center gap-2 flex-wrap">
-        <app-segmented ariaLabel="Range" [options]="rangeOptions" [value]="range()" (valueChange)="setRange($event)" />
-        <button type="button" class="btn btn-ghost btn-sm" (click)="load()"><app-icon name="refresh" />Refresh</button>
+        <button type="button" class="btn btn-ghost btn-sm" data-test="refresh-all" (click)="refreshAll()" [disabled]="health()?.loading()"><app-icon name="refresh" [busy]="!!health()?.loading()" />Refresh</button>
       </div>
     </div>
   </app-page-header>
 
-  <!-- MIG-355: each service's health (Core's minute samples of what the services serve), Kafka lag, disk, billing
-       reconciliation, and the platform's alerts and rules. Part of this page's own lazy chunk; its chart's library loads on
-       first draw (app-echart). No @defer: its runtime would join the initial bundle. -->
+  <!-- Owner #21 (2026-10-19): the services, the background checks and the platform's alerts (the planned-deploy list removed later that day: each row says its own) -- no heap, CPU or request charts
+       (CloudWatch's on AWS) and no disk box (the disk rule still alerts). -->
   <app-platform-health />
 
-  <h2 class="text-lg font-semibold m-0 mt-2">Objectives</h2>
+  <div class="flex flex-wrap items-center gap-2 mt-2">
+    <h2 class="text-lg font-semibold m-0">Objectives</h2>
+    <span class="text-sm text-[color:var(--text-secondary)]">Pipeline execution and billing against their 99.99% targets.</span>
+    <app-segmented class="ml-auto" ariaLabel="Range" [options]="rangeOptions" [value]="range()" (valueChange)="setRange($event)" />
+  </div>
 
   <!-- Firing rules, collapsed: one plain line per objective, the rule lines behind Details. -->
   @if (alertGroups().length) {
@@ -151,7 +153,7 @@
             <strong class="text-[color:var(--text-primary)]">What to do:</strong>
             @if (b.unpriced > 0) {
               {{ b.unpriced | number }} {{ b.unpriced === 1 ? 'event has' : 'events have' }} no rate on the rate card.
-              <a class="rel-link" routerLink="/platform/rate-cards">Add the missing rates</a>
+              <a class="rel-link" routerLink="/billing/settings">Add the missing rates</a>
             }
             @if (b.unrolled > 0) {
               {{ b.unrolled | number }} {{ b.unrolled === 1 ? 'event was' : 'events were' }} not rolled up into their day's bill; the daily rollup in billing-service needs a look.
@@ -166,8 +168,12 @@
     </article>
   </div>
 
+  <!-- Owner #21: the objectives' days, reasons, meters and burn rules, folded under one disclosure; "Details" opens it. -->
+  <details class="card p-4 rel-details" id="objective-details" data-testid="objective-details">
+    <summary class="cursor-pointer select-none text-sm font-semibold">Objective details: days, reasons, meters and burn rates</summary>
+    <div class="flex flex-col gap-4 mt-4">
   <!-- Pipeline execution: the counts beside the heading, the days full width, then why runs ended. -->
-  <section class="card p-4" id="slo-runs" data-testid="slo-runs" aria-labelledby="slo-runs-title">
+  <section class="rel-detail" id="slo-runs" data-testid="slo-runs" aria-labelledby="slo-runs-title">
     <div class="rel-section-head">
       <div class="rel-section-text">
         <h2 id="slo-runs-title" class="font-semibold text-sm">Pipeline execution</h2>
@@ -218,7 +224,7 @@
   </section>
 
   <!-- Billing: the same two rows; the meters with something wrong first, every meter behind a disclosure. -->
-  <section class="card p-4" id="slo-billing" data-testid="slo-billing" aria-labelledby="slo-billing-title">
+  <section class="rel-detail" id="slo-billing" data-testid="slo-billing" aria-labelledby="slo-billing-title">
     <div class="rel-section-head">
       <div class="rel-section-text">
         <h2 id="slo-billing-title" class="font-semibold text-sm">Billing</h2>
@@ -298,7 +304,7 @@
   </ng-template>
 
   <!-- Burn rates: for engineers, behind a disclosure; the table inside is unchanged. -->
-  <section class="card p-4" data-testid="slo-burn" aria-labelledby="slo-burn-title">
+  <section class="rel-detail" data-testid="slo-burn" aria-labelledby="slo-burn-title">
     <details data-testid="burn-rules">
       <summary class="cursor-pointer select-none">
         <h2 id="slo-burn-title" class="inline font-semibold text-sm">For engineers: burn-rate rules</h2>
@@ -345,4 +351,6 @@
       }
     </details>
   </section>
+    </div>
+  </details>
 </div>

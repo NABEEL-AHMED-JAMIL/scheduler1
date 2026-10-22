@@ -1,4 +1,5 @@
 import { expect as expectNow, Page } from '@playwright/test';
+import { openFromMenu } from './support/menu';
 import { defaultSession, NO_SESSION, signedIn, test } from './support/session';
 import { analyticsFixtures } from './support/analytics-fixtures';
 
@@ -155,8 +156,8 @@ test('9 — the saved-analysis library is reachable from the menu, not just by t
     // It had a route and no entry. A page you can only reach by knowing the URL is a page nobody
     // reaches, and no unit test can see the difference -- the route existed and resolved fine.
     await page.goto('/data/analytics');
-    await page.getByRole('button', { name: 'Data', exact: true }).click();
-    await page.getByRole('link', { name: /Saved Analyses/ }).click();
+    // The library is the menu's See results › Dashboards since the menu tree (2026-10-12).
+    await openFromMenu(page, 'See results', 'Dashboards');
     await expect(page).toHaveURL(/\/analytics\/dashboards/);
     await expect(page.getByText(/re-run each time you open them/)).toBeVisible();
   });

@@ -2,6 +2,8 @@ import { test, expect, APIRequestContext, Page, TestInfo } from '@playwright/tes
 import { join } from 'path';
 import { api, authOf, canMintPeople, pageAs, Session, sessionAsPerson } from './support/session';
 import { hasFixtures, meridian, NEEDS_FIXTURES, pipeline, riverside } from './support/fixtures';
+import { ensureOrders, ORDERS } from './support/analytics-fixtures';
+import { waitOnOwnerData } from './support/owner-data';
 
 /**
  * MIG-357, "AI chooses, console draws", live on the rebuilt workspaces with qwen3:8b: a question about numbers answered as
@@ -66,7 +68,9 @@ async function tableRows(page: Page): Promise<string[][]> {
     rows.map(r => Array.from(r.querySelectorAll('td')).map(td => (td.textContent ?? '').trim())));
 }
 
-const round = (v: string | number | null | undefined, places = 2) => Number(Number(v).toFixed(places));
+/** A figure as a number: the answer's table groups thousands ("698,758.58"), the direct query does not. */
+const round = (v: string | number | null | undefined, places = 2) =>
+  Number(Number(typeof v === 'string' ? v.replace(/,/g, '') : v).toFixed(places));
 
 /**
  * Every figure a correct answer could hold, per group, from a query of our own: the group's rows, and for each value of
@@ -118,6 +122,8 @@ test.describe('MIG-357: charts for analytics questions', () => {
   test('Riverside: readmission rate by age band and no-show rate by weekday, as charts whose figures are the data\'s',
     async ({ browser, request }, info) => {
       const s = await sessionAsPerson(request, riverside().admin);
+      // Both questions read the two tabular inputs (synthetic stand-ins since 2026-10-21; support/owner-data.ts).
+      await waitOnOwnerData(request, s, 'readmission', 'appointments');
       const page = await pageAs(browser, s, { viewport: { width: 1920, height: 1080 } });
       await page.goto('/data/ask');
 
@@ -141,12 +147,14 @@ test.describe('MIG-357: charts for analytics questions', () => {
   test('Meridian: revenue by category per month, drawn per category along the month, and pinned to a new dashboard',
     async ({ browser, request }, info) => {
       const s = await sessionAsPerson(request, meridian().admin);
+      // The orders sample is the suite's own (support/analytics-fixtures.ts): made again when the bucket lost it.
+      await ensureOrders(request, s, meridian().storageAlias);
       const page = await pageAs(browser, s, { viewport: { width: 1920, height: 1080 } });
       await page.goto('/data/ask');
       await ask(page, 'revenue by category per month');
       const card = page.locator('[data-turn]').first().locator('[data-test="chart-answer"]');
       await expect(card).toHaveAttribute('data-kind', /lineSmooth|areaStacked|stacked|heatmap|barH|themeRiver|lineStep|lineMarkers|areaShare|groupedBar|pivot|table/);
-      const want = await direct(request, s, 'meridian-s3', 'analytics-samples/orders.csv',
+      const want = await direct(request, s, meridian().storageAlias, ORDERS.path,
         "SELECT category, strftime(order_date, '%Y-%m-01'), sum(amount) FROM dataset GROUP BY 1, 2");
       const shown = await tableRows(page);
       const header = await page.locator('[data-turn]').first().locator('[data-test="query-rows"] thead th').allTextContents();
@@ -178,10 +186,13 @@ test.describe('MIG-357: charts for analytics questions', () => {
 
   test('the AI Assistant draws chart_data\'s answer in its Chart tab', async ({ browser, request }, info) => {
     const s = await sessionAsPerson(request, riverside().admin);
+    // The no-show rate is the appointments file's (a synthetic stand-in since 2026-10-21; support/owner-data.ts).
+    await waitOnOwnerData(request, s, 'appointments');
     const page = await pageAs(browser, s, { viewport: { width: 1920, height: 1080 } });
     await page.goto('/ai/assistant');
     await page.locator('textarea[aria-label="Message the assistant"]').fill('Show me the no-show rate by weekday as a chart.');
-    await page.getByRole('button', { name: 'Send' }).click();
+    // Exact: the conversation list beside the composer has questions with "send" in their names.
+    await page.getByRole('button', { name: 'Send', exact: true }).click();
     await expect(page.locator('[data-tab="chart"]')).toBeVisible({ timeout: ANSWER_MS });
     await page.locator('[data-tab="chart"]').click();
     await expect(page.locator('[data-test="chart-answer"]')).toBeVisible({ timeout: 30_000 });
@@ -189,22 +200,30 @@ test.describe('MIG-357: charts for analytics questions', () => {
     await shots(page, info, 'assistant-chart');
   });
 
-  test('Visualise: a dataset in the Studio and a run\'s output, suggested from the shape', async ({ browser, request }, info) => {
+  test('Visualise: a dataset in the Studio, suggested from the shape', async ({ browser, request }, info) => {
     const s = await sessionAsPerson(request, riverside().admin);
+    await waitOnOwnerData(request, s, 'appointments');
     const page = await pageAs(browser, s, { viewport: { width: 1920, height: 1080 } });
-    await page.goto('/data/analytics?connection=riverside-health-s3&path=' + encodeURIComponent('datasets/appointments/smart_hospital_appointment_dataset.csv'));
+    await page.goto(`/data/analytics?connection=${riverside().storageAlias}&path=` + encodeURIComponent('datasets/appointments/smart_hospital_appointment_dataset.csv'));
     await page.locator('[data-test="visualise"]').first().click();
     await expect(page.locator('[data-test="visualise"] [data-test="chart-answer"], app-visualise-panel [data-test="chart-answer"]').first())
       .toBeVisible({ timeout: 60_000 });
     await expect(page.locator('[data-test="suggestions"] [data-suggestion]').first()).toBeVisible();
     await page.waitForTimeout(1500);
     await shots(page, info, 'visualise-dataset');
-    await page.keyboard.press('Escape');
+  });
 
+  test('Visualise: a run\'s output, suggested from the shape', async ({ browser, request }, info) => {
+    const s = await sessionAsPerson(request, riverside().admin);
+    const page = await pageAs(browser, s, { viewport: { width: 1920, height: 1080 } });
     const readmission = pipeline('readmission');
-    await page.goto(`/pipelines/schedules/${readmission.jobId}/runs/${readmission.run!.jobQueueId}/logs`);
-    const output = page.locator('.exec-file [data-test="visualise"]').first();
-    await expect(output).toBeVisible({ timeout: 30_000 });
+    // The run's files are the run page's Outputs tab now, beside Steps, Map and Log.
+    await page.goto(`/pipelines/schedules/${readmission.jobId}/runs/${readmission.run!.jobQueueId}`);
+    await page.getByRole('tab', { name: /^Outputs/ }).click();
+    // Visualise is in each output's "More" menu (beside Copy file name), not a button of its own.
+    await page.locator('[data-test="output-more"]').first().click({ timeout: 30_000 });
+    const output = page.locator('[data-test="visualise"]').first();
+    await expect(output).toBeVisible();
     await output.click();
     await expect(page.locator('app-visualise-panel [data-test="chart-answer"]').first()).toBeVisible({ timeout: 60_000 });
     await page.waitForTimeout(1500);

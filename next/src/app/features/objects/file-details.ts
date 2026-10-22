@@ -15,10 +15,10 @@ export interface FileDetailsData { bucket: string; key: string; name: string; si
  * MIG-253: Storage's file panel -- everything knowable about one object.
  *
  * The object's own metadata comes from storage (/storage.json/objectMetadata). Which run and
- * pipeline wrote it has no endpoint (a backend gap: object → run): a run's uploads are recorded in
- * its outputs by bucket and key, so the recent runs' outputs (the Reports fan-out, shared and
- * cached) are searched, and the panel says how far. Storage keeps no uploader. Data policy and
- * expiry wait for MIG-243, so every file shows "No policy".
+ * pipeline wrote it is Core's answer (sourceJob.json/objectWriter, 2026-10-20): the newest upload of
+ * the object in a run the reader may read. Only when Core cannot be asked are the recent runs'
+ * outputs (the Reports fan-out, shared and cached) searched, and the panel says how far. Storage
+ * keeps no uploader. Data policy and expiry wait for MIG-243, so every file shows "No policy".
  *
  * @author Nabeel Ahmed
  */
@@ -39,6 +39,8 @@ export class FileDetails implements OnInit {
   readonly run = signal<GeneratedReport | null>(null);
   /** How many runs were searched; null while searching, -1 when they could not be read. */
   readonly runsSearched = signal<number | null>(null);
+  /** Core answered which run wrote it (or that none of the reader's did): exact, not a search of recent runs. */
+  readonly lookedUp = signal(false);
 
   ngOnInit(): void {
     this.storage.objectMetadata(this.data.bucket, this.data.key).subscribe({
@@ -48,6 +50,18 @@ export class FileDetails implements OnInit {
       },
       error: e => this.metaError.set(e?.error?.message || 'Could not read this file\'s metadata.'),
     });
+    this.generated.objectWriter(this.data.bucket, this.data.key).subscribe({
+      next: writer => {
+        this.run.set(writer);
+        this.lookedUp.set(true);
+        this.runsSearched.set(0);
+      },
+      error: () => this.searchRecentRuns(),
+    });
+  }
+
+  /** Core could not say: the recent runs' outputs are searched instead, and the panel says how far. */
+  private searchRecentRuns(): void {
     this.generated.recentOutputs().subscribe({
       next: recent => {
         this.run.set(findRunOf(recent.reports, this.data.bucket, this.data.key) ?? null);

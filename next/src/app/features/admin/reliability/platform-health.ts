@@ -1,22 +1,10 @@
 import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
-import { DecimalPipe } from '@angular/common';
 import { API_SUCCESS } from '../../../core/api/api.config';
-import { Icon } from '../../../shared/ui/icon';
-import { Segmented, SegmentOption } from '../../../shared/ui/segmented';
+import { StatTile } from '../../../shared/ui/stat-tile';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
-import { EChart } from '../../../shared/charts/echart/echart';
-import { ChartThemes } from '../../../shared/charts/echart/chart-themes';
-import { CONSOLE_THEME } from '../../../shared/charts/echart/echart-theme';
 import { refusal } from '../../../shared/ui/bulk/bulk.model';
-import { AlertsApi, PlannedDeploy, PlatformHealth, Probe, ServiceHealth } from '../../settings/alerts/alerts.api';
+import { AlertsApi, PlatformHealth, Probe, ServiceHealth } from '../../settings/alerts/alerts.api';
 import { AlertRules } from '../../settings/alerts/alert-rules';
-
-export type HealthMetric = 'requestsPerMin' | 'errorsPerMin' | 'meanMs' | 'heapUsedMb' | 'cpuPct';
-
-const METRIC_LABEL: Record<HealthMetric, string> = {
-  requestsPerMin: 'Requests a minute', errorsPerMin: 'Errors a minute', meanMs: 'Mean latency (ms)', heapUsedMb: 'Heap in use (MB)',
-  cpuPct: 'CPU (%)',
-};
 
 /** A status as a person reads it, and the tone of its dot. */
 export function statusWord(status: string | undefined): { word: string; tone: 'ok' | 'warn' | 'crit' | 'muted' } {
@@ -29,52 +17,61 @@ export function statusWord(status: string | undefined): { word: string; tone: 'o
   }
 }
 
-/** The series that marks the planned deploys: a dashed line at each start and a band to its end, in the muted text colour. */
-export const PLANNED_DEPLOYS = 'Planned deploys';
-
-function deployMarks(deploys: PlannedDeploy[], text: string): Record<string, unknown> {
-  return {
-    name: PLANNED_DEPLOYS, type: 'line', data: [], silent: true, color: text, lineStyle: { type: 'dashed', width: 1 },
-    markLine: {
-      silent: true, symbol: ['none', 'none'], label: { show: false }, lineStyle: { color: text, type: 'dashed', width: 1, opacity: 0.7 },
-      data: deploys.map(d => ({ xAxis: d.start, name: `${d.service} deploy` })),
-    },
-    markArea: {
-      silent: true, itemStyle: { color: text, opacity: 0.12 },
-      data: deploys.map(d => [{ xAxis: d.start, name: `${d.service} deploy` }, { xAxis: d.closes }]),
-    },
-  };
+/**
+ * Owner 2026-10-19: what a service's newest deploy says on its row, when it says anything -- a deploy that failed, one that
+ * never closed its window, or one running now. A deploy that went well says nothing beyond "deployed …".
+ */
+export function deployNote(s: ServiceHealth): { text: string; tone: 'crit' | 'warn' | 'info' } | null {
+  const d = s.lastDeploy;
+  if (!d) return null;
+  if (d.outcome === 'failed') return { text: 'last deploy failed', tone: 'crit' };
+  if (d.state === 'expired') return { text: 'last deploy never finished', tone: 'warn' };
+  if (d.state === 'open') return { text: 'deploying now', tone: 'info' };
+  return null;
 }
 
-/** A service's 24 hours as one line per service, for the picked figure, with the planned deploys marked: an ECharts option. */
-export function healthOption(services: ServiceHealth[], metric: HealthMetric, palette: string[], text: string, border: string,
-  asOf?: string, deploys: PlannedDeploy[] = []): Record<string, unknown> {
-  const shown = services.filter(s => s.series && s.series.at.length);
-  // The axis is the last 24 hours whatever the samples hold: a first hour of samples is drawn at the right end, not spread.
-  const end = asOf ? Date.parse(asOf) : NaN;
-  return {
-    animation: false,
-    color: palette,
-    grid: { left: 8, right: 16, top: 36, bottom: 4, containLabel: true },
-    legend: { type: 'scroll', top: 0, textStyle: { color: text, fontSize: 11 } },
-    tooltip: { trigger: 'axis', valueFormatter: (v: number | null) => (v == null ? '—' : Number(v).toLocaleString('en-US')) },
-    xAxis: { type: 'time', ...(Number.isNaN(end) ? {} : { min: end - 86_400_000, max: end }), axisLabel: { color: text, fontSize: 11, hideOverlap: true }, axisLine: { lineStyle: { color: border } } },
-    yAxis: { type: 'value', min: 0, axisLabel: { color: text, fontSize: 11 }, splitLine: { lineStyle: { color: border, opacity: 0.5 } } },
-    series: [
-      ...shown.map(s => ({
-        name: s.service, type: 'line', showSymbol: s.series!.at.length < 4, symbolSize: 4, smooth: false, connectNulls: false, lineStyle: { width: 1.5 },
-        data: s.series!.at.map((at, i) => [at, (s.series![metric] as (number | null)[])[i]]),
-      })),
-      ...(deploys.length ? [deployMarks(deploys, text)] : []),
-    ],
-  };
-}
+/** One background check as the page lists it: a name, its result in words, what it found, and when it was read. */
+export interface CheckRow { name: string; ok: boolean | null; tone: 'ok' | 'warn' | 'crit' | 'muted'; result: string; detail: string; readAt: string | null; every: string; }
 
-/** How long a planned deploy's window was open, in words: "2 min", "45 s", or "running". */
-export function deployLength(d: PlannedDeploy): string {
-  if (d.state === 'open') return 'running';
-  const seconds = Math.max(0, Math.round((Date.parse(d.closes) - Date.parse(d.start)) / 1000));
-  return seconds < 90 ? `${seconds} s` : `${Math.round(seconds / 60)} min`;
+const CHECK_NAMES: Record<string, { name: string; every: string }> = {
+  'billing-reconcile': { name: 'Billing reconciliation', every: 'hourly' },
+};
+
+/**
+ * Owner 2026-10-19: the checks Core runs on their own (Kafka consumer lag, the billing reconciliation, and any other probe)
+ * as one short table instead of a box each. Kafka's groups are one row: caught up, or how many are behind and the worst.
+ */
+export function backgroundChecks(probes: Probe[]): CheckRow[] {
+  const rows: CheckRow[] = [];
+  const lag = probes.filter(p => p.probe.startsWith('kafka-lag:'));
+  const latest = (list: Probe[]) => list.map(p => p.readAt).filter((t): t is string => !!t).sort().pop() ?? null;
+  if (lag.length) {
+    const behind = lag.filter(p => (p.reading ?? 0) > 0).sort((a, b) => (b.reading ?? 0) - (a.reading ?? 0));
+    const worst = behind[0]?.reading ?? 0;
+    rows.push({
+      name: 'Kafka consumers', ok: !behind.length, tone: !behind.length ? 'ok' : worst >= 1000 ? 'crit' : 'warn',
+      result: !behind.length ? 'Caught up' : `${behind.length} of ${lag.length} behind`,
+      detail: !behind.length ? `${lag.length} consumer ${lag.length === 1 ? 'group' : 'groups'}, none behind`
+        : behind.slice(0, 3).map(p => `${p.probe.replace(/^kafka-lag:/, '')} ${(p.reading ?? 0).toLocaleString('en-US')} behind`).join(' · ')
+          + (behind.length > 3 ? ` · ${behind.length - 3} more` : ''),
+      readAt: latest(lag), every: 'each minute',
+    });
+  } else {
+    rows.push({ name: 'Kafka consumers', ok: null, tone: 'muted', result: 'Not read yet', detail: 'Read each minute once Core reaches Kafka.', readAt: null, every: 'each minute' });
+  }
+  for (const p of probes.filter(x => !x.probe.startsWith('kafka-lag:'))) {
+    const known = CHECK_NAMES[p.probe];
+    const billing = p.probe === 'billing-reconcile';
+    rows.push({
+      name: known?.name ?? p.probe, ok: p.ok, tone: p.ok ? 'ok' : 'crit',
+      result: billing ? (p.ok ? 'Agrees' : 'Does not agree') : (p.ok ? 'OK' : 'Failing'),
+      detail: p.detail ?? '', readAt: p.readAt, every: known?.every ?? '',
+    });
+  }
+  if (!probes.some(p => p.probe === 'billing-reconcile')) {
+    rows.push({ name: 'Billing reconciliation', ok: null, tone: 'muted', result: 'Not read yet', detail: 'Daily lines, invoices and usage events compared hourly.', readAt: null, every: 'hourly' });
+  }
+  return rows;
 }
 
 /** A service's restarts in 24 hours that were not a planned deploy: the ones that alerted. */
@@ -82,31 +79,53 @@ export function unplannedRestarts(s: ServiceHealth): number {
   return Math.max(0, (s.restarts24h ?? 0) - (s.plannedRestarts24h ?? 0));
 }
 
+/** The error rate as the table says it: "0.4% · 1.2/min", "none", or "—" when nothing was asked. */
+export function errorRate(s: ServiceHealth): { text: string; bad: boolean } {
+  if (s.errorPct == null && (s.requestsPerMin == null || Number(s.requestsPerMin) === 0)) return { text: '—', bad: false };
+  const pct = Number(s.errorPct ?? 0);
+  const epm = Number(s.errorsPerMin ?? 0);
+  if (!epm) return { text: 'none', bad: false };
+  return { text: `${pct.toLocaleString('en-US', { maximumFractionDigits: 1 })}% · ${epm.toLocaleString('en-US', { maximumFractionDigits: 2 })}/min`, bad: true };
+}
+
 /**
- * MIG-355: Platform › Reliability's health view -- every service's status, heap, CPU, request and error rate, mean latency
- * and restarts in 24 hours, from Core's minute samples of what the services already serve (Actuator; nothing new runs);
- * the 24 hours as one chart per figure, the planned deploys marked on it (scripts/deploy.sh's windows: their restarts
- * raised no alert); Kafka lag, disk and the billing reconciliation; then the platform's alerts and the rules that raise them.
+ * Platform › Service health's services (owner #21, 2026-10-19; MIG-355's health view, slimmed): every service's status, the
+ * version it runs (and a deploy that failed or never finished, on its own row), when it started, its restarts in 24 hours --
+ * planned (a deploy) or not -- and its error rate; the background checks (Kafka consumer lag, the billing reconciliation) as
+ * one short table; then the platform's alerts and the rules that raise them. The separate list of planned deploys is gone
+ * (owner 2026-10-19): each row already says its version and when it was deployed.
+ * No heap, CPU or request charts: on AWS those are CloudWatch's (Container Insights). No disk box:
+ * the disk rule still alerts.
  */
 @Component({
   selector: 'app-platform-health',
-  imports: [Icon, Segmented, ServerTimePipe, DecimalPipe, EChart, AlertRules],
+  imports: [StatTile, ServerTimePipe, AlertRules],
   styles: `
     .dot { display: inline-block; width: 0.5rem; height: 0.5rem; border-radius: 999px; margin-right: 0.4rem; vertical-align: middle; }
     .dot-ok { background: var(--series-ok); }
     .dot-warn { background: var(--series-warn, var(--warn-text)); }
     .dot-crit { background: var(--series-crit); }
+    .dot-info { background: var(--info-mark); }
+    .note-info { color: var(--text-secondary); }
     .dot-muted { background: var(--border-strong); }
     .rel-table-wrap { overflow-x: auto; }
-    .probe-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); gap: 0.75rem; }
   `,
   template: `
     <section class="flex flex-col gap-4" aria-labelledby="health-title" data-test="platform-health">
+      <div class="grid grid-cols-2 md:grid-cols-4 stat-strip stat-row is-md is-start" role="list" data-test="health-tiles">
+        <app-stat-tile label="Services up" [value]="upCount() + ' of ' + services().length" icon="activity"
+                       [tone]="upCount() === services().length ? 'ok' : 'crit'" [foot]="asOfFoot()" />
+        <app-stat-tile label="Unplanned restarts" [value]="'' + unplannedTotal()" icon="refresh"
+                       [tone]="unplannedTotal() ? 'warn' : 'ok'" foot="in 24 hours; deploys are not counted" />
+        <app-stat-tile label="Errors" [value]="erroring().length ? erroring().length + ' services' : 'None'" icon="alert"
+                       [tone]="erroring().length ? 'crit' : 'ok'" foot="answering 5xx in the last minutes" />
+        <app-stat-tile label="Background checks" [value]="checksFailing() ? checksFailing() + ' failing' : 'All OK'" icon="shield"
+                       [tone]="checksFailing() ? 'crit' : 'ok'" foot="Kafka lag and billing reconciliation" />
+      </div>
+
       <div class="flex flex-wrap items-center gap-2">
         <h2 class="text-lg font-semibold m-0" id="health-title">Services</h2>
         <span class="text-sm text-[color:var(--text-secondary)]">{{ summary() }}</span>
-        @if (health(); as h) { <span class="text-xs text-[color:var(--text-muted)]">as of {{ h.asOf | serverTime:'recentSec' }}, sampled each minute</span> }
-        <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="load()" [disabled]="loading()"><app-icon name="refresh" [busy]="loading()" />Refresh</button>
       </div>
       @if (error()) { <p class="text-sm text-crit-500 m-0" role="alert">{{ error() }}</p> }
 
@@ -116,14 +135,10 @@ export function unplannedRestarts(s: ServiceHealth): number {
             <tr>
               <th>Service</th>
               <th>Status</th>
-              <th class="text-right">Heap</th>
-              <th class="text-right">After GC</th>
-              <th class="text-right">CPU</th>
-              <th class="text-right">Requests/min</th>
-              <th class="text-right">Errors</th>
-              <th class="text-right">Mean latency</th>
-              <th class="text-right" title="Restarts in 24 hours; a planned deploy's restart (scripts/deploy.sh) raises no alert and is counted apart.">Restarts (24 h)</th>
+              <th>Version</th>
               <th>Started</th>
+              <th class="text-right" title="Restarts in 24 hours. A planned deploy's restart (scripts/deploy.sh) raises no alert and is counted apart.">Restarts (24 h)</th>
+              <th class="text-right" title="Answers 5xx, as a share of the requests a minute, from the latest sample">Error rate</th>
             </tr>
           </thead>
           <tbody>
@@ -132,72 +147,46 @@ export function unplannedRestarts(s: ServiceHealth): number {
                 <td class="font-medium">{{ s.service }}</td>
                 <td class="whitespace-nowrap"><span class="dot" [class]="'dot dot-' + status(s).tone"></span>{{ status(s).word }}
                   @if (s.source === 'HEALTH' && s.status === 'UP') { <span class="text-[11px] text-[color:var(--text-muted)]" title="This service serves its health only: its port is public (the gateway) or its figures need a sign-in (identity)."> · health only</span> }</td>
-                <td class="text-right tabular whitespace-nowrap">@if (s.heapUsedMb != null) { {{ s.heapUsedMb | number }}@if (s.heapMaxMb) { <span class="text-[color:var(--text-muted)]"> / {{ s.heapMaxMb | number }}</span> } MB } @else { — }</td>
-                <td class="text-right tabular" [class.text-crit-500]="(s.heapAfterGcPct ?? 0) >= 85">{{ s.heapAfterGcPct != null ? (s.heapAfterGcPct | number:'1.0-0') + '%' : '—' }}</td>
-                <td class="text-right tabular">{{ s.cpuPct != null ? (s.cpuPct | number:'1.0-1') + '%' : '—' }}</td>
-                <td class="text-right tabular">{{ s.requestsPerMin != null ? (s.requestsPerMin | number:'1.0-1') : '—' }}</td>
-                <td class="text-right tabular" [class.text-crit-500]="(s.errorsPerMin ?? 0) > 0">
-                  {{ s.errorsPerMin != null ? (s.errorsPerMin | number:'1.0-2') : '—' }}@if (s.errorPct != null) { <span class="text-[color:var(--text-muted)]"> ({{ s.errorPct }}%)</span> }</td>
-                <td class="text-right tabular">{{ s.meanMs != null ? (s.meanMs | number:'1.0-0') + ' ms' : '—' }}</td>
-                <td class="text-right tabular whitespace-nowrap" [class.text-warn-500]="unplanned(s) > 0" [attr.data-planned]="s.plannedRestarts24h ?? 0">{{ s.restarts24h ?? '—' }}@if (s.plannedRestarts24h) { <span class="text-[11px] text-[color:var(--text-muted)]"> ({{ s.plannedRestarts24h }} planned)</span> }</td>
+                <td class="whitespace-nowrap" data-test="version">
+                  @if (s.version) {
+                    <span class="mono text-xs">{{ s.version }}</span>
+                    @if (s.branch) { <span class="text-[11px] text-[color:var(--text-muted)]"> {{ s.branch }}</span> }
+                    @if (s.deployedAt) { <div class="text-[11px] text-[color:var(--text-muted)]">deployed {{ s.deployedAt | serverTime:'recent' }}@if ((s.deploys24h ?? 0) > 1) { · {{ s.deploys24h }} deploys in 24 h }</div> }
+                    @if (note(s); as n) { <div class="text-[11px] font-medium" [class.text-crit-500]="n.tone === 'crit'" [class.text-warn-500]="n.tone === 'warn'" [class.note-info]="n.tone === 'info'" data-test="deploy-note">{{ n.text }}</div> }
+                  } @else { <span class="text-[color:var(--text-muted)]" title="Recorded by scripts/deploy.sh from the service's next deploy">—</span> }
+                </td>
                 <td class="whitespace-nowrap text-[color:var(--text-secondary)]">{{ s.startedAt ? (s.startedAt | serverTime:'recent') : '—' }}</td>
+                <td class="text-right tabular whitespace-nowrap" [class.text-warn-500]="unplanned(s) > 0" [attr.data-planned]="s.plannedRestarts24h ?? 0">
+                  {{ s.restarts24h ?? '—' }}
+                  @if (s.restarts24h) { <div class="text-[11px] text-[color:var(--text-muted)]">{{ s.plannedRestarts24h ?? 0 }} planned · {{ unplanned(s) }} unplanned</div> }
+                </td>
+                <td class="text-right tabular whitespace-nowrap" [class.text-crit-500]="rate(s).bad" data-test="error-rate">{{ rate(s).text }}</td>
               </tr>
             } @empty {
-              <tr><td colspan="10" class="text-center text-[color:var(--text-muted)] py-4">{{ loading() ? 'Reading the services…' : 'No sample yet: the first comes within a minute of Core starting.' }}</td></tr>
+              <tr><td colspan="6" class="text-center text-[color:var(--text-muted)] py-4">{{ loading() ? 'Reading the services…' : 'No sample yet: the first comes within a minute of Core starting.' }}</td></tr>
             }
           </tbody>
         </table>
       </div>
 
-      <section class="card chart-card" aria-labelledby="health-chart-title" data-test="health-chart">
-        <div class="flex flex-wrap items-center gap-2">
-          <h3 class="chart-title m-0" id="health-chart-title">The last 24 hours</h3>
-          <span class="chart-sub">{{ metricLabel() }}, every {{ health()?.bucketMinutes ?? 15 }} minutes, one line a service</span>
-          <app-segmented class="ml-auto" ariaLabel="Figure" [options]="metricOptions" [value]="metric()" (valueChange)="metric.set($event)" />
+      <div class="card rel-table-wrap" data-test="background-checks">
+        <div class="px-4 py-3 border-b border-subtle">
+          <h2 class="text-sm font-semibold m-0">Background checks</h2>
+          <p class="text-xs text-[color:var(--text-muted)] m-0">Read on their own schedule; a failing check raises an alert through its rule below.</p>
         </div>
-        <app-echart [option]="option()" [theme]="theme().ref" [height]="260" [label]="metricLabel() + ' over the last 24 hours'" />
-        @if (deploys().length) {
-          <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs mt-1" data-test="planned-deploys">
-            <span class="font-medium text-[color:var(--text-secondary)]" title="Announced by scripts/deploy.sh: a restart or unhealthy minute of that service inside its window raises no alert. Dashed on the chart.">Planned deploys</span>
-            @for (d of deploys(); track d.service + d.start) {
-              <span class="whitespace-nowrap" [attr.data-service]="d.service" [attr.data-state]="d.state">
-                <span class="font-medium">{{ d.service }}</span>
-                <span class="text-[color:var(--text-secondary)]"> {{ d.start | serverTime:'recent' }}, {{ length(d) }}</span>
-                @if (d.outcome === 'failed') { <span class="text-crit-500"> · failed</span> }
-                @if (d.state === 'expired') { <span class="text-warn-500" title="The deploy never ended its window; it ran out at its maximum."> · expired</span> }
-              </span>
+        <table class="table-modern">
+          <thead><tr><th>Check</th><th>Result</th><th>What it found</th><th class="text-right">Read</th></tr></thead>
+          <tbody>
+            @for (c of checks(); track c.name) {
+              <tr [attr.data-check]="c.name">
+                <td class="font-medium whitespace-nowrap">{{ c.name }}</td>
+                <td class="whitespace-nowrap"><span class="dot" [class]="'dot dot-' + c.tone"></span>{{ c.result }}</td>
+                <td class="text-[color:var(--text-secondary)]">{{ c.detail || '—' }}</td>
+                <td class="text-right whitespace-nowrap text-[color:var(--text-secondary)]">{{ c.readAt ? (c.readAt | serverTime:'recent') : '—' }}@if (c.every) { <div class="text-[11px] text-[color:var(--text-muted)]">{{ c.every }}</div> }</td>
+              </tr>
             }
-          </div>
-        }
-      </section>
-
-      <div class="probe-grid" data-test="health-probes">
-        <div class="card p-4">
-          <h3 class="chart-title m-0">Disk</h3>
-          @if (disk(); as d) {
-            <p class="text-2xl font-semibold m-0 mt-1 tabular" [class.text-crit-500]="(d.reading ?? 100) < 10">{{ d.reading | number:'1.0-1' }}% free</p>
-            <p class="text-xs text-[color:var(--text-secondary)] m-0 mt-1">{{ d.detail }}</p>
-          } @else { <p class="text-sm text-[color:var(--text-muted)] m-0 mt-1">Not read yet.</p> }
-        </div>
-        <div class="card p-4">
-          <h3 class="chart-title m-0">Kafka consumers</h3>
-          @if (lagging().length) {
-            <ul class="list-none m-0 mt-1 p-0 text-sm">
-              @for (p of lagging(); track p.probe) {
-                <li class="flex justify-between gap-2"><span class="truncate" [title]="p.probe">{{ group(p) }}</span>
-                  <span class="tabular" [class.text-crit-500]="(p.reading ?? 0) >= 1000">{{ p.reading | number:'1.0-0' }} behind</span></li>
-              }
-            </ul>
-          } @else { <p class="text-sm text-[color:var(--text-secondary)] m-0 mt-1">{{ kafkaRead() ? 'Every consumer group is caught up.' : 'Not read yet.' }}</p> }
-        </div>
-        <div class="card p-4">
-          <h3 class="chart-title m-0">Billing reconciliation</h3>
-          @if (billing(); as b) {
-            <p class="text-sm font-medium m-0 mt-1" [class.text-crit-500]="!b.ok">{{ b.ok ? 'Agrees' : 'Does not agree' }}</p>
-            <p class="text-xs text-[color:var(--text-secondary)] m-0 mt-1">{{ b.detail }}</p>
-            <p class="text-xs text-[color:var(--text-muted)] m-0 mt-1">Read {{ b.readAt | serverTime:'recent' }}, hourly.</p>
-          } @else { <p class="text-sm text-[color:var(--text-muted)] m-0 mt-1">Not read yet (hourly).</p> }
-        </div>
+          </tbody>
+        </table>
       </div>
 
       <h2 class="text-lg font-semibold m-0 mt-2">Platform alerts</h2>
@@ -207,39 +196,29 @@ export function unplannedRestarts(s: ServiceHealth): number {
 })
 export class PlatformHealthView implements OnInit, OnDestroy {
   private readonly api = inject(AlertsApi);
-  private readonly themes = inject(ChartThemes);
   private timer?: ReturnType<typeof setInterval>;
 
   readonly health = signal<PlatformHealth | null>(null);
   readonly loading = signal(true);
   readonly error = signal('');
-  readonly metric = signal<HealthMetric>('requestsPerMin');
-  readonly metricOptions: SegmentOption<HealthMetric>[] = (Object.keys(METRIC_LABEL) as HealthMetric[]).map(id => ({ id, label: METRIC_LABEL[id] }));
-  readonly theme = computed(() => this.themes.resolve(CONSOLE_THEME));
 
   readonly services = computed(() => this.health()?.services ?? []);
-  readonly deploys = computed(() => this.health()?.deploys ?? []);
-  readonly metricLabel = computed(() => METRIC_LABEL[this.metric()]);
-  readonly option = computed(() => {
-    const t = this.theme();
-    return healthOption(this.services(), this.metric(), t.palette, t.tokens.textSecondary, t.tokens.border, this.health()?.asOf, this.deploys());
-  });
+  readonly upCount = computed(() => this.services().filter(s => s.status === 'UP').length);
+  readonly unplannedTotal = computed(() => this.services().reduce((n, s) => n + unplannedRestarts(s), 0));
+  readonly erroring = computed(() => this.services().filter(s => errorRate(s).bad));
   readonly summary = computed(() => {
     const all = this.services();
     if (!all.length) return '';
-    const up = all.filter(s => s.status === 'UP').length;
-    return up === all.length ? `All ${all.length} up.` : `${up} of ${all.length} up.`;
+    return this.upCount() === all.length ? `All ${all.length} up.` : `${this.upCount()} of ${all.length} up.`;
   });
+  readonly asOfFoot = computed(() => (this.health() ? 'sampled each minute' : 'not sampled yet'));
   private readonly probes = computed(() => this.health()?.probes ?? []);
-  readonly disk = computed(() => this.probes().find(p => p.probe.startsWith('disk:')) ?? null);
-  readonly billing = computed(() => this.probes().find(p => p.probe === 'billing-reconcile') ?? null);
-  readonly kafkaRead = computed(() => this.probes().some(p => p.probe.startsWith('kafka-lag:')));
-  readonly lagging = computed(() => this.probes().filter(p => p.probe.startsWith('kafka-lag:') && (p.reading ?? 0) > 0)
-    .sort((a, b) => (b.reading ?? 0) - (a.reading ?? 0)).slice(0, 8));
+  readonly checks = computed(() => backgroundChecks(this.probes()));
+  readonly checksFailing = computed(() => this.checks().filter(c => c.ok === false).length);
 
   ngOnInit(): void {
     this.load();
-    // The samples are a minute apart: reading them again each minute keeps an open page current, and costs five statements.
+    // The samples are a minute apart: reading them again each minute keeps an open page current.
     this.timer = setInterval(() => this.load(), 60_000);
   }
 
@@ -249,7 +228,7 @@ export class PlatformHealthView implements OnInit, OnDestroy {
 
   load(): void {
     this.loading.set(true);
-    this.api.health(15).subscribe({
+    this.api.health().subscribe({
       next: r => {
         this.loading.set(false);
         if (r?.status === API_SUCCESS && r.data) { this.health.set(r.data); this.error.set(''); }
@@ -263,7 +242,7 @@ export class PlatformHealthView implements OnInit, OnDestroy {
 
   unplanned(s: ServiceHealth): number { return unplannedRestarts(s); }
 
-  length(d: PlannedDeploy): string { return deployLength(d); }
+  rate(s: ServiceHealth) { return errorRate(s); }
 
-  group(p: Probe): string { return p.probe.replace(/^kafka-lag:/, ''); }
+  note(s: ServiceHealth) { return deployNote(s); }
 }

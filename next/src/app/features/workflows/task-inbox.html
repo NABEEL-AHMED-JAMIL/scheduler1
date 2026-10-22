@@ -8,7 +8,7 @@
           <p class="page-subtitle">What you asked for, newest first, and where each request stands. Open one to see its history.</p>
         } @else {
           <h1 class="page-title">Approvals</h1>
-          <p class="page-subtitle">Approval steps and tasks for you or your groups, run reviews among them, the soonest due first. Open one to see the request, its history, and decide.</p>
+          <p class="page-subtitle">Approval steps and tasks for you or your teams, run reviews among them, the soonest due first. Open one to see the request, its history, and decide.</p>
         }
       </div>
       <div class="flex items-center gap-2 flex-wrap">
@@ -27,8 +27,8 @@
     <div class="card p-10 flex flex-col items-center text-center gap-2" data-test="needs-workspace">
       <app-icon name="layers" size="1.5rem" class="icon-muted" />
       <p class="text-sm text-[color:var(--text-primary)]">Workflows belong to a workspace, and this sign-in has none.</p>
-      <p class="text-sm text-[color:var(--text-secondary)]">Open the workspace from Work in a workspace to design its workflows or decide its tasks.</p>
-      <a routerLink="/platform/work-in-workspace" class="btn btn-default btn-sm mt-2"><app-icon name="external" />Work in a workspace</a>
+      <p class="text-sm text-[color:var(--text-secondary)]">Open the workspace with "Work in this workspace" on Platform › Workspaces to design its workflows or decide its tasks.</p>
+      <a routerLink="/platform/workspaces" class="btn btn-default btn-sm mt-2"><app-icon name="external" />Choose a workspace</a>
     </div>
   } @else {
   <!-- UX review DR2 (2026-10-13): the runs waiting for an administrator's review are Review's own tab (Runs) and in All
@@ -37,13 +37,20 @@
     <button type="button" class="tab" role="tab" [attr.aria-selected]="tab() === 'mine'" [class.tab-active]="tab() === 'mine'" (click)="pick('mine')" data-test="tab-mine">
       <app-icon name="inbox" />Waiting for me
       <span class="pill" [class.pill-crit]="mineOverdue()" [class.pill-neutral]="!mineOverdue()">{{ mineCount() }}</span></button>
-    <button type="button" class="tab" role="tab" [attr.aria-selected]="tab() === 'groups'" [class.tab-active]="tab() === 'groups'" (click)="pick('groups')" data-test="tab-groups">
-      <app-icon name="users" />My groups <span class="pill pill-neutral">{{ groupsCount() }}</span></button>
+    <button type="button" class="tab" role="tab" [attr.aria-selected]="tab() === 'teams'" [class.tab-active]="tab() === 'teams'" (click)="pick('teams')" data-test="tab-teams">
+      <app-icon name="users" />My teams <span class="pill pill-neutral">{{ teamsCount() }}</span></button>
     <button type="button" class="tab" role="tab" [attr.aria-selected]="tab() === 'done'" [class.tab-active]="tab() === 'done'" (click)="pick('done')" data-test="tab-done">
       <app-icon name="checkCircle" />Done <span class="pill pill-neutral">{{ doneCount() }}</span></button>
-    <button type="button" class="tab" role="tab" [attr.aria-selected]="tab() === 'requests'" [class.tab-active]="tab() === 'requests'" (click)="pick('requests')" data-test="tab-requests">
-      <app-icon name="send" />My requests <span class="pill pill-neutral">{{ requestsCount() }}</span></button>
+    @if (showsRequests()) {
+      <button type="button" class="tab" role="tab" [attr.aria-selected]="tab() === 'requests'" [class.tab-active]="tab() === 'requests'" (click)="pick('requests')" data-test="tab-requests">
+        <app-icon name="send" />My requests <span class="pill pill-neutral">{{ requestsCount() }}</span></button>
+    }
   </div>
+  @if (tab() === 'teams') {
+    <!-- F4: who is in the reader's teams (a team's lead changes its members there). -->
+    <p class="text-xs text-[color:var(--text-muted)]" data-test="teams-link">Tasks for the teams you are in.
+      <a class="link-inline" routerLink="/administration/teams">See who is in your teams</a></p>
+  }
 
   @if (error()) {
     <!-- Review 2026-10-07 (M14): a list that could not be read offers to read it again where the reader is looking. -->
@@ -134,13 +141,13 @@
             @else if (hasFilters()) { Nothing matches. <button type="button" class="link-inline" (click)="clearFilters()">Clear filters</button> }
             @else if (tab() === 'mine') {
               Nothing is waiting for you.
-              <!-- UX review 2026-10-12 (G10, W1): the work waiting for your groups is one click away. -->
-              @if (groupsWaiting()) {
-                <div class="mt-3"><button type="button" class="btn btn-primary btn-sm" (click)="pick('groups')" data-test="see-groups">
-                  <app-icon name="users" />See what waits for your groups ({{ groupsCount() }})</button></div>
+              <!-- UX review 2026-10-12 (G10, W1): the work waiting for your teams is one click away. -->
+              @if (teamsWaiting()) {
+                <div class="mt-3"><button type="button" class="btn btn-primary btn-sm" (click)="pick('teams')" data-test="see-teams">
+                  <app-icon name="users" />See what waits for your teams ({{ teamsCount() }})</button></div>
               }
             }
-            @else if (tab() === 'groups') { Nothing is waiting for your groups. }
+            @else if (tab() === 'teams') { Nothing is waiting for your teams. }
             @else if (tab() === 'requests') { You have not started any request. }
             @else { You have not acted on any task yet. }
           </div>
@@ -181,16 +188,24 @@
                 <span class="pill" [class.pill-crit]="d.overdue && d.state === 'Open'" [class.pill-neutral]="!d.overdue || d.state !== 'Open'"><app-icon name="clock" size="0.9em" />{{ dueLabel(d) }}</span>
               }
               @if (d.standingInFor) { <span class="pill pill-neutral">Standing in for {{ name(d.standingInFor) }}</span> }
+              @if (d.onlyTheRequesterCould) { <span class="pill pill-warn" data-test="only-requester-pill"><app-icon name="shield" size="0.9em" />Only the requester could decide</span> }
             </div>
+            @if (d.managedNote) {
+              <p class="text-sm text-[color:var(--text-secondary)] mt-2 flex items-start gap-1.5" data-test="managed-note"><app-icon name="info" size="0.95em" class="mt-0.5 shrink-0" /><span>{{ d.managedNote }}</span></p>
+            }
           </div>
 
           @if (canDecide()) {
             <div class="inbox-actions" data-test="action-bar">
-              <div class="inbox-comment">
-                <label class="sr-only" for="task-comment">Comment</label>
-                <textarea id="task-comment" class="input resize-y" rows="1" [ngModel]="comment()" (ngModelChange)="comment.set($event)"
-                          [placeholder]="d.rejectNeedsComment ? 'Comment: say why, if you reject it (required)' : 'Comment: a note for the requester (optional)'"></textarea>
-              </div>
+              <!-- A Report Studio review is decided in its card, with the card's note: the bar's comment is only Pass on's note then. -->
+              @if (!decidedInStudio(d) || passing()) {
+                <div class="inbox-comment">
+                  <label class="sr-only" for="task-comment">Comment</label>
+                  <textarea id="task-comment" class="input resize-y" rows="1" [ngModel]="comment()" (ngModelChange)="comment.set($event)"
+                            [placeholder]="decidedInStudio(d) || passing() ? 'Note for the person you pass it to (optional)'
+                              : d.rejectNeedsComment ? 'Comment: say why, if you reject it (required)' : 'Comment: a note for the requester (optional)'"></textarea>
+                </div>
+              }
               @if (passing()) {
                 <div class="flex items-end gap-2 flex-wrap" data-test="pass-on">
                   <div class="min-w-64 flex-1">
@@ -203,7 +218,9 @@
                 </div>
               } @else {
                 <div class="inbox-buttons" data-test="decisions">
-                  @if (d.stepType === 'approval') {
+                  @if (decidedInStudio(d)) {
+                    <span class="text-sm text-[color:var(--text-secondary)]" data-test="decided-in-card">Approve or reject it in the card below.</span>
+                  } @else if (d.stepType === 'approval') {
                     <button type="button" class="btn btn-primary" [disabled]="busy()" (click)="decide('approve')"><app-icon name="check" />Approve</button>
                     <button type="button" class="btn btn-default" [disabled]="busy()" (click)="decide('reject')"><app-icon name="close" />Reject</button>
                     <button type="button" class="btn btn-default" [disabled]="busy()" (click)="decide('changes')"><app-icon name="chat" />Ask for changes</button>
@@ -215,7 +232,11 @@
               }
               <p class="inbox-rule" data-test="decision-rule">
                 <app-icon name="info" size="0.95em" />
-                @if (d.stepType === 'approval') {
+                @if (passing()) {
+                  The task moves to the person you pick, with your note, and leaves your list; the request's history records who passed it.
+                } @else if (decidedInStudio(d)) {
+                  Report Studio records the decision: it checks who may approve and signs the PDF. Pass it on here.
+                } @else if (d.stepType === 'approval') {
                   {{ d.rejectNeedsComment ? 'Rejecting needs a comment saying why; asking for changes needs one saying what.' : 'Asking for changes needs a comment saying what should change.' }}
                 } @else {
                   A comment is optional.
@@ -229,8 +250,8 @@
               <app-icon name="info" size="0.95em" class="mt-0.5 shrink-0" />
               <!-- P2 #36: in a one-person workspace there is no one else, and the request would wait for ever. -->
               @if (aloneInWorkspace()) {
-                <span>This is your own request, and no one may approve their own. You are the only person in this workspace, so it waits
-                  until someone else joins: add a person under Administration › Users, then they decide it from Review › Approvals.</span>
+                <span>This is your own request, and no one may approve their own. No one else in this workspace can approve it; the
+                  platform administrator will decide it. Or add a person under Administration › Users, and they decide it from Review › Approvals.</span>
               } @else {
                 <span>This is your own request: someone else decides it.</span>
               }
@@ -238,7 +259,19 @@
           }
 
           <div class="inbox-detail-body">
-            @if (taskFields().length) {
+            <!-- Owner 2026-10-20: a run's review shows what is reviewed (image, DRAFT answer, truth, measurements, PDF) here. -->
+            <!-- Owner 2026-10-21: a pipeline step's approval shows the step, what it asks, and the rows it holds -- not its raw subject. -->
+            @if (stepApproval(d) && d.subject) {
+              <app-pipeline-approval-card [subject]="d.subject" [open]="d.state === 'Open'" />
+            } @else if (runOf(d); as run) {
+              <app-run-review-card [jobQueueId]="run.jobQueueId" [attempt]="run.attempt" [link]="run.link" />
+            }
+            <!-- Report Studio phase 7: what is reviewed (the report's pages, the draft, the picture) and its decision. -->
+            @if (decidedInStudio(d) && d.subjectId) {
+              <app-report-review-card [subjectId]="d.subjectId" [taskId]="d.state === 'Open' ? d.id : null" (decided)="onStudioDecided(d.id, $event)" (refused)="toast.error($event)" />
+            }
+            <!-- The review card shows what the request names (the report, its version, who asked); its raw fields would repeat it. -->
+            @if (taskFields().length && !decidedInStudio(d) && !stepApproval(d)) {
               <section aria-labelledby="task-details-title">
                 <h3 class="section-title mb-3" id="task-details-title">Request details</h3>
                 <ng-container *ngTemplateOutlet="fieldList; context: { $implicit: taskFields() }" />

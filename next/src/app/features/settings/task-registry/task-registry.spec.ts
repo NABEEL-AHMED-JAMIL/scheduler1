@@ -2,16 +2,17 @@ import { describe, it, expect, vi } from 'vitest';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
-import { DIALOG_DATA, Dialog, DialogRef } from '@angular/cdk/dialog';
-import { ActivatedRoute } from '@angular/router';
+import { Dialog } from '@angular/cdk/dialog';
+import { ActivatedRoute, Router } from '@angular/router';
 import { Observable, of } from 'rxjs';
 import { AuthService } from '../../../core/auth/auth.service';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { StepTaskEntry } from '../../tasks/steps/steps.model';
-import { PipelineDialog } from '../pipelines/pipeline-dialog';
+import { TaskUsagePanel } from './task-usage-panel';
+import { WorkspaceDirectory } from '../../../core/workspaces/workspace-directory';
 import { TaskPanel } from './task-panel';
 import { TaskRegistry } from './task-registry';
-import { CREATE_DATA, DUPLICATE_DATA, EDIT_DATA, LEGACY_FIELDS, LEGACY_ROW, SAVE_REQUEST } from './legacy-save.golden';
+import { LEGACY_FIELDS, LEGACY_ROW } from './legacy-save.golden';
 
 const ROWS = { type: 'array', items: { type: 'object' } };
 const TASKS: StepTaskEntry[] = [
@@ -26,12 +27,17 @@ const TASKS: StepTaskEntry[] = [
 const OTHER = { pipelineKey: 100175, pipelineId: 'UI_CHECK_STEPS_0928', pipelineName: 'UI-CHECK step engine 0928', sourceTaskTypeId: 11831,
   topicName: 'service-1 reference worker', status: 'Inactive', fieldCount: 1, requiredCount: 0 };
 
+const USAGE = { since: '2026-10-01T05:00:00Z', month: '2026-10', tasks: [{ code: 'filter', pipelines: 3, runs: 41 }],
+  legacy: [{ pipelineKey: 100167, pipelines: 1, runs: 2 }] };
+
 interface Setup {
+  usage?: () => Observable<any>;
   tasks?: () => Observable<any>;
   list?: () => Observable<any>;
   del?: () => Observable<any>;
   topic?: string | null;
   role?: 'TENANT_ADMIN' | 'PLATFORM_ADMIN';
+  tenant?: number | null;
 }
 
 function screenWith(setup: Setup = {}) {
@@ -45,9 +51,11 @@ function screenWith(setup: Setup = {}) {
     if (url.endsWith('/pipeline.json/list')) return setup.list?.() ?? of({ status: 'SUCCESS', data: { rows: [structuredClone(LEGACY_ROW), structuredClone(OTHER)],
       summary: { total: 2, active: 1, fields: 5, topics: 1, untopped: 0 } } });
     if (url.endsWith('/pipeline.json/fields')) return of({ status: 'SUCCESS', data: structuredClone(LEGACY_FIELDS) });
+    if (url.endsWith('/pipeline.json/steps/tasks/usage')) return setup.usage?.() ?? of({ status: 'SUCCESS', data: structuredClone(USAGE) });
     return of({ status: 'SUCCESS', data: [] });
   });
   const role = setup.role ?? 'TENANT_ADMIN';
+  const navigate = vi.fn();
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
     providers: [
@@ -58,6 +66,8 @@ function screenWith(setup: Setup = {}) {
         return { closed: of(answers.shift()) };
       } } },
       { provide: ToastService, useValue: toast },
+      { provide: Router, useValue: { navigate } },
+      { provide: WorkspaceDirectory, useValue: { remembered: () => setup.tenant ?? null, names: () => new Map() } },
       { provide: AuthService, useValue: { isPlatformAdmin: () => role === 'PLATFORM_ADMIN', isTenantAdmin: () => true, user: () => null, builderLocked: () => false } },
       { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: { get: (k: string) => (k === 'topic' ? setup.topic ?? null : null) } } } },
     ],
@@ -65,7 +75,7 @@ function screenWith(setup: Setup = {}) {
   const screen = TestBed.runInInjectionContext(() => new TaskRegistry());
   screen.ngOnInit();
   TestBed.tick();
-  return { screen, opened, answers, toast, gets };
+  return { screen, opened, answers, toast, gets, navigate };
 }
 
 describe('Task Registry -- the list', () => {
@@ -78,7 +88,7 @@ describe('Task Registry -- the list', () => {
     expect(screen.counts()).toEqual({ '': 5, Read: 1, Process: 1, Output: 1, Legacy: 2 });
     // The pipelines come whole: kind, state and search are this page's own.
     expect(gets.find(g => g.url.endsWith('/pipeline.json/list'))!.params).toEqual({ page: '1', limit: '1000' });
-    expect(screen.taskTiles()).toEqual({ total: 3, on: 2, unavailable: 1 });
+    expect(screen.taskTiles()).toEqual({ total: 3, on: 2, unavailable: 1, blocked: 0, inUse: 1 });
   });
 
   it('narrows by kind, state and search, back to page one', () => {
@@ -126,52 +136,30 @@ describe('Task Registry -- a row\'s panel', () => {
     expect(screen.rows().find(r => r.code === 'filter')).toMatchObject({ state: 'Off', overridden: true });
   });
 
-  it('opens a Legacy row with its fields, and Edit pipeline opens the pipeline dialog as the list did', async () => {
-    const { screen, opened, answers } = screenWith();
+  it('opens a Legacy row with its fields, and Edit registry task opens its own page', async () => {
+    const { screen, opened, answers, navigate } = screenWith();
     answers.push('edit');
     await screen.open(screen.rows().find(r => r.code === 'REF_CSV_CHECK_V1')!);
     await Promise.resolve();
     expect(opened[0].config.data.row.pipeline.fields).toEqual(LEGACY_FIELDS);
-    expect(opened[1].component).toBe(PipelineDialog);
-    expect(opened[1].config).toEqual({ data: EDIT_DATA });
+    expect(navigate).toHaveBeenCalledWith(['/settings/task-registry', 100167]);
   });
 });
 
-describe('Task Registry -- a Legacy row saves exactly as the Pipelines list did (legacy-save.golden.ts)', () => {
-  it('Edit hands the dialog the same pipeline, fields and all', async () => {
-    const { screen, opened } = screenWith();
-    await screen.edit(screen.rows().find(r => r.code === 'REF_CSV_CHECK_V1')!.pipeline!);
-    expect(opened[0].component).toBe(PipelineDialog);
-    expect(opened[0].config).toEqual({ data: EDIT_DATA });
-  });
-
-  it('and the dialog, saved untouched, POSTs the same request, byte for byte', async () => {
-    const { screen, opened } = screenWith();
-    await screen.edit(screen.rows().find(r => r.code === 'REF_CSV_CHECK_V1')!.pipeline!);
-    const post = vi.fn((_url: string, _body: unknown) => of({ status: 'SUCCESS', message: 'Saved.' }));
-    const error = vi.fn();
-    TestBed.resetTestingModule();
-    TestBed.configureTestingModule({
-      providers: [
-        { provide: DIALOG_DATA, useValue: opened[0].config.data },
-        { provide: DialogRef, useValue: { close: vi.fn() } },
-        { provide: HttpClient, useValue: { post, get: () => of({ status: 'SUCCESS', data: [] }) } },
-        { provide: ToastService, useValue: { success: vi.fn(), error, info: vi.fn() } },
-      ],
-    });
-    TestBed.runInInjectionContext(() => new PipelineDialog()).save();
-    expect(error).not.toHaveBeenCalled();
-    expect(post).toHaveBeenCalledTimes(1);
-    expect(post.mock.calls[0][0]).toBe(SAVE_REQUEST.url);
-    expect(JSON.stringify(post.mock.calls[0][1])).toBe(JSON.stringify(SAVE_REQUEST.body));
-  });
-
-  it('Duplicate and New registry task hand it what they did', async () => {
-    const { screen, opened } = screenWith();
-    await screen.duplicate(screen.rows().find(r => r.code === 'REF_CSV_CHECK_V1')!.pipeline!);
+/** Owner #18: New, Edit and Duplicate are the registry task's own page (registry-task-editor.spec.ts holds its save). */
+describe('Task Registry -- a Legacy row opens its own page', () => {
+  it('Edit, Duplicate and New registry task go to their addresses', () => {
+    const { screen, navigate, opened } = screenWith();
+    const row = screen.rows().find(r => r.code === 'REF_CSV_CHECK_V1')!.pipeline!;
+    screen.edit(row);
+    screen.duplicate(row);
     screen.create();
-    expect(JSON.parse(JSON.stringify(opened[0].config.data))).toEqual(DUPLICATE_DATA);
-    expect(opened[1].config.data).toEqual(CREATE_DATA);
+    expect(navigate.mock.calls).toEqual([
+      [['/settings/task-registry', 100167]],
+      [['/settings/task-registry/new'], { queryParams: { copyOf: 100167 } }],
+      [['/settings/task-registry/new']],
+    ]);
+    expect(opened).toEqual([]);
   });
 
   it('asks to "Delete pipeline", and names the pipeline when it cannot', async () => {
@@ -181,6 +169,73 @@ describe('Task Registry -- a Legacy row saves exactly as the Pipelines list did 
     expect(opened[0].config.data.confirmLabel).toBe('Delete pipeline');
     expect(opened[0].config.data.danger).toBe(true);
     expect(toast.error).toHaveBeenCalledWith('The pipeline could not be deleted.');
+  });
+});
+
+/** Owner #17: each row's pipelines and runs this month, Core's counts; a count opens the list, zero is zero. */
+describe('Task Registry -- usage counts', () => {
+  it('reads the counts once and shows them by row, zero where Core has none', () => {
+    const { screen, gets } = screenWith();
+    expect(gets.filter(g => g.url.endsWith('/pipeline.json/steps/tasks/usage'))).toHaveLength(1);
+    const filter = screen.rows().find(r => r.code === 'filter')!;
+    expect(screen.countOf(filter)).toEqual({ code: 'filter', pipelines: 3, runs: 41 });
+    expect(screen.countOf(screen.rows().find(r => r.code === 'REF_CSV_CHECK_V1')!)).toMatchObject({ pipelines: 1, runs: 2 });
+    expect(screen.countOf(screen.rows().find(r => r.code === 'sample')!)).toEqual({ pipelines: 0, runs: 0 });
+    expect(screen.monthLabel()).toBe('Oct');
+  });
+
+  it('a count opens its list in the drawer: a task by code, a Legacy row by its pipeline', () => {
+    const { screen, opened } = screenWith();
+    screen.openUsage(screen.rows().find(r => r.code === 'filter')!, 'runs');
+    screen.openUsage(screen.rows().find(r => r.code === 'REF_CSV_CHECK_V1')!, 'pipelines');
+    expect(opened[0].component).toBe(TaskUsagePanel);
+    expect(opened[0].config.data).toMatchObject({ list: 'runs', of: { code: 'filter' }, count: 41, tenantId: null });
+    expect(opened[1].config.data).toMatchObject({ list: 'pipelines', of: { pipelineKey: 100167 }, count: 1 });
+  });
+
+  it('says when the counts cannot be read', () => {
+    const { screen } = screenWith({ usage: () => of({ status: 'ERROR', message: 'Core is restarting.' }) });
+    expect(screen.usageError()).toBe('Core is restarting.');
+    expect(screen.countOf(screen.rows().find(r => r.code === 'filter')!)).toEqual({ pipelines: 0, runs: 0 });
+  });
+});
+
+/** Owner #16: a platform administrator controls each task for the workspace chosen in the shared selector. */
+describe('Task Registry -- the platform\'s control per workspace', () => {
+  it('asks for the chosen workspace\'s registry and counts, and offers the control only with one chosen', () => {
+    const { screen, gets } = screenWith({ role: 'PLATFORM_ADMIN', tenant: 2960 });
+    expect(gets.find(g => g.url.endsWith('/pipeline.json/steps/tasks'))!.params).toEqual({ tenantId: 2960 });
+    expect(gets.find(g => g.url.endsWith('/pipeline.json/steps/tasks/usage'))!.params).toEqual({ tenantId: 2960 });
+    expect(screen.canControl()).toBe(true);
+    expect(screen.canSwitch()).toBe(false);
+    const none = screenWith({ role: 'PLATFORM_ADMIN', tenant: null });
+    expect(none.screen.canControl()).toBe(false);
+  });
+
+  it('blocks a task with a reason, and shows Core\'s answer on the row', async () => {
+    const { screen, opened, answers, toast } = screenWith({ role: 'PLATFORM_ADMIN', tenant: 2960 });
+    const post = TestBed.inject(HttpClient).post as unknown as ReturnType<typeof vi.fn>;
+    post.mockReturnValue(of({ status: 'SUCCESS', message: 'Filter is blocked for this workspace.',
+      data: { ...TASKS[0], enabled: false, blocked: true, blockReason: 'Under review', disabledReason: 'Blocked for this workspace by a platform administrator: Under review' } }));
+    answers.push('Under review');
+    const select = { value: 'blocked' } as HTMLSelectElement;
+    await screen.setPlatform(screen.rows().find(r => r.code === 'filter')!.task, select);
+    expect(opened[0].config.data.confirmLabel).toBe('Block task');
+    expect(post).toHaveBeenCalledWith(expect.stringContaining('/pipeline.json/steps/tasks/platformState'),
+      { code: 'filter', state: 'blocked', reason: 'Under review' }, { params: { tenantId: 2960 } });
+    expect(toast.success).toHaveBeenCalled();
+    expect(screen.rows().find(r => r.code === 'filter')!).toMatchObject({ state: 'Blocked' });
+    expect(screen.platformValue(screen.rows().find(r => r.code === 'filter')!.task)).toBe('blocked');
+  });
+
+  it('a block that is cancelled changes nothing', async () => {
+    const { screen, answers } = screenWith({ role: 'PLATFORM_ADMIN', tenant: 2960 });
+    const post = TestBed.inject(HttpClient).post as unknown as ReturnType<typeof vi.fn>;
+    answers.push(null);
+    const select = { value: 'blocked' } as HTMLSelectElement;
+    await screen.setPlatform(screen.rows().find(r => r.code === 'filter')!.task, select);
+    expect(post).not.toHaveBeenCalled();
+    expect(select.value).toBe('default');
   });
 });
 
@@ -197,6 +252,16 @@ describe('Task Registry -- the workspace\'s task switches', () => {
     expect(post).toHaveBeenCalledWith(expect.stringContaining('/pipeline.json/steps/tasks/enabled'), { code: 'filter', enabled: false });
     expect(toast.success).toHaveBeenCalled();
     expect(screen.rows().find(r => r.code === 'filter')!).toMatchObject({ state: 'Off', overridden: true });
+  });
+
+  it('shows a task a platform administrator blocked as Blocked, with who and why, and its switch locked', () => {
+    const blocked = { ...TASKS[0], enabled: false, overridden: true, blocked: true, blockedBy: 4639, blockedByName: 'QA platform administrator',
+      blockedAt: '2026-10-19T22:00:00Z', blockReason: 'Under review', disabledReason: 'Blocked for this workspace by a platform administrator: Under review' };
+    const { screen } = screenWith({ tasks: () => of({ status: 'SUCCESS', data: [blocked, ...structuredClone(TASKS.slice(1))] }) });
+    const row = screen.rows().find(r => r.code === 'filter')!;
+    expect(row).toMatchObject({ state: 'Blocked', reason: 'Blocked for this workspace by a platform administrator: Under review' });
+    expect(screen.setBy(row.task)).toEqual({ who: expect.stringContaining('QA platform administrator'), at: '2026-10-19T22:00:00Z' });
+    expect(screen.taskTiles().blocked).toBe(1);
   });
 
   it('keeps the row as it was when Core refuses', () => {

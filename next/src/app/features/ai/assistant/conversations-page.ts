@@ -41,8 +41,17 @@ const DAYS: DayGroup[] = ['today', 'yesterday', 'week', 'older'];
     .cp-count { margin-left: auto; font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
     .cp-title { max-width: 28rem; }
     .cp-q { color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    /* The side list's row states (owner 2026-10-13): hover sinks the row; the selected one takes the accent's soft tint and
+       a 3 px mark inside its first cell, clear of the card's edge; keyboard focus alone draws a ring. */
     tr.cp-row { cursor: pointer; }
+    tr.cp-row:focus { outline: none; }
     tr.cp-row:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+    tr.cp-row > td:first-child { position: relative; }
+    tr.cp-row > td:first-child::before { content: ''; position: absolute; left: 0.25rem; top: 0.625rem; bottom: 0.625rem; width: 3px;
+      border-radius: var(--radius-full); background: transparent; }
+    tr.cp-row.row-selected > td { background: var(--row-selected-bg); }
+    tr.cp-row.row-selected .cp-q, tr.cp-row.row-selected .cp-muted { color: var(--text-secondary); }
+    tr.cp-row.row-selected > td:first-child::before { background: var(--accent-mark-strong); }
     .cp-detail { position: sticky; top: 1rem; }
     .cp-wide { display: none; }
     @media (min-width: 1024px) {

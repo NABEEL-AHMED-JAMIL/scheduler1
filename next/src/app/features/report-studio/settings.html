@@ -1,0 +1,116 @@
+<div class="page">
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Report settings</h1>
+        <p class="page-subtitle">Who approves reports and publishes templates, and what retention removes. The workspace's own.</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <app-refresh-button [loading]="loading()" (refresh)="load()" />
+        @if (settings()?.editable) {
+          <button type="button" class="btn btn-primary btn-sm" [disabled]="!dirty() || saving()" (click)="save()" data-test="settings-save"><app-icon name="check" />Save</button>
+        }
+      </div>
+    </div>
+  </app-page-header>
+
+  @if (workspaceOnly()) {
+    <app-empty-state class="card p-10" icon="settings" title="The workspace's own settings"
+                     message="Who approves reports, who publishes templates and what retention removes are set by each workspace's administrators, in their own console." />
+  } @else if (error()) {
+    <app-load-error [message]="error()" (retry)="load()" />
+  } @else if (settings(); as s) {
+    <div class="rss-grid">
+      <section class="card p-4" aria-labelledby="rss-approvals" data-test="settings-approvals">
+        <h2 class="section-title" id="rss-approvals">Approvals</h2>
+        <p class="text-sm text-[color:var(--text-muted)] mb-2">A report waiting for approval, and a signature or stamp waiting for approval, are tasks in these people's
+          <a routerLink="/review/approvals" class="link-inline">Review › Approvals</a>. Whoever generated a version never approves it, and only a report's current version is approved.</p>
+        <div class="rss-row">
+          <div>
+            <label class="label" for="rss-reviewers">Who approves</label>
+            <select id="rss-reviewers" class="input" [ngModel]="reviewers()" (ngModelChange)="reviewers.set($event)" [disabled]="!s.editable">
+              <option value="auto">Automatic: the team whose people may approve</option>
+              <option value="admins">The workspace administrators</option>
+              @for (t of teams(); track t.teamId) {
+                <option [value]="'team:' + t.teamId">The {{ t.name }} team</option>
+              }
+            </select>
+            <p class="rss-why mt-1" data-test="reviewers-now">{{ whoWords(s.resolved?.reviewers) }}</p>
+          </div>
+        </div>
+        <label class="rss-row">
+          <input type="checkbox" class="checkbox mt-1" [checked]="everyVersion()" (change)="everyVersion.set($any($event.target).checked)" [disabled]="!s.editable" data-test="every-version" />
+          <div><b class="text-sm">Ask for approval of every new version</b>
+            <p class="rss-why">Every version made, from the console or a pipeline, waits for approval by itself. Off: someone asks, on the report or when generating.</p></div>
+        </label>
+        <label class="rss-row">
+          <input type="checkbox" class="checkbox mt-1" [checked]="secondApprover()" (change)="secondApprover.set($any($event.target).checked)" [disabled]="!s.editable" data-test="second-approver" />
+          <div><b class="text-sm">Two approvals</b>
+            <p class="rss-why">A second person approves after the first; the PDF is signed then, naming both. Off by default.</p></div>
+        </label>
+      </section>
+
+      <section class="card p-4" aria-labelledby="rss-publishing" data-test="settings-publishing">
+        <h2 class="section-title" id="rss-publishing">Publishing templates</h2>
+        <p class="text-sm text-[color:var(--text-muted)] mb-2">"Ask for approval" in the designer is a task for these people: they publish the draft or send it back saying why.</p>
+        <div class="rss-row">
+          <div>
+            <label class="label" for="rss-publishers">Who publishes</label>
+            <select id="rss-publishers" class="input" [ngModel]="publishers()" (ngModelChange)="publishers.set($event)" [disabled]="!s.editable">
+              <option value="auto">Automatic: the team whose people may publish</option>
+              <option value="admins">The workspace administrators</option>
+              @for (t of teams(); track t.teamId) {
+                <option [value]="'team:' + t.teamId">The {{ t.name }} team</option>
+              }
+            </select>
+            <p class="rss-why mt-1">{{ whoWords(s.resolved?.publishers) }}</p>
+          </div>
+        </div>
+        <label class="rss-row">
+          <input type="checkbox" class="checkbox mt-1" [checked]="secondPerson()" (change)="secondPerson.set($any($event.target).checked)" [disabled]="!s.editable" data-test="second-person" />
+          <div><b class="text-sm">Publishing needs a second person</b>
+            <p class="rss-why">Nobody publishes a draft they edited last or asked to have published. Off by default: a publisher may publish their own.</p></div>
+        </label>
+      </section>
+    </div>
+
+    <section class="card p-4 mt-4" aria-labelledby="rss-retention" data-test="settings-retention">
+      <div class="flex flex-wrap items-end gap-3 mb-2">
+        <div class="min-w-0 flex-1">
+          <h2 class="section-title" id="rss-retention">What retention would remove</h2>
+          <p class="text-sm text-[color:var(--text-muted)]">The class Reports of the workspace's retention policy (<a routerLink="/administration/data-policies" class="link-inline">Data policies</a>):
+            the files of versions a newer one replaced, and the frozen data no kept version uses. Each report's current version, every approved or signed version,
+            a version waiting for approval, templates, assets and brand profiles always stay. Nothing is removed here.</p>
+        </div>
+        <label class="flex items-end gap-2"><span class="label">Older than (days)</span>
+          <input class="input w-28" type="number" min="1" max="36500" [ngModel]="days()" (ngModelChange)="days.set($event)" data-test="retention-days" /></label>
+        <button type="button" class="btn btn-default btn-sm" [disabled]="previewing() || !s.editable" (click)="runPreview()" data-test="retention-preview"><app-icon name="eye" />Preview</button>
+      </div>
+      @if (previewError()) { <p class="text-sm text-crit-500" role="alert">{{ previewError() }}</p> }
+      @if (preview(); as p) {
+        <p class="text-sm mb-2" data-test="retention-summary"><b>{{ p.count }}</b> item{{ p.count === 1 ? '' : 's' }} ({{ size(p.bytes) }}) of {{ p.total }} would go.
+          Kept for a rule: {{ p.kept.current }} current version{{ p.kept.current === 1 ? '' : 's' }}, {{ p.kept.approved }} approved or signed, {{ p.kept.waiting }} waiting for approval.</p>
+        @if (p.versions.length) {
+          <div class="overflow-x-auto"><table class="table rss-table" aria-label="Report versions whose files would go">
+            <thead><tr><th>Report</th><th>Version</th><th>Made</th><th class="text-right">Files</th></tr></thead>
+            <tbody>@for (v of p.versions; track v.reportId + v.version) {
+              <tr><td><a [routerLink]="['/reports/library', v.reportId]" class="link-inline">{{ v.reportLabel }}</a> {{ v.name }}</td><td>v{{ v.version }}</td>
+                <td class="whitespace-nowrap">{{ v.createdAt | rsTime: 'dateTime' }}</td><td class="text-right tabular">{{ size(v.bytes) }}</td></tr>
+            }</tbody></table></div>
+        }
+        @if (p.snapshots.length) {
+          <div class="overflow-x-auto mt-3"><table class="table rss-table" aria-label="Frozen data that would go">
+            <thead><tr><th>Frozen data</th><th>Why</th><th>Taken</th><th class="text-right">Size</th></tr></thead>
+            <tbody>@for (d of p.snapshots; track d.snapshotId) {
+              <tr><td class="max-w-80 truncate" [title]="d.label || ''">{{ d.label || 'Data' }}</td><td>{{ d.why }}</td>
+                <td class="whitespace-nowrap">{{ d.takenAt | rsTime: 'dateTime' }}</td><td class="text-right tabular">{{ size(d.bytes) }}</td></tr>
+            }</tbody></table></div>
+        }
+        @if (!p.count) { <p class="text-sm text-[color:var(--text-muted)]">Nothing would go at {{ p.days }} days.</p> }
+      }
+    </section>
+  }
+
+  <!-- Owner 2026-10-21: the workspace's page limit; a platform administrator picks a workspace and sets its ceiling. -->
+  <app-page-limit-card />
+</div>

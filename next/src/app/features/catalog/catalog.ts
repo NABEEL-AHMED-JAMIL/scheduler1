@@ -3,6 +3,7 @@ import { Subscription } from 'rxjs';
 import { Dialog } from '@angular/cdk/dialog';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
+import { NeedsWorkspace } from '../../shared/ui/needs-workspace';
 import { API_SUCCESS } from '../../core/api/api.config';
 import { Icon } from '../../shared/ui/icon';
 import { TableShell } from '../../shared/ui/data-table';
@@ -31,12 +32,17 @@ type KindFilter = '' | 'dataset' | 'file' | 'document_type';
  */
 @Component({
   selector: 'app-catalog',
-  imports: [RefreshButton, PageHeader, StatStrip, TableShell, Icon, Segmented, Pagination, RouterLink],
+  imports: [RefreshButton, PageHeader, NeedsWorkspace, StatStrip, TableShell, Icon, Segmented, Pagination, RouterLink],
   templateUrl: './catalog.html',
 })
 export class Catalog implements OnInit {
   private readonly api = inject(CatalogApi);
   private readonly auth = inject(AuthService);
+  /**
+   * ZT-A12 (owner 2026-10-21, "Managed session only"): a platform administrator's own sign-in has no workspace, and
+   * the catalog answers it 403 on a workspace's data; the page says so (NeedsWorkspace) and makes no call.
+   */
+  readonly noWorkspace = computed(() => !!this.auth.isPlatformAdmin?.() && !this.auth.user?.()?.tenantId);
   private readonly dialog = inject(Dialog);
   private readonly router = inject(Router);
 
@@ -105,16 +111,17 @@ export class Catalog implements OnInit {
         this.flag.set(flag);
         this.search.set(q);
         this.page.set(1);
-        this.load();
+        if (!this.noWorkspace()) this.load();
       });
     });
     effect(() => {
       const asset = Number(this.assetParam());
-      if (asset > 0) untracked(() => this.open(asset, ''));
+      if (asset > 0 && !this.noWorkspace()) untracked(() => this.open(asset, ''));
     });
   }
 
   ngOnInit(): void {
+    if (this.noWorkspace()) return;
     this.loadSummary();
   }
 

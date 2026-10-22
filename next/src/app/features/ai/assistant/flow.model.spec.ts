@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { PipelineFlowArtifact, flowVerdict, graphOf, isFlow, newestFlow, pipelineIdOf, settingsToFill, withStepConfig } from './flow.model';
+import { PipelineFlowArtifact, flowVerdict, graphOf, isFlow, newestFlow, pipelineIdOf, settingsToFill, triggerWhen, withStepConfig } from './flow.model';
 import { jobPayload } from './create-pipeline';
 
 /** AI workflow review: a designed flow as the panel draws it and the Create dialog saves it. */
@@ -40,6 +40,22 @@ describe('a designed flow', () => {
     expect(flowVerdict(flow({ problems: [{ step: 'check', message: 'check needs a setting: contractName.', kind: 'setting' }] })))
       .toEqual({ label: '1 setting to fill', tone: 'warn' });
     expect(flowVerdict(flow({ problems: [] }))).toEqual({ label: 'Ready to create', tone: 'ok' });
+  });
+
+  it('is never "Ready to create" with a warning, and a warned step is drawn warn with its badge', () => {
+    const warned = flow({ problems: [{ step: 'read', message: 'Step read has no groupBy, so it collapses all the rows into ONE row.', kind: 'warning' }] });
+    expect(flowVerdict(warned)).toEqual({ label: 'Check 1 warning', tone: 'warn' });
+    const g = graphOf(flow({ flow: { ...flow().flow, nodes: [{ id: 'read', kind: 'read', label: 'Read', task: 'read_file',
+      problems: [{ step: 'read', message: 'collapses', kind: 'warning' }] }] } }));
+    expect(g.nodes[0].tone).toBe('warn');
+    expect(g.nodes[0].badges).toEqual(['1 warning']);
+  });
+
+  it('says when a created pipeline really runs', () => {
+    expect(triggerWhen({ type: 'schedule', every: 'day', at: '09:00' }, '2026-10-13')).toBe('It runs every day at 09:00 (America/Chicago), from 2026-10-13.');
+    expect(triggerWhen({ type: 'schedule', every: 'week' }, '2026-10-13')).toContain('every week (Mondays)');
+    expect(triggerWhen({ type: 'inbox' }, '2026-10-13')).toBe('It runs when a file lands in its inbox.');
+    expect(triggerWhen({ type: 'manual' }, '2026-10-13')).toBe('Nothing runs until you press Run now.');
   });
 
   it('names the settings to fill, and a filled setting goes into the definition only', () => {

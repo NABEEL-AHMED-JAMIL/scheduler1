@@ -250,8 +250,8 @@ export const PINNED: Record<string, unknown> = {
     ],
     "columns": [],
     "fields": [
-      "Choose a workspace…",
       "Kind",
+      "Pick a workspace",
       "Search tools",
       "State",
       "Workspace"
@@ -320,7 +320,8 @@ export const PINNED: Record<string, unknown> = {
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
-      "GET /aiPrompt.json/tools/list"
+      "GET /aiPrompt.json/tools/list",
+      "GET /aiPrompt.json/tools/history"
     ],
     "headings": [
       "Tool Registry",

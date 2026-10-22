@@ -314,6 +314,38 @@ export interface DocumentType {
   versions?: TypeVersionRow[];
 }
 
+/** One starter of the catalog (/documentType.json/starters), and where this workspace stands with it. */
+export interface StarterRow {
+  typeKey: string;
+  name: string;
+  description?: string | null;
+  fieldCount: number;
+  tableCount: number;
+  ruleCount: number;
+  /** The fields' labels, in order: what the starter reads. */
+  fields: string[];
+  /** Every workspace reads with it already (it is listed among the document types). */
+  builtIn: boolean;
+  /** This workspace has a type of its own with the starter's key. */
+  added: boolean;
+  /** The type it is in this workspace: its own (added) or the built-in one; null when neither. */
+  documentTypeId?: number | null;
+}
+
+/** A market of the starter catalog: its starters, in the catalog's order. The catalog is ai-service's data. */
+export interface StarterMarket {
+  key: string;
+  label: string;
+  description?: string | null;
+  starters: StarterRow[];
+}
+
+/** /documentType.json/starters/add: the types made, and the starters skipped with why. */
+export interface StartersAdded {
+  added: DocumentType[];
+  skipped: { typeKey: string; name: string; reason: string }[];
+}
+
 /** /documentType.json/version: one version exactly as saved. */
 export interface TypeVersion {
   documentTypeId: number;
@@ -613,6 +645,11 @@ export interface RecentRow {
   where: string;
   status: string;
   received: string | null;
+  /**
+   * Set when the same read was extracted more than once (another type, after a failure, a live check run again): which
+   * extraction of the file this row is, so repeats read as one file's extractions and not as the same file received again.
+   */
+  again?: string;
 }
 
 /**
@@ -623,13 +660,20 @@ export interface RecentRow {
 export function recentRows(reads: OcrDocument[], extractions: Extraction[]): RecentRow[] {
   const byRead = new Map(reads.map(r => [r.ocrDocumentId, r]));
   const extracted = new Set(extractions.map(e => e.ocrDocumentId));
+  // Each read's extractions, oldest first: the place of each in its file's line.
+  const perRead = new Map<number, number[]>();
+  for (const e of [...extractions].sort((a, b) => a.extractionId - b.extractionId)) {
+    perRead.set(e.ocrDocumentId, [...(perRead.get(e.ocrDocumentId) ?? []), e.extractionId]);
+  }
   const rows: RecentRow[] = [...extractions].sort((a, b) => b.extractionId - a.extractionId).map(e => {
     const ocr = byRead.get(e.ocrDocumentId) ?? null;
+    const line = perRead.get(e.ocrDocumentId) ?? [];
     return {
       key: `e${e.extractionId}`, ocr, extraction: e,
       name: ocr ? nameOf(ocr) : `OCR document ${e.ocrDocumentId}`,
       where: ocr ? whereOf(ocr) : '',
       status: statusLabel(e), received: e.dateCreated ?? null,
+      ...(line.length > 1 ? { again: `Extraction ${line.indexOf(e.extractionId) + 1} of ${line.length} of this file (read once)` } : {}),
     };
   });
   const unread: RecentRow[] = reads.filter(r => !extracted.has(r.ocrDocumentId)).map(r => ({
@@ -639,8 +683,12 @@ export function recentRows(reads: OcrDocument[], extractions: Extraction[]): Rec
   return [...rows, ...unread];
 }
 
-/** A document's name: the file's own as it arrived (MIG-271), else the last part of its key. */
-function nameOf(r: OcrDocument): string { return r.originalName || fileName(r.sourceKey); }
+/**
+ * A document's name: the file's own as it arrived (MIG-271), else the last part of its key. Every screen names a document
+ * this way (ZT-D1: Review named every upload "original.pdf", the key's last part, so a reviewer could not tell them apart).
+ */
+export function documentName(r: Pick<OcrDocument, 'originalName' | 'sourceKey'>): string { return r.originalName?.trim() || fileName(r.sourceKey); }
+function nameOf(r: OcrDocument): string { return documentName(r); }
 
 /** Where a document came from: the channel's sentence for one that arrived (MIG-271), else its storage connection. */
 function whereOf(r: OcrDocument): string {

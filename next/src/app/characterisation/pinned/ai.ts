@@ -153,39 +153,16 @@ export const PINNED: Record<string, unknown> = {
     "url": "/settings/model-connections",
     "requests": [
       "GET /notification.json/unreadCount",
-      "GET /notification.json/list?limit=20&page=1",
-      "GET /aiConnection.json/list",
-      "GET /tenant.json/listTenants",
-      "GET /aiConnection.json/activity?connectionId=1047"
+      "GET /notification.json/list?limit=20&page=1"
     ],
     "headings": [
-      "Model connections",
-      "Local Ollama",
-      "Models",
-      "Usage · last 30 days",
-      "Runs · last 30 days",
-      "Recent runs",
-      "Prompts on this connection"
+      "Model connections"
     ],
-    "buttons": [
-      "Actions for Local Ollama",
-      "Back to list",
-      "Last test failedUI-REVIEW Zürich – 東京 ✓ unreachable Ollama with a deliberately long connection name for truncation Ollama (local) · gemma3:1b",
-      "Last test passedLocal Ollama Ollama (local) · gemma3:1b · default",
-      "New connection",
-      "Only mine",
-      "Refresh",
-      "Test connection"
-    ],
+    "buttons": [],
     "columns": [],
-    "fields": [
-      "Find a connection",
-      "Find by name, provider or model",
-      "Provider",
-      "State"
-    ],
+    "fields": [],
     "links": [
-      "/pipelines/prompts?connection=1047",
+      "/platform/workspaces",
       "/settings",
       "/settings/alerts",
       "/settings/home-pages",
@@ -222,7 +199,8 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /aiConnection.json/list",
-      "GET /aiConnection.json/activity?connectionId=1047"
+      "GET /aiConnection.json/activity?connectionId=1047",
+      "GET /aiConnection.json/history?connectionId=1047"
     ],
     "headings": [
       "Model connections",
@@ -236,8 +214,9 @@ export const PINNED: Record<string, unknown> = {
     "buttons": [
       "Actions for Local Ollama",
       "Back to list",
-      "Last test failedUI-REVIEW Zürich – 東京 ✓ unreachable Ollama with a deliberately long connection name for truncation Ollama (local) · gemma3:1b",
-      "Last test passedLocal Ollama Ollama (local) · gemma3:1b · default",
+      "Last test failedUI-REVIEW Zürich – 東京 ✓ unreachable Ollama with a deliberately long connection name for truncationOllama (local) · gemma3:1b",
+      "Last test passedLocal OllamaOllama (local) · gemma3:1b · default",
+      "Make inactive",
       "New connection",
       "Only mine",
       "Refresh",

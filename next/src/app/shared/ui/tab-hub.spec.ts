@@ -93,7 +93,8 @@ describe('tab hubs: the strip lists the tabs the reader may open', () => {
   });
 
   it('many, filtered by role: Platform\'s tabs are a platform administrator\'s', () => {
-    expect(strip('/platform/workspaces', 'PLATFORM_ADMIN')).toHaveLength(9);
+    // Owner #20-#23 (2026-10-19): Workspaces, Requests, Managed service, Staff activity, Service health, Engine settings.
+    expect(strip('/platform/workspaces', 'PLATFORM_ADMIN')).toHaveLength(6);
     expect(strip('/platform/workspaces', 'TENANT_ADMIN')).toEqual([]);
   });
 
@@ -157,7 +158,8 @@ describe('tab hubs: a hidden tab\'s address gives the 403 page, never an empty t
     expect(await land('/runs/analytics', 'TENANT_USER', ['jobs'])).toBe('/unauthorized?page=reports&title=Run%20analytics');
     expect(await land('/runs/by-date', 'TENANT_USER', ['jobs'])).toBe('/unauthorized?page=queue&title=Runs%20by%20date');
     expect(await land('/settings/kafka', 'TENANT_USER', null)).toBe('/unauthorized');
-    expect(await land('/platform/rate-cards', 'TENANT_ADMIN')).toBe('/unauthorized');
+    expect(await land('/billing/settings', 'TENANT_ADMIN')).toBe('/unauthorized');
+    expect(await land('/platform/service-health', 'TENANT_ADMIN')).toBe('/unauthorized');
     expect(await land('/developers/portal', 'TENANT_USER', null)).toBe('/unauthorized?page=developer-portal&title=Developer%20portal');
   });
 
@@ -172,6 +174,9 @@ describe('tab hubs: a hidden tab\'s address gives the 403 page, never an empty t
     expect(await land('/integration/connectors/storage', 'TENANT_ADMIN')).toBe('/connections/storage');
     expect(await land('/pipelines/run-analytics', 'TENANT_USER', ['reports'])).toBe('/runs/analytics');
     expect(await land('/administration/data-policies', 'TENANT_USER', ['ai-prompts'])).toBe('/administration/data-policies');
+    // Owner #22: Billing › Analytics is a workspace administrator's own, a member's never.
+    expect(await land('/billing/analytics', 'TENANT_ADMIN')).toBe('/billing/analytics');
+    expect(await land('/billing/analytics', 'TENANT_USER', null)).toBe('/unauthorized');
   });
 });
 
@@ -186,8 +191,8 @@ describe('tab hubs: the breadcrumb reads group › hub › tab', () => {
   });
 
   it('a top-level hub has no group', () => {
-    expect(crumbsFor('/platform/rate-cards', 'Rate cards')).toEqual([
-      { label: 'Platform', link: '/platform' }, { label: 'Rate cards' },
+    expect(crumbsFor('/platform/service-health', 'Service health')).toEqual([
+      { label: 'Platform', link: '/platform' }, { label: 'Service health' },
     ]);
   });
 
@@ -211,6 +216,24 @@ describe('tab hubs: the breadcrumb reads group › hub › tab', () => {
   it('an entry of its own keeps group › entry', () => {
     expect(crumbsFor('/data/analytics/dashboards', 'Dashboards')).toEqual([{ label: 'See results' }, { label: 'Dashboards' }]);
     expect(crumbsFor('/review/requests', 'My requests')).toEqual([{ label: 'Run & review' }, { label: 'My requests' }]);
+  });
+
+  /** MIG-406 (owner 10-19): no step repeats a word -- Reports › Library, Reports › Assets & branding › the asset. */
+  it('reads See results › Reports › Assets & branding, then the asset or brand profile by name', () => {
+    expect(crumbsFor('/reports/library', 'Reports')).toEqual([{ label: 'See results' }, { label: 'Reports', link: '/reports' }, { label: 'Library' }]);
+    expect(crumbsFor('/reports/assets', 'Assets & branding')).toEqual([
+      { label: 'See results' }, { label: 'Reports', link: '/reports' }, { label: 'Assets & branding' },
+    ]);
+    const asset = crumbsFor('/reports/assets/01M5BPGVJ6SGVJ60MQESY15388', 'Quality lead signature');
+    expect(asset).toEqual([
+      { label: 'See results' }, { label: 'Reports', link: '/reports' },
+      { label: 'Assets & branding', link: '/reports/assets' }, { label: 'Quality lead signature' },
+    ]);
+    expect(crumbsFor('/reports/assets/branding/01M5BPGVJ6SGVJ60MQESY15387', 'Riverside Health · Default').slice(-2)).toEqual([
+      { label: 'Assets & branding', link: '/reports/assets' }, { label: 'Riverside Health · Default' },
+    ]);
+    const words = asset.map(c => c.label);
+    expect(new Set(words).size).toBe(words.length);
   });
 
   /** UX review DR2 (2026-10-13): the Review hub -- its tabs, and a document opened from its Documents tab. */

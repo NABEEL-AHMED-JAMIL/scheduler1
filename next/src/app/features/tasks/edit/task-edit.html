@@ -26,7 +26,7 @@
           </div>
         </ng-template>
       } @else {
-        <button type="button" class="btn btn-primary btn-sm" data-test="header-run" [disabled]="!!running() || !jobs().length"
+        <button type="button" class="btn btn-primary btn-sm" data-test="header-run" [disabled]="!!running() || (!jobs().length && (locked() || !jobsLoaded()))"
                 [attr.title]="runHint() || null" (click)="runNow()">
           <app-icon name="play" [class.spin]="running()" />{{ runLabel() }}
         </button>
@@ -271,7 +271,8 @@
     </form>
     @if (stepsMode() && stepsView(); as view) {
       <app-step-builder [class.hidden]="activeTab() === 'details' || activeTab() === 'schedules'" [view]="view" [tab]="builderTab()"
-                        [canManage]="!locked()" [isAdmin]="isAdmin()" (saved)="stepsSaved($event)" />
+                        [canManage]="!locked()" [isAdmin]="isAdmin()" [pipelineName]="loadedName()" [jobIds]="jobIdsOf()"
+                        [tenantId]="pipelineTenantId()" [openStep]="step()" (saved)="stepsSaved($event)" />
     }
     @if (activeTab() === 'schedules') {
       <app-section title="Schedules & triggers" [card]="true" data-test="pipeline-schedules"

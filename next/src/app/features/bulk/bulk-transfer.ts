@@ -1,3 +1,4 @@
+import { refusalOf } from '../../shared/ui/blob-refusal';
 import { Component, Injector, computed, inject, input, signal, viewChild } from '@angular/core';
 import { HttpClient, HttpEventType } from '@angular/common/http';
 import { RouterLink } from '@angular/router';
@@ -192,18 +193,5 @@ export class BulkTransfer {
   }
 }
 
-/**
- * The server's reason for a refused download. The request asks for a blob, so a refusal's body
- * arrives as a Blob too, and `err.error.message` was always undefined: it has to be read and
- * parsed. Anything that is not a JSON envelope with a message (an HTML error page) gives ''.
- */
-export async function refusalOf(err: any): Promise<string> {
-  const body = err?.error;
-  if (!(body instanceof Blob)) return body?.message ?? '';
-  try {
-    const parsed = JSON.parse(await body.text());
-    return typeof parsed?.message === 'string' ? parsed.message : '';
-  } catch {
-    return '';
-  }
-}
+/** The server's reason for a refused download (shared/ui/blob-refusal): kept here for the callers that import it from here. */
+export { refusalOf };

@@ -1,11 +1,12 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, map } from 'rxjs';
+import { Observable, forkJoin, map, of, switchMap } from 'rxjs';
 import { API_BASE, ApiResponse } from '../../../core/api/api.config';
 import { LIST_LIMIT } from '../../../core/api/list-limit';
 import { jobActionRequest } from '../../jobs/job-actions';
 import { DocumentsApi } from '../../documents/documents.service';
-import { DefinitionView, LinkedJob, BucketChoice, DocumentTypeChoice, PromptChoice, RunRow, StepLog, StepTaskEntry, Timeline, ValidateResult, STEP_WEBHOOK_EVENT, WebhookChoice } from './steps.model';
+import { TaskChange, TaskControlState, TaskUsage, UsageOf, UsagePipeline, UsageRuns, usageParams } from './task-usage.model';
+import { DefinitionView, LinkedJob, BucketChoice, DocumentTypeChoice, PromptChoice, RunRow, StepLog, StepTaskEntry, Timeline, ValidateResult, STEP_WEBHOOK_EVENT, WebhookChoice, ApiRequestChoice } from './steps.model';
 
 export type DefinitionFormat = 'json' | 'yaml';
 
@@ -34,9 +35,46 @@ export class StepsApi {
     return this.http.post<ApiResponse<ValidateResult>>(`${API_BASE}/pipeline.json/steps/save`, { pipelineKey, format, text });
   }
 
-  /** The Task Registry as this workspace sees it (MIG-231): every task, and one legacy line per pipeline. */
-  tasks(): Observable<ApiResponse<StepTaskEntry[]>> {
-    return this.http.get<ApiResponse<StepTaskEntry[]>>(`${API_BASE}/pipeline.json/steps/tasks`);
+  /**
+   * The Task Registry as this workspace sees it (MIG-231): every task, and one legacy line per pipeline. Owner #16: a
+   * platform administrator names the workspace (the shared selector); anyone else's tenantId is ignored by Core.
+   */
+  tasks(tenantId?: number | null): Observable<ApiResponse<StepTaskEntry[]>> {
+    const params: Record<string, number> = {};
+    if (tenantId) params['tenantId'] = tenantId;
+    return this.http.get<ApiResponse<StepTaskEntry[]>>(`${API_BASE}/pipeline.json/steps/tasks`, { params });
+  }
+
+  /** Owner #16: a platform administrator sets a task to default, enabled, disabled or blocked for one workspace. */
+  setPlatformState(code: string, state: TaskControlState, tenantId: number, reason: string | null): Observable<ApiResponse<StepTaskEntry>> {
+    return this.http.post<ApiResponse<StepTaskEntry>>(`${API_BASE}/pipeline.json/steps/tasks/platformState`, { code, state, reason },
+      { params: { tenantId } });
+  }
+
+  /** Owner #16: who switched, blocked or reset a task (or every task, code null) in the workspace, newest first. */
+  taskHistory(code: string | null, tenantId?: number | null): Observable<ApiResponse<TaskChange[]>> {
+    const params: Record<string, string | number> = {};
+    if (code) params['code'] = code;
+    if (tenantId) params['tenantId'] = tenantId;
+    return this.http.get<ApiResponse<TaskChange[]>>(`${API_BASE}/pipeline.json/steps/tasks/history`, { params });
+  }
+
+  /** Owner #17: per task and per Legacy row, the pipelines using it and their runs this month (server-counted). */
+  taskUsage(tenantId?: number | null): Observable<ApiResponse<TaskUsage>> {
+    const params: Record<string, number> = {};
+    if (tenantId) params['tenantId'] = tenantId;
+    return this.http.get<ApiResponse<TaskUsage>>(`${API_BASE}/pipeline.json/steps/tasks/usage`, { params });
+  }
+
+  /** Owner #17: the pipelines behind a count -- a task's (code) or a Legacy row's (pipelineKey). */
+  taskPipelines(of: UsageOf, tenantId?: number | null): Observable<ApiResponse<UsagePipeline[]>> {
+    return this.http.get<ApiResponse<UsagePipeline[]>>(`${API_BASE}/pipeline.json/steps/tasks/pipelines`, { params: usageParams(of, tenantId) });
+  }
+
+  /** Owner #17: those pipelines' runs this month, newest first. */
+  taskRuns(of: UsageOf, tenantId?: number | null, limit = 100): Observable<ApiResponse<UsageRuns>> {
+    return this.http.get<ApiResponse<UsageRuns>>(`${API_BASE}/pipeline.json/steps/tasks/runs`,
+      { params: { ...usageParams(of, tenantId), limit } });
   }
 
   /** A workspace administrator switches a task on or off here, or back to its default (null). Legacy is refused. */
@@ -90,6 +128,35 @@ export class StepsApi {
         const why = !w.active ? ' (paused)' : !takes ? ` (does not take ${STEP_WEBHOOK_EVENT})` : '';
         return { id: Number(w.id), label: `#${w.id} ${w.url}${why}`, ready };
       })));
+  }
+
+  /**
+   * Owner #25: the workspace's saved API requests, each with its collection's environments -- what an api-request setting
+   * offers. The first 50 collections (the list's own order), each read once; a collection that cannot be read is left out.
+   * tenantId: the pipeline's workspace, which a platform administrator names (integration-service refuses his read that
+   * names none); left out for a workspace's people.
+   */
+  apiRequests(tenantId?: number | null): Observable<ApiRequestChoice[]> {
+    const scoped = (params: Record<string, string | number>) => (tenantId ? { ...params, tenantId } : params);
+    type Row = { collectionId: number; name: string };
+    type Detail = { collection: Row; requests: { requestId: number; name: string; method: string; enabled: boolean }[];
+      environments: { environmentId: number; name: string; isDefault?: boolean }[] };
+    return this.http.get<{ data?: Row[] }>(`${API_BASE}/apiCollection.json/list`, { params: scoped({ page: 1, limit: 50 }) }).pipe(
+      switchMap(list => {
+        const rows = (Array.isArray(list?.data) ? list.data : []).filter(c => c.collectionId != null);
+        if (!rows.length) return of([] as ApiRequestChoice[]);
+        return forkJoin(rows.map(c => this.http.get<ApiResponse<Detail>>(`${API_BASE}/apiCollection.json/get`,
+          { params: scoped({ collectionId: c.collectionId }) }).pipe(map(r => r.data ?? null)))).pipe(
+          map(details => details.flatMap(d => !d ? [] : (d.requests ?? []).map(r => ({
+            id: Number(r.requestId),
+            label: `${d.collection.name} › ${r.name}`,
+            method: (r.method || 'GET').toUpperCase(),
+            collectionId: Number(d.collection.collectionId),
+            collection: d.collection.name,
+            enabled: r.enabled !== false,
+            environments: (d.environments ?? []).map(e => ({ id: Number(e.environmentId), label: e.name + (e.isDefault ? ' (default)' : '') })),
+          })))));
+      }));
   }
 
   /** MIG-364: the workspace's document types (Document Intelligence's own list), by name, for a step that names one. */

@@ -5,7 +5,8 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Subject, of } from 'rxjs';
 import { AccountSecurityApi, PasswordRules } from '../../account/account-security.api';
 import { ResetPasswordData, ResetPasswordDialog } from './reset-password-dialog';
-import { ResetPasswordNotice } from './reset-password-notice';
+import { announceReset, RESET_NOTICE_MS } from './reset-password-announce';
+import { ToastService } from '../../../shared/ui/toast.service';
 
 const RULES: PasswordRules = {
   passwordMinLength: 12, passwordRequireUpper: true, passwordRequireLower: true, passwordRequireDigit: true,
@@ -129,40 +130,31 @@ describe('ResetPasswordDialog', () => {
   });
 });
 
-describe('ResetPasswordNotice', () => {
-  function notice(result: any) {
-    TestBed.resetTestingModule();
-    const fixture = TestBed.createComponent(ResetPasswordNotice);
-    fixture.componentRef.setInput('result', result);
-    fixture.detectChanges();
-    return fixture;
-  }
-
-  it('says whose password was reset and that they choose a new one, without ever showing it', () => {
-    const fixture = notice({ name: 'Pat Reset', own: false, password: GOOD });
-    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
-    expect(text).toContain('Password reset for Pat Reset.');
-    expect(text).toContain('They\'ll be asked to choose a new one at their next sign-in.');
-    expect(text).not.toContain(GOOD);
-    expect((fixture.nativeElement as HTMLElement).innerHTML).not.toContain(GOOD);
+describe('announceReset (a toast at the top right, owner 2026-10-19 #29)', () => {
+  it('says whose password was reset and that they choose a new one, without ever showing it, for two minutes', () => {
+    const toasts = new ToastService();
+    announceReset(toasts, { name: 'Pat Reset', own: false, password: GOOD });
+    const [toast] = toasts.toasts();
+    expect(toast.title).toBe('Password reset for Pat Reset.');
+    expect(toast.message).toBe('They\'ll be asked to choose a new one at their next sign-in.');
+    expect(JSON.stringify({ title: toast.title, message: toast.message })).not.toContain(GOOD);
+    expect(toast.duration).toBe(RESET_NOTICE_MS);
+    expect(toast.action?.label).toBe('Copy password');
   });
 
   it('copies the password to the clipboard only', async () => {
     const writeText = vi.fn(() => Promise.resolve());
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
-    const fixture = notice({ name: 'Pat Reset', own: false, password: GOOD });
-    const button = (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('[data-test="copy-reset-password"]')!;
-    button.click();
-    await Promise.resolve();
-    await Promise.resolve();
-    fixture.detectChanges();
+    const toasts = new ToastService();
+    announceReset(toasts, { name: 'Pat Reset', own: false, password: GOOD });
+    expect(await toasts.toasts()[0].action!.run()).toBe(true);
     expect(writeText).toHaveBeenCalledWith(GOOD);
-    expect(button.textContent).toContain('Copied');
   });
 
   it('offers no copy for the administrator\'s own reset', () => {
-    const fixture = notice({ name: 'Me', own: true, password: null });
-    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Your password has been reset.');
-    expect((fixture.nativeElement as HTMLElement).querySelector('[data-test="copy-reset-password"]')).toBeNull();
+    const toasts = new ToastService();
+    announceReset(toasts, { name: 'Me', own: true, password: null });
+    expect(toasts.toasts()[0].title).toBe('Your password has been reset.');
+    expect(toasts.toasts()[0].action).toBeUndefined();
   });
 });

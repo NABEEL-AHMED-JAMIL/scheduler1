@@ -45,7 +45,7 @@ describe('EnvironmentDialog -- secrets are replace-only', () => {
       { key: 'baseUrl', secret: false, value: 'https://api.example.test' },
       { key: 'token', secret: true },
       { key: 'clientSecret', secret: true },
-    ] });
+    ] }, undefined);
   });
 
   it('sends a replaced secret\'s new value, and only that', () => {
@@ -105,7 +105,7 @@ describe('EnvironmentDialog -- the environment', () => {
     dialog.setValue(0, 'https://httpbin.org');
     dialog.save();
     expect(stub.saveEnvironment).toHaveBeenCalledWith({ environmentId: null, collectionId: 11, name: 'UI-CHECK Prod', isDefault: true,
-      variables: [{ key: 'baseUrl', secret: false, value: 'https://httpbin.org' }] });
+      variables: [{ key: 'baseUrl', secret: false, value: 'https://httpbin.org' }] }, undefined);
   });
 
   it('refuses a key listed twice before the service does', () => {

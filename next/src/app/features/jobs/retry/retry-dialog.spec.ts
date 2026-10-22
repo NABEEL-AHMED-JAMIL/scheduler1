@@ -161,6 +161,9 @@ describe('Retry wording', () => {
       .toBe('Attempt 2: resumed from step 3 <enrich>, reusing 2 steps of attempt 1 by Dana Ortiz');
     expect(attemptSentence({ attempt: 3, previousAttempt: 2, mode: 'restart', reusedSteps: 0, requestedVia: 'api',
       requestedBy: 'API client etl_abc' })).toBe('Attempt 3: run again from the start after attempt 2 failed by API client etl_abc');
+    expect(attemptSentence({ attempt: 2, previousAttempt: 1, mode: 'resume', fromStepIndex: 2, fromStepKey: 'check', reusedSteps: 2,
+      requestedVia: 'platform' })).toBe('Attempt 2: resumed from step 3 <check>, reusing 2 steps of attempt 1 automatically, after Core '
+      + 'restarted while it ran');
   });
 });
 

@@ -1,3 +1,5 @@
+import { WorkspaceSelect } from '../../../shared/ui/workspace-select';
+import { WorkspaceDirectory } from '../../../core/workspaces/workspace-directory';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { API_SUCCESS } from '../../../core/api/api.config';
@@ -6,7 +8,6 @@ import { ToastService } from '../../../shared/ui/toast.service';
 import { Icon } from '../../../shared/ui/icon';
 import { LoadError } from '../../../shared/ui/load-error';
 import { BlurLoader } from '../../../shared/ui/blur-loader';
-import { Combobox, ComboboxOption } from '../../../shared/ui/combobox';
 import { SENSITIVITY_TEXT } from '../../../shared/ui/sensitivity';
 import { ModelConnection } from '../../ai/ai-providers';
 import { DataPolicyApi } from './data-policy.api';
@@ -18,6 +19,11 @@ import { PageHeader } from '../../../shared/ui/page-header';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
 import { ReviewPolicyCard } from './review-policy-card';
 import { RetentionCard } from './retention-card';
+import { Dialog } from '@angular/cdk/dialog';
+import { isOwnPlatformSignIn } from '../../../core/auth/workspace-data';
+import { NeedsWorkspace } from '../../../shared/ui/needs-workspace';
+import { sidePanelConfig } from '../../../shared/ui/side-panel';
+import { RetentionPlatformPanel } from './retention-platform-panel';
 
 type Switch = 'aiWriteTools' | 'minFieldsWarning';
 
@@ -32,7 +38,7 @@ const readable = (text: string | null | undefined) => (text ?? '').replace(/\s--
  */
 @Component({
   selector: 'app-data-policies',
-  imports: [RefreshButton, PageHeader, Icon, LoadError, BlurLoader, Combobox, RouterLink, ReviewPolicyCard, RetentionCard],
+  imports: [WorkspaceSelect, RefreshButton, PageHeader, Icon, LoadError, BlurLoader, RouterLink, ReviewPolicyCard, RetentionCard, NeedsWorkspace],
   templateUrl: './data-policies.html',
   styles: `
     .policy-table { table-layout: fixed; min-width: 56rem; }
@@ -57,8 +63,14 @@ export class DataPolicies implements OnInit {
     return this.drafts().map((d, i) => ({ d, i })).sort((a, b) => (rank[a.d.sensitivity] ?? 9) - (rank[b.d.sensitivity] ?? 9));
   });
 
-  readonly tenantId = signal<number | null>(null);
-  readonly tenants = signal<ComboboxOption[]>([]);
+  /**
+   * ZT-A12 follow-up (owner 2026-10-21, "Managed session only"): a workspace's data policy, review policy and retention
+   * are its own, read and changed in "Work in this workspace"; the platform administrator's own sign-in is told so
+   * (NeedsWorkspace) and reads none of them. The platform's retention minimums, for every workspace, stay here.
+   */
+  readonly ownSignIn = computed(() => isOwnPlatformSignIn(this.auth));
+  private readonly dialog = inject(Dialog);
+  readonly tenantId = signal<number | null>(this.ownSignIn() ? null : inject(WorkspaceDirectory).remembered());
   readonly loading = signal(false);
   readonly error = signal('');
   readonly saving = signal(false);
@@ -78,17 +90,18 @@ export class DataPolicies implements OnInit {
   readonly waitingForWorkspace = computed(() => this.isPlatformAdmin() && this.tenantId() == null);
 
   ngOnInit(): void {
-    if (this.isPlatformAdmin()) {
-      this.api.tenants().subscribe({
-        next: r => { if (r.status === API_SUCCESS) this.tenants.set((r.data ?? []).map(t => ({ value: String(t.tenantId), label: t.tenantName }))); },
-        error: () => {},
-      });
-      return;
-    }
+    // A platform administrator reads the workspace picked (this session's choice, owner #5); a workspace's own people theirs.
+    if (this.ownSignIn() || (this.isPlatformAdmin() && this.tenantId() == null)) return;
     this.load();
   }
 
+  /** The platform's retention minimums, for every workspace (setting.json/retention/platform): the own sign-in's to set. */
+  openPlatformMinimums(): void {
+    this.dialog.open<boolean, unknown, RetentionPlatformPanel>(RetentionPlatformPanel, sidePanelConfig({}, 'narrow', 'right'));
+  }
+
   pickWorkspace(value: string): void {
+    if (this.ownSignIn()) return;
     const id = Number(value);
     this.tenantId.set(value && Number.isFinite(id) ? id : null);
     this.saveError.set('');

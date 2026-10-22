@@ -26,6 +26,8 @@ export interface SourcePanelData {
   canManage: boolean;
   /** A platform administrator's workspaces: a new source names the one it is for. */
   tenants?: ComboboxOption[];
+  /** Owner #5: the workspace the page's selector picked -- a new source's owner unless changed. */
+  tenantId?: number | null;
 }
 
 type ResultTab = 'preview' | 'schema';
@@ -135,7 +137,7 @@ export class SourcePanel {
         error: err => { this.loading.set(false); this.loadError.set(err?.error?.message || 'Could not read the source.'); },
       });
     } else {
-      this.take(blankSource('FILE'), false);
+      this.take({ ...blankSource('FILE'), tenantId: this.data.tenantId ?? null }, false);
       this.pickersFor('FILE');
     }
   }
@@ -161,12 +163,14 @@ export class SourcePanel {
   private pickersFor(kind: SourceKind): void {
     if (kind === 'FILE' || kind === 'BUCKET') this.once('buckets', () => this.api.buckets(), d => this.buckets.set(d));
     if (kind === 'DATABASE') this.once('connections', () => this.api.connections(), d => this.connections.set(d));
-    if (kind === 'API') this.once('collections', () => this.collectionsApi.list('', 1, 100), d => this.collections.set(d));
+    // A platform administrator's API-library reads name the source's workspace (integration-service refuses one that names none).
+    const tenant = this.data.tenants ? this.tenantId() : null;
+    if (kind === 'API') this.once(`collections:${tenant ?? ''}`, () => this.collectionsApi.list('', 1, 100, tenant), d => this.collections.set(d));
   }
 
   /** A collection's APIs, versions and environments; `pick` also pins its current version and default environment. */
   private readCollection(collectionId: number, pick: boolean): void {
-    this.collectionsApi.get(collectionId).subscribe({
+    this.collectionsApi.get(collectionId, this.data.tenants ? this.tenantId() : null).subscribe({
       next: r => {
         if (r.status !== API_SUCCESS || !r.data) { if (pick) this.error.set(r.message); return; }
         const d = r.data;

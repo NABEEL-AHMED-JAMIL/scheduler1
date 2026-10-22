@@ -13,7 +13,7 @@ import { ReviewCount, ReviewViewer, ageOf, countKinds, countReview, dueIn, loadR
 /** UX review DR2 (2026-10-13): the three review sources, read as the reader and laid out as one list with one count. */
 
 const task = (id: number, over: Partial<InboxTask> = {}): InboxTask => ({
-  id, instanceId: id - 6, stepKey: 'review', stepType: 'approval', name: 'Approve the visit', assigneeKind: 'group',
+  id, instanceId: id - 6, stepKey: 'review', stepType: 'approval', name: 'Approve the visit', assigneeKind: 'team',
   assigneeValue: '1063', state: 'Open', requestTitle: `Visit #${id}`, workflowName: 'Visit approval', createdAt: '2026-10-13T12:00:00+00:00',
   ...over,
 });
@@ -32,15 +32,15 @@ const doc = (extractionId: number, over: Partial<Extraction> = {}): Extraction =
 
 const REVIEWER: ReviewViewer = { tasks: true, documents: true, admin: false, me: 4641 };
 const ADMIN: ReviewViewer = { tasks: true, documents: true, admin: true, me: 4640 };
-const none = { count: null, mine: [], groups: [], runs: [], runsMore: false, runsFailed: false, documents: [], documentTotal: 0 };
+const none = { count: null, mine: [], teams: [], runs: [], runsMore: false, runsFailed: false, documents: [], documentTotal: 0 };
 
 describe('Review sources: one list over three services', () => {
   it('lists a reviewer\'s task about a run once, as the run, decided through the task', () => {
-    const load = merge(REVIEWER, { ...none, groups: [runTask(1142, 8311)], runs: [run(8311)] });
+    const load = merge(REVIEWER, { ...none, teams: [runTask(1142, 8311)], runs: [run(8311)] });
     expect(load.items.length).toBe(1);
     const [row] = load.items;
     expect(row).toMatchObject({ kind: 'run', via: 'task', id: 1142, runId: 8311, jobId: 2907, title: 'Run #8311',
-      from: 'Patient 360 (daily)', waitsOn: 'Your groups', pickable: true });
+      from: 'Patient 360 (daily)', waitsOn: 'Your teams', pickable: true });
     expect(row.since).toBe('2026-10-13T07:22:29.235395');
     expect(load.total).toBe(1);
   });
@@ -89,7 +89,7 @@ describe('Review sources: one list over three services', () => {
 
   it('counts what did not fit the first pages, as each service counts it', () => {
     const load = merge(REVIEWER, {
-      ...none, count: { mine: 120, groups: 30, total: 150, overdue: 0 }, mine: [task(1)], groups: [task(2)],
+      ...none, count: { mine: 120, teams: 30, total: 150, overdue: 0 }, mine: [task(1)], teams: [task(2)],
       documents: [doc(9)], documentTotal: 40,
     });
     expect(load.beyond).toEqual({ tasks: 148, documents: 39, runs: false });
@@ -132,12 +132,12 @@ describe('Review sources: asked as the reader', () => {
     const reqs = pending.map(r => r.request.urlWithParams.replace(/^.*\/api\/v1\//, ''));
     expect(reqs.sort()).toEqual([
       'documentReview.json/queue?page=0&size=100&status=Review', 'sourceJob.json/review/waiting', 'taskInbox.json/count',
-      'taskInbox.json/groups?limit=100', 'taskInbox.json/mine?limit=100',
+      'taskInbox.json/mine?limit=100', 'taskInbox.json/teams?limit=100',
     ]);
     for (const r of pending) {
       const url = r.request.url;
-      r.flush({ status: 'SUCCESS', data: url.endsWith('/count') ? { mine: 0, groups: 1, total: 1, overdue: 0 }
-        : url.endsWith('/groups') ? [task(7)] : url.endsWith('/mine') ? [] : url.includes('waiting') ? { runs: [run(8311)], more: false }
+      r.flush({ status: 'SUCCESS', data: url.endsWith('/count') ? { mine: 0, teams: 1, total: 1, overdue: 0 }
+        : url.endsWith('/teams') ? [task(7)] : url.endsWith('/mine') ? [] : url.includes('waiting') ? { runs: [run(8311)], more: false }
         : { items: [doc(1133)], total: 1 } });
     }
     expect((await answer).items.length).toBe(3);
@@ -152,16 +152,27 @@ describe('Review sources: asked as the reader', () => {
     expect((await answer).total).toBe(1);
   });
 
+  /** ZT-F2 (2026-10-21, Zanium "Nurse Access"): the Task inbox without Schedules or the Queue, refused review/waiting twice a page. */
+  it('ZT-F2: the badge asks no run list of a task-inbox holder without Schedules or the Queue', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [provideZonelessChangeDetection(), provideHttpClient(), provideHttpClientTesting(),
+      { provide: AuthService, useValue: { canOpen: (p: string) => p === 'task-inbox', isTenantAdmin: () => false, user: () => ({ appUserId: 4696 }) } }] });
+    countReview({ injector: TestBed.inject(Injector), review: signal<ReviewCount | null>(null) });
+    const asked = TestBed.inject(HttpTestingController).match(() => true).map(r => r.request.url.replace(/^.*\/api\/v1\//, ''));
+    expect(asked).not.toContain('sourceJob.json/review/waiting');
+    expect(asked).toContain('taskInbox.json/count');
+  });
+
   it('counts for the badge as the page lists it', () => {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({ providers: [provideZonelessChangeDetection(), provideHttpClient(), provideHttpClientTesting(),
-      { provide: AuthService, useValue: { canOpen: (p: string) => p === 'task-inbox', isTenantAdmin: () => false, user: () => ({ appUserId: 4641 }) } }] });
+      { provide: AuthService, useValue: { canOpen: (p: string) => p === 'task-inbox' || p === 'queue', isTenantAdmin: () => false, user: () => ({ appUserId: 4641 }) } }] });
     const target = { injector: TestBed.inject(Injector), review: signal<ReviewCount | null>(null) };
     countReview(target);
     for (const r of TestBed.inject(HttpTestingController).match(() => true)) {
       const url = r.request.url;
-      r.flush({ status: 'SUCCESS', data: url.endsWith('/count') ? { mine: 1, groups: 0, total: 1, overdue: 1 }
-        : url.endsWith('/mine') ? [task(5, { overdue: true })] : url.endsWith('/groups') ? [] : { runs: [], more: false } });
+      r.flush({ status: 'SUCCESS', data: url.endsWith('/count') ? { mine: 1, teams: 0, total: 1, overdue: 1 }
+        : url.endsWith('/mine') ? [task(5, { overdue: true })] : url.endsWith('/teams') ? [] : { runs: [], more: false } });
     }
     expect(target.review()).toEqual({ total: 1, overdue: 1, more: false, kinds: { approval: 1, run: 0, document: 0 } });
   });

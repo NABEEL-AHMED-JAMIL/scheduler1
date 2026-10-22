@@ -4,7 +4,10 @@ import { provideZonelessChangeDetection } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
-import { StaffActivity, changeText, targetText } from './staff-activity';
+import { StaffActivity, changeText, readText, targetText } from './staff-activity';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { ManagedServiceApi as RealApi } from './managed-service.api';
 import { ManagedServiceApi } from './managed-service.api';
 
 const row = (id: number, extra: Record<string, unknown> = {}) => ({ id, tenantId: 2924, tenantName: 'Claude Demo', appUserId: 5001,
@@ -75,7 +78,7 @@ describe('MIG-254: Our team\'s activity (a workspace administrator)', () => {
 
   it('says plainly when our team has changed nothing', () => {
     const { text } = setup('workspace', [{ data: [], next: null }]);
-    expect(text()).toContain('Our team has not changed anything in this workspace yet.');
+    expect(text()).toContain('Our team has not changed or opened anything in this workspace yet.');
   });
 });
 
@@ -86,5 +89,61 @@ describe('UI review U6: a change in words', () => {
     expect(changeText('')).toBe('A change');
     expect(targetText('tenantId=2924')).toBe('');
     expect(targetText('sourceTaskId=1854&version=3')).toBe('Source task 1854 · Version 3');
+  });
+});
+
+describe('ZT-A12 follow-up: data reads in a managed session (owner 2026-10-21)', () => {
+  const readRow = (id: number, readKind: string, readId: string | number | null) => row(id, { method: 'GET',
+    path: '/sourceJob.json/runOutputs', target: 'jobQueueId=8913', builderAction: false, readKind, readId });
+
+  it('shows a read as Read, in words built from its kind and id, beside the changes', () => {
+    const { text, fixture } = setup('platform', [{ data: [readRow(10, 'run output', '8913:csv'), row(9)], next: null }]);
+    const el = fixture.nativeElement as HTMLElement;
+    expect(text()).toContain('Activity');
+    expect(text()).toContain('Every change and every data read our staff made in a managed session');
+    expect(el.querySelectorAll('[data-test="read-pill"]').length).toBe(1);
+    expect(el.querySelector('[data-test="read-text"]')!.textContent).toContain('Downloaded run output 8913:csv');
+    // The change beside it reads as before.
+    expect(text()).toContain('Source task › Update source task');
+  });
+
+  it('words every kind in use, and an unknown one generically', () => {
+    expect(readText({ readKind: 'board', readId: 41 })).toBe('Opened board 41');
+    expect(readText({ readKind: 'report PDF', readId: 77 })).toBe('Downloaded report PDF 77');
+    expect(readText({ readKind: 'approved data CSV', readId: 3 })).toBe('Downloaded approved data CSV 3');
+    expect(readText({ readKind: 'file preview', readId: 'bucket/a.csv' })).toBe('Previewed file bucket/a.csv');
+    expect(readText({ readKind: 'pipelines export', readId: null })).toBe('Downloaded pipelines export');
+    expect(readText({ readKind: 'telemetry blob', readId: 5 })).toBe('Read telemetry blob 5');
+    expect(readText({ readKind: null, readId: null })).toBe('');
+  });
+
+  it('filters: changes and reads by default, then only the data reads (kind=reads) or only the changes', () => {
+    const { page, api } = setup('workspace', [{ data: [readRow(10, 'board', 41)], next: null }]);
+    expect(api.actions).toHaveBeenLastCalledWith({ tenantId: null, appUserId: null, beforeId: null, limit: 50 });
+    page.setKind('reads');
+    expect(api.actions).toHaveBeenLastCalledWith({ tenantId: null, appUserId: null, beforeId: null, limit: 50, kind: 'reads' });
+    page.setKind('changes');
+    expect(api.actions).toHaveBeenLastCalledWith({ tenantId: null, appUserId: null, beforeId: null, limit: 50, kind: 'changes' });
+    page.clearFilters();
+    expect(page.kindFilter()).toBe('');
+  });
+
+  it("the workspace's page says it records what our team opened, exported or downloaded", () => {
+    const { text } = setup('workspace', [{ data: [], next: null }]);
+    expect(text()).toContain('Every change our team made here and every data they opened, exported or downloaded');
+  });
+
+  it('sends ?kind=reads to Identity', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [provideZonelessChangeDetection(), provideHttpClient(), provideHttpClientTesting()] });
+    const api = TestBed.inject(RealApi);
+    api.actions({ limit: 50, kind: 'reads' }).subscribe();
+    const req = TestBed.inject(HttpTestingController).expectOne(r => r.url.endsWith('/managedService.json/actions'));
+    expect(req.request.params.get('kind')).toBe('reads');
+    req.flush({ status: 'SUCCESS', data: [] });
+    api.actions({ limit: 50 }).subscribe();
+    const both = TestBed.inject(HttpTestingController).expectOne(r => r.url.endsWith('/managedService.json/actions'));
+    expect(both.request.params.has('kind')).toBe(false);
+    both.flush({ status: 'SUCCESS', data: [] });
   });
 });

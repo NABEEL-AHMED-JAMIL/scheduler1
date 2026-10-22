@@ -1,11 +1,16 @@
-import { Component, inject } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
+import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { Dialog } from '@angular/cdk/dialog';
 import { Icon } from '../../../shared/ui/icon';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { chartable, openVisualise } from '../../analytics/charts/visualise-open';
 import { RunOutput, formatsFor } from './run-steps.model';
 import { outputLabel } from './run-page.model';
+import { RunOutputView, RunOutputViewData, viewKind } from './run-output-view';
+import { PreviewDialog, PreviewData } from '../../objects/preview/preview-dialog';
 import { RunTimelineStore } from './run-timeline.store';
+import { copyText } from '../../../shared/ui/clipboard.util';
+import { ToastService } from '../../../shared/ui/toast.service';
 
 /**
  * The run page's Outputs tab (Wave 4, sourceJob.json/runOutputs): what the run put out -- kept files download through
@@ -14,66 +19,135 @@ import { RunTimelineStore } from './run-timeline.store';
  */
 @Component({
   selector: 'app-run-outputs',
-  imports: [Icon, ServerTimePipe],
+  imports: [Icon, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger],
+  styles: `
+    .ro-table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
+    .ro-table th { text-align: left; font-weight: 600; font-size: 0.6875rem; letter-spacing: 0.04em; text-transform: uppercase;
+                   color: var(--text-muted); padding: 0.5rem 1rem; border-bottom: 1px solid var(--border-subtle); white-space: nowrap; }
+    .ro-table td { padding: 0.55rem 1rem; border-bottom: 1px solid var(--border-subtle); vertical-align: middle; }
+    .ro-table tr:last-child td { border-bottom: 0; }
+    .ro-group td { background: var(--surface-sunken); padding-block: 0.4rem; }
+    .ro-name { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+    .ro-name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ro-actions { display: flex; justify-content: flex-end; gap: 0.25rem; white-space: nowrap; }
+  `,
   template: `
     <section class="card overflow-clip" aria-labelledby="run-files-heading" data-test="run-outputs">
-      <div class="flex items-center gap-2 px-4 py-2.5 border-b border-subtle">
+      <div class="flex flex-wrap items-center gap-2 px-4 py-2.5 border-b border-subtle">
         <h2 id="run-files-heading" class="text-sm font-semibold">Files
-          @if (files().length) { <span class="font-normal text-[color:var(--text-muted)]">· {{ files().length }}</span> }</h2>
+          @if (files().length) { <span class="font-normal text-[color:var(--text-muted)]">· {{ shownCount() }}{{ shownCount() !== files().length ? ' of ' + files().length : '' }}</span> }</h2>
+        <span class="flex-1"></span>
+        @if (files().length > 6) {
+          <select class="input py-1 text-xs w-36" aria-label="Type" [value]="typeFilter()" (change)="typeFilter.set($any($event.target).value)" data-test="output-type">
+            <option value="">All types</option>
+            @for (t of types(); track t) { <option [value]="t">{{ t }}</option> }
+          </select>
+          <input class="input py-1 text-xs w-56" type="search" placeholder="Find a file" aria-label="Find a file"
+                 [value]="query()" (input)="query.set($any($event.target).value)" data-test="output-search" />
+        }
       </div>
       @if (store.outputs() === 'error') {
         <p class="px-4 py-3 text-xs text-[color:var(--text-muted)]">The run's files could not be read.</p>
       } @else if (store.outputs() === null) {
         <p class="px-4 py-3 text-xs text-[color:var(--text-muted)]">
-          {{ store.legacy() ? 'This run was not taken by the step engine, so it recorded no files.' : 'Reading the run\\'s files…' }}</p>
+          {{ store.legacy() ? 'This run was not taken by the step engine, so it recorded no files.' : 'Reading the run\'s files…' }}</p>
+      } @else if (!files().length) {
+        <p class="px-4 py-3 text-xs text-[color:var(--text-muted)]">No files were recorded for this run.</p>
       } @else {
-        <ul class="divide-y divide-[color:var(--border-subtle)] text-xs">
-          @for (o of files(); track o.runOutputId) {
-            <li class="exec-file flex flex-wrap items-center gap-x-4 gap-y-1.5 px-4 py-2.5" [attr.data-kind]="o.kind">
-              <div class="min-w-0 flex-1">
-                <div class="flex items-center gap-1.5 min-w-0">
-                  <app-icon [name]="o.kind === 'bucket' ? 'upload' : 'file'" size="0.95em" class="icon-muted shrink-0" />
-                  <span class="mono font-medium truncate text-sm" [title]="o.name">{{ o.name }}</span>
-                  <span class="text-[color:var(--text-secondary)] whitespace-nowrap" data-test="output-label">{{ label(o) }}</span>
-                </div>
-                <div class="mt-0.5 text-[color:var(--text-muted)]">
-                  {{ o.kind === 'bucket' ? 'Uploaded' : 'Kept' }} by step {{ (o.stepIndex ?? 0) + 1 }} <span class="mono">{{ o.stepKey }}</span>
-                  @if (o.kind === 'file') {
-                    @if (o.expired) { · <span class="text-warn-600">Expired</span> }
-                    @else if (o.expiresAt) { · kept until {{ o.expiresAt | serverTime:'recent' }} }
-                  } @else if (o.bucket) {
-                    · <span class="mono break-all">{{ o.bucket }} / {{ o.key }}</span>
-                  }
-                </div>
-              </div>
-              <div class="flex flex-wrap justify-end gap-1" role="group" [attr.aria-label]="'Download ' + o.name">
-                @if (canVisualise(o)) {
-                  <button type="button" class="btn btn-default btn-xs" data-test="visualise" [disabled]="o.kind === 'file' ? !!o.expired || !o.runDatasetId : !o.bucket || !o.key"
-                          [attr.aria-label]="'Visualise ' + o.name" title="Suggested charts of this file" (click)="visualise(o)">
-                    <app-icon name="chart" />Visualise
-                  </button>
-                }
-                @if (o.kind === 'file') {
-                  @for (f of formatsFor(o.name, o.format); track f.id) {
-                    <button type="button" class="btn btn-default btn-xs" [attr.data-format]="f.id"
-                            [disabled]="!!o.expired || !o.runDatasetId || store.busy() !== ''"
-                            [title]="o.expired ? 'This file has expired and can no longer be downloaded' : 'Download as ' + f.label"
-                            (click)="store.downloadDataset(o.runDatasetId!, f.id, o.name)">
-                      <app-icon name="download" />{{ f.label }}
+        <div class="overflow-x-auto">
+          <table class="ro-table">
+            <thead><tr><th>File</th><th>Type</th><th>Size</th><th>Kept</th><th class="text-right"><span class="sr-only">Actions</span></th></tr></thead>
+            <tbody>
+              @for (g of groups(); track g.key) {
+                <tr class="ro-group">
+                  <td colspan="5">
+                    <button type="button" class="flex items-center gap-1.5 text-xs font-medium text-[color:var(--text-secondary)]"
+                            [attr.aria-expanded]="!isFolded(g.key)" (click)="toggle(g.key)" data-test="output-group">
+                      <app-icon [name]="isFolded(g.key) ? 'chevronRight' : 'chevronDown'" size="0.9em" />
+                      Step {{ g.step }} · <span class="mono">{{ g.stepKey }}</span>
+                      <span class="font-normal text-[color:var(--text-muted)]">&nbsp;· {{ g.rows.length }} {{ g.rows.length === 1 ? 'file' : 'files' }}</span>
                     </button>
+                  </td>
+                </tr>
+                @if (!isFolded(g.key)) {
+                  @for (o of g.rows; track o.runOutputId) {
+                    <tr class="exec-file" [attr.data-kind]="o.kind">
+                      <td class="max-w-0 w-[44%]">
+                        <div class="ro-name">
+                          <app-icon [name]="iconOf(o)" size="1em" class="icon-muted shrink-0" />
+                          <span class="font-medium" [title]="o.name">{{ o.name }}</span>
+                        </div>
+                      </td>
+                      <td><span class="pill">{{ typeOf(o) }}</span></td>
+                      <td class="whitespace-nowrap text-[color:var(--text-secondary)]" data-test="output-label">{{ sizeOf(o) }}</td>
+                      <td class="whitespace-nowrap text-[color:var(--text-muted)] max-w-[16rem] truncate"
+                          [title]="o.kind === 'bucket' ? (o.bucket + ' / ' + o.key) : ''">
+                        @if (o.kind === 'file') {
+                          @if (o.expired) { <span class="text-warn-600">Expired</span> }
+                          @else if (o.expiresAt) { With the run · until {{ o.expiresAt | serverTime:'recent' }} }
+                          @else { With the run }
+                        } @else {
+                          <app-icon name="cloud" size="0.9em" class="icon-muted" /> {{ o.bucket }} / {{ o.key }}
+                        }
+                      </td>
+                      <td>
+                        <div class="ro-actions" role="group" [attr.aria-label]="'Actions for ' + o.name">
+                          @if (canView(o)) {
+                            <button type="button" class="btn btn-default btn-xs" data-test="view" [disabled]="!usable(o)"
+                                    [attr.aria-label]="'View ' + o.name" [title]="o.expired ? 'This file has expired' : 'Look at this file here'" (click)="view(o)">
+                              <app-icon name="eye" />View
+                            </button>
+                          }
+                          @if (o.kind === 'file') {
+                            @if (formatsFor(o.name, o.format).length === 1) {
+                              <button type="button" class="btn btn-default btn-xs" [attr.data-format]="formatsFor(o.name, o.format)[0].id"
+                                      [disabled]="!usable(o) || store.busy() !== ''" [attr.aria-label]="'Download ' + o.name"
+                                      [title]="o.expired ? 'This file has expired and can no longer be downloaded' : 'Download as ' + formatsFor(o.name, o.format)[0].label"
+                                      (click)="store.downloadDataset(o.runDatasetId!, formatsFor(o.name, o.format)[0].id, o.name)">
+                                <app-icon name="download" />Download
+                              </button>
+                            } @else {
+                              <button type="button" class="btn btn-default btn-xs" data-test="download" [cdkMenuTriggerFor]="formats"
+                                      [disabled]="!usable(o) || store.busy() !== ''" [attr.aria-label]="'Download ' + o.name + ' as…'">
+                                <app-icon name="download" />Download<app-icon name="chevronDown" size="0.8em" />
+                              </button>
+                              <ng-template #formats>
+                                <div cdkMenu class="card shadow-xl py-1 min-w-36 text-sm">
+                                  @for (f of formatsFor(o.name, o.format); track f.id) {
+                                    <button cdkMenuItem class="menu-item" [attr.data-format]="f.id"
+                                            (cdkMenuItemTriggered)="store.downloadDataset(o.runDatasetId!, f.id, o.name)">As {{ f.label }}</button>
+                                  }
+                                </div>
+                              </ng-template>
+                            }
+                          } @else {
+                            <button type="button" class="btn btn-default btn-xs" data-test="download-upload" [disabled]="!usable(o) || store.busy() !== ''"
+                                    [attr.aria-label]="'Download ' + o.name + ' from ' + o.bucket" (click)="store.downloadUpload(o)">
+                              <app-icon name="download" />Download
+                            </button>
+                          }
+                          <button type="button" class="btn btn-ghost btn-icon btn-xs" data-test="output-more" [cdkMenuTriggerFor]="more"
+                                  [attr.aria-label]="'More for ' + o.name"><app-icon name="dots" /></button>
+                          <ng-template #more>
+                            <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                              @if (canVisualise(o)) {
+                                <button cdkMenuItem class="menu-item" data-test="visualise" [cdkMenuItemDisabled]="!usable(o)"
+                                        (cdkMenuItemTriggered)="visualise(o)"><app-icon name="chart" />Visualise</button>
+                              }
+                              <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="copyWhere(o)"><app-icon name="copy" />{{ o.kind === 'bucket' ? 'Copy bucket path' : 'Copy file name' }}</button>
+                            </div>
+                          </ng-template>
+                        </div>
+                      </td>
+                    </tr>
                   }
-                } @else {
-                  <button type="button" class="btn btn-default btn-xs" [disabled]="!o.bucket || !o.key || store.busy() !== ''"
-                          [attr.aria-label]="'Download ' + o.name + ' from ' + o.bucket" (click)="store.downloadUpload(o)">
-                    <app-icon name="download" />Download
-                  </button>
                 }
-              </div>
-            </li>
-          } @empty {
-            <li class="px-4 py-3 text-[color:var(--text-muted)]">No files were recorded for this run.</li>
-          }
-        </ul>
+              } @empty {
+                <tr><td colspan="5" class="text-[color:var(--text-muted)]">No file matches.</td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
       }
     </section>
   `,
@@ -84,7 +158,74 @@ export class RunOutputs {
   readonly formatsFor = formatsFor;
   readonly files = this.store.outputList;
 
+  private readonly toast = inject(ToastService);
+  readonly query = signal('');
+  readonly typeFilter = signal('');
+  private readonly folded = signal<ReadonlySet<string>>(new Set());
+
   label(o: RunOutput): string { return outputLabel(o); }
+
+  /** The Size column: rows or pages and bytes; the type has its own column, so it is not said twice. */
+  sizeOf(o: RunOutput): string { return outputLabel(o).split(' · ').slice(1).join(' · ') || '—'; }
+
+  /** A file's type as people say it: the format, else its extension. */
+  typeOf(o: RunOutput): string { return (o.format || (/\.([a-z0-9]+)$/i.exec(o.name ?? '')?.[1] ?? 'file')).toUpperCase(); }
+
+  iconOf(o: RunOutput): string {
+    const t = this.typeOf(o);
+    if (t === 'PDF') return 'file';
+    if (['JSON', 'JSONL', 'NDJSON'].includes(t)) return 'code';
+    if (['CSV', 'TSV', 'XLSX', 'PARQUET'].includes(t)) return 'table';
+    if (['M4A', 'MP3', 'WAV', 'OGG', 'FLAC', 'WEBM'].includes(t)) return 'volume';
+    if (['PNG', 'JPG', 'JPEG', 'GIF', 'WEBP'].includes(t)) return 'image';
+    return o.kind === 'bucket' ? 'cloud' : 'file';
+  }
+
+  usable(o: RunOutput): boolean { return o.kind === 'file' ? !o.expired && !!o.runDatasetId : !!o.bucket && !!o.key; }
+
+  readonly types = computed(() => [...new Set(this.files().map(o => this.typeOf(o)))].sort());
+  private readonly shown = computed(() => {
+    const q = this.query().trim().toLowerCase();
+    const t = this.typeFilter();
+    return this.files().filter(o => (!t || this.typeOf(o) === t) && (!q || o.name.toLowerCase().includes(q) || (o.key ?? '').toLowerCase().includes(q)));
+  });
+  readonly shownCount = computed(() => this.shown().length);
+  /** The files by the step that made them, in step order (owner 2026-10-20: one flat list of ten looked like a wall of buttons). */
+  readonly groups = computed(() => {
+    const byStep = new Map<string, { key: string; step: number; stepKey: string; rows: RunOutput[] }>();
+    for (const o of this.shown()) {
+      const key = `${o.stepIndex ?? 0}:${o.stepKey ?? ''}`;
+      if (!byStep.has(key)) byStep.set(key, { key, step: (o.stepIndex ?? 0) + 1, stepKey: o.stepKey ?? '', rows: [] });
+      byStep.get(key)!.rows.push(o);
+    }
+    return [...byStep.values()].sort((a, b) => a.step - b.step);
+  });
+
+  isFolded(key: string): boolean { return this.folded().has(key); }
+  toggle(key: string): void {
+    const next = new Set(this.folded());
+    if (next.has(key)) next.delete(key); else next.add(key);
+    this.folded.set(next);
+  }
+
+  async copyWhere(o: RunOutput): Promise<void> {
+    const text = o.kind === 'bucket' ? `${o.bucket}/${o.key}` : o.name;
+    if (await copyText(text)) this.toast.success('Copied'); else this.toast.error('Could not copy; select the text instead.');
+  }
+
+  /** Owner 2026-10-20: every output can be looked at in place -- an upload with the object browser's preview (any kind), a
+   *  kept file when it is a PDF or a table (RunOutputView); anything else only downloads. */
+  canView(o: RunOutput): boolean { return o.kind === 'bucket' || viewKind(o.name, o.format) !== null; }
+
+  view(o: RunOutput): void {
+    if (o.kind === 'bucket') {
+      if (!o.bucket || !o.key) return;
+      this.dialog.open<boolean, PreviewData>(PreviewDialog, { data: { bucket: o.bucket, key: o.key, name: o.name }, hasBackdrop: true });
+    } else if (o.runDatasetId && !o.expired) {
+      this.dialog.open<unknown, RunOutputViewData>(RunOutputView,
+        { data: { name: o.name, runDatasetId: o.runDatasetId, format: o.format ?? null, rowCount: o.rowCount ?? null }, hasBackdrop: true });
+    }
+  }
 
   /** MIG-357: a table the run put out can be charted -- a kept file read as rows, an upload through Analytics. */
   canVisualise(o: RunOutput): boolean { return chartable(o.name, o.format); }

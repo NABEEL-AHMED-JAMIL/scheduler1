@@ -1,16 +1,100 @@
 <div class="page">
-  <app-page-header>
-    <div class="page-head">
-      <div>
-        <h1 class="page-title">Billing analytics</h1>
-        <p class="page-subtitle">Every workspace: what was invoiced, what came in, what is open, who churns data.</p>
-      </div>
-      <div class="flex items-center gap-2 flex-wrap">
-        <app-segmented ariaLabel="Range" [options]="rangeOptions" [value]="'' + months()" (valueChange)="setMonths(+$event)" />
-        <a routerLink="/billing/invoices" class="btn btn-ghost btn-sm">Invoices</a>
-      </div>
-    </div>
+  <app-page-header title="Analytics"
+                   [subtitle]="isPlatform() ? 'What was used and what it cost, by month, service and pipeline — one workspace or every one; with every workspace, the revenue too.' : 'What your workspace used and what it cost, by month, by service and by pipeline.'">
+    <app-workspace-select [value]="tenantId()" (valueChange)="pickWorkspace($event)" [allowAll]="true" />
+    <app-segmented ariaLabel="Range" [options]="rangeOptions" [value]="'' + months()" (valueChange)="setMonths(+$event)" />
+    <a routerLink="/billing/usage" class="btn btn-ghost btn-sm">Cost &amp; usage</a>
   </app-page-header>
+
+  <!-- Owner #22: the trends, scoped by the server -- a workspace administrator's own workspace, always. -->
+  <section class="flex flex-col gap-4" data-test="cost-trends" aria-label="Cost trends">
+    @if (trendsLoading()) {
+      <div class="card p-12 text-center text-sm text-[color:var(--text-muted)]" role="status"><div class="spinner mx-auto mb-3"></div>Reading the trends…</div>
+    } @else if (trendsError()) {
+      <div class="card p-8 text-center"><app-icon name="alert" size="1.6rem" class="icon-crit" /><p class="text-sm text-crit-500 mt-2">{{ trendsError() }}</p>
+        <button type="button" class="btn btn-default btn-sm mt-3" (click)="load()"><app-icon name="refresh" />Try again</button></div>
+    } @else if (trends(); as t) {
+      <div class="grid grid-cols-2 md:grid-cols-4 stat-strip stat-row is-md is-start" role="list">
+        <app-stat-tile [label]="'Last ' + months() + ' months'" [value]="money2(total())" icon="chart" tone="info" [foot]="scopeName()" />
+        <app-stat-tile label="This month so far" [value]="money2(thisMonth())" icon="calendar" tone="info"
+                       [foot]="lastMonth() === null ? 'priced each day' : 'last month ' + money2(lastMonth()!)" />
+        <app-stat-tile label="Largest service" [value]="topService()?.service ?? '—'" icon="layers" tone="muted"
+                       [foot]="topService() ? money2(+topService()!.amount) : 'nothing used yet'" />
+        @if (t.byPipeline) {
+          <app-stat-tile label="Costliest pipeline" [value]="pipelineRows()[0]?.pipeline ?? '—'" icon="list" tone="muted"
+                         [foot]="pipelineRows()[0] ? money2(pipelineRows()[0].cost) + ' · ' + pipelineRows()[0].runs + ' runs' : 'no run billed in this range'" />
+        } @else {
+          <app-stat-tile label="Workspaces billed" [value]="'' + workspaceRows().length" icon="building" tone="muted" foot="with usage in this range" />
+        }
+      </div>
+
+      <div class="card p-4 min-w-0" data-test="cost-by-month">
+        <h2 class="font-semibold text-sm">Cost by month</h2>
+        <p class="text-xs text-[color:var(--text-muted)] mb-2">Priced each day, before the month's allowances and tiers (Cost &amp; usage's chart). Coloured by service.</p>
+        <app-bar-chart [data]="monthBars()" [height]="180" [format]="money2" [axis]="true" emptyMessage="Nothing used in this range." />
+      </div>
+
+      <div class="grid gap-4 lg:grid-cols-2">
+        <div class="card p-4 min-w-0" data-test="cost-by-service">
+          <h2 class="font-semibold text-sm mb-2">By service</h2>
+          <div class="overflow-x-auto">
+            <table class="table-modern">
+              <thead><tr><th>Service</th><th class="text-right">Cost</th><th class="w-40">Share</th></tr></thead>
+              <tbody>
+                @for (s of serviceRows(); track s.service) {
+                  <tr><td>{{ s.service }}</td><td class="text-right tabular">{{ money2(s.amount) }}</td>
+                    <td><div class="progress" role="meter" [attr.aria-label]="s.service + ' share'" aria-valuemin="0" aria-valuemax="100" [attr.aria-valuenow]="s.share">
+                      <div class="progress-bar" [style.width.%]="s.share"></div></div></td></tr>
+                }
+                @if (!serviceRows().length) { <tr><td colspan="3" class="text-center text-[color:var(--text-muted)] py-4">Nothing used in this range.</td></tr> }
+              </tbody>
+            </table>
+          </div>
+        </div>
+        @if (t.byPipeline !== undefined) {
+          <div class="card p-4 min-w-0" data-test="cost-by-pipeline">
+            <h2 class="font-semibold text-sm mb-2">By pipeline</h2>
+            <div class="overflow-x-auto">
+              <table class="table-modern">
+                <thead><tr><th>Pipeline</th><th class="text-right">Runs</th><th class="text-right">Cost</th><th class="hidden 2xl:table-cell">Last run</th></tr></thead>
+                <tbody>
+                  @for (p of pipelineRows(); track p.taskDetailId ?? $index) {
+                    <tr><td class="max-w-56 truncate" [title]="p.pipeline || ''">{{ p.pipeline || 'Not tied to a pipeline' }}</td>
+                      <td class="text-right tabular">{{ p.runs | number }}</td><td class="text-right tabular">{{ money2(p.cost) }}</td>
+                      <td class="hidden 2xl:table-cell text-xs text-[color:var(--text-secondary)] whitespace-nowrap">{{ p.lastRunAt ? (p.lastRunAt | serverTime: 'recent') : '—' }}</td></tr>
+                  }
+                  @if (!pipelineRows().length) { <tr><td colspan="4" class="text-center text-[color:var(--text-muted)] py-4">{{ t.byPipeline === null ? 'Pipeline costs could not be read just now.' : 'No pipeline run was billed in this range.' }}</td></tr> }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        } @else {
+          <div class="card p-4 min-w-0" data-test="cost-by-workspace">
+            <h2 class="font-semibold text-sm mb-2">By workspace</h2>
+            <div class="overflow-x-auto">
+              <table class="table-modern">
+                <thead><tr><th>Workspace</th><th class="text-right">Cost</th><th class="w-40">Share</th></tr></thead>
+                <tbody>
+                  @for (w of workspaceRows(); track w.tenantId) {
+                    <tr><td><button type="button" class="link-inline" (click)="pickWorkspace(w.tenantId); directory.choose(w.tenantId)">{{ w.name }}</button></td>
+                      <td class="text-right tabular">{{ money2(w.amount) }}</td>
+                      <td><div class="progress" role="meter" [attr.aria-label]="w.name + ' share'" aria-valuemin="0" aria-valuemax="100" [attr.aria-valuenow]="w.share">
+                        <div class="progress-bar" [style.width.%]="w.share"></div></div></td></tr>
+                  }
+                  @if (!workspaceRows().length) { <tr><td colspan="3" class="text-center text-[color:var(--text-muted)] py-4">Nothing used in this range.</td></tr> }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        }
+      </div>
+    }
+  </section>
+
+  @if (showRevenue()) {
+  <!-- Cross-customer revenue: the platform's alone (billing.json/analytics is PLATFORM_ADMIN). -->
+  <section class="flex flex-col gap-0 mt-2" data-test="revenue" aria-labelledby="revenue-title">
+  <h2 class="text-lg font-semibold m-0 mb-3" id="revenue-title">Revenue across workspaces</h2>
   @if (loading()) {
     <div class="card p-12 text-center text-sm text-[color:var(--text-muted)]"><div class="spinner mx-auto mb-3"></div>Reading…</div>
   } @else if (error()) {
@@ -23,12 +107,12 @@
         <div>
           <b>Usage with no price anywhere</b> — on no workspace card and not on the default card, so billed at 0:
           @for (u of unpriced(); track u.tenantId) { <span>{{ u.tenantName }}: <span class="mono">{{ u.meters.join(', ') }}</span>{{ $last ? '.' : '; ' }}</span> }
-          <a routerLink="/platform/rate-cards" class="link-inline">Price them on a rate card</a>; the days are priced again.
+          <a routerLink="/billing/settings" class="link-inline">Price them on a rate card</a>; the days are priced again.
         </div>
       </div>
     }
     <div class="grid grid-cols-2 md:grid-cols-5 stat-strip stat-row is-md is-start" role="list">
-      <app-stat-tile label="Invoiced" [value]="money2(d.invoiced)" icon="file" tone="info" [foot]="(d.months?.length ?? 0) + ' month' + (d.months?.length === 1 ? '' : 's')" />
+      <app-stat-tile label="Invoiced" [value]="money2(d.invoiced)" icon="file" tone="info" [foot]="monthCount() + ' month' + (monthCount() === 1 ? '' : 's')" />
       <app-stat-tile label="Collected" [value]="money2(d.collected)" icon="check" tone="ok" [foot]="collectedFoot()" />
       <app-stat-tile label="Overdue" [value]="money2(d.overdue)" icon="alert" [tone]="d.overdue > 0 ? 'crit' : 'muted'" [foot]="d.overdueCount + ' invoice' + (d.overdueCount === 1 ? '' : 's')" />
       <app-stat-tile label="Open" [value]="money2(d.open)" icon="clock" [tone]="d.open > 0 ? 'warn' : 'muted'" [foot]="'issued, not yet paid'" />
@@ -98,5 +182,7 @@
       </table>
       </div>
     </div>
+  }
+  </section>
   }
 </div>

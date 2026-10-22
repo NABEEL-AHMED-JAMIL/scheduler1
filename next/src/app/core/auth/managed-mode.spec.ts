@@ -144,7 +144,7 @@ describe('MIG-254: a staff member working in a managed workspace', () => {
     expect(auth.role()).toBe('PLATFORM_ADMIN');
     expect(auth.heldPlatformSession()).toBe(false);
     expect(localStorage.getItem(PLATFORM_SESSION_KEY)).toBeNull();
-    expect(navigated.at(-1)?.[0]).toEqual(['/platform/work-in-workspace']);
+    expect(navigated.at(-1)?.[0]).toEqual(['/platform/workspaces']);
   });
 
   it('exit with no platform session held signs out', () => {

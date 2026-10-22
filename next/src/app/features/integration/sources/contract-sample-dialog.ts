@@ -16,6 +16,8 @@ export interface ContractSampleData {
   contract?: ContractRow;
   /** A platform administrator's workspaces: a new contract names the one it is for. */
   tenants?: ComboboxOption[];
+  /** Owner #5: the workspace the page's selector picked, the default owner. */
+  tenantId?: number | null;
 }
 
 /**
@@ -101,7 +103,7 @@ export class ContractSampleDialog {
   readonly subtitle = 'Paste a sample, propose a schema from it, then mark the fields every payload must carry.';
   readonly samplePlaceholder = '{"order_id": "A-1", "total": 12.5, "items": [{"sku": "X", "qty": 1}]}';
 
-  readonly tenantId = signal<number | null>(null);
+  readonly tenantId = signal<number | null>(this.data.tenantId ?? null);
   readonly name = signal('');
   readonly direction = signal(this.data.contract?.direction ?? 'IN');
   readonly sensitivity = signal('');

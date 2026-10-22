@@ -31,7 +31,7 @@ const page = <T>(rows: T[], nextCursor: string | null) => of({ status: 'SUCCESS'
 function screen(options: { mine?: (q: InboxQuery) => ReturnType<typeof page<InboxTask>>; requests?: RequestRow[] } = {}) {
   const api = {
     mine: vi.fn(options.mine ?? ((q: InboxQuery) => q.cursor === 'c2' ? page(PAGE_2, null) : page(PAGE_1, 'c2'))),
-    groups: vi.fn(() => page<InboxTask>([], null)),
+    teams: vi.fn(() => page<InboxTask>([], null)),
     done: vi.fn(() => page<InboxTask>([], null)),
     requests: vi.fn(() => page<RequestRow>(options.requests ?? [], null)),
     task: vi.fn((id: number) => of({ status: 'SUCCESS', message: '', data: detail(id) })),
@@ -46,7 +46,7 @@ function screen(options: { mine?: (q: InboxQuery) => ReturnType<typeof page<Inbo
       provideRouter([]),
       { provide: WorkflowsApi, useValue: api },
       { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn() } },
-      { provide: TaskCountService, useValue: { refresh: vi.fn(), count: signal(240), overdue: signal(0), mine: signal(240), groups: signal(0),
+      { provide: TaskCountService, useValue: { refresh: vi.fn(), count: signal(240), overdue: signal(0), mine: signal(240), teams: signal(0),
         done: signal(0), requests: signal(0) } },
       { provide: AuthService, useValue: { canOpen: () => true, user: signal({ appUserId: 4537, tenantId: 2924 }) } },
     ],

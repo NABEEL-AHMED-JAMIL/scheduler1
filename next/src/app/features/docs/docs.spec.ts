@@ -5,11 +5,16 @@ import { provideRouter } from '@angular/router';
 import { ThemeService } from '../../core/theme.service';
 import { Docs } from './docs';
 import { AuthService } from '../../core/auth/auth.service';
+import { NAV, NavViewer, entryVisible } from '../../core/nav/nav-tree';
+import { NavAccess } from '../../core/nav/nav-access';
 
-function mount(signedIn = false) {
+function mount(signedIn = false, viewer?: NavViewer) {
   TestBed.resetTestingModule();
+  const seen: NavViewer = viewer ?? { canOpen: () => true, isAdmin: true, isPlatform: false, showTeam: false };
   TestBed.configureTestingModule({ imports: [Docs], providers: [provideRouter([]),
     { provide: AuthService, useValue: { isLoggedIn: signal(signedIn) } },
+    // The menu's own rule (nav-tree's entryVisible), for the reader the test names.
+    { provide: NavAccess, useValue: { visible: (gate: Parameters<typeof entryVisible>[0]) => entryVisible(gate, seen) } },
     { provide: ThemeService, useValue: { theme: signal('light'), toggle: () => {} } }] });
   const fixture = TestBed.createComponent(Docs);
   fixture.detectChanges();
@@ -78,7 +83,7 @@ describe('Docs for someone already signed in, and on a narrow screen', () => {
 describe('Docs for the current product', () => {
   it('follows the main flow, in the menu\'s order', () => {
     const titles = Array.from(mount().querySelectorAll('main h2[id]')).map(h => h.id);
-    expect(titles).toEqual(['start', 'people', 'data-in', 'build', 'run', 'review', 'results', 'monitor', 'billing', 'health-data', 'reference']);
+    expect(titles).toEqual(['start', 'people', 'data-in', 'build', 'run', 'review', 'results', 'reports', 'monitor', 'billing', 'developers', 'health-data', 'reference']);
   });
 
   it('never names the old menus or calls a pipeline a task or a schedule a job', () => {
@@ -104,10 +109,118 @@ describe('Docs for the current product', () => {
     expect(rows.some(r => r.includes('My requests'))).toBe(false);
   });
 
+  // 2026-10-20: the map linked "Platform" for everyone, so a workspace administrator (4640) landed on Not available.
+  describe('links an entry only where the menu would show it', () => {
+    const row = (page: HTMLElement, entry: string) => Array.from(page.querySelectorAll<HTMLElement>('[data-test="doc-menu"] tbody tr'))
+      .find(r => r.querySelectorAll('td')[1]?.textContent?.trim().startsWith(entry))!;
+    const link = (page: HTMLElement, entry: string) => row(page, entry).querySelector('a')?.getAttribute('href') ?? null;
+
+    it('a workspace administrator: no link to Platform, which says whom it is for; their own pages linked', () => {
+      const page = mount(true, { canOpen: () => true, isAdmin: true, isPlatform: false, showTeam: false });
+      expect(link(page, 'Platform')).toBeNull();
+      expect(row(page, 'Platform').textContent).toContain('(for platform administrators)');
+      expect(link(page, 'Review')).toBe('/review');
+      expect(link(page, 'Administration')).toBe('/administration');
+    });
+
+    it('a platform administrator: Platform linked', () => {
+      expect(link(mount(true, { canOpen: () => true, isAdmin: true, isPlatform: true, showTeam: false }), 'Platform')).toBe('/platform');
+    });
+
+    it('a member: no link to an administrator\'s entry, nor to a page their access does not open', () => {
+      const page = mount(true, { canOpen: key => key !== 'document-review' && key !== 'task-inbox', isAdmin: false, isPlatform: false, showTeam: false });
+      expect(link(page, 'Platform')).toBeNull();
+      expect(link(page, 'Review')).toBeNull();
+      expect(row(page, 'Review').textContent).toContain('(not in your page access)');
+    });
+
+    it('signed out: every entry but the role-only ones', () => {
+      const page = mount(false);
+      expect(link(page, 'Platform')).toBeNull();
+      expect(link(page, 'Review')).toBe('/review');
+    });
+  });
+
   it('keeps healthcare wording safe: synthetic examples, and no claim of compliance', () => {
     const text = mount().textContent ?? '';
     expect(text).toContain('synthetic');
     expect(text).not.toMatch(/HIPAA[- ]compliant|compliant with HIPAA/i);
     expect(text).toContain('does not by itself make a workspace compliant');
+  });
+});
+
+/**
+ * 2026-10-20: the guide follows what shipped since -- Report Studio (phases 1 to 5), the pipeline's Generate report step,
+ * Flow folding, the run's Outputs View, Forms' Rebuild dataset files, Cost & usage's parts, and the Developers pages --
+ * in the console's own words, and every place it names is a menu entry, a tab, or a page beneath one.
+ */
+describe('Docs for what shipped by 2026-10-20', () => {
+  const section = (page: HTMLElement, id: string) => page.querySelector(`#${id}`)!.closest('section')!;
+  const where = (el: Element) => Array.from(el.querySelectorAll('[data-test="doc-where"] a')).map(a => a.getAttribute('href'));
+
+  it('sends the reader to every tab of Reports, by the names the menu gives them', () => {
+    const page = mount();
+    const reports = section(page, 'reports');
+    expect(where(reports)).toEqual(['/reports/overview', '/reports/templates', '/reports/library', '/reports/data', '/reports/assets', '/reports/settings']);
+    const hub = NAV.flatMap(i => i.children ?? []).find(c => c.label === 'Reports')!;
+    for (const tab of hub.tabs!) expect(reports.textContent, tab.label).toContain(tab.label);
+    for (const words of ['Approve and sign', 'Verify signature', 'Void', 'Mark this version as COPY', 'Archive', 'Delete', 'Superseded',
+      'Brand profile'.toLowerCase(), 'Signatures and stamps', 'watermark', 'QR codes', 'KPI tiles', 'Create report',
+      // Phase 7: reviews in the Task inbox, the settings, retention.
+      'Ask for approval', 'Review › Approvals', 'Two approvals', 'Publishing needs a second person', 'Removed by retention']) {
+      expect(reports.textContent!.toLowerCase(), words).toContain(words.toLowerCase());
+    }
+  });
+
+  it('names the pipeline\'s Generate report step, the Flow view\'s folding and the run\'s Outputs View', () => {
+    const page = mount();
+    const build = section(page, 'build').textContent!;
+    expect(build).toContain('Generate report');
+    expect(build).toContain('Design the report here');
+    expect(build).toContain('Use a saved template');
+    expect(build).toContain('Collapse all');
+    expect(build).toContain('Work in this workspace');
+    const run = section(page, 'run').textContent!;
+    expect(run).toContain('Outputs');
+    expect(run).toContain('View');
+  });
+
+  it('names the steps that work on files, and One file per row, by the names the step form gives them', () => {
+    const build = section(mount(), 'build').textContent!;
+    for (const words of ['Transcribe audio', 'Timestamps', 'Convert file', 'File key column', 'When a file fails', 'Save File',
+      'Upload to bucket', 'One file per row', '{{file_stem}}-insight.json', 'JSON columns', 'Which objects', 'last_run',
+      'The run\'s own files first', 'One report per row']) {
+      expect(build, words).toContain(words);
+    }
+  });
+
+  it('names Rebuild dataset files and Cost & usage\'s parts as the console does', () => {
+    const page = mount();
+    expect(section(page, 'data-in').textContent).toContain('Rebuild dataset files');
+    const billing = section(page, 'billing').textContent!;
+    for (const part of ['Cost by day', 'Cost by pipeline', 'By pipeline', 'By run', 'AI model calls', 'Line by line', 'Pricing rules']) {
+      expect(billing, part).toContain(part);
+    }
+  });
+
+  it('sends developers to API Clients and the Developer portal, and says the Reports library has no API yet', () => {
+    const page = mount();
+    const dev = section(page, 'developers');
+    expect(where(dev)).toEqual(['/developers/api-clients', '/developers/portal']);
+    expect(dev.textContent).toContain('600 calls a minute');
+    expect(dev.textContent).toContain('no calls for the Reports library yet');
+  });
+
+  it('links only to places the menu has, or pages beneath them', () => {
+    const paths = NAV.flatMap(i => [i.path, ...(i.tabs ?? []).map(t => t.path), ...(i.children ?? []).flatMap(c => [c.path, ...(c.tabs ?? []).map(t => t.path)])])
+      .filter((p): p is string => !!p);
+    const known = (href: string) => ['/request-workspace', '/account/security', '/notifications', '/pipelines/new'].includes(href)
+      || paths.some(p => href === p || href.startsWith(p + '/'));
+    const links = Array.from(mount().querySelectorAll('[data-test="doc-where"] a')).map(a => a.getAttribute('href')!);
+    expect(links.filter(l => !known(l))).toEqual([]);
+  });
+
+  it('keeps its examples domain-neutral: no claims or reinsurance examples', () => {
+    expect(mount().textContent).not.toMatch(/claims file|reinsurance/i);
   });
 });

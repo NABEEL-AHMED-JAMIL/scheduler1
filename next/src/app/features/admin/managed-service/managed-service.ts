@@ -1,3 +1,5 @@
+import { WorkspaceSelect } from '../../../shared/ui/workspace-select';
+import { WorkspaceDirectory } from '../../../core/workspaces/workspace-directory';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Dialog } from '@angular/cdk/dialog';
@@ -23,7 +25,7 @@ interface TenantRow { tenantId: number; tenantName: string; status?: string; man
  */
 @Component({
   selector: 'app-managed-service',
-  imports: [RefreshButton, PageHeader, TableShell, Icon, ServerTimePipe, RouterLink],
+  imports: [WorkspaceSelect, RefreshButton, PageHeader, TableShell, Icon, ServerTimePipe, RouterLink],
   templateUrl: './managed-service.html',
 })
 export class ManagedService implements OnInit {
@@ -37,7 +39,7 @@ export class ManagedService implements OnInit {
   readonly error = signal('');
   readonly tenants = signal<GrantWorkspace[]>([]);
   readonly staff = signal<StaffCandidate[]>([]);
-  readonly tenantFilter = signal<number | null>(null);
+  readonly tenantFilter = signal<number | null>(inject(WorkspaceDirectory).remembered());
   readonly staffFilter = signal<number | null>(null);
   readonly includeRevoked = signal(false);
   /** The grant a revoke is in flight for. */

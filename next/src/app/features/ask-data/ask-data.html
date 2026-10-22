@@ -133,7 +133,7 @@
         @switch (t.state) {
           @case ('asking') {
             <p class="text-sm text-[color:var(--text-muted)] flex items-center gap-2" data-test="asking">
-              <app-icon name="refresh" class="spin" />Reading your data and asking the model… {{ elapsed() }}s
+              <app-icon name="refresh" class="spin" />Reading your data and asking the model… {{ elapsedText() }}
             </p>
           }
           @case ('failed') {

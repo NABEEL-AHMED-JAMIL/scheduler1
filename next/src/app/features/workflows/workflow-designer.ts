@@ -1,4 +1,4 @@
-import { Component, ElementRef, OnInit, computed, inject, signal, viewChild } from '@angular/core';
+import { Component, ElementRef, OnInit, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
@@ -14,12 +14,14 @@ import { FlowGraph } from '../../shared/flow-graph/flow-graph';
 import { workflowGraph } from '../../shared/flow-graph/flow-adapters';
 import { ToastService } from '../../shared/ui/toast.service';
 import { confirmWith } from '../../shared/ui/confirm';
-import { AccessProfilesService } from '../admin/access-profiles/access-profiles.service';
-import { Colleague, RequestRow, WorkflowDetail, WorkflowSummary, WorkflowsApi } from './workflows.api';
-import { DraftStep, OPERATORS, STEP_TYPES, StepType, Who, WhoKind, fromJson, newStep, problemStep, subjectWho, toJson } from './designer.model';
+import { TeamsApi } from '../../core/teams/teams.api';
+import { Colleague, RequestRow, WorkflowDetail, WorkflowSummary, WorkflowsApi, CANNOT_ACT } from './workflows.api';
+import { DraftStep, OPERATORS, STEP_TYPES, StepType, Who, WhoKind, canEnd, fromJson, newStep, problemStep, subjectWho, toJson, runSaveAs } from './designer.model';
 import { shortTime } from './history';
 import { splitTail } from './inbox-list';
 import { PageHeader } from '../../shared/ui/page-header';
+import { StepsApi } from '../tasks/steps/steps.service';
+import { ApiRequestChoice } from '../tasks/steps/steps.model';
 
 /** The platform made it -- a service's built-in workflow (builtIn, or createdBy 0 from a service that predates it). */
 export function isBuiltIn(w: Pick<WorkflowSummary, 'builtIn' | 'createdBy'>): boolean {
@@ -50,7 +52,7 @@ export function isBuiltIn(w: Pick<WorkflowSummary, 'builtIn' | 'createdBy'>): bo
 export class WorkflowDesigner implements OnInit {
   private readonly api = inject(WorkflowsApi);
   private readonly http = inject(HttpClient);
-  private readonly profiles = inject(AccessProfilesService);
+  private readonly teamsApi = inject(TeamsApi);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
@@ -94,8 +96,11 @@ export class WorkflowDesigner implements OnInit {
   /** P2 #36: the workspace has nobody but the reader, so an approval has no one to decide it. */
   readonly soleMember = computed(() => this.colleaguesLoaded()
     && !this.colleagues().some(c => c.userId !== this.auth.user()?.appUserId));
-  readonly groups = signal<{ id: number; name: string }[]>([]);
+  readonly teams = signal<{ id: number; name: string }[]>([]);
   readonly jobs = signal<{ jobId: number; jobName?: string }[]>([]);
+  /** Owner #25: the workspace's saved API requests, for a Call API step; read the first time one is shown. */
+  readonly apiRequests = signal<ApiRequestChoice[] | null>(null);
+  private readonly stepsApi = inject(StepsApi);
 
   // new workflow
   readonly newName = signal('');
@@ -188,18 +193,109 @@ export class WorkflowDesigner implements OnInit {
 
   readonly workflowProblems = computed(() => this.problems().filter(p => problemStep(p) === null));
 
+  /** Anyone may be told (a notice); a step's assignee or escalation must be able to open the inbox to act on it. */
   readonly colleagueOptions = computed<ComboboxOption[]>(() => this.colleagues()
     .map(c => ({ value: String(c.userId), label: c.fullName || c.username, hint: c.username })));
+  readonly actorOptions = computed<ComboboxOption[]>(() => this.colleagues()
+    .map(c => c.canAct === false ? { value: String(c.userId), label: c.fullName || c.username, hint: CANNOT_ACT, disabled: true }
+      : { value: String(c.userId), label: c.fullName || c.username, hint: c.username }));
 
   readonly jobOptions = computed<ComboboxOption[]>(() => this.jobs()
     .map(j => ({ value: String(j.jobId), label: j.jobName || `Schedule #${j.jobId}`, hint: `#${j.jobId}` })));
+
+  readonly requestOptions = computed<ComboboxOption[]>(() => (this.apiRequests() ?? [])
+    .map(r => ({ value: String(r.id), label: `${r.method} · ${r.label}`, hint: r.enabled ? `#${r.id}` : 'disabled', disabled: !r.enabled })));
+
+  /** The selected Call API step's request, for its environments and method. */
+  requestOf(s: DraftStep): ApiRequestChoice | undefined {
+    return (this.apiRequests() ?? []).find(r => r.id === s.requestId);
+  }
+
+  readonly variablePlaceholder = '{{amount}}';
+
+  constructor() {
+    // The requests are read once a workflow has a Call API step to show them in.
+    effect(() => {
+      if (this.steps().some(s => s.type === 'call_api')) untracked(() => this.loadApiRequests());
+    });
+  }
+
+  /** Reads the requests once, when a Call API step is first shown. */
+  loadApiRequests(): void {
+    if (this.apiRequests() !== null) return;
+    this.apiRequests.set([]);
+    this.stepsApi.apiRequests().subscribe({ next: r => this.apiRequests.set(r), error: () => this.apiRequests.set([]) });
+  }
+
+  /** A Call API step's variables as rows to edit. */
+  variableRows(s: DraftStep): { name: string; value: string }[] {
+    return Object.entries(s.variables ?? {}).map(([name, value]) => ({ name, value }));
+  }
+
+  setVariables(rows: { name: string; value: string }[]): void {
+    const out: Record<string, string> = {};
+    rows.forEach(r => { if (r.name.trim()) out[r.name.trim()] = r.value; });
+    this.set('variables', out);
+  }
+
+  setVariable(s: DraftStep, i: number, part: 'name' | 'value', text: string): void {
+    const rows = this.variableRows(s);
+    if (i >= rows.length) rows.push({ name: '', value: '' });
+    rows[i] = { ...rows[i], [part]: text };
+    // A row whose name is still empty is kept while it is typed into.
+    const out: Record<string, string> = {};
+    rows.forEach((r, n) => { out[r.name.trim() || `variable_${n + 1}`] = r.value; });
+    this.set('variables', out);
+  }
+
+  addVariable(s: DraftStep): void {
+    const rows = this.variableRows(s);
+    let n = rows.length + 1;
+    while (rows.some(r => r.name === `variable_${n}`)) n++;
+    this.setVariables([...rows, { name: `variable_${n}`, value: '' }]);
+  }
+
+  removeVariable(s: DraftStep, i: number): void {
+    this.setVariables(this.variableRows(s).filter((_, n) => n !== i));
+  }
+
+  /** Turns waiting on or off for a Run pipeline step; on, its outcome is kept at run_<key> unless named. */
+  setWaitFor(s: DraftStep, on: boolean): void {
+    this.set('waitFor', on);
+    if (on && !s.saveAs) this.set('saveAs', runSaveAs(s.key));
+    if (on && s.waitHours == null) this.set('waitHours', 24);
+  }
+
+  /** Puts a Condition on the run's outcome right after the selected Run pipeline step: completed one way, the rest the other. */
+  branchOnRun(s: DraftStep): void {
+    const i = this.selected();
+    if (i === null) return;
+    const step = newStep('condition', this.keys());
+    step.name = 'Completed?';
+    step.condition = { field: `${s.saveAs || runSaveAs(s.key)}.ok`, op: 'eq', value: true };
+    this.steps.update(list => [...list.slice(0, i + 1), step, ...list.slice(i + 1)]);
+    this.selected.set(i + 1);
+    this.touch();
+  }
+
+  /** Puts a Condition on the answer right after the selected Call API step: accepted one way, the rest the other. */
+  branchOnAnswer(s: DraftStep): void {
+    const i = this.selected();
+    if (i === null) return;
+    const step = newStep('condition', this.keys());
+    step.name = 'Accepted?';
+    step.condition = { field: `${s.saveAs || 'api'}.status`, op: 'lt', value: 300 };
+    this.steps.update(list => [...list.slice(0, i + 1), step, ...list.slice(i + 1)]);
+    this.selected.set(i + 1);
+    this.touch();
+  }
 
   ngOnInit(): void {
     if (this.noWorkspace()) { this.loading.set(false); return; }
     this.api.colleagues().subscribe({ next: r => { if (r.status === API_SUCCESS) { this.colleagues.set(r.data ?? []); this.colleaguesLoaded.set(true); } }, error: () => {} });
     if (this.auth.isTenantAdmin()) {
-      this.profiles.list().subscribe({
-        next: r => { if (r.status === API_SUCCESS) this.groups.set((r.data ?? []).map(p => ({ id: p.pageAccessProfileId, name: p.profileName }))); },
+      this.teamsApi.list().subscribe({
+        next: r => { if (r.status === API_SUCCESS) this.teams.set((r.data ?? []).map(t => ({ id: t.teamId, name: t.name }))); },
         error: () => {},
       });
     }
@@ -573,10 +669,24 @@ export class WorkflowDesigner implements OnInit {
         return `If ${c?.field || '…'} ${op}${this.needsValue(s) ? ' ' + this.conditionValue(s) : ''}`;
       }
       case 'notify': return `Tell ${this.who(s.to)}`;
-      case 'run_pipeline': return s.jobId ? this.jobName(s.jobId) : 'No schedule picked';
+      case 'run_pipeline': return s.jobId ? this.jobName(s.jobId) + (s.waitFor ? ` · waits, → ${s.saveAs || runSaveAs(s.key)}` : '') : 'No schedule picked';
+      case 'call_api': {
+        const r = this.requestOf(s);
+        return s.requestId ? (r ? `${r.method} ${r.label}` : `API request #${s.requestId}`) + ` → ${s.saveAs || 'api'}` : 'No API request picked';
+      }
       case 'save_dataset': return `Into ${s.dataset || '…'}`;
       case 'wait': return s.hours ? `For ${hours(s.hours)}` : 'For …';
     }
+  }
+
+  /** The step can end the request, so it may say how: the "ends as" choice shows. */
+  endsHere(s: DraftStep): boolean {
+    const all = this.steps();
+    return canEnd(s, all.indexOf(s) === all.length - 1);
+  }
+
+  hasApprovals(): boolean {
+    return this.steps().some(x => x.type === 'approval');
   }
 
   branches(s: DraftStep): string {
@@ -596,9 +706,9 @@ export class WorkflowDesigner implements OnInit {
         return c ? (c.fullName || c.username) : w.value ? `user ${w.value}` : 'a person (pick one)';
       }
       case 'role': return w.value === 'TENANT_ADMIN' ? 'the administrators' : 'any member';
-      case 'group': {
-        const g = this.groups().find(x => String(x.id) === String(w.value));
-        return g ? `the ${g.name} group` : 'a group';
+      case 'team': {
+        const g = this.teams().find(x => String(x.id) === String(w.value));
+        return g ? `the ${g.name} team` : 'a team';
       }
       case 'manager': return 'the requester\'s manager';
       case 'requester': return 'the requester';

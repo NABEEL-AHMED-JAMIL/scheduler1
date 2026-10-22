@@ -22,49 +22,14 @@ export const PINNED: Record<string, unknown> = {
     "url": "/connections/storage",
     "requests": [
       "GET /notification.json/unreadCount",
-      "GET /notification.json/list?limit=20&page=1",
-      "GET /storageConnection.json/fetchAllConnections",
-      "GET /tenant.json/listTenants"
+      "GET /notification.json/list?limit=20&page=1"
     ],
     "headings": [
-      "Connections",
-      "Connections (1 of 1)"
+      "Storage connections"
     ],
-    "buttons": [
-      "Actions for UI-REVIEW LocalStack S3 (fake keys)",
-      "Cards",
-      "Columns",
-      "Copy ui-review-2924",
-      "Copy ui-review-s3",
-      "New storage connection",
-      "Only mine",
-      "Refresh",
-      "Table"
-    ],
-    "columns": [
-      [
-        "",
-        "Name",
-        "Alias",
-        "Provider",
-        "Target",
-        "Workspace",
-        "Credentials",
-        "Last test",
-        "Created by",
-        "Updated by",
-        "State",
-        "Actions"
-      ]
-    ],
-    "fields": [
-      "Filter by provider",
-      "Search connections",
-      "Search name, alias or host",
-      "Select UI-REVIEW LocalStack S3 (fake keys)",
-      "Select all shown",
-      "Workspace"
-    ],
+    "buttons": [],
+    "columns": [],
+    "fields": [],
     "links": [
       "/connections",
       "/connections/api-collections",
@@ -72,7 +37,8 @@ export const PINNED: Record<string, unknown> = {
       "/connections/contracts",
       "/connections/databases",
       "/connections/sources",
-      "/connections/storage"
+      "/connections/storage",
+      "/platform/workspaces"
     ]
   },
   "storage connections, as a tenant user (admin-only)": {

@@ -1,4 +1,4 @@
-import { PageKey } from '../auth/page-keys';
+import { PageKey, TabKey } from '../auth/page-keys';
 
 /**
  * Who may see a menu entry or a hub's tab. Every rule must hold: a role floor (`adminOnly`, `platformOnly`), the
@@ -15,6 +15,10 @@ export interface NavGate {
   pageKey?: PageKey;
   /** Shown to whoever holds ANY of these pages (Runs' Latest view lists the runs of either). */
   pageKeys?: PageKey[];
+  /** F3 (MIG-400): the tab of `pageKey` this entry is, when the page's tabs can be granted apart (AuthService.canOpenTab). */
+  tabKey?: TabKey;
+  /** F3: an administrator's tab a member with an access delegation opens too (Page access, for the people they reach). */
+  delegateOk?: boolean;
   /**
    * MIG-254: a workspace administrator's view of what our team did there -- offered when the workspace is
    * MANAGED, or once it is known our team has acted in it (a workspace that went back to SELF keeps its history).
@@ -107,21 +111,23 @@ export const NAV: NavItem[] = [
             alsoAt: ['/integration/connectors/oauth/callback'] },
           // Role-gated, not page-keyed: every call behind it is TENANT_ADMIN.
           { label: 'Storage', path: '/connections/storage', adminOnly: true, icon: 'cloud' },
-          { label: 'Databases', path: '/connections/databases', pageKey: 'sources', icon: 'database' },
+          { label: 'Databases', path: '/connections/databases', pageKey: 'sources', tabKey: 'sources:databases', icon: 'database' },
           { label: 'API collections', path: '/connections/api-collections', pageKey: 'api-collections', icon: 'code' },
-          { label: 'Sources', path: '/connections/sources', pageKey: 'sources', icon: 'download' },
-          { label: 'Data contracts', path: '/connections/contracts', pageKey: 'sources', icon: 'shield' },
+          { label: 'Sources', path: '/connections/sources', pageKey: 'sources', tabKey: 'sources:sources', icon: 'download' },
+          { label: 'Data contracts', path: '/connections/contracts', pageKey: 'sources', tabKey: 'sources:contracts', icon: 'shield' },
         ],
       },
       {
         label: 'Documents', path: '/documents', icon: 'file',
-        hint: 'Upload documents, read them into fields, and drop files that start schedules',
+        hint: 'Documents read into fields, their types, the approved data, and every way files come in',
         tabs: [
-          { label: 'Documents in', path: '/documents/in', pageKey: 'document-intelligence', icon: 'search' },
-          { label: 'Document types', path: '/documents/types', pageKey: 'document-intelligence', icon: 'file' },
-          { label: 'Datasets', path: '/documents/datasets', pageKey: 'document-intelligence', icon: 'table' },
-          { label: 'Email-in', path: '/documents/email-in', pageKey: 'document-intelligence', icon: 'mail' },
-          { label: 'File drop', path: '/documents/file-drop', pageKey: 'objects', icon: 'upload' },
+          { label: 'Documents in', path: '/documents/in', pageKey: 'document-intelligence', tabKey: 'document-intelligence:in', icon: 'search' },
+          { label: 'Document types', path: '/documents/types', pageKey: 'document-intelligence', tabKey: 'document-intelligence:types', icon: 'file' },
+          { label: 'Approved data', path: '/documents/approved-data', pageKey: 'document-intelligence', tabKey: 'document-intelligence:approved-data', icon: 'table' },
+          // Owner 2026-10-20 (§0.1): Upload, Email-in and File drop as one tab; each section keeps its own page and guard
+          // (features/documents/intake/intake-sections.ts), so the tab shows to whoever holds either page.
+          { label: 'Intake', path: '/documents/intake', pageKeys: ['document-intelligence', 'objects'], icon: 'upload',
+            alsoAt: ['/documents/intake/upload', '/documents/intake/email-in', '/documents/intake/file-drop'] },
         ],
       },
       {
@@ -145,12 +151,12 @@ export const NAV: NavItem[] = [
           // Deliberately not adminOnly: listSourceTask is TENANT_USER, and a schedule points at a pipeline, so reading
           // the list is part of reading the console. Only writing one is TENANT_ADMIN, gated inside the page.
           { label: 'Pipelines', path: '/pipelines/list', pageKey: 'tasks', icon: 'list' },
-          { label: 'Schedules & triggers', path: '/pipelines/schedules', pageKey: 'jobs', icon: 'calendar' },
-          { label: 'Prompts', path: '/pipelines/prompts', pageKey: 'ai-prompts', icon: 'sparkle' },
+          { label: 'Schedules & triggers', path: '/pipelines/schedules', pageKey: 'jobs', tabKey: 'jobs:schedules', icon: 'calendar' },
+          { label: 'Prompts', path: '/pipelines/prompts', pageKey: 'ai-prompts', tabKey: 'ai-prompts:prompts', icon: 'sparkle' },
         ],
       },
       // MIG-252: the assistant and its tools ride the Prompts key; every call they make is TENANT_USER.
-      { label: 'AI Assistant', path: '/ai/assistant', pageKey: 'ai-prompts', icon: 'chat',
+      { label: 'AI Assistant', path: '/ai/assistant', pageKey: 'ai-prompts', tabKey: 'ai-prompts:assistant', icon: 'chat',
         hint: 'Describe a pipeline in plain language and run it' },
       { label: 'Approval workflows', path: '/workflows/designer', pageKey: 'workflow-designer', icon: 'checkCircle',
         hint: 'Who approves what, and what runs after' },
@@ -167,12 +173,12 @@ export const NAV: NavItem[] = [
           // UX review B3 (E1): Latest lists every schedule's newest runs and what waits for review -- for whoever holds
           // Schedules or Runs by date.
           { label: 'Latest', path: '/runs/latest', pageKeys: ['jobs', 'queue'], icon: 'history' },
-          { label: 'By date', path: '/runs/by-date', pageKey: 'queue', icon: 'calendar' },
+          { label: 'By date', path: '/runs/by-date', pageKey: 'queue', tabKey: 'queue:by-date', icon: 'calendar' },
           { label: 'Analytics', path: '/runs/analytics', pageKey: 'reports', icon: 'chart' },
           // MIG-355: every failed or timed-out run, grouped by error pattern, retried from the failed step -- the Queue's reads.
-          { label: 'Failed', path: '/runs/failed', pageKey: 'queue', icon: 'alert' },
+          { label: 'Failed', path: '/runs/failed', pageKey: 'queue', tabKey: 'queue:failed', icon: 'alert' },
           // MIG-347: a schedule run for each period of a past range, with its progress -- Schedules' (who may run the schedule).
-          { label: 'Backfills', path: '/runs/backfills', pageKey: 'jobs', icon: 'layers' },
+          { label: 'Backfills', path: '/runs/backfills', pageKey: 'jobs', tabKey: 'jobs:backfills', icon: 'layers' },
         ],
       },
       {
@@ -186,12 +192,12 @@ export const NAV: NavItem[] = [
         hint: 'Approvals, run results and documents waiting for your decision',
         tabs: [
           { label: 'All waiting', path: '/review/all', pageKeys: ['task-inbox', 'document-review'], icon: 'inbox' },
-          { label: 'Approvals', path: '/review/approvals', pageKey: 'task-inbox', icon: 'checkCircle' },
-          { label: 'Runs', path: '/review/runs', pageKey: 'task-inbox', icon: 'history' },
+          { label: 'Approvals', path: '/review/approvals', pageKey: 'task-inbox', tabKey: 'task-inbox:approvals', icon: 'checkCircle' },
+          { label: 'Runs', path: '/review/runs', pageKey: 'task-inbox', tabKey: 'task-inbox:runs', icon: 'history' },
           { label: 'Documents', path: '/review/documents', pageKey: 'document-review', icon: 'file' },
         ],
       },
-      { label: 'My requests', path: '/review/requests', pageKey: 'task-inbox', icon: 'send', crumbOnly: true },
+      { label: 'My requests', path: '/review/requests', pageKey: 'task-inbox', tabKey: 'task-inbox:requests', icon: 'send', crumbOnly: true },
     ],
   },
   {
@@ -207,8 +213,25 @@ export const NAV: NavItem[] = [
           { label: 'Ask your data', path: '/data/ask', pageKey: 'ask-data', icon: 'chat' },
           { label: 'Analytics Studio', path: '/data/analytics', pageKey: 'analytics', icon: 'chart' },
           { label: 'Data Catalog', path: '/data/catalog', pageKey: 'data-catalog', icon: 'database' },
-          { label: 'Generated reports', path: '/data/reports', pageKey: 'tools-converter', icon: 'layers' },
           { label: 'Files', path: '/data/files', pageKey: 'objects', icon: 'folder' },
+        ],
+      },
+      {
+        // MIG-403 (Report Studio): templates designed once, filled from pipeline runs and files, every version kept. A hub
+        // under See results (owner-approved 2026-10-19): Overview, Templates, Library, Data, and Assets & branding (MIG-406). The old Analysis › Generated reports moved here (its pipeline files: /reports/from-pipelines).
+        label: 'Reports', path: '/reports', icon: 'file',
+        hint: 'Report templates, the reports made from them, and their data',
+        tabs: [
+          { label: 'Overview', path: '/reports/overview', pageKey: 'report-studio', icon: 'chart' },
+          { label: 'Templates', path: '/reports/templates', pageKeys: ['report-templates', 'report-generate'], icon: 'template' },
+          // Owner 2026-10-19: 'Library', not a second 'Reports' -- the trail read See results › Reports › Reports.
+          { label: 'Library', path: '/reports/library', pageKey: 'report-library', icon: 'file' },
+          { label: 'Data', path: '/reports/data', pageKey: 'report-data', icon: 'database' },
+          // MIG-406: logos, images, signatures and stamps, and brand profiles. The trail reads See results › Reports ›
+          // Assets & branding, then the asset or brand profile's own name: no word twice.
+          { label: 'Assets & branding', path: '/reports/assets', pageKey: 'report-assets', icon: 'image' },
+          // Phase 7: who approves reports and publishes templates, and what retention would remove; administrators only.
+          { label: 'Settings', path: '/reports/settings', adminOnly: true, icon: 'settings' },
         ],
       },
       {
@@ -227,10 +250,14 @@ export const NAV: NavItem[] = [
     children: [
       {
         label: 'Administration', path: '/administration', icon: 'users',
-        hint: 'Users, page access, sign-in security, data policies and appearance',
+        hint: 'Users, teams, page access, sign-in security, data policies and appearance',
         tabs: [
           { label: 'Users', path: '/administration/users', icon: 'users', adminOnly: true },
-          { label: 'Page access', path: '/administration/access-profiles', icon: 'shield', adminOnly: true },
+          // F4: an administrator makes teams here. The page opens to every member (a team's lead changes its members), who
+          // reaches it from Review › Approvals' My teams.
+          { label: 'Teams', path: '/administration/teams', icon: 'users', adminOnly: true },
+          // F3: an access delegate opens it too, for the people their delegation reaches.
+          { label: 'Page access', path: '/administration/access-profiles', icon: 'shield', adminOnly: true, delegateOk: true },
           // MIG-353: password rules, lockout, idle sign-out, two-factor, single sign-on and the sign-in history.
           { label: 'Sign-in security', path: '/administration/security', icon: 'key', adminOnly: true },
           // The route opens to whoever holds Prompts (a member reads the policy from the AI Assistant); the tab is an
@@ -246,8 +273,13 @@ export const NAV: NavItem[] = [
         hint: 'What the workspace used, what it costs, and its bills',
         tabs: [
           { label: 'Cost & usage', path: '/billing/usage', icon: 'chart', adminOnly: true },
+          // Owner #22 (2026-10-19): a workspace administrator's own trends; a platform administrator's every workspace's, with a
+          // workspace filter and the cross-customer revenue (platform only, inside the page).
+          { label: 'Analytics', path: '/billing/analytics', icon: 'trendingUp', adminOnly: true },
           { label: 'Invoices', path: '/billing/invoices', icon: 'file', adminOnly: true },
           { label: 'Billing documents', path: '/billing/documents', icon: 'folder', adminOnly: true },
+          // Owner #23: the rate cards and their pricing rules -- the platform's alone.
+          { label: 'Settings', path: '/billing/settings', icon: 'settings', platformOnly: true },
         ],
       },
       {
@@ -256,7 +288,7 @@ export const NAV: NavItem[] = [
         tabs: [
           { label: 'Model connections', path: '/settings/model-connections', icon: 'server', adminOnly: true },
           // Open to a member holding the Prompts page, as before: the list is TENANT_USER.
-          { label: 'Tool Registry', path: '/settings/tools', pageKey: 'ai-prompts', icon: 'plug' },
+          { label: 'Tool Registry', path: '/settings/tools', pageKey: 'ai-prompts', tabKey: 'ai-prompts:tools', icon: 'plug' },
           // Task Registry: every task a step can run, and the existing pipelines as Legacy tasks (MIG-250).
           { label: 'Task Registry', path: '/settings/task-registry', icon: 'template', adminOnly: true },
           { label: 'Kafka & Topics', path: '/settings/kafka', icon: 'server', adminOnly: true },
@@ -287,11 +319,11 @@ export const NAV: NavItem[] = [
       // listRequests, approve and reject all carry hasRole('PLATFORM_ADMIN').
       { label: 'Requests', path: '/platform/requests', icon: 'inbox', platformOnly: true },
       { label: 'Managed service', path: '/platform/managed-service', icon: 'briefcase', platformOnly: true },
-      { label: 'Work in a workspace', path: '/platform/work-in-workspace', icon: 'external', platformOnly: true },
+      // Owner #20 (2026-10-19): no Work in a workspace page -- "Work in this workspace" is on Workspaces' row menu and beside the
+      // workspace selector. Staff activity stays.
       { label: 'Staff activity', path: '/platform/staff-activity', icon: 'history', platformOnly: true },
-      { label: 'Reliability', path: '/platform/reliability', icon: 'chart', platformOnly: true },
-      { label: 'Billing analytics', path: '/platform/billing-analytics', icon: 'chart', platformOnly: true },
-      { label: 'Rate cards', path: '/platform/rate-cards', icon: 'layers', platformOnly: true },
+      // Owner #21: Reliability slimmed into Service health. #22 and #23: Billing analytics and Rate cards moved into Billing.
+      { label: 'Service health', path: '/platform/service-health', icon: 'activity', platformOnly: true },
       { label: 'Engine settings', path: '/platform/engine', icon: 'settings', platformOnly: true },
     ],
   },
@@ -311,6 +343,10 @@ const pathOf = (url: string) => url.split(/[?#]/)[0].replace(/\/+$/, '') || '/';
 /** What the menu needs to know about the reader (core/nav/nav-access.ts fills it in from the session). */
 export interface NavViewer {
   canOpen(page: PageKey): boolean;
+  /** F3: a tab of a page; absent, every tab of a page held opens. */
+  canOpenTab?(page: PageKey, tab: TabKey): boolean;
+  /** F3: the member holds an access delegation in force. */
+  isDelegate?: boolean;
   isAdmin: boolean;
   isPlatform: boolean;
   /** Our team's activity is worth offering (a MANAGED workspace, or one our team has acted in). */
@@ -319,9 +355,10 @@ export interface NavViewer {
 
 /** Whether the reader passes an entry's or a tab's own rules (a hub also needs a tab: see `visibleTabs`). */
 export function passes(gate: NavGate, viewer: NavViewer): boolean {
-  return (!gate.adminOnly || viewer.isAdmin) && (!gate.platformOnly || viewer.isPlatform)
+  return (!gate.adminOnly || viewer.isAdmin || (!!gate.delegateOk && !!viewer.isDelegate)) && (!gate.platformOnly || viewer.isPlatform)
     && (!gate.teamOnly || (!viewer.isPlatform && viewer.showTeam))
     && (!gate.pageKey || viewer.canOpen(gate.pageKey))
+    && (!gate.pageKey || !gate.tabKey || !viewer.canOpenTab || viewer.canOpenTab(gate.pageKey, gate.tabKey))
     && (!gate.pageKeys || gate.pageKeys.some(key => viewer.canOpen(key)));
 }
 

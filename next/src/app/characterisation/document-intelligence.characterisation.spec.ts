@@ -93,6 +93,18 @@ const ANSWERS: Record<string, unknown> = {
   ] } },
   'GET /documentReview.json/queue': { status: 'SUCCESS', message: '1 document(s).', data: { total: 1, page: 0, size: 50, items: [IN_REVIEW] } },
   'GET /documentReview.json/fetchById': { status: 'SUCCESS', message: 'Data found.', data: REVIEW_1005 },
+  'GET /documentOcr.json/intakes': { status: 'SUCCESS', message: '1 file(s).', data: [
+    { intakeId: 1001, channel: 'upload', sourceLabel: 'Uploaded by alex', fileName: 'po-77104.pdf', sizeBytes: 10, outcome: 'Accepted',
+      ocrDocumentId: 1001, extractionId: 1005, dateCreated: '2026-09-29T05:12:10.000+00:00' },
+  ] },
+  'GET /documentOcr.json/mailbox': { status: 'SUCCESS', message: '', data: { configured: true, active: true,
+    address: 'abcdefghij0123456789@docs.etl-console.local', domain: 'docs.etl-console.local', enabled: true, maxFiles: 20, maxFileSizeMb: 20 } },
+  'GET /documentType.json/starters': { status: 'SUCCESS', message: '1 market(s) of starters.', data: [
+    { key: 'healthcare', label: 'Healthcare', description: 'Clinical and patient paperwork.', starters: [
+      { typeKey: 'referral', name: 'Referral', description: 'A letter asking another provider to see a patient.', fieldCount: 13, tableCount: 0,
+        ruleCount: 4, fields: ['Referral date', 'Patient name'], builtIn: false, added: false, documentTypeId: null },
+    ] },
+  ] },
   'GET /storage.json/buckets': { status: 'SUCCESS', message: 'Buckets fetched successfully.', data: [
     { label: 'UI-REVIEW LocalStack S3 (fake keys)', bucket: 'ui-review-s3', provider: 'S3', bucketName: 'ui-review-2924', region: 'us-east-1',
       connectionStatus: 'SUCCESS', dateCreated: '2026-09-24T22:39:41.53' },
@@ -147,8 +159,25 @@ describe('MIG-272: Document Intelligence', () => {
   });
 
   it('the dataset, as a workspace administrator', async () => {
-    const v = await visit('/documents/datasets', 'TENANT_ADMIN', null, ANSWERS);
+    const v = await visit('/documents/approved-data', 'TENANT_ADMIN', null, ANSWERS);
     pin(FILE, 'the dataset, as a workspace administrator', v.surface, PINNED);
+  });
+
+  // Owner 2026-10-20 (§0.1): Upload and Email-in are sections of Documents › Intake; the starters are on Document types.
+  it('the upload section of Intake, as a workspace administrator', async () => {
+    const v = await visit('/documents/intake/upload', 'TENANT_ADMIN', null, ANSWERS);
+    pin(FILE, 'the upload section of Intake, as a workspace administrator', v.surface, PINNED);
+  });
+
+  it('the email-in section of Intake, as a tenant user with the page', async () => {
+    const v = await visit('/documents/intake/email-in', 'TENANT_USER', DOC_PAGES, ANSWERS);
+    pin(FILE, 'the email-in section of Intake, as a tenant user with the page', v.surface, PINNED);
+  });
+
+  it('add from starters', async () => {
+    const v = await visit('/documents/types', 'TENANT_ADMIN', null, ANSWERS);
+    await click(v, 'Add from starters');
+    pin(FILE, 'add from starters', overlay(), PINNED);
   });
 
   it('read a document', async () => {

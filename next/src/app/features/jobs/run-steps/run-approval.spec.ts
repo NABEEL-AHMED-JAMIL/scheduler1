@@ -19,7 +19,7 @@ import { RunTimelineStore } from './run-timeline.store';
 const HOUR = 3_600_000;
 const NOW = Date.now();
 const APPROVAL = { approvalId: 1006, status: 'PENDING', waiting: true, title: 'Approve 3 bulk-review test rows of run 8298',
-  reviewers: { kind: 'group', value: '1063' }, requestedAt: new Date(NOW - 7 * HOUR - 60_000).toISOString(),
+  reviewers: { kind: 'team', value: '1063' }, requestedAt: new Date(NOW - 7 * HOUR - 60_000).toISOString(),
   expiresAt: new Date(NOW + 65 * HOUR).toISOString() };
 const TIMELINE = { jobQueueId: 8298, jobId: 2977, runStatus: 'Running', attempt: 1, attempts: [1], legacy: false, waitingForApproval: true,
   steps: [
@@ -27,10 +27,10 @@ const TIMELINE = { jobQueueId: 8298, jobId: 2977, runStatus: 'Running', attempt:
     { stepExecutionId: 2, index: 1, key: 'approve', name: 'Approve the test rows', task: 'approval', status: 'Running', log: 'step', approval: APPROVAL },
   ] };
 const TASK = { id: 1136, instanceId: 1130, stepKey: 'approve', stepType: 'approval', name: 'Approve the run to continue', state: 'Open',
-  assigneeKind: 'group', assigneeValue: '1063', rejectNeedsComment: true, requestTitle: APPROVAL.title, subjectId: 'pipeline-approval:1006' };
+  assigneeKind: 'team', assigneeValue: '1063', rejectNeedsComment: true, requestTitle: APPROVAL.title, subjectId: 'pipeline-approval:1006' };
 
 function box(opts: { tasks?: unknown[]; inbox?: boolean; admin?: boolean; timeline?: unknown }) {
-  const get = vi.fn(() => of({ status: 'SUCCESS', message: '', data: [{ pageAccessProfileId: 1063, profileName: 'Reviewer' }, { pageAccessProfileId: 1064, profileName: 'Viewer' }] }));
+  const get = vi.fn(() => of({ status: 'SUCCESS', message: '', data: [{ teamId: 1063, name: 'Reviewer', members: [] }, { teamId: 1064, name: 'Viewer', members: [] }] }));
   const api = {
     forSubject: vi.fn(() => of({ status: 'SUCCESS', message: '', data: opts.tasks ?? [] })),
     act: vi.fn(() => of({ status: 'SUCCESS', message: 'Approved.', data: {} })),
@@ -82,9 +82,9 @@ describe('Run page: waiting for approval', () => {
     expect(api.forSubject).toHaveBeenCalledWith('pipeline-approval:1006');
   });
 
-  it('lets someone in the group decide: Reject then Approve, the primary rightmost, as their inbox task', () => {
+  it('lets someone in the team decide: Reject then Approve, the primary rightmost, as their inbox task', () => {
     const { el, text, click, api } = box({ tasks: [TASK] });
-    expect(text('approval-who')).toBe('You (the Reviewer group)');
+    expect(text('approval-who')).toBe('You (the Reviewer team)');
     const buttons = [...el.querySelectorAll('[data-test="approval-buttons"] button')];
     expect(buttons.map(b => b.getAttribute('data-test'))).toEqual(['approval-reject', 'approval-approve']);
     expect(buttons[1].classList.contains('btn-primary')).toBe(true);
@@ -102,19 +102,18 @@ describe('Run page: waiting for approval', () => {
     expect(api.act).toHaveBeenCalledWith(1136, 'reject', 'Totals do not match', '1136:reject:run-page');
   });
 
-  it('tells an administrator outside the group who it waits on, by the group\'s name, and points to Review › Approvals', () => {
+  it('tells an administrator outside the team who it waits on, by the team\'s name, and points to Review › Approvals', () => {
     const { el, text, get } = box({ admin: true });
-    expect(get).toHaveBeenCalledWith(expect.stringContaining('/pageAccess.json/listProfiles'));
-    expect(text('approval-who')).toBe('The Reviewer group');
+    expect(get).toHaveBeenCalledWith(expect.stringContaining('/appUser.json/teams/list'), expect.anything());
+    expect(text('approval-who')).toBe('The Reviewer team');
     expect(el.querySelector('[data-test="approval-buttons"]')).toBeNull();
     expect(el.querySelector('[data-test="approval-inbox"]')?.getAttribute('href')).toBe('/review/approvals');
   });
 
   it('gives a viewer who decides, and nothing to press', () => {
-    const { el, text, api, get } = box({ inbox: false });
+    const { el, text, api } = box({ inbox: false });
     expect(api.forSubject).not.toHaveBeenCalled();
-    expect(get).not.toHaveBeenCalled();
-    expect(text('approval-who')).toBe('The pipeline\'s reviewer group');
+    expect(text('approval-who')).toBe('The Reviewer team');
     expect(el.querySelectorAll('button').length).toBe(0);
     expect(el.querySelector('[data-test="approval-inbox"]')).toBeNull();
   });

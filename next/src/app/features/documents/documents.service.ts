@@ -3,8 +3,8 @@ import { HttpClient, HttpResponse } from '@angular/common/http';
 import { Observable, map } from 'rxjs';
 import { API_BASE, ApiResponse } from '../../core/api/api.config';
 import {
-  CorrectionSent, DatasetPage, DocumentType, Extraction, IntakeAnswer, IntakeRow, Mailbox, OcrDocument, QueuePage, ReviewDetail, TypeDefinition,
-  TypeStats, TypeVersion,
+  CorrectionSent, DatasetPage, DocumentType, Extraction, IntakeAnswer, IntakeRow, Mailbox, OcrDocument, QueuePage, ReviewDetail, StarterMarket,
+  StartersAdded, TypeDefinition, TypeStats, TypeVersion,
 } from './documents.model';
 
 const OCR = `${API_BASE}/documentOcr.json`;
@@ -123,6 +123,16 @@ export class DocumentsApi {
   /** A new type (no id), or the next version of one; a type that moved on since `baseVersion` is 409. */
   saveType(body: TypeSave): Observable<ApiResponse<DocumentType>> {
     return this.http.post<ApiResponse<DocumentType>>(`${TYPES}/save`, body);
+  }
+
+  /** The starter catalog by market, and where this workspace stands with each starter. */
+  starters(): Observable<ApiResponse<StarterMarket[]>> {
+    return this.http.get<ApiResponse<StarterMarket[]>>(`${TYPES}/starters`);
+  }
+
+  /** Adds starters to the workspace as its own types (a workspace administrator's); built-in and added ones are skipped. */
+  addStarters(typeKeys: string[]): Observable<ApiResponse<StartersAdded>> {
+    return this.http.post<ApiResponse<StartersAdded>>(`${TYPES}/starters/add`, { typeKeys });
   }
 
   setTypeStatus(documentTypeId: number, status: 'Active' | 'Inactive'): Observable<ApiResponse<DocumentType>> {

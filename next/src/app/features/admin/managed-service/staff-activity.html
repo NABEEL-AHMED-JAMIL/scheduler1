@@ -5,30 +5,30 @@
         <h1 class="page-title">{{ showWorkspace() ? 'Staff activity' : "Our team's activity" }}</h1>
         <p class="page-subtitle">
           @if (showWorkspace()) {
-            Every change our staff made in a customer's workspace during a managed session, newest first.
+            Every change and every data read our staff made in a managed session, newest first.
           } @else {
-            Every change our team made in this workspace, newest first. Nothing they change here goes unrecorded.
+            Every change our team made here and every data they opened, exported or downloaded, newest first.
           }
         </p>
       </div>
-      <app-refresh-button [loading]="loading()" (refresh)="load()" />
+      <div class="flex items-center gap-2">
+        @if (showWorkspace()) { <app-workspace-select [allowAll]="true" [value]="tenantFilter()" (valueChange)="setTenant($event === null ? '' : '' + $event)" /> }
+        <app-refresh-button [loading]="loading()" (refresh)="load()" />
+      </div>
     </div>
   </app-page-header>
 
-  <app-table-shell heading="Changes" [loading]="loading()" [error]="error()" [isEmpty]="!rows().length"
+  <app-table-shell heading="Activity" [loading]="loading()" [error]="error()" [isEmpty]="!rows().length"
                    [shown]="rows().length" [emptyMessage]="emptyMessage()" emptyIcon="history" (retry)="load()">
     <ng-container toolbar>
-      @if (showWorkspace()) {
-        <select class="input max-w-48 min-w-0" aria-label="Filter by workspace" [value]="tenantFilter() ?? ''"
-                (change)="setTenant($any($event.target).value)">
-          <option value="">Every workspace</option>
-          @for (t of tenants(); track t.tenantId) { <option [value]="t.tenantId">{{ t.tenantName }}</option> }
-        </select>
-      }
       <select class="input max-w-48 min-w-0" aria-label="Filter by staff member" [value]="staffFilter() ?? ''"
               (change)="setStaff($any($event.target).value)">
         <option value="">Every staff member</option>
         @for (s of staff(); track s.appUserId) { <option [value]="s.appUserId">{{ name(s) }}</option> }
+      </select>
+      <select class="input max-w-48 min-w-0" aria-label="Changes or data reads" data-test="activity-kind" [value]="kindFilter()"
+              (change)="setKind($any($event.target).value)">
+        @for (k of kinds; track k.value) { <option [value]="k.value" [selected]="k.value === kindFilter()">{{ k.label }}</option> }
       </select>
       @if (hasFilters()) {
         <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()"><app-icon name="close" />Clear</button>
@@ -41,7 +41,7 @@
           <th>When</th>
           <th>Staff member</th>
           @if (showWorkspace()) { <th>Workspace</th> }
-          <th>Change</th>
+          <th>Change or read</th>
           <th>Service</th>
         </tr>
       </thead>
@@ -62,8 +62,13 @@
             <td class="min-w-64">
               <!-- In words, not the API's path and query (UI review U6); the raw request stays on the tooltip. -->
               <div class="flex items-center gap-2 min-w-0" [title]="a.method + ' ' + a.path + (a.target ? '?' + a.target : '')">
-                <span class="truncate">{{ change(a.path) }}</span>
-                @if (a.builderAction) { <span class="pill pill-brand" title="A change to what the workspace builds">Builder</span> }
+                @if (isRead(a)) {
+                  <span class="pill pill-info" title="A workspace's data opened, exported or downloaded" data-test="read-pill">Read</span>
+                  <span class="truncate" data-test="read-text">{{ read(a) }}</span>
+                } @else {
+                  <span class="truncate">{{ change(a.path) }}</span>
+                  @if (a.builderAction) { <span class="pill pill-brand" title="A change to what the workspace builds">Builder</span> }
+                }
               </div>
               @if (targetOf(a.target); as what) { <div class="text-xs text-[color:var(--text-muted)] truncate">{{ what }}</div> }
             </td>

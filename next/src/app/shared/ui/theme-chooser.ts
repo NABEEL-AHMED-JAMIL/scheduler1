@@ -35,7 +35,8 @@ import { SWATCH_CSS, THEME_OPTIONS } from '../../core/theme-options';
     </div>
   `,
   styles: [SWATCH_CSS, `
-    .tc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr)); gap: 0.75rem; }
+    /* Owner #4: every option the same height, on the same columns, whatever its note's length. */
+    .tc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr)); grid-auto-rows: 1fr; gap: 0.75rem; }
     .tc-option { position: relative; display: flex; flex-direction: column; gap: 0.5rem; padding: 0.5rem;
       border: 1px solid var(--border-subtle); border-radius: var(--radius-card); background: var(--surface-raised);
       text-align: left; color: var(--text-primary); cursor: pointer; }
@@ -43,7 +44,7 @@ import { SWATCH_CSS, THEME_OPTIONS } from '../../core/theme-options';
     .tc-option[aria-checked="true"] { border-color: var(--accent-mark); box-shadow: 0 0 0 1px var(--accent-mark); }
     .tc-option:disabled { cursor: default; opacity: 0.7; }
     .tc-option:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
-    .tc-preview { position: relative; display: block; height: 4.5rem; border-radius: var(--radius-lg);
+    .tc-preview { position: relative; display: block; isolation: isolate; flex: none; height: 4.5rem; border-radius: var(--radius-lg);
       background: var(--chip-page); border: 1px solid var(--border-subtle); overflow: hidden; }
     .tc-bar { position: absolute; inset: 0 0 auto 0; height: 0.75rem; background: var(--chip-card);
       border-bottom: 1px solid color-mix(in oklab, var(--chip-text) 15%, transparent); }

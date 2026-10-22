@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, input, signal } from '@angular/core';
+import { Component, OnChanges, OnInit, SimpleChanges, inject, input, signal } from '@angular/core';
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { ActivatedRoute, RouterLink } from '@angular/router';
@@ -66,7 +66,7 @@ import { SecretDialog, SecretDialogData } from './secret-dialog';
                 </thead>
                 <tbody>
                   @for (c of clients(); track c.clientId) {
-                    <tr [class.opacity-70]="c.status !== 'Active'">
+                    <tr [class.row-inactive]="c.status !== 'Active'">
                       <td class="max-w-64"><div class="flex items-center gap-1.5 min-w-0"><span class="pill pill-info">Test</span><span class="font-medium truncate">{{ c.name }}</span></div></td>
                       <td class="mono text-xs text-[color:var(--text-secondary)]">{{ c.clientId }}</td>
                       <td class="max-w-80">
@@ -112,7 +112,7 @@ import { SecretDialog, SecretDialogData } from './secret-dialog';
     </section>
   `,
 })
-export class SandboxPanel implements OnInit {
+export class SandboxPanel implements OnInit, OnChanges {
   private readonly api = inject(ApiClientsApi);
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);
@@ -120,6 +120,8 @@ export class SandboxPanel implements OnInit {
 
   /** The scopes a key may hold, as the page read them. */
   readonly scopes = input<ScopeRow[]>([]);
+  /** The workspace a platform administrator picked (its sandbox is shown); none for a workspace administrator (their own). */
+  readonly tenantId = input<number | null>(null);
 
   readonly sandbox = signal<SandboxInfo | null>(null);
   readonly clients = signal<ApiClientRow[]>([]);
@@ -129,6 +131,15 @@ export class SandboxPanel implements OnInit {
 
   ngOnInit(): void {
     this.load();
+  }
+
+  /** Another workspace picked: its sandbox, and nothing of the last one's. */
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['tenantId'] && !changes['tenantId'].firstChange) {
+      this.sandbox.set(null);
+      this.clients.set([]);
+      this.load();
+    }
   }
 
   /** The Developer portal links here as #sandbox; the page is drawn only once the panel has read it. */
@@ -144,32 +155,38 @@ export class SandboxPanel implements OnInit {
   load(): void {
     this.loading.set(true);
     this.error.set('');
-    this.api.sandbox().subscribe({
+    const asked = this.tenantId();
+    this.api.sandbox(asked).subscribe({
       next: r => {
+        if (asked !== this.tenantId()) return;
         if (r.status !== API_SUCCESS) {
           this.error.set(r.message || 'Your sandbox could not be read.');
           this.settled();
           return;
         }
         this.sandbox.set(r.data ?? null);
-        if (r.data) this.loadClients();
+        if (r.data) this.loadClients(asked);
         else this.settled();
       },
       error: err => {
+        if (asked !== this.tenantId()) return;
         this.error.set(err?.error?.message || 'Your sandbox could not be read.');
         this.settled();
       },
     });
   }
 
-  private loadClients(): void {
-    this.api.sandboxList().subscribe({
+  /** `asked`: the workspace the read was for; an answer for one picked away from is dropped. */
+  private loadClients(asked: number | null): void {
+    this.api.sandboxList(asked).subscribe({
       next: r => {
+        if (asked !== this.tenantId()) return;
         if (r.status === API_SUCCESS) this.clients.set(r.data ?? []);
         else this.error.set(r.message || 'The sandbox\'s test keys could not be read.');
         this.settled();
       },
       error: err => {
+        if (asked !== this.tenantId()) return;
         this.error.set(err?.error?.message || 'The sandbox\'s test keys could not be read.');
         this.settled();
       },
@@ -181,7 +198,8 @@ export class SandboxPanel implements OnInit {
   }
 
   openNew(): void {
-    const data: ClientDialogData = { scopes: this.scopes(), client: null, bounds: null, canSetLimits: false, sandbox: true };
+    const data: ClientDialogData = { scopes: this.scopes(), client: null, bounds: null, canSetLimits: false, sandbox: true,
+      tenantId: this.tenantId() };
     this.dialog.open<ClientDialogResult>(ClientDialog, { data, hasBackdrop: true }).closed.subscribe(result => {
       if (!result) return;
       this.load();
@@ -203,7 +221,7 @@ export class SandboxPanel implements OnInit {
     });
     if (!ok) return;
     this.busy.set(client.clientId);
-    this.api.rotateSecret(client.clientId, true).subscribe({
+    this.api.rotateSecret(client.clientId, true, this.tenantId()).subscribe({
       next: r => {
         this.busy.set(null);
         if (r.status === API_SUCCESS && r.data) {
@@ -226,7 +244,7 @@ export class SandboxPanel implements OnInit {
     });
     if (!ok) return;
     this.busy.set(client.clientId);
-    this.api.revoke(client.clientId, true).subscribe({
+    this.api.revoke(client.clientId, true, this.tenantId()).subscribe({
       next: r => {
         this.busy.set(null);
         if (r.status === API_SUCCESS) {

@@ -49,7 +49,7 @@ npx ng test --watch=false
 
 ### End-to-end (Playwright)
 
-`e2e/` holds the Playwright suite (40 specs, Chromium), run against a running console and backend:
+`e2e/` holds the Playwright suite (48 specs, Chromium), run against a running console and backend:
 
 ```bash
 npx playwright install chromium   # once
@@ -59,6 +59,37 @@ E2E_MINT=1 npx playwright test    # or: npx playwright test e2e/inbox.spec.ts
 - **Who it signs in as.** No password is ever in the repository. `E2E_PASSWORD` (with `E2E_USERNAME`) signs in through the API; without it, `E2E_TENANT_ADMIN_TOKEN` or `E2E_MINT=1` uses a minted test token (etl-platform's `scripts/mint-test-token.sh`, development stacks only) for the rebuilt workspace's administrator. With none of them the specs skip and say why.
 - **Fixtures.** Workspaces, people, pipelines, schedules and dashboards come from the platform rebuild's state file, `etl-platform/.state/demo/rebuild.json` (`e2e/support/fixtures.ts`; another file with `E2E_FIXTURES`). Specs name a role, never an id, and only read the rebuilt rows; what a spec makes for itself is named "E2E ..." . Without the file, the specs that need it skip, naming it.
 - **Where.** `E2E_BASE_URL` (default `http://localhost:4400`) and `E2E_API_URL` (default `http://localhost:9098/api/v1`). The sales demo's paths are opt-in with `E2E_DEMO=1`.
+- **A branch before its deploy.** `E2E_LOCAL_BUILD=http://127.0.0.1:4301` serves the pages from a worktree's `ng build`
+  (any static server on `dist/next/browser`) at the console's own address, so CORS and the session still apply; a spec
+  opts in with `test.use(LOCAL_BUILD_USE)` and `useLocalBuild(page)` (`e2e/support/local-build.ts`).
+- **Written test cases.** `docs/test-cases/` lists a screen's cases with their inputs, expected results and limits;
+  each automated test names the cases it runs (`TC-...`). `docs/test-cases/tools.md`: the Document Converter (with
+  the every-pair matrix) and Audio Transcript.
+
+#### Report Studio
+
+```bash
+npm run e2e:reports               # = E2E_MINT=1 playwright test e2e/report-studio (about 30 s, 12 tests)
+npm run e2e:reports -- --reporter=line e2e/report-studio-reports.spec.ts   # one area
+```
+
+Run it after every Report Studio change, against a stack you have just deployed (console and media-service are
+containers: they do not reload from source). It needs the rebuild's state file and the mint script; without them every
+test skips with the reason. People: Riverside Health's admin, reviewer and viewer (roles admin, user, viewer), Meridian's
+admin (minted by id with `sessionAsPerson`), and the test platform administrator (role platform).
+
+| Spec | What it drives |
+| --- | --- |
+| `report-studio-designer.spec.ts` | Blank template, pasted test data, heading, text, a table bound to the data, an image from the library; reorder (Alt+Up), undo/redo, autosave; Preview with pasted JSON (the PDF's page count); publish v1 |
+| `report-studio-reports.spec.ts` | Create report: Missing blocks Generate, matched data generates v1 (PDF and HTML); Generate again makes v2 and keeps v1; the generator cannot approve (UI and API), the reviewer approves and it is Signed; verify by version, by the downloaded PDF, and a one-byte change fails |
+| `report-studio-assets.spec.ts` | Upload a generated PNG (approved on upload); a PDF renamed .png refused; brand profile: colours, WCAG check refusing a low-contrast pair (UI and API), publish, make default |
+| `report-studio-access.spec.ts` | Meridian's admin gets "not found" for Riverside's template, report and asset (API and screens); the viewer is refused every page; the reviewer reads and may approve, nothing more; the platform administrator's designer is read only |
+
+What the specs make is Riverside's, synthetic (fictional patients, generated pictures) and named "E2E ..." with a run
+stamp, and it stays: Report Studio keeps versions by design and the owner removes test data. The access spec reuses its
+three "E2E isolation wound ..." rows by name. The brand spec makes its profile the workspace default and hands the default
+back to the previous profile afterwards. Setup the UI is not testing goes through media-service's API
+(`e2e/support/report-studio.ts`).
 
 The backend's own end-to-end suites drive the HTTP API through the real security chain.
 
@@ -119,14 +150,31 @@ group, hub and tab; the paths below are today's (old addresses redirect).
   name) and Audio Transcript.
 - **Administration & billing.** Users, Page access, Sign-in security, Data policies, Activity; Billing (Cost & usage by
   day, pipeline and run, in the workspace's billing time zone; Invoices with Pay now on Stripe's hosted page and the
-  payments side panel; Billing documents); Settings (Model connections, Tool Registry, Task Registry, Kafka & Topics,
+  payments side panel; Billing documents; Analytics -- cost by month, service and pipeline, a workspace administrator's own and
+  the platform's every workspace with its revenue; Settings -- the rate cards, platform only); Settings (Model connections, Tool Registry, Task Registry, Kafka & Topics,
   Configuration values, Home pages, Task groups); Developers (API Clients with scopes, webhooks, event routes and API
   limits, and the Developer portal at `/developers/portal`, bundled by `scripts/sync-developer-docs.mjs` from
   etl-platform's `docs/api/`). The embedded run view at `/embed/runs/:token` sits outside the shell for a customer's
   portal to frame.
-- **Platform.** Workspaces (`/platform/workspaces`: a table with every action in the row's ⋮, among them API limits and
-  Billing time zone), Requests, Managed service, Work in a workspace, Staff activity, Reliability (a status card per
-  objective with its error budget), Billing analytics, Rate cards, Engine settings.
+- **Platform.** Workspaces (`/platform/workspaces`: tiles and a table of each workspace's users, pipelines, runs this
+  month, storage, cost this month, alerts open and plan, with every action in the row's ⋮ -- "Work in this workspace" first,
+  API limits, Billing time zone), Requests, Managed service, Staff activity, Service health (status, version, restarts,
+  error rate, planned deploys, alerts, then the objectives), Engine settings (the allow-listed limits: ranges, defaults,
+  reset, history, a workspace's own values). Owner #20-#24 (2026-10-19) removed Work in a workspace, Reliability, Billing
+  analytics and Rate cards as Platform pages; their addresses redirect (`removed-pages.spec.ts` holds that nothing else
+  names them).
+- **Task Registry** (`/settings/task-registry`, owner #16-#18, 2026-10-19). Every step task and every registry pipeline (a
+  Legacy task), each row with the pipelines that use it and their runs this month -- Core's counts, the caller's workspace's;
+  a count opens the list in a drawer (`task-usage-panel.ts`), zero is 0 and an unknown count a dash. A workspace
+  administrator switches a task on or off; a platform administrator picks the workspace and sets each task to Default,
+  Enabled, Disabled or Blocked for it (a block asks why and is shown to the workspace, whose switch is then locked); Recent
+  changes is the audit. New / Edit registry task is a page (`/settings/task-registry/new`, `/<key>`, Duplicate
+  `new?copyOf=<key>`; `registry-task-editor.ts`) with the payload preview, Used by and help on the right, and
+  `shared/ui/unsaved-changes.guard.ts` asking before unsaved changes are left.
+- **The workspace selector.** One component for a platform administrator, `app-workspace-select`
+  (`shared/ui/workspace-select.ts` over `core/workspaces/workspace-directory.ts`): first in the page header's actions on every
+  screen that picks a workspace, "All workspaces" only where the page can show them all, the recent ones first, the choice
+  kept for the session, and "Work in this workspace" beside it. A workspace's own people never see it.
 - **Shared page pieces.** `app-page-header` (breadcrumb, title, pills, actions in a fixed order with the primary
   rightmost), `app-section`, the field grid, `app-actions-bar`, `app-table-shell` (heading, then the filters, Columns at
   the right; numbers right-aligned), `app-stat-strip`, `app-empty-state` and `app-side-panel` (a row's detail on the

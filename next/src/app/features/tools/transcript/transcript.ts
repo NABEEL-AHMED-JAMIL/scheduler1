@@ -1,4 +1,4 @@
-import { Component, OnDestroy, computed, effect, inject, signal, untracked } from '@angular/core';
+import { Component, LOCALE_ID, OnDestroy, computed, effect, inject, signal, untracked } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { ToastService } from '../../../shared/ui/toast.service';
@@ -12,13 +12,54 @@ import { ReadAloudService } from '../../../shared/ui/read-aloud.service';
 import { ReadAlongText } from '../../../shared/ui/read-along-text';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { ActionsBar } from '../../../shared/ui/actions-bar';
+import { Section } from '../../../shared/ui/section';
+import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
+import { formatSize } from '../../../shared/ui/format-size';
+import { AuthService } from '../../../core/auth/auth.service';
+import { isOwnPlatformSignIn } from '../../../core/auth/workspace-data';
 
 const AUDIO_EXTENSIONS = ['mp3', 'm4a'];
 
+/** What the transcriber takes (media-service audioTranscript.json/limits, owner #27). */
+export interface TranscriptLimits {
+  formats: string[];
+  uploadMaxMb: number;
+  bucketMaxMb: number;
+  timeoutMinutes: number;
+  retryAfterSeconds: number;
+}
+
+/** Until the limits are read (or if they cannot be), the numbers the service ships with -- the server still checks. */
+export const DEFAULT_TRANSCRIPT_LIMITS: TranscriptLimits = {
+  formats: AUDIO_EXTENSIONS, uploadMaxMb: 250, bucketMaxMb: 500, timeoutMinutes: 30, retryAfterSeconds: 30,
+};
+
+/** Why a file cannot be sent, said before it is: the wrong kind, or over the size this path takes. Empty when it can. */
+export function audioProblem(name: string, bytes: number | undefined, maxMb: number): string {
+  const dot = name.lastIndexOf('.');
+  const extension = dot >= 0 ? name.slice(dot + 1).toLowerCase() : '';
+  if (!AUDIO_EXTENSIONS.includes(extension)) return `"${name}" is not an .mp3 or .m4a file.`;
+  if (bytes != null && bytes > maxMb * 1024 * 1024) {
+    return `This file is ${formatSize(bytes)}; this way takes up to ${maxMb} MB.`;
+  }
+  return '';
+}
+
 @Component({
   selector: 'app-transcript',
-  imports: [PageHeader, ActionsBar, Icon, Segmented, FileDropzone, ReadAlongText],
+  imports: [PageHeader, ActionsBar, Icon, Segmented, FileDropzone, ReadAlongText, Section, ServerTimePipe],
   templateUrl: './transcript.html',
+  styles: `
+    /* Owner #27: the work on the left, what the tool takes on the right; one column below a wide screen. */
+    .limits-strip { display: flex; flex-wrap: wrap; gap: 0.375rem 1.25rem; font-size: 0.8125rem; color: var(--text-secondary);
+                    padding: 0.625rem 0.875rem; margin-bottom: 1rem; border-radius: var(--radius-lg); background: var(--surface-inset);
+                    border: 1px solid var(--border-subtle); font-variant-numeric: tabular-nums; }
+    .limits-strip b { font-weight: 500; color: var(--text-muted); margin-right: 0.25rem; }
+    .limits-note { color: var(--text-muted); flex-basis: 100%; }
+    .picked-file { display: flex; align-items: center; gap: 0.75rem; padding: 0.875rem 1rem; border: 1px solid var(--border-subtle);
+                   border-radius: var(--radius-lg); background: var(--surface-sunken); }
+    .picked-empty { border-style: dashed; background: transparent; }
+  `,
 })
 export class Transcript implements OnDestroy {
   private readonly http = inject(HttpClient);
@@ -26,16 +67,40 @@ export class Transcript implements OnDestroy {
   private readonly toast = inject(ToastService);
   readonly reader = inject(ReadAloudService);
 
+  /**
+   * ZT-A12 follow-up (owner 2026-10-21, "Managed session only"): the platform administrator's own sign-in transcribes an
+   * upload only -- a recording in a bucket is a workspace's file, which media-service answers it 403 on
+   * (extractFromBucket); that source opens in "Work in this workspace".
+   */
+  readonly ownSignIn = isOwnPlatformSignIn(inject(AuthService, { optional: true }));
   readonly mode = signal<'upload' | 'bucket'>('upload');
   readonly modeOptions: SegmentOption<'upload' | 'bucket'>[] = [
     { id: 'upload', label: 'Upload a file', icon: 'upload' },
-    { id: 'bucket', label: 'From a bucket', icon: 'folder' },
+    ...(this.ownSignIn ? [] : [{ id: 'bucket' as const, label: 'From a bucket', icon: 'folder' }]),
   ];
   readonly timestamps = signal(false);
   readonly file = signal<File | null>(null);
 
   readonly bucket = signal('');
   readonly selectedKey = signal('');
+  /** The bucket file picked, with its size and date for the card (the picker's answer). */
+  readonly picked = signal<PickedObject | null>(null);
+
+  /** What the transcriber takes; the defaults until the server's limits are read. */
+  readonly limits = signal<TranscriptLimits>(DEFAULT_TRANSCRIPT_LIMITS);
+  /** The last try was turned away because every transcriber slot and its waiting line were full (429). */
+  readonly busy = signal(false);
+  readonly size = formatSize;
+
+  /** The chosen file cannot go: the wrong kind or too big for this path, said before Transcribe. */
+  readonly problem = computed(() => {
+    if (this.mode() === 'upload') {
+      const file = this.file();
+      return file ? audioProblem(file.name, file.size, this.limits().uploadMaxMb) : '';
+    }
+    const picked = this.picked();
+    return picked ? audioProblem(picked.name, picked.size, this.limits().bucketMaxMb) : '';
+  });
 
   readonly extracting = signal(false);
   readonly transcript = signal('');
@@ -98,7 +163,7 @@ export class Transcript implements OnDestroy {
   }
 
   readonly canExtract = computed(() =>
-    this.mode() === 'upload' ? !!this.file() : !!this.selectedKey());
+    (this.mode() === 'upload' ? !!this.file() : !!this.selectedKey()) && !this.problem());
 
   /**
    * Chooses the audio in the console's one ObjectPicker, which offers only mp3 and m4a and
@@ -109,13 +174,46 @@ export class Transcript implements OnDestroy {
     this.dialog.open<PickedObject | undefined>(ObjectPicker, objectPickerConfig({
       heading: 'Pick an audio file',
       bucket: this.bucket() || undefined,
-      prefix: key ? key.slice(0, key.lastIndexOf('/') + 1) : undefined,
+      selectedKey: key || undefined,
       extensions: AUDIO_EXTENSIONS,
     })).closed.subscribe(picked => {
       if (!picked) return;
       this.bucket.set(picked.bucket);
       this.selectedKey.set(picked.key);
+      this.picked.set(picked);
     });
+  }
+
+  /** Forgets the bucket file; the next Choose opens at the bucket's root. */
+  clearPick(): void {
+    this.selectedKey.set('');
+    this.picked.set(null);
+  }
+
+  /** "77.0 KB · modified 19 Oct 2026, 18:07" for the picked file's card; empty when the picker said neither. */
+  readonly pickedMeta = computed(() => {
+    const picked = this.picked();
+    if (!picked) return '';
+    const parts: string[] = [];
+    if (picked.size != null) parts.push(formatSize(picked.size));
+    const at = picked.lastModified ? this.when.transform(picked.lastModified, 'dateTime') : null;
+    if (at) parts.push(`modified ${at}`);
+    return parts.join(' · ');
+  });
+  private readonly when = new ServerTimePipe(inject(LOCALE_ID));
+
+  /** The folder a picked key sits in, for the card. */
+  folderOf(key: string): string {
+    const cut = key.lastIndexOf('/');
+    return cut > 0 ? key.slice(0, cut + 1) : '/';
+  }
+
+  setMode(mode: 'upload' | 'bucket'): void {
+    if (mode === 'bucket' && this.ownSignIn) return;
+    this.mode.set(mode);
+    this.transcript.set('');
+    this.error.set('');
+    this.busy.set(false);
   }
 
   onFile(file: File | null): void {
@@ -124,8 +222,10 @@ export class Transcript implements OnDestroy {
   }
 
   extract(): void {
+    if (!this.canExtract()) return;
     this.extracting.set(true);
     this.error.set('');
+    this.busy.set(false);
     this.transcript.set('');
 
     const done = {
@@ -136,7 +236,11 @@ export class Transcript implements OnDestroy {
       },
       error: (err: any) => {
         this.extracting.set(false);
-        this.error.set(err?.error?.message || 'The extraction failed.');
+        // 429: every transcriber slot is busy and its waiting line is full -- nothing is wrong with the file.
+        this.busy.set(err?.status === 429);
+        this.error.set(err?.error?.message || (err?.status === 429
+          ? `The transcriber is busy with other recordings. Try again in about ${this.limits().retryAfterSeconds} seconds.`
+          : err?.status === 413 ? 'The file is too big to upload.' : 'The extraction failed.'));
       },
     };
 
@@ -188,6 +292,11 @@ export class Transcript implements OnDestroy {
   readonly speedId = computed(() => String(this.reader.rate()));
 
   constructor() {
+    this.http.get<ApiResponse<TranscriptLimits>>(`${API_BASE}/audioTranscript.json/limits`).subscribe({
+      next: r => { if (r?.status === API_SUCCESS && typeof r.data?.uploadMaxMb === 'number') this.limits.set(r.data); },
+      error: () => { /* the limits are a hint; the server still checks */ },
+    });
+
     // Follows the voice down the page. Keyed on the segment, not the word, so the container is
     // not fighting the reader for the scroll position several times a second.
     effect(() => {
@@ -220,7 +329,7 @@ export class Transcript implements OnDestroy {
       const key = this.selectedKey();
       if (key === lastKey) return;
       lastKey = key;
-      untracked(() => { this.transcript.set(''); this.error.set(''); });
+      untracked(() => { this.transcript.set(''); this.error.set(''); this.busy.set(false); });
     });
   }
 

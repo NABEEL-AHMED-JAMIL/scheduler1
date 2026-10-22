@@ -20,6 +20,7 @@
                  (input)="patch({ name: $any($event.target).value })" />
         </app-field>
       </app-form-row>
+      @if (showsReads()) {
       <app-form-row>
         <app-field class="fr-12" label="Reads" for="stepInput" [error]="problemsAt('input')"
                    hint="Another step's output, from earlier in the pipeline. The first step reads the pipeline's source.">
@@ -29,6 +30,7 @@
           </select>
         </app-field>
       </app-form-row>
+      }
       <section class="flex flex-col gap-2 min-w-0" aria-labelledby="stepConfigHeading">
         <div class="flex items-center gap-2">
           <h3 id="stepConfigHeading" class="section-title">Task settings</h3>
@@ -38,10 +40,15 @@
             </button>
           }
         </div>
-        @if (configMode() === 'form' && data.task?.configSchema; as schema) {
+        @if (reportStep) {
+          <app-report-step-design class="block mb-3" [config]="s.config ?? {}" [pipelineKey]="data.pipeline?.key ?? null"
+                                  [pipelineName]="data.pipeline?.name ?? ''" [stepKey]="s.key" [stepName]="s.name ?? ''" [upstreamKey]="upstreamKey"
+                                  [jobIds]="data.pipeline?.jobIds ?? []" [disabled]="readOnly" (changed)="setDesign($event)" />
+        }
+        @if (configMode() === 'form' && formSchema; as schema) {
           <app-schema-form [schema]="schema" [value]="s.config" [problems]="formProblems()" idPrefix="cfg" [disabled]="readOnly"
                            [columns]="columns" [steps]="data.earlierKeys" [prompts]="data.prompts ?? []" [buckets]="data.buckets ?? []"
-                           [webhooks]="data.webhooks ?? []" [documentTypes]="data.documentTypes ?? []" (valueChange)="setConfig($event)" />
+                           [webhooks]="data.webhooks ?? []" [documentTypes]="data.documentTypes ?? []" [apiRequests]="data.apiRequests ?? []" (valueChange)="setConfig($event)" />
         } @else {
           <app-field label="Settings as JSON" for="stepConfig" [error]="configError() || configProblems().join(' · ')"
                      [hint]="hasForm ? 'The same settings as the form.' : 'This task has no settings form yet: its settings are edited as JSON.'">
@@ -49,11 +56,15 @@
                       spellcheck="false" (input)="typeConfig($any($event.target).value)"></textarea>
           </app-field>
         }
+        @if (s.task === 'call_api') {
+          <!-- MIG-419: what the first call sends, from the pipeline's sample rows. -->
+          <app-call-api-preview class="block mt-3" [config]="s.config ?? {}" [rows]="data.sampleRows ?? null" />
+        }
       </section>
       <!-- How it runs: the related numbers on one row (A4). -->
       <app-section title="How it runs" sub="Retries, the time limit, and what happens when it fails." [level]="3">
         <app-form-row>
-          <app-field class="fr-3" label="Tries" for="stepTries" [error]="problemsAt('retry.maxAttempts')" [hint]="triesHint">
+          <app-field class="fr-2" label="Tries" for="stepTries" [error]="problemsAt('retry.maxAttempts')" [hint]="triesHint">
             <input id="stepTries" class="input" type="number" min="1" [max]="limits.maxTries" step="1" [value]="s.retry?.maxAttempts ?? ''"
                    [disabled]="readOnly" (input)="setRetry('maxAttempts', $any($event.target).value)" />
           </app-field>
@@ -65,7 +76,7 @@
             <input id="stepTimeout" class="input" type="number" min="1" [max]="limits.maxTimeoutSeconds" step="1" [value]="s.timeoutSeconds ?? ''"
                    [disabled]="readOnly" (input)="patch({ timeoutSeconds: whole($any($event.target).value) })" />
           </app-field>
-          <app-field class="fr-3" label="If it fails" for="stepOnError" [error]="problemsAt('onError')">
+          <app-field class="fr-4" label="If it fails" for="stepOnError" [error]="problemsAt('onError')">
             <select id="stepOnError" class="input" [value]="s.onError ?? ''" [disabled]="readOnly" (change)="patch({ onError: $any($event.target).value })">
               <option value="">{{ defaultOnErrorText() }}</option>
               @for (o of onErrors; track o) { <option [value]="o" [selected]="s.onError === o">{{ onErrorText(o) }}</option> }

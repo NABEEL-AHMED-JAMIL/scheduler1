@@ -16,6 +16,9 @@
   <!-- The data has the full width. The storage rail is the same connection -> folder -> file walk
        the Object Browser does, and uses that screen's own service; it slides in from the right, beside the
        Files button, when that is pressed and goes away once something is picked (owner, 2026-09-28). -->
+  @if (noWorkspace()) {
+    <app-needs-workspace what="Analytics Studio reads files that are" todo="read, query and export its files" icon="database" />
+  } @else {
   <div class="grid gap-3">
 
     @if (panel()) {
@@ -2351,4 +2354,5 @@
       }
     </div>
   </div>
+  }
 </div>

@@ -1,9 +1,13 @@
+import { RunReviewCard } from './run-review-card';
+import { PipelineApprovalCard } from './pipeline-approval-card';
+import { ReportReviewCard, STUDIO_SUBJECT_TYPES, studioSubject } from './report-review-card';
 import { Avatar } from '../../shared/ui/avatar';
 import { Component, ElementRef, Injector, OnInit, afterRenderEffect, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { API_SUCCESS } from '../../core/api/api.config';
+import { TeamsApi } from '../../core/teams/teams.api';
 import { AuthService } from '../../core/auth/auth.service';
 import { Icon } from '../../shared/ui/icon';
 import { StatusPill } from '../../shared/ui/status-pill';
@@ -12,7 +16,7 @@ import { ToastService } from '../../shared/ui/toast.service';
 import { confirmWith } from '../../shared/ui/confirm';
 import { Dialog } from '@angular/cdk/dialog';
 import { Observable } from 'rxjs';
-import { Colleague, Decision, InboxPage, InboxTask, RequestDetail, RequestRow, TaskDetail, WorkflowsApi } from './workflows.api';
+import { Colleague, Decision, InboxPage, InboxTask, RequestDetail, RequestRow, TaskDetail, WorkflowsApi, CANNOT_ACT } from './workflows.api';
 import { HistoryLine, compactTime, dropOwnStep, exactTime, historyLines, relativeTime, shortTime } from './history';
 import { TaskCountService } from './task-count.service';
 import { ListItem, RowTone, appendPage, choicesOf, commonOf, dueGroup, groupRows, matchesSearch, mergeHead, nextAfter, pastGroup, splitRef, stepFrom } from './inbox-list';
@@ -23,14 +27,14 @@ import { BulkBar } from '../../shared/ui/bulk/bulk-bar';
 import { BulkReviewApi } from '../../shared/ui/bulk/bulk-review.api';
 import { BULK_CAP, BulkAnswer, BulkMatch, BulkSelection } from '../../shared/ui/bulk/bulk.model';
 
-export type InboxTab = 'mine' | 'groups' | 'done' | 'requests';
+export type InboxTab = 'mine' | 'teams' | 'done' | 'requests';
 
 /** A page of a tab's list: the workflow service's Inbox.DEFAULT_LIMIT (it pages by cursor, at most 200 at a time). */
 export const INBOX_PAGE_SIZE = 100;
 
-const TABS: InboxTab[] = ['mine', 'groups', 'done', 'requests'];
+const TABS: InboxTab[] = ['mine', 'teams', 'done', 'requests'];
 type PerTab<T> = Record<InboxTab, T>;
-const perTab = <T>(value: T): PerTab<T> => ({ mine: value, groups: value, done: value, requests: value });
+const perTab = <T>(value: T): PerTab<T> => ({ mine: value, teams: value, done: value, requests: value });
 
 /** A request's field with how its value reads (value-kind.ts). */
 export interface FieldView { label: string; value: string; view: ValueView; }
@@ -44,7 +48,7 @@ export interface FieldView { label: string; value: string; view: ValueView; }
  */
 @Component({
   selector: 'app-task-inbox',
-  imports: [RefreshButton, PageHeader, FormsModule, NgTemplateOutlet, RouterLink, Icon, StatusPill, Combobox, Avatar, BulkBar],
+  imports: [RunReviewCard, PipelineApprovalCard, ReportReviewCard, RefreshButton, PageHeader, FormsModule, NgTemplateOutlet, RouterLink, Icon, StatusPill, Combobox, Avatar, BulkBar],
   templateUrl: './task-inbox.html',
   host: { '(document:keydown)': 'onKey($event)' },
   styles: `
@@ -59,9 +63,20 @@ export interface FieldView { label: string; value: string; view: ValueView; }
 export class TaskInbox implements OnInit {
   private readonly api = inject(WorkflowsApi);
   readonly auth = inject(AuthService);
+  private readonly teamsApi = inject(TeamsApi);
+  /** F4: the workspace's team names by id, for "With Wound care" on a team's task. */
+  readonly teamNames = signal<Map<string, string>>(new Map());
+  /**
+   * F3 (MIG-400): My requests is a tab of its own (task-inbox:requests); a person granted the inbox's other tabs only is
+   * never shown it, and its list -- refused to them -- is not read.
+   */
+  readonly showsRequests = computed(() => { this.auth.pageKeys?.(); return this.auth.canOpenTab?.('task-inbox', 'task-inbox:requests') ?? true; });
+  private tabs(): InboxTab[] {
+    return this.showsRequests() ? TABS : TABS.filter(t => t !== 'requests');
+  }
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
-  private readonly toast = inject(ToastService);
+  readonly toast = inject(ToastService);
   private readonly dialog = inject(Dialog);
   private readonly badge = inject(TaskCountService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
@@ -69,7 +84,7 @@ export class TaskInbox implements OnInit {
 
   readonly tab = signal<InboxTab>('mine');
   readonly mine = signal<InboxTask[]>([]);
-  readonly groups = signal<InboxTask[]>([]);
+  readonly teams = signal<InboxTask[]>([]);
   readonly done = signal<InboxTask[]>([]);
   readonly requests = signal<RequestRow[]>([]);
   readonly loading = signal(true);
@@ -113,8 +128,8 @@ export class TaskInbox implements OnInit {
 
   // ---- bulk review (2026-10-12) -----------------------------------------------------------------------------------
 
-  /** Waiting for me and My groups pick approval tasks for a bulk decision; Done and My requests have nothing to decide. */
-  readonly canPick = computed(() => this.tab() === 'mine' || this.tab() === 'groups');
+  /** Waiting for me and My teams pick approval tasks for a bulk decision; Done and My requests have nothing to decide. */
+  readonly canPick = computed(() => this.tab() === 'mine' || this.tab() === 'teams');
   readonly taskById = computed(() => new Map(this.rows().map(t => [t.id, t])));
   /** The approval tasks shown that the reader may decide: the page Select all picks. */
   readonly pagePicks = computed<InboxTask[]>(() => {
@@ -134,15 +149,17 @@ export class TaskInbox implements OnInit {
 
   readonly rows = computed<InboxTask[]>(() => {
     switch (this.tab()) {
-      case 'groups': return this.groups();
+      case 'teams': return this.teams();
       case 'done': return this.done();
       default: return this.mine();
     }
   });
 
+  /** Whom a task may be passed to: listed all, and someone who cannot open the inbox (a read-only viewer) marked and never picked. */
   readonly colleagueOptions = computed<ComboboxOption[]>(() => this.colleagues()
     .filter(c => c.userId !== this.me())
-    .map(c => ({ value: String(c.userId), label: c.fullName || c.username, hint: c.username })));
+    .map(c => c.canAct === false ? { value: String(c.userId), label: c.fullName || c.username, hint: CANNOT_ACT, disabled: true }
+      : { value: String(c.userId), label: c.fullName || c.username, hint: c.username }));
 
   /** The open task is the reader's own request's approval: someone else decides it. */
   readonly ownRequest = computed(() => {
@@ -158,12 +175,12 @@ export class TaskInbox implements OnInit {
   /** The task's history, its own lines without its name: the heading already says it. */
   readonly taskHistory = computed<HistoryLine[]>(() => {
     const d = this.detail();
-    return d ? dropOwnStep(historyLines(d.history, id => this.name(id), key => this.stepName(key, d.tasks)), d.name) : [];
+    return d ? dropOwnStep(historyLines(d.history, id => this.historyName(id), key => this.stepName(key, d.tasks)), d.name) : [];
   });
 
   readonly requestHistory = computed<HistoryLine[]>(() => {
     const r = this.request();
-    return r ? historyLines(r.history, id => this.name(id), key => this.stepName(key, r.tasks)) : [];
+    return r ? historyLines(r.history, id => this.historyName(id), key => this.stepName(key, r.tasks)) : [];
   });
 
   // ---- the list ---------------------------------------------------------------------------------------------------
@@ -214,7 +231,7 @@ export class TaskInbox implements OnInit {
   /** The open tab's total, as the service counts it (0 until the count is in). */
   private readonly total = computed(() => {
     switch (this.tab()) {
-      case 'groups': return this.badge.groups();
+      case 'teams': return this.badge.teams();
       case 'done': return this.badge.done();
       case 'requests': return this.badge.requests();
       default: return this.badge.mine();
@@ -296,6 +313,10 @@ export class TaskInbox implements OnInit {
     const task = Number(params.get('task'));
     if (task) { this.followLinkedTask = true; this.openTask(task, true); }
     this.api.colleagues().subscribe({ next: r => { if (r.status === API_SUCCESS) { this.colleagues.set(r.data ?? []); this.colleaguesLoaded.set(true); } }, error: () => {} });
+    this.teamsApi.list().subscribe({
+      next: r => { if (r.status === API_SUCCESS) this.teamNames.set(new Map((r.data ?? []).map(t => [String(t.teamId), t.name]))); },
+      error: () => {},
+    });
     this.load();
   }
 
@@ -308,8 +329,9 @@ export class TaskInbox implements OnInit {
     this.now.set(Date.now());
     this.loading.set(true);
     this.error.set('');
-    let pending = TABS.length;
-    for (const tab of TABS) {
+    const tabs = this.tabs();
+    let pending = tabs.length;
+    for (const tab of tabs) {
       this.readPage(tab, null, rows => {
         this.setRows(tab, rows);
         // The inbox opens on the first task, My requests on the newest.
@@ -353,7 +375,7 @@ export class TaskInbox implements OnInit {
 
   private dropSearchAll(): void {
     const searched = this.searched();
-    const tabs = TABS.filter(t => searched[t]);
+    const tabs = this.tabs().filter(t => searched[t]);
     if (!tabs.length) return;
     this.searched.set(perTab(''));
     for (const tab of tabs) this.readPage(tab, null, rows => this.setRows(tab, rows), () => {});
@@ -366,7 +388,7 @@ export class TaskInbox implements OnInit {
   private refreshKeeping(left: number | null): void {
     this.now.set(Date.now());
     const before = this.next();
-    for (const tab of TABS) {
+    for (const tab of this.tabs()) {
       const keep = this.rowsOf(tab);
       this.readPage(tab, null, rows => {
         const gone = tab === 'done' || tab === 'requests' ? null : left;
@@ -382,7 +404,7 @@ export class TaskInbox implements OnInit {
 
   private rowsOf(tab: InboxTab): (InboxTask | RequestRow)[] {
     switch (tab) {
-      case 'groups': return this.groups();
+      case 'teams': return this.teams();
       case 'done': return this.done();
       case 'requests': return this.requests();
       default: return this.mine();
@@ -391,7 +413,7 @@ export class TaskInbox implements OnInit {
 
   private setRows(tab: InboxTab, rows: (InboxTask | RequestRow)[]): void {
     switch (tab) {
-      case 'groups': this.groups.set(rows as InboxTask[]); break;
+      case 'teams': this.teams.set(rows as InboxTask[]); break;
       case 'done': this.done.set(rows as InboxTask[]); break;
       case 'requests': this.requests.set(rows as RequestRow[]); break;
       default: this.mine.set(rows as InboxTask[]);
@@ -437,19 +459,19 @@ export class TaskInbox implements OnInit {
   private firstLoad = true;
 
   /**
-   * UX review 2026-10-12 (W1): the inbox opens on the tab with work. A reviewer whose tasks all wait in their group's pool
-   * opened on an empty "Waiting for me" saying "Nothing is waiting for you" while My groups held five. When Mine is empty
-   * and My groups is not, it opens My groups on its first task; a link to a task or to My requests decides for itself.
+   * UX review 2026-10-12 (W1): the inbox opens on the tab with work. A reviewer whose tasks all wait in their team's pool
+   * opened on an empty "Waiting for me" saying "Nothing is waiting for you" while My teams held five. When Mine is empty
+   * and My teams is not, it opens My teams on its first task; a link to a task or to My requests decides for itself.
    */
   private openWhereTheWorkIs(): void {
-    if (this.tab() !== 'mine' || this.mine().length || !this.groups().length) return;
-    this.pick('groups');
+    if (this.tab() !== 'mine' || this.mine().length || !this.teams().length) return;
+    this.pick('teams');
   }
 
   private showLinkedTab(): void {
     const id = this.selectedTask();
     if (this.tab() !== 'mine' || id == null || this.mine().some(t => t.id === id)) return;
-    if (this.groups().some(t => t.id === id)) this.tab.set('groups');
+    if (this.teams().some(t => t.id === id)) this.tab.set('teams');
     else if (this.done().some(t => t.id === id)) this.tab.set('done');
   }
 
@@ -625,22 +647,38 @@ export class TaskInbox implements OnInit {
   /** P2 #36: nobody else in the workspace, so a request of one's own has no one to approve it. */
   readonly aloneInWorkspace = computed(() => this.colleaguesLoaded() && !this.colleagues().some(c => c.userId !== this.me()));
   readonly mineCount = computed(() => this.tabCount(this.mine().length, this.badge.mine(), this.complete('mine')));
-  readonly groupsCount = computed(() => this.tabCount(this.groups().length, this.badge.groups(), this.complete('groups')));
-  /** Whether anything waits for the reader's groups: the empty "Waiting for me" tab then points there (G10, W1). */
-  readonly groupsWaiting = computed(() => this.groups().length > 0 || this.badge.groups() > 0);
+  readonly teamsCount = computed(() => this.tabCount(this.teams().length, this.badge.teams(), this.complete('teams')));
+  /** Whether anything waits for the reader's teams: the empty "Waiting for me" tab then points there (G10, W1). */
+  readonly teamsWaiting = computed(() => this.teams().length > 0 || this.badge.teams() > 0);
   readonly doneCount = computed(() => this.tabCount(this.done().length, this.badge.done(), this.complete('done')));
   readonly requestsCount = computed(() => this.tabCount(this.requests().length, this.badge.requests(), this.complete('requests')));
   readonly mineOverdue = computed(() => this.mine().some(t => t.overdue));
 
   /** An approval task, open, not the reader's own request: theirs to decide, so theirs to pick. */
   pickable(t: InboxTask): boolean {
-    return t.stepType === 'approval' && t.state === 'Open' && t.requestState !== 'Approved' && !(t.requestedBy != null && t.requestedBy === this.me());
+    return t.stepType === 'approval' && t.state === 'Open' && t.requestState !== 'Approved' && !(t.requestedBy != null && t.requestedBy === this.me())
+      && !this.decidedInStudio(t);
+  }
+
+  /**
+   * Report Studio phase 7: a report waiting for approval, a template's publish request, a signature waiting for approval --
+   * decided in its review card through Report Studio (it signs what is approved), never by the inbox's own buttons or bulk.
+   */
+  decidedInStudio(t: { subjectType?: string | null; subjectId?: string | null }): boolean {
+    return STUDIO_SUBJECT_TYPES.includes(t.subjectType ?? '') || studioSubject(t.subjectId) !== null;
+  }
+
+  /** The review card told us the decision is made: say so, and move on as after any decision. */
+  onStudioDecided(taskId: number, message: string): void {
+    this.toast.success(message);
+    this.afterChange(taskId, nextAfter(this.shownIds(), taskId));
   }
 
   /** Why an approval task's checkbox is off. */
   pickTitle(t: InboxTask | undefined): string {
     if (!t || this.pickable(t)) return '';
     if (t.requestedBy != null && t.requestedBy === this.me()) return 'Your own request: someone else decides it.';
+    if (this.decidedInStudio(t)) return 'Decided in its review card: Report Studio signs what is approved.';
     return 'No longer waiting for a decision.';
   }
 
@@ -659,7 +697,7 @@ export class TaskInbox implements OnInit {
    * left (twenty pages at most). The total is known only when the list ran out.
    */
   private matchingTasks(): Observable<BulkMatch<InboxTask>> {
-    const tab = this.tab() === 'groups' ? 'groups' : 'mine';
+    const tab = this.tab() === 'teams' ? 'teams' : 'mine';
     const q = this.query().trim() || null;
     const status = this.statusFilter();
     const workflow = this.workflowFilter();
@@ -697,7 +735,7 @@ export class TaskInbox implements OnInit {
     const open = this.selectedTask();
     const next = open != null && done.has(open) ? this.shownIds().find(id => !done.has(id)) ?? null : open;
     this.mine.update(list => list.filter(t => !done.has(t.id)));
-    this.groups.update(list => list.filter(t => !done.has(t.id)));
+    this.teams.update(list => list.filter(t => !done.has(t.id)));
     this.refreshKeeping(null);
     if (open != null && done.has(open)) {
       if (next != null) this.openTask(next);
@@ -714,6 +752,15 @@ export class TaskInbox implements OnInit {
     return c ? (c.fullName || c.username) : `user ${id}`;
   }
 
+  /** Owner 2026-10-21: in a history, the signed-in person by name with "(you)", so a screenshot or an export says who it was. */
+  historyName(id: number | null | undefined): string {
+    if (id != null && id === this.me()) {
+      const mine = this.auth.user()?.fullName || this.colleagues().find(x => x.userId === id)?.fullName;
+      if (mine) return `${mine} (you)`;
+    }
+    return this.name(id);
+  }
+
   stepName(key: string | null | undefined, tasks: { stepKey: string; name: string }[]): string {
     if (!key) return 'The request';
     const base = key.endsWith('#changes') ? key.slice(0, -'#changes'.length) : key;
@@ -724,7 +771,9 @@ export class TaskInbox implements OnInit {
   holder(t: InboxTask): string {
     if (t.assigneeUserId != null) return this.name(t.assigneeUserId);
     if (t.assigneeKind === 'role') return t.assigneeValue === 'TENANT_ADMIN' ? 'Administrators' : 'Any member';
-    return 'Group';
+    // ZT-R16 / F4: a task in My teams is for one of the reader's own teams, named ("With Wound care"), never a bare "Team".
+    if (t.assigneeKind === 'team') return this.teamNames().get(String(t.assigneeValue)) ?? 'a team';
+    return 'someone';
   }
 
   dueLabel(t: InboxTask): string {
@@ -792,6 +841,22 @@ export class TaskInbox implements OnInit {
     };
   }
 
+  /** A pipeline step's approval (the "approval" step pausing a run): its subject is the step's, "pipeline-approval:<run>". */
+  stepApproval(d: { subjectId?: string | null; subject?: Record<string, unknown> | null }): boolean {
+    return /^pipeline-approval:\d+$/.test(d.subjectId ?? '') || (d.subject?.['approvalId'] != null && d.subject?.['stepKey'] != null);
+  }
+
+  /** The run a "Pipeline run review" task is about, from its subject ("pipeline-run:8517" and the run's own fields). */
+  runOf(d: { subjectId?: string | null; subject?: Record<string, unknown> | null }): { jobQueueId: number; attempt: number; link: string | null } | null {
+    const fromId = /^pipeline-run:(\d+)$/.exec(d.subjectId ?? '');
+    const subject = d.subject ?? {};
+    const id = Number(subject['jobQueueId'] ?? (fromId ? fromId[1] : NaN));
+    if (!Number.isFinite(id) || id <= 0) return null;
+    const attempt = Number(subject['attempt'] ?? 1) || 1;
+    const link = typeof subject['link'] === 'string' && (subject['link'] as string).startsWith('/') ? subject['link'] as string : null;
+    return { jobQueueId: id, attempt, link };
+  }
+
   private fieldViews(subject: Record<string, unknown> | undefined | null): FieldView[] {
     return this.fields(subject).map(f => ({ ...f, view: valueKind(f.value) }));
   }
@@ -809,6 +874,9 @@ export class TaskInbox implements OnInit {
     if (!subject) return [];
     return Object.entries(subject)
       .filter(([, v]) => v !== null && v !== undefined && v !== '')
+      // QA 2026-10-20: who a step goes to ({kind, value}: a team, a role, a person) is the workflow's routing, already
+      // shown as the "With ..." chip; as a field it read "Kind team / Value 1063".
+      .filter(([, v]) => !isAssignee(v))
       .map(([k, v]) => ({ label: labelOf(k), value: this.valueText(v) }));
   }
 
@@ -822,4 +890,12 @@ export class TaskInbox implements OnInit {
     const me = this.auth.user();
     return me?.username && text === me.username && me.fullName ? me.fullName : text;
   }
+}
+
+/** A step's assignee as a subject names it: {kind: team | role | user | subject, value} and nothing else. */
+function isAssignee(v: unknown): boolean {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return false;
+  const keys = Object.keys(v as object);
+  const kind = (v as { kind?: unknown }).kind;
+  return keys.length === 2 && keys.includes('kind') && keys.includes('value') && ['team', 'role', 'user', 'subject'].includes(String(kind));
 }

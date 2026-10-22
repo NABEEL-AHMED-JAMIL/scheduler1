@@ -16,22 +16,22 @@ export function waitingApproval(timeline: StepTimeline | null | undefined): Wait
   return null;
 }
 
-/** The group ids (access profiles) the run's Approval steps go to, for their names. */
-export function approvalGroups(timeline: StepTimeline | null | undefined): string[] {
+/** The team ids the run's Approval steps go to, for their names (F4). */
+export function approvalTeams(timeline: StepTimeline | null | undefined): string[] {
   const ids = (timeline?.steps ?? []).map(s => s.approval?.reviewers)
-    .filter(who => who?.kind === 'group' && !!who.value).map(who => String(who!.value));
+    .filter(who => who?.kind === 'team' && !!who.value).map(who => String(who!.value));
   return [...new Set(ids)];
 }
 
 /**
- * Who an approval goes to, in words: a role as the people it names, a group by its name ("the Reviewer group") -- never
- * its id. A group whose name the reader may not read is "the pipeline's reviewer group".
+ * Who an approval goes to, in words: a role as the people it names, a team by its name ("the Wound care team") -- never
+ * its id. A team whose name is not known (archived since) is "the pipeline's reviewer team".
  */
-export function reviewersWords(reviewers: StepApproval['reviewers'], groupNames: ReadonlyMap<string, string>): string {
+export function reviewersWords(reviewers: StepApproval['reviewers'], teamNames: ReadonlyMap<string, string>): string {
   if (!reviewers?.kind) return 'the workspace administrators';
   if (reviewers.kind === 'role') return reviewers.value === 'TENANT_USER' ? 'the workspace users' : 'the workspace administrators';
-  const name = reviewers.value ? groupNames.get(String(reviewers.value)) : undefined;
-  return name ? `the ${name} group` : 'the pipeline\'s reviewer group';
+  const name = reviewers.value ? teamNames.get(String(reviewers.value)) : undefined;
+  return name ? `the ${name} team` : 'the pipeline\'s reviewer team';
 }
 
 /** A span as a person says it, coarse enough to read at a glance (and to fit the strip): "<1 min", "45 min", "7 h", "2 d 17 h". */

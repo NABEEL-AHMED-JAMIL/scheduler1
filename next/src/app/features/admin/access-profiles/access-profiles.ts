@@ -1,11 +1,11 @@
+import { WorkspaceSelect } from '../../../shared/ui/workspace-select';
+import { WorkspaceDirectory } from '../../../core/workspaces/workspace-directory';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { Combobox } from '../../../shared/ui/combobox';
 import { Dialog } from '@angular/cdk/dialog';
-import { HttpClient } from '@angular/common/http';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { forkJoin } from 'rxjs';
-import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
+import { API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { AuthService } from '../../../core/auth/auth.service';
 import { PageCatalogueEntry } from '../../../core/auth/page-keys';
 import { Icon } from '../../../shared/ui/icon';
@@ -13,15 +13,16 @@ import { StatTile } from '../../../shared/ui/stat-tile';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { confirmWith } from '../../../shared/ui/confirm';
 import { AccessPerson, AccessProfile, AccessProfilesService } from './access-profiles.service';
-import { AccessProfileDialog, AccessProfileDialogData } from './access-profile-dialog';
 import { AccessPeopleGrid } from './access-people-grid';
+import { AccessGrants } from './access-grants';
+import { AccessDelegation } from '../../../core/auth/access-delegation';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
+import { NeedsWorkspace } from '../../../shared/ui/needs-workspace';
+import { isOwnPlatformSignIn } from '../../../core/auth/workspace-data';
 
 /** A profile's pages arranged the way the menu arranges them, for the card. */
 interface CardSection { section: string; opens: string[]; withholds: string[]; }
-
-interface Tenant { tenantId: number; tenantName: string; }
 
 /**
  * Administration > Access profiles: the named page bundles a workspace hands its tenant users.
@@ -32,23 +33,27 @@ interface Tenant { tenantId: number; tenantName: string; }
  */
 @Component({
   selector: 'app-access-profiles',
-  imports: [RefreshButton, PageHeader, Icon, StatTile, CdkMenu, CdkMenuItem, CdkMenuTrigger, AccessPeopleGrid, Combobox],
+  imports: [WorkspaceSelect, RefreshButton, PageHeader, Icon, StatTile, CdkMenu, CdkMenuItem, CdkMenuTrigger, AccessPeopleGrid, AccessGrants, NeedsWorkspace],
   templateUrl: './access-profiles.html',
 })
 export class AccessProfiles implements OnInit {
   private readonly api = inject(AccessProfilesService);
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);
-  private readonly http = inject(HttpClient);
   readonly auth = inject(AuthService);
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+  readonly delegation = inject(AccessDelegation);
+  /** F3: a member with an access delegation: the people they reach and what they may grant, nothing else of this page. */
+  readonly delegateMode = computed(() => !this.auth.isTenantAdmin() && this.delegation.isDelegate());
 
   /**
    * A platform administrator has no workspace of its own, so it picks one; the screen is empty until it
    * does. A tenant administrator never sees the picker -- its workspace is the only one it can reach.
    */
   readonly canPickTenant = computed(() => this.auth.isPlatformAdmin());
-  readonly tenants = signal<Tenant[]>([]);
+  /** ZT-M16: the platform administrator's own sign-in reads no person's effective access, delegation or change log. */
+  readonly ownSignIn = computed(() => isOwnPlatformSignIn(this.auth));
   readonly tenantId = signal<number | null>(null);
 
   readonly profiles = signal<AccessProfile[]>([]);
@@ -106,9 +111,14 @@ export class AccessProfiles implements OnInit {
   })));
 
   readonly needsWorkspace = computed(() => this.canPickTenant() && !this.tenantId());
-  readonly tenantOptions = computed(() => this.tenants().map(t => ({ value: String(t.tenantId), label: t.tenantName })));
+
+  private readonly directory = inject(WorkspaceDirectory);
 
   ngOnInit(): void {
+    if (!this.auth.isTenantAdmin()) {
+      this.delegation.load().subscribe(() => this.loadPeople());
+      return;
+    }
     // A link from the Users screen lands on one person's row: the grid view, their name in the
     // filter, and -- for a platform administrator -- their workspace already picked.
     const params = this.route.snapshot.queryParamMap;
@@ -117,13 +127,6 @@ export class AccessProfiles implements OnInit {
     this.gridSearch.set(this.search());
     const linkedTenant = Number(params.get('tenantId'));
     if (this.canPickTenant()) {
-      this.http.get<ApiResponse<Tenant[]>>(`${API_BASE}/tenant.json/listTenants`).subscribe({
-        next: response => {
-          if (response.status === API_SUCCESS) this.tenants.set(response.data ?? []);
-          else this.toast.error(response.message || 'The workspaces could not be loaded.');
-        },
-        error: err => this.toast.error(err?.error?.message || 'The workspaces could not be loaded.'),
-      });
       this.api.pages().subscribe({
         next: r => {
           if (r.status === API_SUCCESS) this.pages.set(r.data ?? []);
@@ -131,7 +134,10 @@ export class AccessProfiles implements OnInit {
         },
         error: err => this.toast.error(err?.error?.message || 'The page catalogue could not be loaded.'),
       });
+      // A deep link's workspace, else the one picked on the last screen (owner #5: the choice is kept for the session).
+      const remembered = this.directory.remembered();
       if (Number.isFinite(linkedTenant) && linkedTenant > 0) this.pickTenant(String(linkedTenant));
+      else if (remembered !== null) this.pickTenant(String(remembered));
       return;
     }
     this.load();
@@ -143,6 +149,12 @@ export class AccessProfiles implements OnInit {
     this.profiles.set([]);
     this.people.set([]);
     if (this.tenantId()) this.load();
+  }
+
+  /** "21 Jan 2027": when a delegation ends. */
+  until(value: string): string {
+    const at = new Date(value);
+    return Number.isNaN(at.getTime()) ? value : new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(at);
   }
 
   showProfiles(): void {
@@ -199,6 +211,11 @@ export class AccessProfiles implements OnInit {
     if (this.view() === 'people') this.loadPeople();
   }
 
+  /** F3: Grant pages and tabs reads the people the first time a person is to be chosen. */
+  needPeople(): void {
+    if (this.people().length === 0 && !this.peopleLoading()) this.loadPeople();
+  }
+
   loadPeople(): void {
     if (this.needsWorkspace()) return;
     this.peopleLoading.set(true);
@@ -229,20 +246,20 @@ export class AccessProfiles implements OnInit {
     return sections;
   }
 
-  private dialogData(profile?: AccessProfile): AccessProfileDialogData {
-    return { profile, pages: this.pages(), first: this.profiles().length === 0, tenantId: this.tenantId() };
-  }
-
+  /**
+   * Owner 2026-10-19 #3: a profile is made and changed on a page of its own (AccessProfileEditor), where fifty-odd pages
+   * are grouped by the menu, searchable and previewed -- not in a dialog. A platform administrator's workspace travels.
+   */
   add(): void {
-    this.dialog.open<boolean>(AccessProfileDialog, { data: this.dialogData() }).closed.subscribe(saved => {
-      if (saved) this.load();
-    });
+    void this.router.navigate(['/administration/access-profiles/new'], { queryParams: this.workspaceQuery() });
   }
 
   edit(profile: AccessProfile): void {
-    this.dialog.open<boolean>(AccessProfileDialog, { data: this.dialogData(profile) }).closed.subscribe(saved => {
-      if (saved) this.load();
-    });
+    void this.router.navigate(['/administration/access-profiles', profile.pageAccessProfileId], { queryParams: this.workspaceQuery() });
+  }
+
+  private workspaceQuery(): Record<string, number> {
+    return this.canPickTenant() && this.tenantId() ? { tenantId: this.tenantId()! } : {};
   }
 
   setDefault(profile: AccessProfile): void {

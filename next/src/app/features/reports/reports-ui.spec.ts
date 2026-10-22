@@ -152,7 +152,7 @@ describe('Reports times', () => {
     expect(text()).not.toContain('2026-09-25 03:59');
     expect(text()).toContain(pipe.transform(lastAt, 'recent')!);
     // The median call reads as a duration, not "0.9 s".
-    expect(text()).toContain('900ms');
+    expect(text()).toContain('900 ms');
   });
 
   it('shows a failure\'s time the way Queue does, and still groups by the latest', () => {
@@ -186,8 +186,8 @@ describe('Reports times', () => {
     const { reports, fixture, text } = page();
     reports.failures.set([{ ...failure(4, 'nightly-load', 'Disk full'), seconds: 125 }]);
     fixture.detectChanges();
-    expect(text()).toContain('2m 5s');                        // the failure's duration
-    expect(text()).toContain('44s');                          // a task's slowest run
-    expect(reports.durationFoot()).toContain('2s running');   // the median tile's foot
+    expect(text()).toContain('2 min 5 sec');                      // the failure's duration
+    expect(text()).toContain('44 sec');                       // a task's slowest run
+    expect(reports.durationFoot()).toContain('2 sec running');   // the median tile's foot
   });
 });

@@ -1,3 +1,5 @@
+import { WorkspaceSelect } from '../../../shared/ui/workspace-select';
+import { WorkspaceDirectory } from '../../../core/workspaces/workspace-directory';
 import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Dialog } from '@angular/cdk/dialog';
@@ -5,7 +7,6 @@ import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config
 import { AuthService } from '../../../core/auth/auth.service';
 import { TableShell } from '../../../shared/ui/data-table';
 import { Icon } from '../../../shared/ui/icon';
-import { Combobox, ComboboxOption } from '../../../shared/ui/combobox';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { confirmWith } from '../../../shared/ui/confirm';
@@ -36,7 +37,7 @@ const COPY: Record<TaskReferenceKind, { title: string; singular: string; subtitl
  */
 @Component({
   selector: 'app-task-references',
-  imports: [RefreshButton, PageHeader, TableShell, Icon, Combobox, ServerTimePipe],
+  imports: [WorkspaceSelect, RefreshButton, PageHeader, TableShell, Icon, ServerTimePipe],
   templateUrl: './task-references.html',
 })
 export class TaskReferences implements OnInit {
@@ -58,9 +59,7 @@ export class TaskReferences implements OnInit {
 
   readonly isPlatformAdmin = computed(() => this.auth.isPlatformAdmin());
   readonly tenants = signal<TenantOption[]>([]);
-  readonly tenantFilter = signal('');
-  readonly tenantOptions = computed<ComboboxOption[]>(() =>
-    this.tenants().map(t => ({ value: String(t.tenantId), label: t.tenantName, hint: t.tenantCode ?? '' })));
+  readonly tenantFilter = signal(String(inject(WorkspaceDirectory).remembered() ?? ''));
   readonly showWorkspace = computed(() => this.isPlatformAdmin() && !this.tenantFilter());
 
   readonly filtered = computed(() => {

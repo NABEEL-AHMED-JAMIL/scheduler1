@@ -65,6 +65,12 @@ const TOKEN_FILES = [
   /^src\/app\/features\/landing\/landing\.tokens\.css$/,
 ];
 
+/**
+ * Document data, not styling: the printed report's platform default look (media's Stylesheet), which the brand
+ * editor shows in its colour pickers and contrast check when a brand profile leaves a colour blank (MIG-406).
+ */
+const PRINTED_DATA = /^src\/app\/features\/report-studio\/assets\/printed-look\.ts$/;
+
 /** A token file with its custom-property declarations blanked out: whatever is left is a rule. */
 function withoutTokenDefinitions(f: Source): Source {
   if (!TOKEN_FILES.some(p => p.test(f.path))) return f;
@@ -98,7 +104,7 @@ describe('design system', () => {
   describe('colour comes from a token', () => {
     it('has no hex colour in feature code', async () => {
       const { files } = await designSources();
-      expect(offenders(files.map(withoutTokenDefinitions), HEX)).toEqual([]);
+      expect(offenders(files.filter(f => !PRINTED_DATA.test(f.path)).map(withoutTokenDefinitions), HEX)).toEqual([]);
     });
 
     it('has no rgb(), hsl() or other literal colour function in feature code', async () => {

@@ -192,9 +192,9 @@ describe('JobLogs for a run that does not exist', () => {
 describe('JobLogs on the console clock', () => {
   it('writes the run and the AI step with the shared duration format', () => {
     const { el, component } = page('ai');
-    expect(component.duration()).toBe('2m 8s');
-    expect(el.textContent).toContain('9.9s');
-    expect(el.textContent).not.toContain('9.9 s');
+    expect(component.duration()).toBe('2 min 8 sec');
+    expect(el.textContent).toContain('9.9 sec');
+    expect(el.textContent).not.toContain('9.9s');
   });
 
   it('writes a long wait in minutes', () => {
@@ -202,8 +202,8 @@ describe('JobLogs on the console clock', () => {
     const at = (time: string) => `2026-09-20T${time}`;
     component.runStartedAt.set(at('18:00:00'));
     component.logs.set([{ jobAuditLogId: 1, logsDetail: 'waited', dateCreated: at('18:02:05') }] as any);
-    expect(component.topGaps()[0].display).toBe('2m 5s');
-    expect(component.gapSummary()?.totalLabel).toBe('2m 5s');
+    expect(component.topGaps()[0].display).toBe('2 min 5 sec');
+    expect(component.gapSummary()?.totalLabel).toBe('2 min 5 sec');
   });
 
   it('times the log\'s lines on the 24-hour clock, the full date in each one\'s title', () => {
@@ -268,7 +268,7 @@ describe('JobLogs with the run\'s steps', () => {
     expect(el.querySelector('[data-tab="steps"]')?.getAttribute('aria-selected')).toBe('true');
     expect(el.querySelector('[data-tab="ai"]')?.textContent).toContain('AI answers (1)');
     const summary = el.querySelector('[data-test="run-summary"]')!;
-    expect(summary.textContent).toContain('2m 8s');
+    expect(summary.textContent).toContain('2 min 8 sec');
     expect(summary.compareDocumentPosition(el.querySelector('[data-test="run-tabs"]')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });
@@ -463,18 +463,18 @@ describe('Run page: a run waiting at an Approval step', () => {
       { stepExecutionId: 2, index: 1, key: 'approve', name: 'Approve the test rows', task: 'approval', status: 'Running', recordsIn: 3, tries: 1, datasets: [], log: 'step',
         statusMessage: 'Waiting for approval: Approve 3 bulk-review test rows of run 8298',
         approval: { approvalId: 1006, status: 'PENDING', waiting: true, title: 'Approve 3 bulk-review test rows of run 8298',
-          reviewers: { kind: 'group', value: '1063' }, requestedAt, expiresAt: new Date(Date.now() + 65 * HOUR).toISOString() } },
+          reviewers: { kind: 'team', value: '1063' }, requestedAt, expiresAt: new Date(Date.now() + 65 * HOUR).toISOString() } },
       { stepExecutionId: 3, index: 2, key: 'save', task: 'save_file', status: 'Queue', tries: 0, datasets: [], log: 'step' },
     ] };
   const RUN = {
     auditLogs: [
-      { jobAuditLogId: 1, logsDetail: 'Step 2/3 <approve> (approval) waits for approval by the group 1063 (request 1006): Approve 3 bulk-review test rows of run 8298', dateCreated: '2026-10-12 22:08:36' },
+      { jobAuditLogId: 1, logsDetail: 'Step 2/3 <approve> (approval) waits for approval by the team 1063 (request 1006): Approve 3 bulk-review test rows of run 8298', dateCreated: '2026-10-12 22:08:36' },
     ],
     sourceJob: { jobId: 2977, jobName: 'Bulk approval step test #4', taskDetail: { taskName: 'Bulk approval step test' } },
     sourceJobQueue: { jobQueueId: 8298, jobStatus: 'Running', startTime: '2026-10-12 22:08:35', endTime: null,
       jobStatusMessage: 'Waiting for approval at step 2 <approve>: Approve 3 bulk-review test rows of run 8298' },
   };
-  const TASK = { id: 1136, instanceId: 1130, stepKey: 'approve', stepType: 'approval', state: 'Open', assigneeKind: 'group', assigneeValue: '1063' };
+  const TASK = { id: 1136, instanceId: 1130, stepKey: 'approve', stepType: 'approval', state: 'Open', assigneeKind: 'team', assigneeValue: '1063' };
 
   function waiting(tab: string | null, reader: 'reviewer' | 'admin' = 'reviewer') {
     TestBed.resetTestingModule();
@@ -501,7 +501,7 @@ describe('Run page: a run waiting at an Approval step', () => {
     http.match(r => r.url.endsWith('/sourceJob.json/review')).forEach(r => r.flush({ status: API_SUCCESS, data: { jobQueueId: 8298, jobId: 2977, reviewStatus: 'NOT_REQUIRED', required: [] } }));
     fixture.detectChanges();
     http.match(r => r.url.endsWith('/taskInbox.json/forSubject')).forEach(r => r.flush({ status: API_SUCCESS, data: reader === 'admin' ? [] : [TASK] }));
-    http.match(r => r.url.endsWith('/pageAccess.json/listProfiles')).forEach(r => r.flush({ status: API_SUCCESS, data: [{ pageAccessProfileId: 1063, profileName: 'Reviewer' }] }));
+    http.match(r => r.url.endsWith('/appUser.json/teams/list')).forEach(r => r.flush({ status: API_SUCCESS, data: [{ teamId: 1063, name: 'Reviewer', members: [] }] }));
     http.match(r => r.url.endsWith('/billing.json/runCost')).forEach(r => r.flush({ status: API_SUCCESS, data: { cost: 0, currency: 'USD' } }));
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
@@ -545,19 +545,19 @@ describe('Run page: a run waiting at an Approval step', () => {
     expect(location.path()).toBe('/pipelines/schedules/2977/runs/8298');
   });
 
-  it('names the group in the log and links the request to the reviewer\'s task', () => {
+  it('names the team in the log and links the request to the reviewer\'s task', () => {
     const { el, component, fixture } = waiting(null);
     component.setTab('log');
     fixture.detectChanges();
     const line = el.querySelector('.run-log-msg')!;
-    expect(line.textContent).toContain('waits for approval by the Reviewer group (request 1006)');
-    expect(line.textContent).not.toContain('group 1063');
+    expect(line.textContent).toContain('waits for approval by the Reviewer team (request 1006)');
+    expect(line.textContent).not.toContain('team 1063');
     expect(line.querySelector('a.log-ref')?.getAttribute('href')).toBe('/review/approvals?task=1136');
   });
 
-  it('names the group in the steps table too', () => {
+  it('names the team in the steps table too', () => {
     const { el } = waiting(null, 'admin');
-    expect(el.querySelector('[data-test="step-approval"]')?.textContent).toContain('Waiting for approval by the Reviewer group in Review');
+    expect(el.querySelector('[data-test="step-approval"]')?.textContent).toContain('Waiting for approval by the Reviewer team in Review');
   });
 
   it('walks the reviewer through Runs, and the administrator through Build › Pipelines', () => {
@@ -585,6 +585,26 @@ describe('Run page: a run waiting at an Approval step', () => {
     expect(el.querySelector('[data-link="dashboards"]')).toBeNull();
   });
 
+  /**
+   * ZT §3.11 (the browser budget on Riverside, CLS 0.16 at 1024): "Feeds: Riverside -- Hospital readmission risk, ..." arrived
+   * after the body and wrapped the link row to a second line, and the Cost fact added a second row of facts.
+   */
+  it('draws the header link row with the body, once the boards it feeds and its cost have answered', () => {
+    const { el, fixture, component } = waiting(null, 'admin');
+    expect(component.topReady()).toBe(false);
+    expect(el.querySelector('[data-test="run-related"]')).toBeNull();
+    expect(el.querySelector('[data-test="run-pending"]')).not.toBeNull();
+    TestBed.inject(HttpTestingController).expectOne(r => r.url.endsWith('/analyticsWorkspace.json/fetchAllDashboards')).flush({ status: API_SUCCESS,
+      data: [{ analyticsDashboardId: 1450, dashboardName: 'Readmissions', pipelines: [{ jobId: 2977 }] }] });
+    fixture.detectChanges();
+    TestBed.tick();
+    fixture.detectChanges();
+    expect(component.topReady()).toBe(true);
+    expect(el.querySelector('[data-test="run-pending"]')).toBeNull();
+    expect(el.querySelector('[data-test="run-related"] [data-link="feeds"]')?.textContent).toContain('Readmissions');
+    expect(el.querySelector('[data-fact="Cost"]')).not.toBeNull();
+  });
+
   it('keeps the plain Dashboards link when no board names the schedule, and reads no boards for a reader without them', () => {
     const { el, fixture } = waiting(null, 'admin');
     TestBed.inject(HttpTestingController).expectOne(r => r.url.endsWith('/analyticsWorkspace.json/fetchAllDashboards'))
@@ -596,5 +616,43 @@ describe('Run page: a run waiting at an Approval step', () => {
     TestBed.inject(HttpTestingController).expectNone(r => r.url.endsWith('/analyticsWorkspace.json/fetchAllDashboards'));
     expect(boardsFedBy([{ analyticsDashboardId: null, dashboardName: 'x', pipelines: [{ jobId: 1 }] },
       { analyticsDashboardId: 7, dashboardName: ' ', pipelines: [{ jobId: 1 }] }], 1)).toEqual([{ id: 7, name: 'Dashboard #7' }]);
+  });
+});
+
+/**
+ * MIG-416 (the browser budget, CLS 0.16 at 1024): the run, its review and its steps answered apart, and the review box
+ * stacked above the tabs before it moved beside the summary. The body is drawn once all three have answered.
+ */
+describe('JobLogs drawn once its parts have answered (MIG-416)', () => {
+  const ENGINE = { jobQueueId: 6839, jobId: 2808, runStatus: 'Completed', attempt: 1, attempts: [1], legacy: false, aiSteps: [],
+    steps: [{ stepExecutionId: 1, index: 0, key: 'read', task: 'read_file', status: 'Completed', durationMs: 5, recordsIn: 0, recordsOut: 2,
+      tries: 1, onError: 'fail', datasets: [], log: 'step' }] };
+  const hidden = (el: HTMLElement, test: string) => !!el.querySelector(`[data-test="${test}"]`)?.closest('.run-waiting');
+
+  it('holds the summary and the tabs behind one busy card until the review and the steps have answered', () => {
+    const { fixture, el, component } = page('steps');
+    const http = TestBed.inject(HttpTestingController);
+    expect(el.querySelector('[data-test="run-pending"]')?.getAttribute('aria-busy')).toBe('true');
+    expect(hidden(el, 'run-summary')).toBe(true);
+    expect(hidden(el, 'run-tabs')).toBe(true);
+    http.match(r => r.url.endsWith('/sourceJob.json/stepExecutions')).forEach(r => r.flush({ status: API_SUCCESS, data: ENGINE }));
+    fixture.detectChanges();
+    expect(component.topReady()).toBe(false);
+    http.match(r => r.url.endsWith('/sourceJob.json/review')).forEach(r => r.flush({ status: API_SUCCESS, data: { reviewStatus: 'NOT_REQUIRED' } }));
+    fixture.detectChanges();
+    TestBed.tick();
+    // ZT §3.11: and the boards it feeds and its cost, where the reader reads them.
+    http.match(r => r.url.endsWith('/analyticsWorkspace.json/fetchAllDashboards')).forEach(r => r.flush({ status: API_SUCCESS, data: [] }));
+    http.match(r => r.url.endsWith('/billing.json/runCost')).forEach(r => r.flush({ status: API_SUCCESS, data: { cost: 0, currency: 'USD' } }));
+    fixture.detectChanges();
+    TestBed.tick();
+    fixture.detectChanges();
+    expect(component.topReady()).toBe(true);
+    expect(el.querySelector('[data-test="run-pending"]')).toBeNull();
+    expect(hidden(el, 'run-summary')).toBe(false);
+    expect(hidden(el, 'run-tabs')).toBe(false);
+    component.refresh();
+    fixture.detectChanges();
+    expect(hidden(el, 'run-tabs')).toBe(false);
   });
 });

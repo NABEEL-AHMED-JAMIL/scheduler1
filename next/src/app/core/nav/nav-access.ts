@@ -3,6 +3,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { RedirectFunction, Router, UrlTree } from '@angular/router';
 import { API_BASE, ApiResponse } from '../api/api.config';
 import { AuthService } from '../auth/auth.service';
+import { AccessDelegation } from '../auth/access-delegation';
 import { NavGate, NavHub, NavTab, NavViewer, entryVisible, hubByPath, passes, visibleTabs } from './nav-tree';
 
 /**
@@ -14,6 +15,7 @@ import { NavGate, NavHub, NavTab, NavViewer, entryVisible, hubByPath, passes, vi
 export class NavAccess {
   private readonly auth = inject(AuthService);
   private readonly http = inject(HttpClient);
+  private readonly delegation = inject(AccessDelegation);
 
   /** MIG-254: our team has acted in this SELF workspace (asked once, when the menu is first opened). */
   private readonly teamActivitySeen = signal(false);
@@ -26,7 +28,9 @@ export class NavAccess {
     const isAdmin = this.auth.isTenantAdmin();
     const isPlatform = this.auth.isPlatformAdmin();
     const showTeam = this.showTeamActivity();
-    return { canOpen: key => this.auth.canOpen(key), isAdmin, isPlatform, showTeam };
+    const isDelegate = this.delegation.isDelegate();
+    return { canOpen: key => this.auth.canOpen(key), canOpenTab: (page, tab) => this.auth.canOpenTab(page, tab), isAdmin, isPlatform, showTeam,
+      isDelegate };
   });
 
   passes(gate: NavGate): boolean { return passes(gate, this.viewer()); }
@@ -39,6 +43,8 @@ export class NavAccess {
    * menu for.
    */
   checkTeamActivity(): void {
+    // F3: a member's access delegation, read once, so the menu can offer them Page access.
+    if (!this.auth.isTenantAdmin()) this.delegation.load().subscribe();
     if (this.teamActivityAsked || !this.auth.isTenantAdmin() || this.auth.isPlatformAdmin() || this.showTeamActivity()) return;
     this.teamActivityAsked = true;
     this.http.get<ApiResponse<unknown[]>>(`${API_BASE}/managedService.json/actions`, { params: { limit: 1 } }).subscribe({

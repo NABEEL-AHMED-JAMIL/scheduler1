@@ -11,7 +11,7 @@ import { Pagination } from '../../shared/ui/pagination';
 import { PAGE_SIZES } from '../../shared/ui/pager';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import {
-  AGE_FILTERS, CLAIM_FILTERS, CONFIDENCE_FILTERS, DocumentType, Extraction, OcrDocument, QUEUE_STATUSES, fileName, lowLine,
+  AGE_FILTERS, CLAIM_FILTERS, CONFIDENCE_FILTERS, DocumentType, Extraction, OcrDocument, QUEUE_STATUSES, documentName, lowLine,
   refusalText, statusLabel,
 } from './documents.model';
 import { DocumentsApi } from './documents.service';
@@ -20,6 +20,7 @@ import { PageHeader } from '../../shared/ui/page-header';
 import { RefreshButton } from '../../shared/ui/refresh-button';
 import { BulkBar } from '../../shared/ui/bulk/bulk-bar';
 import { BulkReviewApi } from '../../shared/ui/bulk/bulk-review.api';
+import { NeedsWorkspace } from '../../shared/ui/needs-workspace';
 import { BULK_CAP, BulkSelection } from '../../shared/ui/bulk/bulk.model';
 
 /**
@@ -30,7 +31,7 @@ import { BULK_CAP, BulkSelection } from '../../shared/ui/bulk/bulk.model';
  */
 @Component({
   selector: 'app-review-queue',
-  imports: [RefreshButton, PageHeader, RouterLink, Icon, TableShell, StatusPill, Pagination, ServerTimePipe, ConfidenceBar, BulkBar],
+  imports: [RefreshButton, PageHeader, RouterLink, Icon, TableShell, StatusPill, Pagination, ServerTimePipe, ConfidenceBar, BulkBar, NeedsWorkspace],
   template: `
     <div class="page">
       <app-page-header>
@@ -42,13 +43,20 @@ import { BULK_CAP, BulkSelection } from '../../shared/ui/bulk/bulk.model';
               not sure about, correct them, and approve or reject it.
             </p>
           </div>
-          <div class="flex items-center gap-2">
-            <app-refresh-button [loading]="loading()" (refresh)="load()" />
-            <button type="button" class="btn btn-primary btn-sm" [disabled]="!firstFree()" (click)="start()"><app-icon name="play" />Start reviewing</button>
-          </div>
+          @if (!noWorkspace()) {
+            <div class="flex items-center gap-2">
+              <app-refresh-button [loading]="loading()" (refresh)="load()" />
+              <button type="button" class="btn btn-primary btn-sm" [disabled]="!firstFree()" (click)="start()"><app-icon name="play" />Start reviewing</button>
+            </div>
+          }
         </div>
       </app-page-header>
 
+      <!-- ZT-D11 (§0's rule for Document Intelligence): a sign-in with no workspace -- a platform administrator's own -- reviews
+           no workspace's documents here; it opens the workspace with "Work in this workspace" first. No call is made. -->
+      @if (noWorkspace()) {
+        <app-needs-workspace what="Documents are" todo="review documents, correct and approve them" icon="file" />
+      } @else {
       <app-table-shell data-test="queue" heading="Documents" columnsKey="document-review-queue" [loading]="loading()" [error]="error()"
                        [isEmpty]="!items().length" [shown]="items().length" [total]="total()"
                        [emptyMessage]="hasFilters() ? 'No document matches the current filters.' : status() === 'Review' ? 'Nothing is waiting for review.' : 'No documents here yet.'"
@@ -127,6 +135,7 @@ import { BULK_CAP, BulkSelection } from '../../shared/ui/bulk/bulk.model';
       @if (canBulk()) {
         <app-bulk-bar [selection]="bulk" [pageRows]="pageRows()" [moreMatch]="total() > items().length" [matchTotal]="total()" (decided)="load()" />
       }
+      }
     </div>
   `,
 })
@@ -201,7 +210,11 @@ export class ReviewQueue implements OnInit {
     }
   }
 
+  /** A sign-in with no workspace (a platform administrator's own): the needs-workspace card, and no call. */
+  readonly noWorkspace = computed(() => !this.auth.user()?.tenantId);
+
   ngOnInit(): void {
+    if (this.noWorkspace()) { this.loading.set(false); return; }
     this.load();
     this.api.types().subscribe({ next: r => { if (r.status === API_SUCCESS) this.types.set(r.data ?? []); }, error: () => { /* the filter lists no types */ } });
     this.api.reads().subscribe({
@@ -262,7 +275,7 @@ export class ReviewQueue implements OnInit {
 
   nameOf(e: Extraction): string {
     const read = this.reads().get(e.ocrDocumentId);
-    return read ? fileName(read.sourceKey) : `OCR document ${e.ocrDocumentId}`;
+    return read ? documentName(read) : `OCR document ${e.ocrDocumentId}`;
   }
 
   label(e: Extraction): string { return statusLabel(e); }

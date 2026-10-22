@@ -4,6 +4,7 @@ import { DataText } from '../../../shared/ui/data-text';
 import { formatSize } from '../../../shared/ui/format-size';
 import { clipText } from '../../../shared/ui/long-text';
 import { RunResult } from './api-collections.model';
+import { formatDuration } from '../../../shared/ui/time-format';
 
 type Tab = 'body' | 'headers' | 'extracted' | 'assertions';
 
@@ -26,7 +27,7 @@ const BODY_MAX = 200_000;
           <app-icon [name]="r.outcome === 'OK' ? 'checkCircle' : r.outcome === 'BLOCKED' ? 'shield' : 'xCircle'" size="0.9em" />{{ outcomeLabel() }}
         </span>
         @if (r.statusCode) { <span class="mono">HTTP {{ r.statusCode }}</span> }
-        <span class="text-[color:var(--text-secondary)]">{{ r.durationMs }} ms</span>
+        <span class="text-[color:var(--text-secondary)]">{{ took(r.durationMs) }}</span>
         @if (r.responseBytes) { <span class="text-[color:var(--text-secondary)]">{{ size() }}</span> }
         @if (r.attempts > 1) { <span class="text-[color:var(--text-secondary)]">{{ r.attempts }} attempts</span> }
         @if (r.assertions?.length) { <span [class.text-crit-500]="failedAssertions()">{{ passedAssertions() }} of {{ r.assertions!.length }} assertions passed</span> }
@@ -93,6 +94,9 @@ const BODY_MAX = 200_000;
   `,
 })
 export class ResponseViewer {
+  /** Milliseconds in the console's duration words (formatDuration): "420 ms", "1.4 sec", "15 sec". */
+  took(ms: number): string { return formatDuration(ms / 1000); }
+
   readonly result = input.required<RunResult>();
   readonly tab = signal<Tab>('body');
 

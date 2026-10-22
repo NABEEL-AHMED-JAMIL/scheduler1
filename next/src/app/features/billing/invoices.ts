@@ -16,6 +16,7 @@ import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { BillingAccountDialog } from './billing-account-dialog';
 import { InvoicePane } from './invoice-detail';
 import { WorkspacePicker } from './workspace-picker';
+import { WorkspaceSelect } from '../../shared/ui/workspace-select';
 import { PageHeader } from '../../shared/ui/page-header';
 import { RefreshButton } from '../../shared/ui/refresh-button';
 
@@ -27,7 +28,7 @@ import { RefreshButton } from '../../shared/ui/refresh-button';
  */
 @Component({
   selector: 'app-invoices',
-  imports: [RefreshButton, PageHeader, Icon, StatTile, InvoicePane, CdkMenu, CdkMenuItem, CdkMenuTrigger],
+  imports: [WorkspaceSelect, RefreshButton, PageHeader, Icon, StatTile, InvoicePane, CdkMenu, CdkMenuItem, CdkMenuTrigger],
   styles: [ONE_PANE_BELOW_1024],
   templateUrl: './invoices.html',
 })
@@ -148,10 +149,6 @@ export class Invoices implements OnInit {
   overdueDays(r: InvoiceRow): number { return daysOverdue(r.dueAt); }
   /** MIG-359: "paid by card", "card declined" or "pay link open" in the rail, from the same chip the pane shows. */
   cardNote(r: InvoiceRow): string | null { return cardPaymentChip(r)?.label.toLowerCase() ?? null; }
-  /** The rail's dot: what the row's state means for the reader. */
-  tone(r: InvoiceRow): string {
-    return r.status === 'overdue' ? 'crit' : (r.pendingPayments ?? 0) > 0 ? 'warn' : r.status === 'paid' ? 'ok' : r.status === 'draft' || r.status === 'void' ? 'muted' : 'warn';
-  }
   docsLabel(r: InvoiceRow): string {
     const short: Record<string, string> = { invoice: 'PDF', credit_note: 'PDF', payment_slip: 'slip', receipt: 'receipt', statement: 'statement' };
     const order = ['invoice', 'credit_note', 'payment_slip', 'receipt', 'statement'];

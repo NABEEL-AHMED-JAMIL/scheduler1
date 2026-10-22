@@ -1,7 +1,7 @@
 import {
   FieldKind, JsonSchema, LEGACY_TASK, StepTaskEntry, TASK_KINDS, TaskState, fieldsOf, isMapSchema, mapValueKind, stateOf,
 } from '../../tasks/steps/steps.model';
-import { Pipeline } from '../pipelines/pipeline-dialog';
+import { Pipeline } from '../pipelines/pipeline.model';
 
 export { stateOf };
 export type { TaskState };
@@ -15,7 +15,7 @@ export type { TaskState };
 /** The kind chips, in the order the table lists them. */
 export const REGISTRY_KINDS = [...TASK_KINDS, 'Legacy'] as const;
 
-export const TASK_STATES: TaskState[] = ['On', 'Off', 'Unavailable'];
+export const TASK_STATES: TaskState[] = ['On', 'Off', 'Blocked', 'Unavailable'];
 
 export interface RegistryRow {
   /** The task's code, or legacy:<pipelineKey> for a pipeline. */
@@ -122,17 +122,20 @@ export function kindCounts(rows: RegistryRow[]): Record<string, number> {
 
 export const permissionLabel = (p: string | null | undefined) => (p === 'TENANT_ADMIN' ? 'Workspace administrators' : 'Any member');
 
-export function retryText(retry: StepTaskEntry['retry']): string {
+export function retryText(retry: StepTaskEntry['retry'], repeatSafe = false): string {
   const tries = retry?.maxAttempts ?? 1;
-  if (tries <= 1) return 'Once, no retry';
-  return `Up to ${tries} tries, ${retry?.delaySeconds ?? 0} s apart`;
+  const base = tries <= 1 ? 'Once' : `Up to ${tries} tries, ${retry?.delaySeconds ?? 0} sec apart`;
+  // Owner 2026-10-21: Core tries a step that is safe to repeat again when a service or storage is briefly away, unless the
+  // pipeline's own step sets its retry.
+  if (repeatSafe) return `${base}; up to 3 more when a service is briefly away (5, 15, 45 sec)`;
+  return tries <= 1 ? 'Once, no retry' : base;
 }
 
 export function timeoutText(seconds: number | null | undefined): string {
   if (!seconds) return 'No limit';
   if (seconds % 3600 === 0) return `${seconds / 3600} h`;
   if (seconds % 60 === 0 && seconds >= 120) return `${seconds / 60} min`;
-  return `${seconds} s`;
+  return `${seconds} sec`;
 }
 
 /** A setting of a task's config, for reading rather than filling in. */
@@ -152,7 +155,7 @@ const KIND_WORDS: Record<FieldKind, string> = {
   text: 'Text', textarea: 'Long text', number: 'Number', integer: 'Whole number', boolean: 'Yes or no', enum: 'One of', multi: 'Any of',
   list: 'List', objects: 'Repeatable group', object: 'Group', json: 'JSON', scalar: 'Text, number or yes/no',
   column: 'Column', step: 'Earlier step', columns: 'Columns', prompt: 'AI prompt', bucket: 'Bucket', webhook: 'Webhook',
-  'document-type': 'Document type',
+  'document-type': 'Document type', 'api-request': 'API request', 'api-environment': 'API environment',
 };
 
 /** The registry's widget hints that name what a value points at (FORMATS), as words. */

@@ -126,8 +126,8 @@ describe('Embedded run view (view link)', () => {
     expect(statusLabel('queued')).toBe('Queue');
     expect(statusLabel('interrupted')).toBe('Interrupt');
     expect(statusLabel('not_a_word')).toBe('not_a_word');
-    expect(durationLabel(1200)).toBe('1.2 s');
-    expect(durationLabel(125_000)).toBe('2 min 5 s');
+    expect(durationLabel(1200)).toBe('1.2 sec');
+    expect(durationLabel(125_000)).toBe('2 min 5 sec');
     expect(durationLabel(null)).toBe('');
     expect(refusalOf(410, '/problems/link-ended').title).toContain('no longer works');
   });

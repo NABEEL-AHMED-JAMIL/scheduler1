@@ -8,25 +8,23 @@
           whether the AI Assistant may change things with it.
         </p>
       </div>
-      @if (!waitingForWorkspace()) {
-        <div class="flex items-center gap-2">
-          <app-refresh-button [loading]="loading()" (refresh)="load()" />
-        </div>
-      }
+      <div class="flex items-center gap-2">
+        @if (ownSignIn()) {
+          <button type="button" class="btn btn-default btn-sm" (click)="openPlatformMinimums()" data-retention-platform><app-icon name="settings" />Platform minimums</button>
+        } @else {
+          <app-workspace-select [value]="tenantId()" (valueChange)="pickWorkspace($event === null ? '' : '' + $event)" />
+          @if (!waitingForWorkspace()) {
+            <app-refresh-button [loading]="loading()" (refresh)="load()" />
+          }
+        }
+      </div>
     </div>
   </app-page-header>
 
-  @if (isPlatformAdmin()) {
-    <div class="card px-4 py-2.5 flex flex-wrap items-center gap-3">
-      <label for="policy-workspace" class="text-sm font-medium">Workspace</label>
-      <app-combobox id="policy-workspace" ariaLabel="Workspace whose data policy to read" class="w-72 max-w-full"
-                    placeholder="Pick a workspace" [allowClear]="false" [options]="tenants()" [selected]="tenantId()"
-                    (selectedChange)="pickWorkspace($event)" />
-    </div>
-  }
-
-  @if (waitingForWorkspace()) {
-    <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]">Pick the workspace whose data policy to read.</div>
+  @if (ownSignIn()) {
+    <app-needs-workspace what="A data policy is" todo="see and change its data policy, review policy and retention" icon="shield" />
+  } @else if (waitingForWorkspace()) {
+    <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]">Pick the workspace whose data policy to read, above.</div>
   } @else if (error()) {
     <div class="card p-0"><app-load-error [message]="error()" (retry)="load()" /></div>
   } @else {
@@ -66,7 +64,7 @@
               <tr>
                 <th scope="col" class="align-bottom">Setting</th>
                 @for (c of columns(); track c.d.sensitivity) {
-                  <th scope="col" class="align-top normal-case" [attr.data-level]="c.d.sensitivity" data-row="head">
+                  <th scope="col" class="align-top normal-case whitespace-normal" [attr.data-level]="c.d.sensitivity" data-row="head">
                     <div class="flex items-start justify-between gap-2">
                       <div class="min-w-0">
                         <h2 class="text-sm font-semibold text-[color:var(--text-primary)] flex items-center gap-1.5" [id]="'level-' + c.d.sensitivity">
@@ -195,20 +193,10 @@
             </tbody>
           </table>
         </div>
-        @if (rule()) {
-          <section class="card p-4 flex flex-col gap-1" aria-labelledby="policy-rule">
-            <h2 id="policy-rule" class="font-semibold text-sm">How a call's level is decided</h2>
-            <p class="text-sm text-[color:var(--text-secondary)]">{{ rule() }}</p>
-            <p class="text-xs text-[color:var(--text-muted)]">
-              A prompt declares its level on its editor; a pipeline may declare one in its settings; an API collection or a data
-              contract has one of its own.
-              @if (canEdit()) { Mark a hosted connection as covered by a BAA on <a class="link-inline" routerLink="/settings/model-connections">Model connections</a>. }
-            </p>
-          </section>
-        }
-        <app-review-policy-card />
+        <!-- Owner #4: the levels' save bar sits under the levels it saves (it stuck to the page bottom below the review policy, which
+             saves itself, and left a gap above Retention). -->
         @if (canEdit() && levels().length) {
-          <div class="card px-4 py-2.5 flex flex-wrap items-center justify-end gap-2 sticky bottom-3 z-10">
+          <div class="card px-4 py-2.5 flex flex-wrap items-center justify-end gap-2">
             @if (saveError()) {
               <p class="text-sm text-crit-500 mr-auto flex items-start gap-1.5" role="alert" data-save-error><app-icon name="alert" size="0.9em" class="mt-0.5 shrink-0" /><span>{{ saveError() }}</span></p>
             } @else {
@@ -222,6 +210,18 @@
             </button>
           </div>
         }
+        @if (rule()) {
+          <section class="card p-4 flex flex-col gap-1" aria-labelledby="policy-rule">
+            <h2 id="policy-rule" class="font-semibold text-sm">How a call's level is decided</h2>
+            <p class="text-sm text-[color:var(--text-secondary)]">{{ rule() }}</p>
+            <p class="text-xs text-[color:var(--text-muted)]">
+              A prompt declares its level on its editor; a pipeline may declare one in its settings; an API collection or a data
+              contract has one of its own.
+              @if (canEdit()) { Mark a hosted connection as covered by a BAA on <a class="link-inline" routerLink="/settings/model-connections">Model connections</a>. }
+            </p>
+          </section>
+        }
+        <app-review-policy-card />
         <app-retention-card [tenantId]="tenantId()" />
       </div>
     </app-blur-loader>

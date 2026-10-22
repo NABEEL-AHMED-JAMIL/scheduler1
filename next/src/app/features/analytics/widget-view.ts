@@ -45,6 +45,8 @@ export interface Mark {
    * finally settled -- rather than at each of the places that decide to withhold them.
    */
   inert?: boolean;
+  /** The rolled-up rest of a Top-N ("Other"): drawn after the ranked groups whatever its size (ZT-A7). */
+  rollup?: boolean;
 }
 
 /**
@@ -250,9 +252,10 @@ export function mergeMarks(pairs: Mark[]): { marks: Mark[]; merged: number } {
       // screen. Dropped rather than picked between: see MarkOperand.
       delete existing.operands;
     } else {
-      byName.set(pair.name, pair.operands
-        ? { name: pair.name, value: pair.value, operands: pair.operands }
-        : { name: pair.name, value: pair.value });
+      byName.set(pair.name, {
+        ...(pair.operands ? { name: pair.name, value: pair.value, operands: pair.operands } : { name: pair.name, value: pair.value }),
+        ...(pair.rollup ? { rollup: true } : {}),
+      });
     }
   }
   // Insertion order is the result's own order, which is what "bars in order" is for: a saved
@@ -835,7 +838,8 @@ export function analysisView(result: AnalysisResult, aggregation: Aggregation | 
         .join(' · ');
       const operands = narrowable && !rolled?.has(at)
         ? markOperands(columns, dimensionAt, row, otherLabel) : null;
-      pairs.push(operands ? { name, value, operands } : { name, value });
+      const rollup = rolled ? rolled.has(at) : !!otherLabel && dimensionAt.length === 1 && row[dimensionAt[0]] === otherLabel;
+      pairs.push({ ...(operands ? { name, value, operands } : { name, value }), ...(rollup ? { rollup: true } : {}) });
     }
   }
   const { marks, merged } = mergeMarks(pairs);
@@ -922,6 +926,11 @@ export function withChartTable(view: WidgetView, context: Parameters<typeof tabl
   return { ...view, chart, issues: { ...view.issues, ...fitIssues(chart) } };
 }
 
+/** The kinds a saved query's negative figure stops (ZT-A1): each draws a figure as a length up from zero. */
+const LENGTH_FROM_ZERO: ClassicKind[] = ['ranked', 'bar'];
+/** The kinds that read a result's figures without a name for each (ZT-A2): a single figure, a distribution, a spread. */
+const FIGURES_ONLY = new Set<ClassicKind>(['table', 'kpi', 'histogram', 'distributionSummary']);
+
 /**
  * A tile's view of a saved query's result.
  *
@@ -985,7 +994,16 @@ export function queryView(result: QueryResult, additive?: boolean | null): Widge
       if (!name) { noLabel++; continue; }
       pairs.push({ name, value: amount });
     }
+  } else if (value && columns.length === 1) {
+    // ZT-A2: one column of figures (`SELECT bmi FROM dataset`) is exactly what a distribution and a spread are drawn
+    // from. Each row is a mark named by its place; every kind that needs a NAME for each figure still refuses (below).
+    allRows.forEach((row, at) => {
+      const amount = asNumber(row[value.index]);
+      if (amount === null) { noNumber++; return; }
+      pairs.push({ name: String(at + 1), value: amount });
+    });
   }
+  const unlabelled = !label && pairs.length > 0;
   const { marks, merged } = mergeMarks(pairs);
 
   const notes: string[] = [];
@@ -1008,13 +1026,17 @@ export function queryView(result: QueryResult, additive?: boolean | null): Widge
   const dropped = nonPositiveNote(marks);
   if (dropped) notes.push(dropped);
 
+  const ONE_COLUMN = 'This result has one column, so there is nothing to label its values with.';
   const reason = !allRows.length ? 'This query returned no rows.'
     : !value ? 'No column in this result has numbers in it.'
-    : !label ? 'This result has one column, so there is nothing to label its values with.'
-    : value.negative
-      ? `"${value.name}" holds ${value.negative} negative `
-        + `${value.negative === 1 ? 'value' : 'values'}, and a length cannot be negative.`
+    : !label ? ONE_COLUMN
       : 'No row has both a label and a number.';
+  // ZT-A1: a negative figure stops only the kinds that draw it as a length from zero -- ranked bars leave it out and plain
+  // bars flatten it. A single figure, a line, a trend, a scatter, a comparison and the summaries show a loss as it is
+  // (they were all refused: a "Net result" of -4.9M read "a single figure needs one row, and this returned 1").
+  const negativeLength = value && value.negative
+    ? `"${value.name}" holds ${value.negative} negative ${value.negative === 1 ? 'value' : 'values'}, and a length cannot be negative.`
+    : '';
   // 'unknown', which is the same thing the view declares below as `additive: false` -- and the
   // argument here used to be a flat `true`. That told issuesFor the figures add up, so every kind
   // gated on additivity was offered over a statement that may return averages: ranked share drew
@@ -1028,9 +1050,17 @@ export function queryView(result: QueryResult, additive?: boolean | null): Widge
   const known = additive === true || additive === false;
   // The shape the single figure reads: a statement returning one row of one number IS a single figure, though it has
   // no label to make a mark of (a KPI tile's `SELECT count(*) FROM dataset` was refused as "returned 0").
-  const issues = issuesFor(
-    value && value.negative ? [] : marks, reason, known ? additive : 'unknown', 'this measure',
+  const issues = issuesFor(marks, reason, known ? additive : 'unknown', 'this measure',
     { rowCount: allRows.length, columnCount: columns.length });
+  if (negativeLength) {
+    for (const kind of LENGTH_FROM_ZERO) issues[kind] = issues[kind] || negativeLength;
+  }
+  if (unlabelled) {
+    // Figures by their place in the result: a distribution and a spread read them; anything that names each one cannot.
+    for (const kind of Object.keys(issues) as ClassicKind[]) {
+      if (!FIGURES_ONLY.has(kind)) issues[kind] = issues[kind] || ONE_COLUMN;
+    }
+  }
 
   return withChartTable({
     columns,

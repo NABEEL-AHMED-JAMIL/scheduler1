@@ -1,17 +1,18 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import { signal } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 import { BillingAnalyticsPage } from './billing-analytics';
 import { BillingApi } from './billing.service';
-import { WorkspacePicker } from './workspace-picker';
 import { API_SUCCESS } from '../../core/api/api.config';
+import { AuthService } from '../../core/auth/auth.service';
+import { WorkspaceDirectory } from '../../core/workspaces/workspace-directory';
 
 /**
- * The platform's view of billing (MIG-211): months named as the console names them, workspaces
- * that share a name told apart, statuses in sentence case, and tables that scroll inside their
- * card on a phone rather than pushing the whole page sideways.
+ * Billing › Analytics (owner #22, 2026-10-19; MIG-211's platform view before it): the trends -- by month, service and
+ * pipeline -- for whoever opens it, scoped by the server (a workspace administrator's own); the cross-customer revenue
+ * only for a platform administrator over every workspace. Months named as the console names them, workspaces that share a
+ * name told apart, statuses in sentence case, and tables that scroll inside their card on a phone.
  */
 const DATA = {
   invoiced: '0.51', collected: '0', open: '0.51', overdue: '0', overdueCount: 0, drafts: '0', medianDaysToPay: 0, pendingPayments: 0,
@@ -27,20 +28,32 @@ const TENANTS = [
   { tenantId: 2905, tenantName: 'MedAxis Care Network' }, { tenantId: 2901, tenantName: 'CareBridge Health Services' }, { tenantId: 3107, tenantName: 'MedAxis Care Network' },
 ];
 
-function page(data: object = DATA, payments: object[] = []) {
-  const api = { analytics: vi.fn(() => of({ status: API_SUCCESS, data })), payments: vi.fn(() => of({ status: API_SUCCESS, data: payments })) };
-  const tenants = signal(TENANTS);
+const TRENDS = {
+  tenantId: null, from: '2026-05-01', to: '2026-10-19', total: '12.50000',
+  months: [{ month: '2026-09', amount: '4.50000', byService: { Pipelines: '4.50000' } }, { month: '2026-10', amount: '8.00000', byService: { Pipelines: '5', 'Model calls': '3' } }],
+  byService: [{ service: 'Pipelines', amount: '9.50000' }, { service: 'Model calls', amount: '3.00000' }],
+  byWorkspace: [{ tenantId: 2905, amount: '10' }, { tenantId: 2901, amount: '2.5' }],
+};
+const OWN_TRENDS = { ...TRENDS, tenantId: 2960, byWorkspace: undefined,
+  byPipeline: [{ taskDetailId: 1, pipeline: 'Patient 360', runs: 12, cost: '7.25', lastRunAt: '2026-10-19T06:04:00Z' }] };
+
+function page(data: object = DATA, payments: object[] = [], role: 'PLATFORM_ADMIN' | 'TENANT_ADMIN' = 'PLATFORM_ADMIN', trends: object = TRENDS) {
+  const api = { analytics: vi.fn(() => of({ status: API_SUCCESS, data })), payments: vi.fn(() => of({ status: API_SUCCESS, data: payments })),
+    costTrends: vi.fn(() => of({ status: API_SUCCESS, data: trends })) };
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({ imports: [BillingAnalyticsPage], providers: [provideRouter([]),
     { provide: BillingApi, useValue: api },
-    { provide: WorkspacePicker, useValue: { tenants, ready: (then: () => void) => then() } },
+    { provide: AuthService, useValue: { isPlatformAdmin: () => role === 'PLATFORM_ADMIN', isManagedSession: () => false,
+      user: () => ({ tenantName: role === 'PLATFORM_ADMIN' ? null : 'Riverside Health' }) } },
   ] });
+  TestBed.inject(WorkspaceDirectory).workspaces.set(TENANTS);
   const fixture = TestBed.createComponent(BillingAnalyticsPage);
   fixture.detectChanges();
-  return { fixture, component: fixture.componentInstance, el: fixture.nativeElement as HTMLElement };
+  return { fixture, component: fixture.componentInstance, el: fixture.nativeElement as HTMLElement, api };
 }
 
 describe('BillingAnalyticsPage', () => {
+  beforeEach(() => sessionStorage.clear());
   it('names each month the way the rest of the console does, not "26-09"', () => {
     const { component } = page();
     expect(component.bars().map(b => b.name)).toEqual(['Aug 2026', 'Sep 2026']);
@@ -65,7 +78,7 @@ describe('BillingAnalyticsPage', () => {
   it('keeps each table inside a scroller of its own, so a phone never scrolls the page sideways', () => {
     const { el } = page();
     const tables = [...el.querySelectorAll('table')];
-    expect(tables.length).toBe(3);   // by workspace, usage and churn, payments (MIG-359)
+    expect(tables.length).toBe(5);   // trends: by service, by workspace; revenue: by workspace, usage and churn, payments (MIG-359)
     for (const t of tables) expect(t.parentElement!.classList).toContain('overflow-x-auto');
     // A grid item will not shrink below its content unless told to; the scroller inside it then never scrolls.
     for (const card of el.querySelectorAll('.card')) if (card.parentElement!.classList.contains('grid')) expect(card.classList).toContain('min-w-0');
@@ -95,17 +108,18 @@ describe('BillingAnalyticsPage', () => {
   });
 
   it('offers Try again when the read fails, and it reads again', () => {
-    const api = { analytics: vi.fn(() => of({ status: 'FAILED', message: 'The meter did not answer.' })), payments: vi.fn(() => of({ status: API_SUCCESS, data: [] })) };
+    const api = { analytics: vi.fn(() => of({ status: 'FAILED', message: 'The meter did not answer.' })), payments: vi.fn(() => of({ status: API_SUCCESS, data: [] })),
+      costTrends: vi.fn(() => of({ status: API_SUCCESS, data: TRENDS })) };
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({ imports: [BillingAnalyticsPage], providers: [provideRouter([]),
       { provide: BillingApi, useValue: api },
-      { provide: WorkspacePicker, useValue: { tenants: signal(TENANTS), ready: (then: () => void) => then() } },
+      { provide: AuthService, useValue: { isPlatformAdmin: () => true, isManagedSession: () => false, user: () => null } },
     ] });
     const fixture = TestBed.createComponent(BillingAnalyticsPage);
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
     expect(el.textContent).toContain('The meter did not answer.');
-    const retry = [...el.querySelectorAll('button')].find(b => b.textContent!.includes('Try again'));
+    const retry = [...el.querySelectorAll<HTMLButtonElement>('[data-test="revenue"] button')].find(b => b.textContent!.includes('Try again'));
     expect(retry).toBeTruthy();
     retry!.click();
     expect(api.analytics).toHaveBeenCalledTimes(2);
@@ -123,5 +137,32 @@ describe('BillingAnalyticsPage', () => {
     const rows = [...el.querySelectorAll('[data-payments] tbody tr')].map(r => r.textContent!.replace(/\s+/g, ' ').trim());
     for (const said of ['INV-2026-10-0002', 'Card · Stripe', 'pi_test_2', 'Declined']) expect(rows[0]).toContain(said);
     for (const said of ['CareBridge Health Services', '$9.67', 'Paid']) expect(rows[1]).toContain(said);
+  });
+
+  it('owner #22: a workspace administrator sees their own trends -- by month, service and pipeline -- and never the revenue', () => {
+    const { api, el, component } = page(DATA, [], 'TENANT_ADMIN', OWN_TRENDS);
+    expect(api.costTrends).toHaveBeenCalledWith(expect.any(String), expect.any(String), null);
+    expect(api.analytics).not.toHaveBeenCalled();
+    expect(api.payments).not.toHaveBeenCalled();
+    expect(el.querySelector('[data-test="revenue"]')).toBeNull();
+    expect(el.querySelector('[data-test="workspace-select"]')).toBeNull();
+    expect(el.querySelector('[data-test="cost-by-pipeline"]')!.textContent).toContain('Patient 360');
+    expect(el.querySelector('[data-test="cost-by-workspace"]')).toBeNull();
+    expect(component.monthBars().map(b => b.name)).toEqual(['Sep 2026', 'Oct 2026']);
+    expect(component.scopeName()).toBe('Riverside Health');
+  });
+
+  it('owner #22: the platform sees every workspace by workspace with the revenue, or one workspace\'s trends alone', () => {
+    const all = page();
+    expect(all.api.costTrends).toHaveBeenCalledWith(expect.any(String), expect.any(String), null);
+    expect(all.api.analytics).toHaveBeenCalled();
+    expect(all.el.querySelector('[data-test="revenue"]')).not.toBeNull();
+    expect(all.el.querySelector('[data-test="cost-by-workspace"]')!.textContent).toContain('MedAxis Care Network (#2905)');
+
+    all.component.pickWorkspace(2905);
+    all.fixture.detectChanges();
+    expect(all.api.costTrends).toHaveBeenLastCalledWith(expect.any(String), expect.any(String), 2905);
+    expect(all.api.analytics).toHaveBeenCalledTimes(1);
+    expect(all.el.querySelector('[data-test="revenue"]')).toBeNull();
   });
 });

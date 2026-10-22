@@ -1,0 +1,201 @@
+<div class="page">
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Reports</h1>
+        <p class="page-subtitle">Design report templates once, fill them from pipeline runs, and keep every version.</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <app-workspace-select [(value)]="tenantId" [allowAll]="true" (valueChange)="load()" />
+        <app-refresh-button [loading]="loading()" (refresh)="load()" />
+        @if (canTemplates()) {
+          <button type="button" class="btn btn-default btn-sm" (click)="newTemplate()"><app-icon name="plus" />New template</button>
+        }
+        @if (canGenerate()) {
+          <button type="button" class="btn btn-primary btn-sm" (click)="newReport()"><app-icon name="plus" />New report</button>
+        }
+      </div>
+    </div>
+  </app-page-header>
+
+  @if (error()) {
+    <app-load-error [message]="error()" (retry)="load()" />
+  } @else if (data(); as d) {
+    <app-stat-strip [items]="kpis()" [cols]="2" [smCols]="4" align="start" size="md" label="Reports at a glance" />
+
+    <!-- Phase 7 / ZT-R23: what waits for the reader's decision (Approvals lists exactly these), and what they asked for. -->
+    @if (waiting(); as w) {
+      @if (w.forYou.reports + w.forYou.templates > 0) {
+        <div class="rs-banner mt-4" role="status" data-test="waiting-banner">
+          <app-icon name="inbox" class="shrink-0" />
+          <div class="min-w-0 flex-1">
+            <div class="font-semibold">@if (w.forYou.reports) { {{ w.forYou.reports }} report{{ w.forYou.reports === 1 ? '' : 's' }} waiting for {{ w.split ? 'you' : 'approval' }} }@if (w.forYou.reports && w.forYou.templates) { · }@if (w.forYou.templates) { {{ w.forYou.templates }} template{{ w.forYou.templates === 1 ? '' : 's' }} to publish }</div>
+            <div class="text-sm text-[color:var(--text-secondary)]">Decide them in Review › Approvals, with the pages beside Approve and sign.</div>
+          </div>
+          <a routerLink="/review/approvals" class="btn btn-default btn-sm">Open Approvals</a>
+        </div>
+      }
+      @if (w.asked.reports + w.asked.templates > 0) {
+        <div class="rs-banner mt-4" role="status" data-test="asked-banner">
+          <app-icon name="clock" class="shrink-0" />
+          <div class="min-w-0 flex-1">
+            <div class="font-semibold">{{ w.asked.reports + w.asked.templates }} waiting for another approver: you asked for {{ w.asked.reports + w.asked.templates === 1 ? 'it' : 'these' }}</div>
+            @if (w.nobodyElse > 0) {
+              <div class="text-sm text-[color:var(--text-secondary)]" data-test="nobody-else">No one else in this workspace can approve {{ w.nobodyElse === 1 ? 'it' : w.nobodyElse + ' of them' }}; the platform administrator will decide {{ w.nobodyElse === 1 ? 'it' : 'them' }}.</div>
+            } @else {
+              <div class="text-sm text-[color:var(--text-secondary)]">Someone else decides {{ w.asked.reports + w.asked.templates === 1 ? 'it' : 'them' }}; you can follow {{ w.asked.reports + w.asked.templates === 1 ? 'it' : 'them' }} in Review › My requests.</div>
+            }
+          </div>
+          <a routerLink="/review/requests" class="btn btn-default btn-sm">My requests</a>
+        </div>
+      }
+    }
+
+    @if (blocked(); as j) {
+      <div class="rs-banner rs-banner-crit mt-4" role="status">
+        <app-icon name="alert" class="icon-crit shrink-0" />
+        <div class="min-w-0 flex-1">
+          <div class="font-semibold">{{ j.reportName }} · generation {{ isMapping(j) ? 'blocked' : 'failed' }}</div>
+          <div class="text-sm">{{ j.label }} could not make a new version: {{ j.error }}
+            The report's last version is unchanged.</div>
+          <app-page-limit-actions [job]="j" />
+        </div>
+        @if (isMapping(j) && canGenerate()) {
+          <button type="button" class="btn btn-default btn-sm shrink-0" (click)="fixMapping(j)"><app-icon name="arrowRight" />Fix field mapping</button>
+        } @else if (canLibrary()) {
+          <a class="btn btn-default btn-sm shrink-0" [routerLink]="['/reports/library', j.reportId]"><app-icon name="arrowRight" />Open the report</a>
+        }
+      </div>
+    }
+
+    <div class="rs-overview mt-4">
+      <div class="flex flex-col gap-4 min-w-0">
+        <section class="card">
+          <div class="rs-head">
+            <div><h2 class="section-title">Recent reports</h2><p class="text-xs text-[color:var(--text-muted)]">Each report keeps its own versions.</p></div>
+            @if (canLibrary()) { <a class="btn btn-default btn-sm" routerLink="/reports/library">View all reports</a> }
+          </div>
+          @if (!d.recentReports.length) {
+            <p class="p-4 text-sm text-[color:var(--text-muted)]">No reports yet. Publish a template, then create a report from a pipeline run or pasted data.</p>
+          } @else {
+            <table class="table-modern">
+              <thead><tr><th>Report</th><th>Version</th><th>Status</th><th>Signed</th><th>Updated</th><th class="w-12"><span class="sr-only">Open</span></th></tr></thead>
+              <tbody>
+                @for (r of d.recentReports; track r.reportId) {
+                  <tr>
+                    <td class="max-w-80">
+                      <a class="link-inline font-medium" [routerLink]="['/reports/library', r.reportId]">{{ r.name }}</a>
+                      <div class="text-xs text-[color:var(--text-muted)]">{{ r.label }} · from {{ r.templateName }}</div>
+                    </td>
+                    <td class="tabular">@if (r.currentVersion) { v{{ r.currentVersion }} } @else { — }</td>
+                    <td><app-status [label]="r.lastJob && isRunning(r.lastJob.status) ? 'Running' : chipWord(r.status)" /></td>
+                    <td>@if (r.current?.approval?.signed) { <span class="pill pill-ok" [title]="'Approved and signed by ' + r.current!.approval!.approverName">Signed</span> }
+                      @else if (r.current?.approval) { <span class="pill pill-neutral" [title]="'Approved by ' + r.current!.approval!.approverName">Approved</span> }
+                      @else { <span class="text-[color:var(--text-muted)]" title="Not approved yet">—</span> }</td>
+                    <td class="text-xs whitespace-nowrap">{{ r.updatedAt | rsTime: 'recent' }}</td>
+                    <td><a class="btn btn-ghost btn-icon btn-sm" [routerLink]="['/reports/library', r.reportId]" [attr.aria-label]="'Open ' + r.name"><app-icon name="chevronRight" /></a></td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          }
+        </section>
+
+        <section class="card">
+          <div class="rs-head">
+            <div><h2 class="section-title">Generation jobs</h2><p class="text-xs text-[color:var(--text-muted)]">A failed job never replaces an earlier version.</p></div>
+            @if (canLibrary()) { <a class="btn btn-ghost btn-sm" routerLink="/reports/library" [queryParams]="{ view: 'jobs' }">View all</a> }
+          </div>
+          @if (!d.recentJobs.length) {
+            <p class="p-4 text-sm text-[color:var(--text-muted)]">No jobs yet.</p>
+          } @else {
+            <table class="table-modern">
+              <thead><tr><th>Job · report</th><th>Started by</th><th>Progress</th><th>Started</th><th></th></tr></thead>
+              <tbody>
+                @for (j of d.recentJobs; track j.jobId) {
+                  <tr>
+                    <td class="max-w-80"><span class="font-medium mono">{{ j.label }}</span> · {{ j.reportName }}
+                      <div class="text-xs text-[color:var(--text-muted)]">{{ j.templateName }}@if (j.templateVersion) { · v{{ j.templateVersion }} }</div></td>
+                    <td class="text-sm">{{ startedBy(j) }}@if (j.source && j.source !== 'CONSOLE') { <span class="mono text-xs"> GENERATE_REPORT</span> }</td>
+                    <td>
+                      @if (isRunning(j.status)) {
+                        <div class="flex items-center gap-2"><span class="rs-progress-sm" role="progressbar" [attr.aria-valuenow]="j.progressPct" aria-valuemin="0" aria-valuemax="100"
+                             [attr.aria-label]="stageWord(j.status)"><i [style.width.%]="j.progressPct"></i></span><span class="text-xs text-[color:var(--text-muted)]">{{ stageWord(j.status) }} · {{ j.progressPct }}%</span></div>
+                      } @else {
+                        <span class="pill" [class.pill-ok]="j.status === 'SUCCEEDED'" [class.pill-crit]="j.status === 'FAILED'" [class.pill-neutral]="j.status !== 'SUCCEEDED' && j.status !== 'FAILED'"
+                              [title]="j.errorCode ? j.errorCode + (j.error ? ': ' + j.error : '') : ''"><app-icon [name]="j.status === 'FAILED' ? 'alert' : j.status === 'SUCCEEDED' ? 'checkCircle' : 'clock'" size="0.9em" />{{ jobChip(j) }}</span>
+                      }
+                    </td>
+                    <td class="text-xs whitespace-nowrap">{{ j.createdAt | rsTime: 'recent' }}</td>
+                    <td class="whitespace-nowrap">
+                      @if (j.status === 'FAILED' && isMapping(j) && canGenerate()) { <button type="button" class="link-inline text-sm" (click)="fixMapping(j)">Fix mapping</button> }
+                      @else if (j.status === 'SUCCEEDED' && canLibrary()) { <a class="link-inline text-sm" [routerLink]="['/reports/library', j.reportId]">View report</a> }
+                      @else if (canLibrary()) { <a class="link-inline text-sm" [routerLink]="['/reports/library', j.reportId]">View job</a> }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          }
+        </section>
+      </div>
+
+      <aside class="card rs-side min-w-0">
+        <section class="rs-side-sec">
+          <h2 class="rsd-eyebrow m-0">Start here</h2>
+          @if (canGenerate()) {
+            <div class="rs-side-row"><span class="flex items-center gap-2"><app-icon name="file" />Create a report</span><button type="button" class="link-inline text-sm" (click)="newReport()">Start</button></div>
+          }
+          @if (canTemplates()) {
+            <div class="rs-side-row"><span class="flex items-center gap-2"><app-icon name="layers" />Build a template</span><a class="link-inline text-sm" routerLink="/reports/templates">Open designer</a></div>
+          }
+          @if (canData()) {
+            <div class="rs-side-row"><span class="flex items-center gap-2"><app-icon name="database" />Browse data</span><a class="link-inline text-sm" routerLink="/reports/data">Open Data</a></div>
+          }
+        </section>
+        <section class="rs-side-sec">
+          <h2 class="rsd-eyebrow m-0">Connected pipelines</h2>
+          @for (p of pipelines(); track p.jobId) {
+            <div class="flex flex-col gap-1">
+              <div class="rs-side-row"><b class="truncate">{{ p.pipeline || p.name }}</b><app-status [label]="runWord(p.lastRun)" /></div>
+              <dl class="rs-kv">
+                <dt>Last run</dt><dd class="mono text-xs">@if (p.lastRun) { #{{ p.lastRun.jobQueueId }} · {{ p.lastRun.startTime | rsTime: 'recent' }} } @else { — }</dd>
+                <dt>Feeds</dt><dd>{{ p.templates }} template{{ p.templates === 1 ? '' : 's' }}</dd>
+              </dl>
+            </div>
+          } @empty {
+            <p class="text-sm text-[color:var(--text-muted)]">
+              @if ((d.pipelineRuns ?? []).length) { Reports were made from {{ d.pipelineRuns!.length }} pipeline run{{ d.pipelineRuns!.length === 1 ? '' : 's' }} lately; their schedules are not ones you can open. }
+              @else { No report has been made from a pipeline run yet. Pick a run's output when you create one. }
+            </p>
+          }
+          @if (canData()) { <a class="link-inline text-sm" routerLink="/reports/data">Inspect source and schema →</a> }
+        </section>
+        <section class="rs-side-sec">
+          <h2 class="rsd-eyebrow m-0">Template activity</h2>
+          @if (!d.templateActivity.length) { <p class="text-sm text-[color:var(--text-muted)]">No templates yet: start from a starter or import one.</p> }
+          @for (t of d.templateActivity; track t.templateId) {
+            <div class="flex flex-col gap-0.5">
+              <div class="flex flex-wrap items-center gap-1.5">
+                @if (t.hasDraft) { <span class="pill pill-info">Draft</span> }
+                @if (t.currentPublishedVersion) { <span class="pill pill-ok">Published v{{ t.currentPublishedVersion }}</span> }
+                <a class="link-inline font-medium" [routerLink]="['/reports/templates', t.templateId]">{{ t.name }}</a>
+              </div>
+              <span class="text-xs text-[color:var(--text-muted)]">
+                @if (t.hasDraft && t.currentPublishedVersion) { Draft changes; published v{{ t.currentPublishedVersion }} is unchanged · }
+                Updated {{ t.updatedAt | rsTime: 'recent' }}
+              </span>
+              @if (t.hasDraft && canTemplates()) { <a class="link-inline text-xs" [routerLink]="['/reports/templates', t.templateId, 'design']">Continue editing the draft →</a> }
+            </div>
+          }
+          <p class="text-xs text-[color:var(--text-muted)]">
+            @if (canTemplates()) { You can design@if (canGenerate()) { and generate}. }
+            {{ canPublish() ? 'You can publish templates.' : 'Publishing a template needs an approver.' }}
+          </p>
+        </section>
+      </aside>
+    </div>
+  } @else {
+    <div class="flex justify-center py-16"><span class="spinner" role="status" aria-label="Loading"></span></div>
+  }
+</div>

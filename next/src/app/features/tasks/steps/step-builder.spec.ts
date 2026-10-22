@@ -55,7 +55,7 @@ const TASKS = [
     disabledReason: 'integration-service is not there yet' },
 ];
 
-function build(opts: { view?: DefinitionView; jobs?: unknown[]; dialogAnswer?: unknown; canManage?: boolean; isAdmin?: boolean; tasks?: unknown[]; offer?: HandedDraft } = {}) {
+function build(opts: { view?: DefinitionView; jobs?: unknown[]; jobIds?: number[]; dialogAnswer?: unknown; canManage?: boolean; isAdmin?: boolean; tasks?: unknown[]; offer?: HandedDraft; openStep?: string } = {}) {
   const view = opts.view ?? VIEW;
   const api = {
     definition: vi.fn(() => of({ status: 'SUCCESS', message: '', data: { ...view, version: 2 } })),
@@ -98,6 +98,8 @@ function build(opts: { view?: DefinitionView; jobs?: unknown[]; dialogAnswer?: u
   fixture.componentRef.setInput('view', view);
   fixture.componentRef.setInput('canManage', opts.canManage ?? true);
   fixture.componentRef.setInput('isAdmin', opts.isAdmin ?? true);
+  if (opts.jobIds) fixture.componentRef.setInput('jobIds', opts.jobIds);
+  if (opts.openStep) fixture.componentRef.setInput('openStep', opts.openStep);
   fixture.detectChanges();
   const el = fixture.nativeElement as HTMLElement;
   const builder = fixture.componentInstance;
@@ -164,6 +166,16 @@ describe('StepBuilder -- the step cards', () => {
     expect(panel.data).toMatchObject({ index: 1, earlierKeys: ['read'], canManage: true, step: { key: 'keep' } });
     expect(panel.data.task.code).toBe('select');
     expect(cards()).toEqual(['read', 'shape']);
+  });
+
+  // Owner 2026-10-21: a report over its page limit links to its Generate report step (?step=): that step opens, once.
+  it('opens the step the address names, once its task is known, and only that one', () => {
+    const { opened, fixture } = build({ openStep: 'keep' });
+    fixture.detectChanges();
+    const panels = opened.filter(o => o.component === StepPanel);
+    expect(panels).toHaveLength(1);
+    expect(panels[0].data).toMatchObject({ index: 1, step: { key: 'keep' } });
+    expect(build({ openStep: 'no-such-step' }).opened.filter(o => o.component === StepPanel)).toHaveLength(0);
   });
 
   // MIG-245: a task with a prompt setting gets the workspace's prompts to choose from -- asked for once, only then.
@@ -344,6 +356,22 @@ describe('StepBuilder -- Settings', () => {
     expect(builder.draft().settings).toEqual({ defaultTimeoutSeconds: 120, defaultOnError: 'continue' });
   });
 
+  /** Owner #23: a pipeline's tags, which a rate card's Tag rule may price by. */
+  it('takes tags as comma-separated words, drops blanks and repeats, and takes them back', () => {
+    const { tab, el, builder, fixture } = build();
+    tab('settings');
+    const box = el.querySelector<HTMLInputElement>('#defTags')!;
+    box.value = ' research, pilot,, research ';
+    box.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    expect(builder.draft().settings).toEqual({ tags: ['research', 'pilot'] });
+    expect(box.value).toBe('research, pilot');
+    box.value = ' ';
+    box.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    expect(builder.draft().settings).toBeUndefined();
+  });
+
   it('declares the level of the data the pipeline handles, and takes it back', () => {
     const { tab, el, builder, fixture } = build();
     tab('settings');
@@ -415,7 +443,7 @@ describe('StepBuilder -- Validate points at the step', () => {
 
 describe('StepBuilder -- a legacy pipeline', () => {
   it('says it runs as its legacy step, and a real step replaces it', () => {
-    const { el, cards, builder, fixture } = build({ view: LEGACY });
+    const { el, cards, builder, fixture } = build({ view: LEGACY, jobIds: [2848] });
     expect(el.textContent).toContain('runs as its legacy step');
     expect(cards()).toEqual(['legacy']);
     builder.add('sample');
@@ -424,11 +452,24 @@ describe('StepBuilder -- a legacy pipeline', () => {
   });
 
   it('asks before the first save moves every task on the pipeline to the steps', async () => {
-    const { builder, api, dialog, fixture, click } = build({ view: LEGACY });
+    const { builder, api, dialog, fixture, click } = build({ view: LEGACY, jobIds: [2848] });
     builder.add('sample');
     fixture.detectChanges();
     click('Save');
     expect(dialog.open).toHaveBeenCalledWith(Confirm, expect.anything());
+    await new Promise(resolve => setTimeout(resolve));
+    expect(api.save).toHaveBeenCalled();
+  });
+});
+
+describe('StepBuilder -- a new pipeline (ZT-P5)', () => {
+  it('saves its first steps without the legacy question, and never says it runs as its legacy step', async () => {
+    const { builder, api, dialog, fixture, click, el } = build({ view: LEGACY, jobIds: [] });
+    expect(el.textContent).not.toContain('legacy step');
+    builder.add('sample');
+    fixture.detectChanges();
+    click('Save');
+    expect(dialog.open).not.toHaveBeenCalledWith(Confirm, expect.anything());
     await new Promise(resolve => setTimeout(resolve));
     expect(api.save).toHaveBeenCalled();
   });

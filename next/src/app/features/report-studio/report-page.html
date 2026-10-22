@@ -1,0 +1,294 @@
+<div class="page">
+  @if (error()) {
+    <app-page-header title="Report" />
+    <app-load-error [message]="error()" (retry)="load()" />
+  } @else if (r(); as r) {
+    <app-page-header [crumb]="r.name + (r.currentVersion ? ' · v' + r.currentVersion : '')">
+      <div class="page-head">
+        <div>
+          <div class="page-head-title">
+            <h1 class="page-title">{{ r.name }}</h1>
+            <span pills class="flex flex-wrap gap-1">
+              <app-status [label]="chipWord(r.status)" />
+              @if (r.currentVersion) { <span class="pill pill-info">Version {{ r.currentVersion }}</span> }
+            </span>
+          </div>
+          <p class="page-subtitle"><span class="mono text-xs">{{ r.label }}</span>@if (workspace()) { · {{ workspace() }} } · from
+            <a class="link-inline" [routerLink]="['/reports/templates', r.templateId]">{{ r.templateName }}</a>
+            @if (current()?.snapshot?.pipelineRunId) { · pipeline run #{{ current()!.snapshot!.pipelineRunId }} }</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <app-refresh-button [loading]="loading()" (refresh)="load()" />
+          <button type="button" class="btn btn-default btn-sm" (click)="share()"><app-icon name="link" />Share</button>
+          @if (canGenerate()) { <button type="button" class="btn btn-default btn-sm" (click)="archive()"><app-icon name="inbox" />Archive</button>
+            <button type="button" class="btn btn-default btn-sm btn-intent-crit" (click)="remove()" [disabled]="r.approved"
+                    [title]="r.approved ? keptWords : 'Delete this report, its versions and files'" data-report-delete><app-icon name="trash" />Delete</button> }
+          @if (current()) { <button type="button" class="btn btn-primary btn-sm" (click)="downloadCurrent()"><app-icon name="download" />Download</button> }
+        </div>
+      </div>
+    </app-page-header>
+
+    @if (running(); as j) {
+      <div class="rs-banner rs-banner-info mb-3" role="status">
+        <span class="spinner shrink-0" aria-hidden="true"></span>
+        <div><b>{{ j.label }}</b> · {{ stageWord(j.status) }} · {{ j.progressPct }}%. The current version stays until the new one is ready.</div>
+      </div>
+    } @else if (lastFailed(); as j) {
+      <div class="rs-banner rs-banner-crit mb-3" role="status">
+        <app-icon name="alert" class="icon-crit shrink-0" />
+        <div class="min-w-0 flex-1"><b>{{ j.label }} failed</b> <span class="mono text-xs">({{ j.errorCode }})</span>: {{ j.error }}
+          No version was made@if (r.currentVersion) {; version {{ r.currentVersion }} is unchanged}.
+          <!-- Owner 2026-10-21: over the page limit, what to do instead (where it applies). -->
+          <app-page-limit-actions [job]="j" /></div>
+        @if (canGenerate() && !overLimit(j)) { <a class="btn btn-default btn-sm" routerLink="/reports/new" [queryParams]="{ reportId: r.reportId }"><app-icon name="arrowRight" />Fix field mapping</a> }
+      </div>
+    } @else if (justMade(); as j) {
+      <div class="rs-banner rs-banner-ok mb-3" role="status">
+        <app-icon name="checkCircle" class="icon-ok shrink-0" />
+        <div class="min-w-0 flex-1"><b>Version {{ j.resultVersion }} is ready.</b> {{ current()!.outputs.length > 1 ? 'PDF and HTML are both ready.' : current()!.outputs[0]?.format + ' is ready.' }}
+          Version {{ (j.resultVersion ?? 1) - 1 }} is unchanged.@if (current()?.reason) { Why: {{ current()!.reason }}. }</div>
+        <span class="pill pill-ok">Completed@if (current()?.jobMs) { · {{ took(current()!.jobMs!) }} }</span>
+      </div>
+    }
+
+    <div class="tabs mb-4" role="tablist" aria-label="Report sections">
+      <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'details'" [attr.aria-selected]="tab() === 'details'" (click)="tabTo('details')">Details</button>
+      <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'versions'" [attr.aria-selected]="tab() === 'versions'" (click)="tabTo('versions')">Versions <span class="rs-count">{{ r.versions.length }}</span></button>
+      <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'activity'" [attr.aria-selected]="tab() === 'activity'" (click)="tabTo('activity')">Activity <span class="rs-count">{{ r.activity.length }}</span></button>
+      <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'access'" [attr.aria-selected]="tab() === 'access'" (click)="tabTo('access')">Access</button>
+    </div>
+
+    <div class="rsr-split">
+      <div class="flex flex-col gap-4 min-w-0">
+        @switch (tab()) {
+          @case ('details') {
+            <section class="card">
+              <div class="rs-head">
+                <h2 class="section-title">Current version</h2>
+                <div class="flex flex-wrap gap-1">@if (current(); as v) { <span class="pill pill-info">Version {{ v.version }}</span><app-status label="Ready" />
+                  @if (v.approval?.signed) { <span class="pill pill-ok"><app-icon name="check" />Signed</span> }
+                  @else if (v.approval) { <span class="pill pill-neutral">Approved</span> }
+                  @else if (waiting(v)) { <span class="pill pill-warn" data-test="waiting-for-approval"><app-icon name="clock" />Waiting for approval</span> } }</div>
+              </div>
+              @if (current(); as v) {
+                <div class="rsr-current">
+                  <!-- Owner 2026-10-20: the small view turns through the pages with Back and Next. -->
+                  <div class="rsr-thumb-wrap">
+                    <div class="rsr-thumb" [class.is-loading]="thumbLoading()">
+                      @if (thumb(); as src) { <img [src]="src" [alt]="'Page ' + thumbPage() + ' of ' + r.name + ' version ' + v.version" /> }
+                      @else { <span class="rst-paper-sm" aria-hidden="true"><i></i><i></i><b></b><i></i><i></i></span> }
+                    </div>
+                    @if ((v.pages ?? 0) > 1) {
+                      <div class="rsr-thumb-nav" data-test="thumb-nav">
+                        <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Previous page" [disabled]="thumbPage() <= 1 || thumbLoading()" (click)="turn(-1)"><app-icon name="chevronLeft" /></button>
+                        <span class="text-xs tabular" aria-live="polite">Page {{ thumbPage() }} of {{ v.pages }}</span>
+                        <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Next page" [disabled]="thumbPage() >= (v.pages ?? 1) || thumbLoading()" (click)="turn(1)"><app-icon name="chevronRight" /></button>
+                      </div>
+                    }
+                  </div>
+                  <div class="flex flex-col gap-3 min-w-0">
+                    <div><b class="text-base">{{ r.name }}</b><br>
+                      <span class="text-sm text-[color:var(--text-muted)]">
+                        {{ v.pages ?? '?' }} page{{ v.pages === 1 ? '' : 's' }}@if (records() !== null) { · {{ records() }} record{{ records() === 1 ? '' : 's' }} } · template v{{ v.templateVersion }}, frozen@if (v.snapshot?.pipelineRunId) { · pipeline run #{{ v.snapshot!.pipelineRunId }} }
+                      </span></div>
+                    <div class="rsr-figures">
+                      <div><span class="text-xs text-[color:var(--text-muted)]">Pages</span><b>{{ v.pages ?? '—' }}</b></div>
+                      <div><span class="text-xs text-[color:var(--text-muted)]">Records</span><b>{{ records() ?? '—' }}</b></div>
+                      <div><span class="text-xs text-[color:var(--text-muted)]">Made in</span><b>{{ v.jobMs ? took(v.jobMs) : '—' }}</b></div>
+                    </div>
+                    <dl class="rs-kv">
+                      <dt>Generated by</dt><dd>{{ versionBy(v) }}</dd>
+                      @if (v.approval; as ap) {
+                        <dt>{{ ap.signed ? 'Approved and signed' : 'Approved' }}</dt>
+                        <dd>{{ ap.approverName }} · {{ ap.approvedAt | rsTime: 'recent' }}@if (ap.signed) { · <button type="button" class="link-inline" (click)="verifyVersion(v)">check signature</button> }
+                          @if (!ap.signed && ap.notSignedReason) { <span class="text-xs text-[color:var(--text-muted)] block">{{ ap.notSignedReason }}</span> }</dd>
+                      } @else if (v.review) {
+                        <dt>Approval</dt><dd data-test="review-state">{{ reviewWords(v) }}@if (v.review.state === 'OPEN') {
+                          <span class="text-xs text-[color:var(--text-muted)] block">Asked by {{ v.review.requestedByName }} · {{ v.review.requestedAt | rsTime: 'recent' }}@if (v.review.inTaskInbox) { · in the reviewers' <a routerLink="/review/approvals" class="link-inline">Review › Approvals</a> }@if (v.review.needsSecond) { · two approvals }</span> }
+                          @if (v.review.state === 'REJECTED' && v.review.decisionNote) { <span class="text-xs block">“{{ v.review.decisionNote }}”</span> }
+                          @if (canApprove() && v.createdBy === me()) { <span class="text-xs text-[color:var(--text-muted)] block">You generated it; someone else approves it.</span> }</dd>
+                      } @else {
+                        <dt>Approval</dt><dd>Not approved yet@if (canApprove() && v.createdBy === me()) { <span class="text-xs text-[color:var(--text-muted)] block">You generated it; someone else approves it.</span> }</dd>
+                      }
+                      <dt>Completed</dt><dd>{{ v.createdAt | rsTime: 'dateTime' : $any(v.config?.['timeZone']) }} ({{ zoneCity($any(v.config?.['timeZone'])) }})</dd>
+                      @if (v.reason) { <dt>Why</dt><dd>{{ v.reason }}</dd> }
+                    </dl>
+                    <div class="flex flex-wrap gap-2">
+                      @if (hasPdf(v)) { <button type="button" class="btn btn-default btn-sm" (click)="open()"><app-icon name="maximize" />Open report</button> }
+                      <button type="button" class="btn btn-default btn-sm" (click)="tabTo('versions')">View generation job</button>
+                      @if (mayApprove(v) && hasPdf(v)) { <button type="button" class="btn btn-primary btn-sm" [disabled]="approving()" (click)="approve(v)"><app-icon name="shield" />{{ v.review?.state === 'OPEN' && v.review.needsSecond && !v.review.firstApproval ? 'Give the first approval of v' + v.version : 'Approve and sign v' + v.version }}</button> }
+                      @if (mayAsk(v)) { <button type="button" class="btn btn-default btn-sm" [disabled]="asking()" (click)="ask(v)" data-test="ask-approval"><app-icon name="inbox" />Ask for approval</button> }
+                      @if (v.approval?.signed) { <button type="button" class="btn btn-default btn-sm" (click)="verifyVersion(v)"><app-icon name="shield" />Verify signature</button> }
+                    </div>
+                    @if (v.diagnostics.length) {
+                      <div><h3 class="text-sm font-semibold mb-1">Warnings when it was made</h3><app-report-problems [problems]="v.diagnostics" /></div>
+                    }
+                  </div>
+                </div>
+              } @else {
+                <p class="p-4 text-sm text-[color:var(--text-muted)]">No version yet: the first job has not finished.</p>
+              }
+            </section>
+
+            @if (current(); as v) {
+              <div class="rsr-files">
+                @for (o of outputsOf(v); track o.format) {
+                  <div class="card rsr-file">
+                    <span class="rsr-file-icon"><app-icon [name]="o.format === 'PDF' ? 'file' : 'code'" size="1.25rem" /></span>
+                    <div class="min-w-0 flex-1">
+                      <b>{{ o.format }}</b>
+                      <div class="mono text-xs text-[color:var(--text-muted)] truncate" [title]="o.fileName">{{ o.fileName }}</div>
+                      <div class="text-xs text-[color:var(--text-muted)]">{{ size(o.format === 'PDF' && v.approval?.signed ? v.approval!.signedBytes : o.bytes) }}@if (o.pages) { · {{ o.pages }} page{{ o.pages === 1 ? '' : 's' }} }@if (o.format === 'HTML') { · self-contained }@if (o.format === 'PDF' && v.approval?.signed) { · signed }</div>
+                    </div>
+                    <button type="button" class="btn btn-ghost btn-sm" (click)="view(v, o)" [attr.aria-label]="'View the ' + o.format"><app-icon name="eye" />View</button>
+                    <button type="button" class="btn btn-ghost btn-icon btn-sm" [disabled]="downloading() === v.versionId + o.format" (click)="download(v, o)"
+                            [attr.aria-label]="'Download the ' + o.format"><app-icon name="download" /></button>
+                  </div>
+                }
+              </div>
+            }
+            <ng-container *ngTemplateOutlet="versionsCard" />
+          }
+          @case ('versions') { <ng-container *ngTemplateOutlet="versionsCard" /> }
+          @case ('activity') {
+            <section class="card">
+              <ul class="divide-y divide-[color:var(--border-subtle)]">
+                @for (a of r.activity; track $index) {
+                  <li class="p-3 flex flex-wrap items-baseline gap-2">
+                    <span class="font-medium">{{ activityWord(a.action) }}</span>
+                    <span class="text-xs text-[color:var(--text-muted)]">{{ detail(a.detail) }}</span>
+                    <span class="text-xs text-[color:var(--text-muted)] ml-auto whitespace-nowrap">{{ a.at | rsTime: 'recent' }}</span>
+                  </li>
+                } @empty { <li class="p-4 text-sm text-[color:var(--text-muted)]">Nothing yet.</li> }
+              </ul>
+            </section>
+          }
+          @case ('access') {
+            <section class="card p-4 flex flex-col gap-2 text-sm">
+              <h2 class="section-title">Who can see this report</h2>
+              <p>Everyone in {{ workspace() || 'this workspace' }} who may open Reports, and no one outside it. Downloads are signed links that work for five minutes, for the person who asked.</p>
+              <p class="text-xs text-[color:var(--text-muted)]">Access to single reports comes with page and tab access; until then the Reports page decides.</p>
+            </section>
+          }
+        }
+      </div>
+
+      <aside class="card rs-side min-w-0">
+        @if (canGenerate()) {
+          <section class="rs-side-sec">
+            <div><h2 class="section-title">Generate again</h2><span class="text-xs text-[color:var(--text-muted)]">Make a new version and keep all the others.</span></div>
+            <label class="field"><span class="label">Template version</span>
+              <select class="input" [ngModel]="againVersion()" (ngModelChange)="againVersion.set($event)" aria-label="Template version">
+                @for (tv of templateVersions(); track tv.versionId) { <option [ngValue]="tv.version">v{{ tv.version }} · {{ tv.state === 'PUBLISHED' ? 'Published (fixed)' : 'Superseded' }}</option> }
+              </select></label>
+            <label class="field"><span class="label">Data</span>
+              <select class="input" [ngModel]="againData()" (ngModelChange)="againData.set($event)" aria-label="Data">
+                @if (current(); as v) { <option value="same">The data of v{{ v.version }} (frozen{{ v.snapshot?.pipelineRunId ? ', run #' + v.snapshot!.pipelineRunId : '' }})</option> }
+                <option value="other">Other data: a newer run, a file, pasted JSON</option>
+              </select></label>
+            <label class="rsd-check text-sm"><input type="checkbox" class="checkbox" [checked]="againCopy()" (change)="againCopy.set($any($event.target).checked)" />
+              <span>Mark this version as COPY</span></label>
+            <label class="rsd-check text-sm"><input type="checkbox" class="checkbox" [checked]="againAsk()" (change)="againAsk.set($any($event.target).checked)" data-test="again-ask" />
+              <span>Ask for approval when it is ready</span></label>
+            <p class="text-xs text-[color:var(--text-muted)]"><app-icon name="link" /> Creates version {{ nextVersion() }}. Version {{ nextVersion() - 1 }} and the others are kept.@if (current()?.approval) { It needs its own approval before it is signed. }</p>
+            @if (againJob(); as j) {
+              <div class="flex flex-col gap-1" aria-live="polite">
+                <span class="text-sm">{{ j.label }} · {{ stageWord(j.status) }} · {{ j.progressPct }}%</span>
+                @if (j.status === 'FAILED') { <span class="text-xs text-[color:var(--crit-text)]">{{ j.error }} No version was made.</span> }
+              </div>
+            }
+            @if (againError()) { <p class="text-xs text-[color:var(--crit-text)]" role="alert">{{ againError() }}</p> }
+            <button type="button" class="btn btn-primary btn-sm self-start" [disabled]="againBusy() || (againJob() && isRunning(againJob()!.status))" (click)="again()">
+              <app-icon name="refresh" />{{ againData() === 'other' ? 'Pick the data' : 'Check and generate v' + nextVersion() }}
+            </button>
+          </section>
+        }
+        @if (current(); as v) {
+          <section class="rs-side-sec">
+            <h2 class="rsd-eyebrow m-0">Where version {{ v.version }} came from</h2>
+            <ol class="rsr-lineage">
+              <li><span class="rsr-li-icon"><app-icon name="layers" /></span><div class="min-w-0"><span class="label">Template</span>
+                <a class="link-inline rsr-li-title" [routerLink]="['/reports/templates', r.templateId]">{{ r.templateName }} · v{{ v.templateVersion }}</a>
+                <span class="text-xs text-[color:var(--text-muted)] block">Published · can't change</span></div></li>
+              <li><span class="rsr-li-icon"><app-icon [name]="v.snapshot?.pipelineRunId ? 'list' : 'database'" /></span><div class="min-w-0">
+                @if (partsOf(v); as ps) {
+                  <span class="label">Data · {{ ps.length }} files{{ v.snapshot?.pipelineRunId ? ' · run #' + v.snapshot!.pipelineRunId : '' }}</span>
+                  <ul class="rs-parts text-sm" aria-label="Files">
+                    @for (p of ps; track p.name) { <li><b class="mono">{{ p.name }}</b>@if (p.label) { <span class="text-[color:var(--text-muted)]"> · {{ p.label }}</span> }</li> }
+                  </ul>
+                } @else {
+                <span class="label">{{ v.snapshot?.pipelineRunId ? 'Pipeline run' : 'Data' }}</span>
+                <b class="rsr-li-title truncate" [title]="v.snapshot?.label || ''">{{ v.snapshot?.label || '—' }}</b>
+                }
+                <span class="text-xs text-[color:var(--text-muted)] block">Frozen {{ v.snapshot?.takenAt | rsTime: 'recent' }} · {{ recordsText(v.snapshot?.records) }} · {{ size(v.snapshot?.bytes) }}</span></div></li>
+              <li><span class="rsr-li-icon"><app-icon name="play" /></span><div class="min-w-0"><span class="label">Generation job</span>
+                <b class="rsr-li-title">{{ v.jobLabel }}@if (v.jobMs) { · completed in {{ took(v.jobMs) }} }</b>
+                <span class="text-xs text-[color:var(--text-muted)] block">@if (v.config?.['mapping']) { With a field mapping · } {{ v.rendererVersion }}</span></div></li>
+              @if (v.approval; as ap) {
+                <li><span class="rsr-li-icon"><app-icon name="shield" /></span><div class="min-w-0"><span class="label">{{ ap.signed ? 'Approval and signature' : 'Approval' }}</span>
+                  <b class="rsr-li-title">{{ ap.approverName }} · {{ ap.approvedAt | rsTime: 'time' }}</b>
+                  <span class="text-xs text-[color:var(--text-muted)] block">{{ ap.signed ? 'PDF signed with the workspace certificate' : ap.notSignedReason }}</span></div></li>
+              }
+              <li><span class="rsr-li-icon"><app-icon name="file" /></span><div class="min-w-0"><span class="label">Report</span>
+                <b class="rsr-li-title">{{ r.label }} · version {{ v.version }}</b>
+                <span class="text-xs text-[color:var(--text-muted)] block">{{ formatsOf(v) }} · {{ v.createdAt | rsTime: 'recent' }}</span></div></li>
+            </ol>
+          </section>
+        }
+        <section class="rs-side-sec text-xs text-[color:var(--text-muted)]">
+          <span><app-icon name="shield" /> Only {{ workspace() || 'this workspace' }} can see this report. Files and versions follow the workspace's retention rules.</span>
+        </section>
+      </aside>
+    </div>
+
+    <ng-template #versionsCard>
+      <section class="card">
+        <div class="rs-head">
+          <div><h2 class="section-title">Versions</h2><p class="text-xs text-[color:var(--text-muted)]">Generating again makes a new version. Nothing is overwritten.</p></div>
+          <span class="pill pill-neutral">{{ r.versions.length }} version{{ r.versions.length === 1 ? '' : 's' }}</span>
+        </div>
+        <div class="overflow-x-auto"><table class="table-modern">
+          <thead><tr><th>Version</th><th>Generated · by</th><th>Template · data</th><th>Signed</th><th class="text-right">Files</th></tr></thead>
+          <tbody>
+            @for (v of r.versions; track v.versionId) {
+              <tr>
+                <td>v{{ v.version }}@if (v.version === r.currentVersion) { <span class="pill pill-ok ml-1">Current</span> }
+                  @if (v.config?.['markAsCopy'] === true) { <span class="pill pill-neutral ml-1" title="Generated marked as COPY: every page of its files says COPY">COPY</span> }
+                  @if (v.expired) { <span class="pill pill-neutral ml-1" [title]="'Its files were removed by the workspace\'s retention policy' + (v.expiredAt ? ' on ' + (v.expiredAt | rsTime: 'dateTime') : '') + '; its record stays.'">Removed by retention</span> }
+                  @if (v.void) { <span class="pill pill-crit ml-1" [title]="'VOID: ' + v.void.reason + (v.void.by ? ' · ' + v.void.by : '')">VOID</span> }
+                  @else if (canGenerate()) { <button type="button" class="btn btn-ghost btn-xs ml-1" (click)="voidIt(v)" [attr.aria-label]="'Mark version ' + v.version + ' VOID'" title="Mark this version VOID">Void</button> }</td>
+                <td class="text-xs"><span class="whitespace-nowrap">{{ v.createdAt | rsTime: 'recent' }}</span><div class="text-[color:var(--text-muted)] max-w-36 xl:max-w-60 2xl:max-w-80 truncate" [title]="versionBy(v) + (v.reason ? ' · ' + v.reason : '')">{{ versionBy(v) }}@if (v.reason) { · {{ v.reason }} }</div></td>
+                <td class="text-xs"><span class="whitespace-nowrap">Template v{{ v.templateVersion }}</span>
+                  <div class="mono text-[color:var(--text-muted)] max-w-36 xl:max-w-60 2xl:max-w-80 truncate" [title]="v.snapshot?.label || ''">{{ dataOf(v) }}</div></td>
+                <td>@if (v.approval?.signed) { <button type="button" class="pill pill-ok" (click)="verifyVersion(v)" [title]="'Signed by ' + v.approval!.approverName + ', ' + (v.approval!.approvedAt | rsTime: 'dateTime') + '. Click to check the signature.'"><app-icon name="check" />Signed</button> }
+                  @else if (v.approval) { <span class="pill pill-neutral" [title]="v.approval.notSignedReason || ''">Approved</span> }
+                  @else if (mayApprove(v) && hasPdf(v)) { <button type="button" class="btn btn-ghost btn-sm" [disabled]="approving()" (click)="approve(v)">Approve</button> }
+                  @else if (waiting(v)) { <span class="pill pill-warn" [title]="reviewWords(v)">Waiting</span> }
+                  @else if (superseded(v)) { <span class="text-xs text-[color:var(--text-muted)]" title="A newer version replaced it; only the current version can be approved.">Superseded</span> }
+                  @else { <span class="text-xs text-[color:var(--text-muted)]">—</span> }</td>
+                <td class="whitespace-nowrap text-right">
+                  @for (o of outputsOf(v); track o.format) {
+                    <span class="rsr-file-chip" [attr.data-format]="o.format">
+                      <span class="rsr-file-chip-name">{{ o.format }}</span>
+                      <button type="button" class="btn btn-ghost btn-icon btn-xs" (click)="view(v, o)" [attr.aria-label]="'View the ' + o.format + ' of version ' + v.version" [title]="'View the ' + o.format"><app-icon name="eye" /></button>
+                      <button type="button" class="btn btn-ghost btn-icon btn-xs" [disabled]="downloading() === v.versionId + o.format" (click)="download(v, o)"
+                              [attr.aria-label]="'Download the ' + o.format + ' of version ' + v.version" [title]="'Download the ' + o.format"><app-icon name="download" /></button>
+                    </span>
+                  }
+                </td>
+              </tr>
+            } @empty { <tr><td colspan="5" class="text-sm text-[color:var(--text-muted)]">No version yet.</td></tr> }
+          </tbody>
+        </table></div>
+        @for (j of failedJobs(); track j.jobId) {
+          <p class="px-4 py-2 text-xs text-[color:var(--text-muted)] border-t border-subtle">
+            <app-icon name="info" /> {{ j.label }} failed {{ j.finishedAt | rsTime: 'recent' }} ({{ j.errorCode }}). No version was made.
+          </p>
+        }
+      </section>
+    </ng-template>
+  } @else {
+    <app-page-header title="Report" />
+    <div class="flex justify-center py-16"><span class="spinner" role="status" aria-label="Loading"></span></div>
+  }
+</div>

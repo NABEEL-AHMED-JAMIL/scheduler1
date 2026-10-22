@@ -2,6 +2,7 @@ import { Component, computed, effect, inject, input, untracked } from '@angular/
 import { RouterLink } from '@angular/router';
 import { NavAccess } from '../../core/nav/nav-access';
 import { tabAt } from '../../core/nav/nav-tree';
+import { TabCounts } from '../../core/nav/tab-counts';
 import { Icon } from './icon';
 
 /**
@@ -30,6 +31,7 @@ import { Icon } from './icon';
     .tab { white-space: nowrap; margin-bottom: 0; }
     /* Below the sidebar's width the icons go, so Platform's nine tabs fit a 1187px screen on one line. */
     @media (max-width: 89.99rem) { .tab app-icon { display: none; } }
+    .tab-count { margin-left: 0.375rem; font-size: 0.75rem; font-variant-numeric: tabular-nums; color: var(--text-muted); }
     .tab:focus-visible { outline: 2px solid var(--accent-mark-strong); outline-offset: -2px; border-radius: var(--radius-sm); }
   `],
   template: `
@@ -38,7 +40,7 @@ import { Icon } from './icon';
         @for (t of tabs(); track t.path) {
           <a class="tab" [class.tab-active]="t === place()!.tab" [routerLink]="t.path"
              [attr.aria-current]="t === place()!.tab ? 'page' : null" [attr.data-tab]="t.path">
-            <app-icon [name]="t.icon" size="0.95em" />{{ t.label }}
+            <app-icon [name]="t.icon" size="0.95em" />{{ t.label }}@let n = counts.of(t.path);@if (n !== null) { <span class="tab-count">{{ n }}</span> }
           </a>
         }
       </nav>
@@ -47,6 +49,7 @@ import { Icon } from './icon';
 })
 export class TabHub {
   private readonly access = inject(NavAccess);
+  protected readonly counts = inject(TabCounts);
   /** The address shown (the page header follows the router and hands it in). */
   readonly url = input.required<string>();
 

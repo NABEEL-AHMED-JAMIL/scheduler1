@@ -13,6 +13,7 @@ import { DocumentIntelligence } from './intelligence';
 import { ReadDocumentDialog } from './read-document-dialog';
 import { TypePanel } from './type-panel';
 import { UploadDocumentsDialog } from './upload-documents-dialog';
+import { StartersDialog } from './starters-dialog';
 import { DocumentType } from './documents.model';
 import { PO_DEFINITION } from './documents.fixtures';
 
@@ -55,7 +56,7 @@ const INTAKES = [
 const MAILBOX = { configured: true, active: true, address: 'abcdefghij0123456789@docs.etl-console.local', domain: 'docs.etl-console.local',
   enabled: true, maxFiles: 20, maxFileSizeMb: 20 };
 
-function screenWith(opts: { admin?: boolean; tab?: string; closed?: unknown; triggers?: unknown[]; schedules?: boolean } = {}) {
+function screenWith(opts: { admin?: boolean; tab?: string; view?: string; closed?: unknown; triggers?: unknown[]; schedules?: boolean; noWorkspace?: boolean } = {}) {
   const api = {
     documentTriggers: vi.fn(() => ok(opts.triggers ?? [])),
     stats: vi.fn(() => ok(STATS)),
@@ -80,11 +81,11 @@ function screenWith(opts: { admin?: boolean; tab?: string; closed?: unknown; tri
     providers: [
       provideZonelessChangeDetection(),
       provideRouter([]),
-      { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap(opts.tab ? { tab: opts.tab } : {}) } } },
+      { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap(opts.tab ? { tab: opts.tab } : {}), data: opts.view ? { view: opts.view } : {} } } },
       { provide: DocumentsApi, useValue: api },
       { provide: Dialog, useValue: dialog },
       { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn(), info: vi.fn() } },
-      { provide: AuthService, useValue: { isTenantAdmin: () => opts.admin ?? true, canBuild: () => opts.admin ?? true, builderLocked: () => false, user: signal({ appUserId: 4537 }),
+      { provide: AuthService, useValue: { isTenantAdmin: () => opts.admin ?? true, canBuild: () => opts.admin ?? true, builderLocked: () => false, user: signal({ appUserId: 4537, tenantId: opts.noWorkspace ? null : 2924 }),
         canOpen: (page: string) => page !== 'jobs' || (opts.schedules ?? true) } },
     ],
   });
@@ -105,47 +106,23 @@ describe('DocumentIntelligence -- overview', () => {
     expect(screen.kpis().find(k => k.label === 'In review')?.link).toBe('/review/documents');
   });
 
-  it('shows the active types with their documents, and a custom type for an administrator', async () => {
-    const { fixture, el } = screenWith();
+  /** Owner 2026-10-20 (§0.1): "What approved documents start" left the overview for a column on Document types. */
+  it('no longer carries what approved documents start, nor asks Schedules for it', async () => {
+    const { fixture, el, api } = screenWith();
     await fixture.whenStable();
-    const types = el.querySelector('[data-test="type-starts"]')!;
-    expect(types.textContent).toContain('Purchase order');
-    expect(types.textContent).toContain('6 fields · 5 docs');
-    expect(types.textContent).not.toContain('UI-CHECK old');
-    expect(types.textContent).toContain('Custom type');
-  });
-
-  /** UX review DI1 (2026-10-13): what an approved document of each type starts, in place of the types again as cards. */
-  it('says which schedules an approved document of each type starts, for a reader of Schedules', async () => {
-    const { fixture, el, api } = screenWith({ triggers: [
-      { jobId: 2990, jobName: 'Invoice intake', jobStatus: 'Active', documentTypeId: 1000, enabled: true },
-      { jobId: 2991, jobName: 'Invoice audit', jobStatus: 'Inactive', documentTypeId: 1000, enabled: true },
-    ] });
-    await fixture.whenStable();
-    fixture.detectChanges();
-    expect(api.documentTriggers).toHaveBeenCalled();
-    const what = (key: string) => el.querySelector(`[data-type="${key}"] [data-test="type-start-what"]`)!;
-    expect(what('invoice').textContent!.replace(/\s+/g, ' ').trim()).toBe('Starts Invoice intake, Invoice audit (schedule not active)');
-    expect(what('invoice').querySelector('a')!.getAttribute('href')).toBe('/pipelines/schedules/2990/executions');
-    expect(what('purchase_order').textContent).toContain('Starts nothing');
-    expect(el.querySelector('[data-test="type-cards"]')).toBeNull();
-  });
-
-  it('asks nothing of Schedules for a reader without the page', async () => {
-    const { fixture, el, api } = screenWith({ schedules: false });
-    await fixture.whenStable();
+    expect(el.querySelector('[data-test="type-starts"]')).toBeNull();
+    expect(el.textContent).not.toContain('What approved documents start');
     expect(api.documentTriggers).not.toHaveBeenCalled();
-    expect(el.querySelector('[data-type="invoice"] [data-test="type-start-what"]')!.textContent!.trim()).toBe('—');
   });
 
   /** UX review B4 (DI1): four header buttons became the standard header -- Refresh, the ⋮ overflow, the one primary. */
   it('offers no type change to anyone but an administrator', async () => {
     const { fixture, el } = screenWith({ admin: false });
     await fixture.whenStable();
-    expect(el.textContent).not.toContain('Custom type');
     (el.querySelector('[data-test="intelligence-more"]') as HTMLButtonElement).click();
     await fixture.whenStable();
     expect(document.body.textContent).not.toContain('New document type');
+    expect(document.body.textContent).not.toContain('Add from starters');
     expect(document.body.textContent).toContain('Read a stored file');
     expect(el.textContent).toContain('Upload documents');
   });
@@ -162,15 +139,16 @@ describe('DocumentIntelligence -- overview', () => {
     (el.querySelector('[data-test="intelligence-more"]') as HTMLButtonElement).click();
     await fixture.whenStable();
     expect(document.body.textContent).toContain('New document type');
+    expect(document.body.textContent).toContain('Add from starters');
   });
 
-  it('names healthcare documents in its empty states, as examples', async () => {
+  it('names kinds of documents in its empty states, as examples', async () => {
     const { fixture, el, screen } = screenWith();
     await fixture.whenStable();
     screen.extractions.set([]);
     screen.reads.set([]);
     fixture.detectChanges();
-    expect(el.querySelector('[data-test="recent"]')!.textContent).toContain('a lab report, a referral letter, a claim form or a discharge summary');
+    expect(el.querySelector('[data-test="recent"]')!.textContent).toContain('an invoice, a referral letter, a lab result or a contract');
   });
 
   it('lists every extraction, linked to its review, then the reads not yet extracted', async () => {
@@ -183,6 +161,16 @@ describe('DocumentIntelligence -- overview', () => {
     expect(recent.querySelector('a')?.getAttribute('href')).toBe('/review/documents/1005');
     expect(recent.textContent).toContain('4 to check');
     expect(recent.textContent).toContain('Not extracted');
+  });
+
+  /** §0.5: a read extracted again is the same file's extraction, said so -- not the same file received twice. */
+  it('labels each extraction of a file read once with its place among them', async () => {
+    const { fixture, el, screen } = screenWith();
+    await fixture.whenStable();
+    expect(screen.recent().map(r => r.again ?? '')).toEqual([
+      'Extraction 2 of 2 of this file (read once)', 'Extraction 1 of 2 of this file (read once)', '',
+    ]);
+    expect(el.querySelector('[data-test="again"]')!.textContent).toContain('Extraction 2 of 2');
   });
 
   it('narrows the recent documents by type, state and name', async () => {
@@ -228,6 +216,47 @@ describe('DocumentIntelligence -- types', () => {
     expect(opened[0].data).toEqual(expect.objectContaining({ documentTypeId: 1001, canManage: true }));
     expect(api.types).toHaveBeenCalledTimes(2);
   });
+
+  /** Owner 2026-10-20 (§0.1): the overview's panel, as a column -- each type's schedules, or the way to set one. */
+  it('says which schedules an approved document of each type starts, for a reader of Schedules', async () => {
+    const { fixture, el, api } = screenWith({ tab: 'types', triggers: [
+      { jobId: 2990, jobName: 'Invoice intake', jobStatus: 'Active', documentTypeId: 1000, enabled: true },
+      { jobId: 2991, jobName: 'Invoice audit', jobStatus: 'Inactive', documentTypeId: 1000, enabled: true },
+    ] });
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(api.documentTriggers).toHaveBeenCalled();
+    expect(el.querySelector('[data-test="types"] thead')!.textContent).toContain('When approved, starts…');
+    const cell = (key: string) => el.querySelector(`[data-test="type-starts"][data-type="${key}"]`)!;
+    expect(cell('invoice').textContent!.replace(/\s+/g, ' ').trim()).toBe('Invoice intake, Invoice audit (schedule not active)');
+    expect(cell('invoice').querySelector('a')!.getAttribute('href')).toBe('/pipelines/schedules/2990/executions');
+    expect(cell('purchase_order').textContent).toContain('Nothing yet');
+    expect(cell('purchase_order').querySelector('a')!.getAttribute('href')).toBe('/pipelines/schedules/new?whenApproved=1001');
+  });
+
+  it('asks nothing of Schedules for a reader without the page', async () => {
+    const { fixture, el, api } = screenWith({ tab: 'types', schedules: false });
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(api.documentTriggers).not.toHaveBeenCalled();
+    expect(el.querySelector('[data-test="type-starts"][data-type="invoice"]')!.textContent!.trim()).toBe('—');
+  });
+
+  it('offers an administrator the starters, and reads the types again when any was added', async () => {
+    const { fixture, el, opened, api } = screenWith({ tab: 'types', closed: { changed: true } });
+    await fixture.whenStable();
+    fixture.detectChanges();
+    (el.querySelector('[data-test="add-starters"]') as HTMLButtonElement).click();
+    expect(opened[0].component).toBe(StartersDialog);
+    expect(api.types).toHaveBeenCalledTimes(2);
+  });
+
+  it('offers a member no starters', async () => {
+    const { fixture, el } = screenWith({ tab: 'types', admin: false });
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(el.querySelector('[data-test="add-starters"]')).toBeNull();
+  });
 });
 
 describe('DocumentIntelligence -- dataset', () => {
@@ -237,6 +266,7 @@ describe('DocumentIntelligence -- dataset', () => {
     expect(screen.datasetType()).toBe('1001');
     expect(api.dataset).toHaveBeenCalledWith(1001, 0, 50);
     const table = el.querySelector('[data-test="dataset"]')!;
+    expect(table.textContent).toContain('Approved data');
     expect(table.textContent).toContain('Dock Supplies Ltd (LIVE-CHECK)');
     expect(table.textContent).toContain('By a reviewer');
     expect(table.textContent).toContain('1 row');
@@ -255,8 +285,58 @@ describe('DocumentIntelligence -- dataset', () => {
   });
 });
 
-// MIG-271: files arrive by upload, email-in, a form's file field or a connector; the Intake tab says what became of each.
+// MIG-271: files arrive by upload, email-in, a form's file field or a connector; Intake's sections say what became of each.
 describe('DocumentIntelligence -- intake', () => {
+  it('draws Intake\'s upload section inside the Intake page, listing the uploads first', async () => {
+    const { fixture, el, api, opened, screen } = screenWith({ view: 'upload' });
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(screen.embedded).toBe(true);
+    expect(el.querySelector('app-page-header')).toBeNull();
+    expect(el.querySelector('[data-test="upload-section"]')!.textContent).toContain('Upload documents');
+    expect(api.intakes).toHaveBeenCalledWith('upload');
+    expect(api.extractions).not.toHaveBeenCalled();
+    [...el.querySelectorAll('[data-test="upload-section"] button')].find(b => b.textContent!.includes('Upload documents'))!
+      .dispatchEvent(new MouseEvent('click'));
+    expect(opened[0].component).toBe(UploadDocumentsDialog);
+  });
+
+  it('ZT-D4: links a duplicate to the earlier document by the number screens show, never "OCR n"', async () => {
+    const { fixture, el } = screenWith({ view: 'upload' });
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const duplicate = [...el.querySelectorAll('tbody tr')].find(r => r.textContent!.includes('Duplicate'))!;
+    expect(duplicate.querySelector('a')?.getAttribute('href')).toBe('/review/documents/1020');
+    expect(duplicate.textContent).toContain('#1020');
+    expect(el.textContent).not.toContain('OCR 1010');
+  });
+
+  it('draws the email-in section with the address, listing what was mailed in first', async () => {
+    const { fixture, el, api } = screenWith({ view: 'email' });
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(el.querySelector('app-page-header')).toBeNull();
+    expect(el.querySelector('[data-test="mailbox-address"]')).not.toBeNull();
+    expect(api.intakes).toHaveBeenCalledWith('email');
+  });
+
+  it('opens an old ?tab=intake link on the email-in section', async () => {
+    const { fixture, router } = screenWith({ view: 'overview', tab: 'intake' });
+    await fixture.whenStable();
+    expect(router.navigate).toHaveBeenCalledWith(['/documents/intake/email-in'], { replaceUrl: true });
+  });
+
+  /** Console review L6: a platform administrator's own sign-in has no workspace -- the card, and no call answered "Pick a workspace". */
+  it('says a sign-in with no workspace needs one, and asks the services nothing', async () => {
+    for (const view of ['overview', 'types', 'dataset', 'upload', 'email']) {
+      const { fixture, el, api } = screenWith({ view, noWorkspace: true });
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(el.querySelector('[data-test="needs-workspace"]'), view).not.toBeNull();
+      for (const call of [api.stats, api.types, api.extractions, api.intakes, api.mailbox, api.dataset]) expect(call, view).not.toHaveBeenCalled();
+    }
+  });
+
   it('uploads many documents at once and reads the lists again when any was taken', async () => {
     const { fixture, screen, opened, api } = screenWith({ closed: { changed: true } });
     await fixture.whenStable();
@@ -269,13 +349,19 @@ describe('DocumentIntelligence -- intake', () => {
     const { fixture, el, api, screen } = screenWith({ tab: 'intake' });
     await fixture.whenStable();
     fixture.detectChanges();
-    expect(api.intakes).toHaveBeenCalledWith('');
+    expect(api.intakes).toHaveBeenCalledWith('email');
+    screen.pickChannel('');
+    expect(api.intakes).toHaveBeenLastCalledWith('');
+    fixture.detectChanges();
     const table = el.querySelector('[data-test="intake"]')!;
     expect(table.textContent).toContain('Email from bob@supplier.example: March');
     expect(table.textContent).toContain('The same file as document 1010');
     expect(table.querySelector('a')?.getAttribute('href')).toBe('/review/documents/1020');
-    screen.pickChannel('email');
-    expect(api.intakes).toHaveBeenLastCalledWith('email');
+    screen.pickChannel('upload');
+    expect(api.intakes).toHaveBeenLastCalledWith('upload');
+    screen.intakes.set([]);
+    fixture.detectChanges();
+    expect(el.querySelector('[data-test="intake"]')!.textContent).toContain('Nothing uploaded yet');
   });
 
   it('shows the email-in address, and lets an administrator give it a new one or turn it off', async () => {

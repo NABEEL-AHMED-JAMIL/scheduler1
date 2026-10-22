@@ -72,6 +72,22 @@ describe('Combobox', () => {
     expect(box.filtered().map(o => o.label)).toEqual(['Billing intake']);
   });
 
+  it('ZT-P4: puts the options whose name matches before those only their hint matches, inside each group', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ imports: [Combobox] });
+    const fixture = TestBed.createComponent(Combobox);
+    fixture.componentRef.setInput('options', [
+      { value: 'read', label: 'Read file', hint: 'Reads rows', group: 'Read' },
+      { value: 'aggregate', label: 'Aggregate', hint: 'Groups rows and computes count, sum or avg', group: 'Process' },
+      { value: 'compute', label: 'Compute', hint: 'Formulas on each row', group: 'Process' },
+      { value: 'report', label: 'Render PDF', hint: 'Computes nothing; draws the rows', group: 'Output' },
+    ]);
+    fixture.detectChanges();
+    const box = fixture.componentInstance;
+    box.onInput('compute');
+    expect(box.filtered().map(o => o.value)).toEqual(['compute', 'aggregate', 'report']);
+  });
+
   describe('remote mode', () => {
     function remote() {
       TestBed.resetTestingModule();

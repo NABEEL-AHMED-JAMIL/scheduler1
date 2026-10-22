@@ -172,6 +172,11 @@ export class JobEdit implements OnInit {
   readonly jobId = input<string>('');
   /** A new schedule for this task (?taskDetailId=, from the step builder's Schedule, MIG-249). */
   readonly taskDetailId = input<string>('');
+  /**
+   * A new schedule that starts when a document of this type is approved (?whenApproved=, from Document types' "When
+   * approved, starts…" column, owner 2026-10-20): the document start is on with the type chosen.
+   */
+  readonly whenApproved = input<string>('');
 
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef, { optional: true });
   private readonly injector = inject(Injector);
@@ -361,7 +366,7 @@ export class JobEdit implements OnInit {
     const attempts = Number(v['maxAttempts'] ?? 1);
     const priority = `Priority ${v['priority'] ?? 1}`;
     if (!(attempts > 1)) return `${priority}; a failed run is not retried.`;
-    return `${priority}; up to ${attempts} attempts, ${v['retryBackoffSeconds'] ?? 60} s apart at first.`;
+    return `${priority}; up to ${attempts} attempts, ${v['retryBackoffSeconds'] ?? 60} sec apart at first.`;
   });
   readonly emailLine = computed(() => {
     const v = this.values();
@@ -472,6 +477,10 @@ export class JobEdit implements OnInit {
       // A new schedule starts today (the server's calendar) unless someone picks another day.
       this.scheduler.patchValue({ startDate: new Intl.DateTimeFormat('en-CA', { timeZone: SERVER_ZONE }).format(new Date()) });
       if (isRecordId(this.taskDetailId())) this.form.patchValue({ taskDetailId: Number(this.taskDetailId()) });
+      if (isRecordId(this.whenApproved())) {
+        this.setOnApproval(true);
+        this.documentTypeId.set(Number(this.whenApproved()));
+      }
     }
   }
 

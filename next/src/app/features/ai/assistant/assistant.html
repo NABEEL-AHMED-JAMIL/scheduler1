@@ -77,6 +77,12 @@
       <div class="flex-1 min-h-0 overflow-y-auto px-4 py-4 flex flex-col gap-3" [appStickToBottom]="messages().length + (working() ? 1 : 0) + liveCalls().length">
         @if (threadLoading()) {
           <p class="text-sm text-[color:var(--text-muted)]">Opening the conversation…</p>
+        } @else if (threadMissing()) {
+          <div class="m-auto flex flex-col items-center text-center gap-2 py-6" data-thread-missing>
+            <span class="stat-glyph"><app-icon name="search" /></span>
+            <p class="text-sm font-semibold">This conversation isn't here</p>
+            <p class="text-sm text-[color:var(--text-secondary)] max-w-sm">It may have been deleted, or the link belongs to another workspace. Start a new chat, or open one of yours.</p>
+          </div>
         } @else if (threadError()) {
           <div class="rounded-lg px-3 py-2 text-sm bg-crit-500/12 text-crit-500 flex items-start gap-2">
             <app-icon name="alert" class="icon-crit mt-0.5 shrink-0" size="0.9em" />{{ threadError() }}
@@ -125,15 +131,11 @@
                 </span>
                 <div class="min-w-0 flex-1 flex flex-col gap-2">
                   @if (blocks(m).length) {
-                    <div class="rounded-lg rounded-bl-sm px-3 py-2 text-sm max-w-[92%] break-words w-fit flex flex-col gap-2"
-                         [class]="isRefusal(m) ? 'bg-crit-500/12' : 'bg-sunken'">
-                      @for (b of blocks(m); track $index) {
-                        @if (b.kind === 'code') {
-                          <pre class="mono text-xs whitespace-pre-wrap break-words rounded-md border border-subtle bg-[color:var(--surface-raised)] px-2.5 py-2 max-h-72 overflow-auto">{{ b.text }}</pre>
-                        } @else {
-                          <p class="whitespace-pre-wrap">{{ b.text }}</p>
-                        }
-                      }
+                    <!-- The answer's Markdown (bold, inline code, lists, links, fenced code) drawn by app-markdown: parsed into
+                         blocks and bound as text, never innerHTML, so nothing the model writes becomes markup. -->
+                    <div class="ai-answer rounded-lg rounded-bl-sm px-3 py-2 text-sm max-w-[92%] break-words w-fit min-w-0"
+                         [class]="isRefusal(m) ? 'bg-crit-500/12' : 'bg-sunken'" data-answer>
+                      <app-markdown [source]="m.content ?? ''" />
                     </div>
                   }
                   @if (runNote(m); as note) {
@@ -290,7 +292,7 @@
                   <li class="flex items-center gap-2 min-w-0" [attr.data-live-call]="c.toolName">
                     <span class="mono truncate">{{ c.toolName }}</span>
                     <span class="pill" [class]="'pill pill-' + o.tone">{{ o.label }}</span>
-                    @if (c.durationMs != null) { <span class="text-[color:var(--text-muted)] tabular-nums">{{ c.durationMs }} ms</span> }
+                    @if (c.durationMs != null) { <span class="text-[color:var(--text-muted)] tabular-nums">{{ tookMs(c.durationMs) }}</span> }
                   </li>
                 }
               </ol>
@@ -358,7 +360,7 @@
       <div class="flex-1 min-h-0 overflow-y-auto p-3.5">
         @switch (tab()) {
           @case ('flow') {
-            <app-flow-panel class="block h-full" [flow]="flow()" [canCreate]="canCreatePipelines()" />
+            <app-flow-panel class="block h-full" [flow]="flow()" [messageId]="flowMessageId()" [canCreate]="canCreatePipelines()" [question]="isQuestion()" />
           }
           @case ('chart') {
             <!-- MIG-357: the chart_data tool's answer, drawn with the dashboards' chart engine; loaded only when shown. -->

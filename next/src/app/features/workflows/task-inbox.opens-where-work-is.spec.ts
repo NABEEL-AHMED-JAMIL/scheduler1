@@ -11,19 +11,19 @@ import { InboxTask, TaskDetail, WorkflowsApi } from './workflows.api';
 
 /**
  * UX review 2026-10-12 (W1): the inbox opens on the tab with work. A reviewer whose tasks all wait in their group's pool
- * opened on an empty "Waiting for me" while My groups held five.
+ * opened on an empty "Waiting for me" while My teams held five.
  */
 const GROUP_TASK = {
   id: 1123, instanceId: 1117, stepKey: 'review', stepType: 'approval', name: 'Review the run', workflowName: 'Pipeline run review',
-  requestTitle: 'Review run #8214: Patient 360 (daily)', state: 'Open', assigneeKind: 'group', assigneeValue: '1063',
+  requestTitle: 'Review run #8214: Patient 360 (daily)', state: 'Open', assigneeKind: 'team', assigneeValue: '1063',
 } as InboxTask;
 const MINE_TASK = { ...GROUP_TASK, id: 900, assigneeKind: 'user', assigneeUserId: 4641 } as InboxTask;
 
-function inbox(mine: InboxTask[], groups: InboxTask[]) {
+function inbox(mine: InboxTask[], teams: InboxTask[]) {
   const detail = (id: number) => ({ ...(id === 900 ? MINE_TASK : GROUP_TASK), subject: {}, history: [], tasks: [] }) as unknown as TaskDetail;
   const api = {
     mine: vi.fn(() => of({ status: 'SUCCESS', message: '', data: mine })),
-    groups: vi.fn(() => of({ status: 'SUCCESS', message: '', data: groups })),
+    teams: vi.fn(() => of({ status: 'SUCCESS', message: '', data: teams })),
     done: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [] })),
     requests: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [] })),
     task: vi.fn((id: number) => of({ status: 'SUCCESS', message: '', data: detail(id) })),
@@ -36,7 +36,7 @@ function inbox(mine: InboxTask[], groups: InboxTask[]) {
       provideRouter([]),
       { provide: WorkflowsApi, useValue: api },
       { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn() } },
-      { provide: TaskCountService, useValue: { refresh: vi.fn(), count: signal(1), overdue: signal(0), mine: signal(0), groups: signal(0), done: signal(0), requests: signal(0) } },
+      { provide: TaskCountService, useValue: { refresh: vi.fn(), count: signal(1), overdue: signal(0), mine: signal(0), teams: signal(0), done: signal(0), requests: signal(0) } },
       { provide: AuthService, useValue: { canOpen: () => true, user: signal({ appUserId: 4641, tenantId: 2960 }) } },
     ],
   });
@@ -46,9 +46,9 @@ function inbox(mine: InboxTask[], groups: InboxTask[]) {
 }
 
 describe('Task inbox opens where the work is', () => {
-  it('opens My groups on its first task when nothing is assigned to the reader by name', () => {
+  it('opens My teams on its first task when nothing is assigned to the reader by name', () => {
     const { api, screen } = inbox([], [GROUP_TASK]);
-    expect(screen.tab()).toBe('groups');
+    expect(screen.tab()).toBe('teams');
     expect(api.task).toHaveBeenCalledWith(1123);
   });
 
@@ -63,7 +63,7 @@ describe('Task inbox opens where the work is', () => {
     screen.load();
     fixture.detectChanges();
     expect(screen.tab()).toBe('mine');
-    expect(el.querySelector('[data-test="see-groups"]')!.textContent).toContain('See what waits for your groups');
+    expect(el.querySelector('[data-test="see-teams"]')!.textContent).toContain('See what waits for your teams');
   });
 
   it('says nothing waits when neither tab has work', () => {

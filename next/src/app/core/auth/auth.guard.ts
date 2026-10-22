@@ -2,7 +2,9 @@ import { inject } from '@angular/core';
 import { CanActivateChildFn, CanActivateFn, CanMatchFn, Router } from '@angular/router';
 import { AuthService } from './auth.service';
 import { UserRole } from './auth.models';
-import { PageKey } from './page-keys';
+import { PageKey, TabKey } from './page-keys';
+import { AccessDelegation } from './access-delegation';
+import { map } from 'rxjs/operators';
 
 export const authGuard: CanActivateFn = (_route, state) => {
   const auth = inject(AuthService);
@@ -43,6 +45,17 @@ export const roleGuard: CanActivateFn = (route) => {
 };
 
 /**
+ * F3 (MIG-400): Administration › Page access -- a workspace administrator, or a member with an access delegation in force
+ * (read once, then remembered). Courtesy: identity refuses a member with none (403).
+ */
+export const accessManagerGuard: CanActivateFn = () => {
+  const auth = inject(AuthService);
+  const router = inject(Router);
+  if (auth.hasAtLeast('TENANT_ADMIN')) return true;
+  return inject(AccessDelegation).load().pipe(map(d => (d ? true : router.createUrlTree(['/unauthorized']))));
+};
+
+/**
  * The access-profile counterpart of roleGuard: a route names the page it is (`pageKey` in its
  * data), and the person's profile decides. Same placement rule -- on the route carrying the
  * data, never a parent. Sends the person to /unauthorized with the page named, so that screen
@@ -61,6 +74,12 @@ export const pageGuard: CanActivateFn = (route) => {
   if (anyOf?.length && !anyOf.some(key => auth.canOpen(key))) {
     const title = typeof route.routeConfig?.title === 'string' ? route.routeConfig.title : undefined;
     return router.createUrlTree(['/unauthorized'], { queryParams: title ? { page: anyOf[0], title } : { page: anyOf[0] } });
+  }
+  // F3 (MIG-400): a tab of a page whose tabs are granted apart.
+  const tab = route.data?.['tabKey'] as TabKey | undefined;
+  if (page && tab && auth.canOpen(page) && !auth.canOpenTab(page, tab)) {
+    const title = typeof route.routeConfig?.title === 'string' ? route.routeConfig.title : undefined;
+    return router.createUrlTree(['/unauthorized'], { queryParams: title ? { page, title } : { page } });
   }
   if (!anyOf?.length && page && !auth.canOpen(page)) {
     // The screen's own title as well: several screens open with one page's access (the AI Assistant with Prompts),

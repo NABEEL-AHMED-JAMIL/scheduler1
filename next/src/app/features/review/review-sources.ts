@@ -42,7 +42,7 @@ export interface ReviewItem {
   since: string | null;
   due: string | null;
   overdue: boolean;
-  /** Who it waits on, in words: You, Your groups, Administrators, Claimed by Sam. */
+  /** Who it waits on, in words: You, Your teams, Administrators, Claimed by Sam. */
   waitsOn: string;
   /** The reader may decide it in bulk; else `whyNot` says why its box is off. */
   pickable: boolean;
@@ -63,6 +63,11 @@ export interface ReviewViewer {
   documents: boolean;
   /** A workspace administrator: decides any run through Core's run review. */
   admin: boolean;
+  /**
+   * Holds Schedules or the Queue, the pages Core's review/waiting answers (ZT-F2): a task-inbox holder without either was
+   * asked it on every page and refused (403) twice. Absent: asked as before.
+   */
+  runs?: boolean;
   me: number | null;
 }
 
@@ -108,10 +113,10 @@ export function loadReview(http: HttpClient, viewer: ReviewViewer, context?: Htt
   return forkJoin({
     count: viewer.tasks ? read(http.get<ApiResponse<TaskCount>>(`${inbox}/count`, { context })) : notAsked,
     mine: viewer.tasks ? read(http.get<ApiResponse<InboxTask[]>>(`${inbox}/mine`, page)) : notAsked,
-    groups: viewer.tasks ? read(http.get<ApiResponse<InboxTask[]>>(`${inbox}/groups`, page)) : notAsked,
+    teams: viewer.tasks ? read(http.get<ApiResponse<InboxTask[]>>(`${inbox}/teams`, page)) : notAsked,
     // A reviewer's runs come with their tasks; Core's list adds the pipeline, when it finished and whether it is
     // individual review. Without Schedules or the Queue it answers 403, and the tasks are listed without it.
-    runs: viewer.tasks || viewer.admin
+    runs: viewer.admin || (viewer.tasks && viewer.runs !== false)
       ? read(http.get<ApiResponse<{ runs?: WaitingRun[]; more?: boolean }>>(`${API_BASE}/sourceJob.json/review/waiting`, { context })) : notAsked,
     documents: viewer.documents
       ? read(http.get<ApiResponse<{ items?: Extraction[]; total?: number }>>(`${API_BASE}/documentReview.json/queue`,
@@ -120,7 +125,7 @@ export function loadReview(http: HttpClient, viewer: ReviewViewer, context?: Htt
   }).pipe(map(a => merge(viewer, {
     count: a.count ?? null,
     mine: a.mine === undefined ? [] : a.mine,
-    groups: a.groups === undefined ? [] : a.groups,
+    teams: a.teams === undefined ? [] : a.teams,
     runs: a.runs?.runs ?? [],
     runsMore: !!a.runs?.more,
     runsFailed: a.runs === null && viewer.admin,
@@ -131,20 +136,20 @@ export function loadReview(http: HttpClient, viewer: ReviewViewer, context?: Htt
 
 /** The answers, as one list: what is read, laid out; no call here. Exported for the screen's tests. */
 export function merge(viewer: ReviewViewer, a: {
-  count: TaskCount | null; mine: InboxTask[] | null; groups: InboxTask[] | null;
+  count: TaskCount | null; mine: InboxTask[] | null; teams: InboxTask[] | null;
   runs: WaitingRun[]; runsMore: boolean; runsFailed: boolean;
   documents: Extraction[] | null; documentTotal: number;
 }): ReviewLoad {
   const items: ReviewItem[] = [];
   const failed: ReviewKind[] = [];
-  if (a.mine === null || a.groups === null) failed.push('approval');
+  if (a.mine === null || a.teams === null) failed.push('approval');
   if (a.runsFailed) failed.push('run');
   if (a.documents === null) failed.push('document');
 
   const runs = new Map(a.runs.map(r => [r.jobQueueId, r]));
   const covered = new Set<number>();
   const seen = new Set<number>();
-  const tasks = [...(a.mine ?? []).map(t => ({ t, mine: true })), ...(a.groups ?? []).map(t => ({ t, mine: false }))];
+  const tasks = [...(a.mine ?? []).map(t => ({ t, mine: true })), ...(a.teams ?? []).map(t => ({ t, mine: false }))];
   for (const { t, mine } of tasks) {
     if (t.state !== 'Open' || seen.has(t.id)) continue;
     seen.add(t.id);
@@ -199,7 +204,7 @@ export function merge(viewer: ReviewViewer, a: {
   sortItems(items);
 
   const loadedTasks = seen.size;
-  const taskTotal = a.count ? (a.count.mine ?? 0) + (a.count.groups ?? 0) : loadedTasks;
+  const taskTotal = a.count ? (a.count.mine ?? 0) + (a.count.teams ?? 0) : loadedTasks;
   const beyond = {
     tasks: Math.max(0, taskTotal - loadedTasks),
     documents: Math.max(0, a.documentTotal - (a.documents?.length ?? 0)),
@@ -231,7 +236,7 @@ export function runOf(t: Pick<InboxTask, 'subjectType' | 'subjectId'>): number |
 function waitsOnTask(t: InboxTask, mine: boolean, me: number | null): string {
   if (t.assigneeUserId != null) return t.assigneeUserId === me || mine ? 'You' : 'A colleague';
   if (t.assigneeKind === 'role') return t.assigneeValue === 'TENANT_ADMIN' ? 'Administrators' : 'Any member';
-  return mine ? 'You' : 'Your groups';
+  return mine ? 'You' : 'Your teams';
 }
 
 /** "Internal review", or which party's review is still to come. */
@@ -292,6 +297,7 @@ export function countReview(target: { injector: Injector; review: WritableSignal
   const viewer: ReviewViewer = {
     tasks: auth.canOpen('task-inbox'), documents: auth.canOpen('document-review'),
     admin: typeof auth.isTenantAdmin === 'function' && auth.isTenantAdmin(), me: auth.user()?.appUserId ?? null,
+    runs: auth.canOpen('jobs') || auth.canOpen('queue'),
   };
   if (!http || (!viewer.tasks && !viewer.documents && !viewer.admin)) { target.review.set(null); return; }
   loadReview(http, viewer, new HttpContext().set(BADGE_READ, true)).subscribe({

@@ -77,6 +77,16 @@ export interface FormSummary {
   dataset?: { analyticsDatasetId?: number | null; name: string; connection: string; path: string } | null;
 }
 
+/** What rebuilding a dataset form's files did: the submissions taken (its newest 1000 at most) and the files written. */
+export interface DatasetRebuild {
+  formId: number;
+  bucket: string;
+  path: string;
+  submissions: number;
+  taken: number;
+  written: number;
+}
+
 export interface LinkableJob {
   jobId: number;
   jobName: string;

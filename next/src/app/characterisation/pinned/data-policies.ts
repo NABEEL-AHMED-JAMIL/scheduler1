@@ -4,26 +4,25 @@ export const PINNED: Record<string, unknown> = {
     "url": "/administration/data-policies",
     "requests": [
       "GET /notification.json/unreadCount",
-      "GET /notification.json/list?limit=20&page=1",
-      "GET /tenant.json/listTenants"
+      "GET /notification.json/list?limit=20&page=1"
     ],
     "headings": [
       "Data policies"
     ],
-    "buttons": [],
-    "columns": [],
-    "fields": [
-      "Pick a workspace",
-      "Workspace",
-      "Workspace whose data policy to read"
+    "buttons": [
+      "Platform minimums"
     ],
+    "columns": [],
+    "fields": [],
     "links": [
       "/administration",
       "/administration/access-profiles",
       "/administration/appearance",
       "/administration/data-policies",
       "/administration/security",
-      "/administration/users"
+      "/administration/teams",
+      "/administration/users",
+      "/platform/workspaces"
     ],
     "page": {
       "state": "",
@@ -56,7 +55,8 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/list?limit=20&page=1",
       "GET /aiPrompt.json/dataPolicy",
       "GET /sourceJob.json/review/policy",
-      "GET /documentReview.json/policy"
+      "GET /documentReview.json/policy",
+      "GET /pageAccess.json/delegates/mine"
     ],
     "headings": [
       "Data policies",
@@ -252,7 +252,7 @@ export const PINNED: Record<string, unknown> = {
       "Public",
       "How a call's level is decided",
       "Bulk review",
-      "Retention Off",
+      "Retention",
       "Legal holds"
     ],
     "buttons": [
@@ -306,6 +306,7 @@ export const PINNED: Record<string, unknown> = {
       "/administration/appearance",
       "/administration/data-policies",
       "/administration/security",
+      "/administration/teams",
       "/administration/users",
       "/settings/model-connections"
     ],

@@ -1,7 +1,7 @@
 import { Component, DestroyRef, HostListener, Type, ViewContainerRef, afterNextRender, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NgTemplateOutlet } from '@angular/common';
-import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
+import { ActivatedRouteSnapshot, NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { ThemeService } from '../../core/theme.service';
 import { roleLabel } from '../../core/auth/auth.models';
@@ -85,6 +85,10 @@ export class Shell {
       });
     });
     inject(DestroyRef).onDestroy(() => { destroyed = true; host.clear(); });
+    // ZT-M18: the managed-session banner names its workspace; a session held without the name asks Identity for it.
+    effect(() => {
+      if (this.auth.isManagedSession() && !this.auth.user()?.tenantName) untracked(() => this.auth.nameManagedWorkspace());
+    });
     // The avatar into the bar once loaded, and into the menu's header each time the menu opens (its slot comes and goes).
     effect(() => {
       const type = this.avatarType();
@@ -102,6 +106,8 @@ export class Shell {
     this.router.events.pipe(takeUntilDestroyed()).subscribe(event => {
       if (event instanceof NavigationEnd) {
         this.currentUrl.set(event.urlAfterRedirects);
+        this.canvasPage.set(wantsCanvas(this.router.routerState.snapshot.root));
+        this.unfolded.set(false);
         // Back/forward and programmatic navigation leave the phone menu open otherwise.
         this.mobileOpen.set(false);
       }
@@ -116,8 +122,16 @@ export class Shell {
    */
   private readonly allNav: NavItem[] = NAV;
 
-  /** The sidebar shows the groups' icons only (≥1440px). Remembered per browser. */
-  readonly collapsed = signal(readCollapsed());
+  /** The reader's choice: the sidebar shows the groups' icons only (≥1440px). Remembered per browser. */
+  private readonly preferCollapsed = signal(readCollapsed());
+  /**
+   * A page that needs the whole width -- the report designer (MIG-404) -- says so in its route's data (`canvas: true`):
+   * the sidebar folds to its icons while it is open and the page loses the shell's padding. The reader may still unfold
+   * the sidebar there; that is not remembered, and the next page has their own choice again.
+   */
+  readonly canvasPage = signal(false);
+  private readonly unfolded = signal(false);
+  readonly collapsed = computed(() => (this.canvasPage() ? !this.unfolded() : this.preferCollapsed()));
 
   /**
    * Menus the current role -- and, for a tenant user, their access profile -- can actually
@@ -160,9 +174,13 @@ export class Shell {
   }
 
   toggleCollapsed(): void {
-    const next = !this.collapsed();
-    this.collapsed.set(next);
     this.openMenu.set(null);
+    if (this.canvasPage()) {
+      this.unfolded.update(open => !open);
+      return;
+    }
+    const next = !this.preferCollapsed();
+    this.preferCollapsed.set(next);
     try { localStorage.setItem(COLLAPSED_KEY, next ? '1' : '0'); } catch { /* not remembered */ }
   }
 
@@ -248,6 +266,14 @@ function blocksOf(children: NavChild[]): NavBlock[] {
     else blocks.push({ section: child.section, children: [child] });
   }
   return blocks;
+}
+
+/** True when the page open (any route on the way down to it) asks for the whole width: `data: { canvas: true }`. */
+export function wantsCanvas(root: ActivatedRouteSnapshot): boolean {
+  for (let at: ActivatedRouteSnapshot | null = root; at; at = at.firstChild) {
+    if (at.data?.['canvas'] === true) return true;
+  }
+  return false;
 }
 
 function readCollapsed(): boolean {

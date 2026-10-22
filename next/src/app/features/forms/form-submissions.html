@@ -103,6 +103,10 @@
               }
               <td class="text-xs max-w-96">
                 @if (s.reason) { <span class="text-crit-500">{{ s.reason }}</span> }
+                @else if (s.workflowStatus === 'Rejected' && s.workflowReason) {
+                  <!-- ZT-F4: the approver's reason, which they had to give. -->
+                  <span data-rejected-reason>Rejected: {{ s.workflowReason }}</span>
+                }
                 @else if (s.storageKey) { <span class="mono text-[color:var(--text-muted)] break-all">{{ s.bucket }}/{{ s.storageKey }}</span> }
               </td>
               <td class="text-right">

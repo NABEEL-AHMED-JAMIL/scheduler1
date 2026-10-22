@@ -9,6 +9,8 @@ import { ApiClientsApi, EventRouteRow, RouteTarget } from './api-clients.api';
 export interface RouteDialogData {
   pipelines: RouteTarget[];
   route?: EventRouteRow | null;
+  /** The workspace a platform administrator picked; none for a workspace administrator (their own). */
+  tenantId?: number | null;
 }
 
 /**
@@ -87,7 +89,7 @@ export class RouteDialog {
       routeId: this.data.route?.routeId ?? null, eventType: this.eventType().trim(), targetKind: this.kind(),
       jobId: pipeline ? this.jobId() : null, workflowKey: pipeline ? null : this.workflowKey().trim(),
       contractName: this.contractName().trim() || null, contractVersion: this.data.route?.contractVersion ?? null, active: this.active(),
-    }).subscribe({
+    }, this.data.tenantId).subscribe({
       next: r => {
         this.saving.set(false);
         if (r.status === API_SUCCESS) {

@@ -8,20 +8,16 @@
           rules, lockout, idle sign-out, two-factor login, single sign-on, and every sign-in.
         </p>
       </div>
-      <app-refresh-button [loading]="loading()" (refresh)="load()" />
+      <div class="flex items-center gap-2">
+        <app-workspace-select [allowAll]="true" allLabel="The platform's defaults" [value]="tenantId()" (valueChange)="pickWorkspace($event)" />
+        <app-refresh-button [loading]="loading()" (refresh)="load()" />
+      </div>
     </div>
   </app-page-header>
-
   @if (isPlatformAdmin()) {
-    <div class="card px-4 py-2.5 flex flex-wrap items-center gap-3">
-      <label for="security-workspace" class="text-sm font-medium">Workspace</label>
-      <app-combobox id="security-workspace" ariaLabel="Workspace whose security to read" class="w-72 max-w-full"
-                    placeholder="The platform's defaults" clearLabel="The platform's defaults" [options]="tenants()"
-                    [selected]="tenantId() === null ? '' : '' + tenantId()" (selectedChange)="pickWorkspace($event)" />
-      <span class="text-xs text-[color:var(--text-muted)]">
-        {{ platformMode() ? 'Editing the platform\'s defaults: every workspace has them unless it sets its own.' : 'Editing this workspace\'s own rules.' }}
-      </span>
-    </div>
+    <p class="text-xs text-[color:var(--text-muted)] -mt-2" data-test="security-scope">
+      {{ platformMode() ? 'Editing the platform\'s defaults: every workspace has them unless it sets its own. Pick a workspace above to edit its own rules.' : 'Editing this workspace\'s own rules.' }}
+    </p>
   }
 
   @if (error()) {

@@ -41,7 +41,7 @@ export const BOARD_PRESETS: RangePreset[] = ['30d', '90d', '12m', 'ytd', 'all'];
         @if (valueDefs().length) { <span class="bfb-sep" aria-hidden="true"></span> }
       }
       @for (def of valueDefs(); track def.key) {
-        <app-board-filter-chip [def]="def" [values]="state().values[def.key] ?? []" (changed)="setValues(def.key, $event)" />
+        <app-board-filter-chip [def]="def" [values]="state().values[def.key] ?? []" [boardId]="boardId()" (changed)="setValues(def.key, $event)" />
       }
       <div class="bfb-end">
         @if (active()) {
@@ -58,6 +58,8 @@ export class BoardFilterBar {
   readonly defs = input.required<BoardFilterDef[]>();
   readonly state = input.required<BoardFilterState>();
   readonly canEdit = input(false);
+  /** ZT-A13: the board the bar is on, handed to each chip's values read. */
+  readonly boardId = input<number | null>(null);
   readonly stateChange = output<BoardFilterState>();
   readonly edit = output<void>();
 

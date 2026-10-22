@@ -111,7 +111,8 @@ test.describe('AI prompts in pipelines', () => {
     expect(topic, 'the default profile has a topic').toBeTruthy();
     await page.goto('/configuration/pipelines');
     await page.getByRole('button', { name: 'New registry task' }).click();
-    await page.getByRole('heading', { name: 'New registry task' }).waitFor();
+    // Owner #18: New registry task is a page of its own now, not a dialog.
+    await page.getByRole('heading', { name: 'New registry task', level: 1 }).waitFor();
     await page.locator('#pipelineId').fill(PIPELINE_ID);
     await page.locator('#pipelineName').fill(PIPELINE_NAME);
     await pick(page, 'pipelineTopic', topic.serviceName.slice(0, 12), topic.serviceName);
@@ -129,7 +130,7 @@ test.describe('AI prompts in pipelines', () => {
     await expect(page.locator('.side-panel-foot')).toContainText('Ready');
     await page.getByRole('button', { name: 'Apply' }).click();
     await expect(page.locator('.ai-step-line')).toContainText(PROMPT);
-    await page.getByRole('button', { name: 'Create pipeline' }).click();
+    await page.getByRole('button', { name: 'Create registry task' }).first().click();
     await expect(page.getByText(`"${PIPELINE_NAME}" saved`)).toBeVisible();
     const pipelines = await (await request.get(`${api}/pipeline.json/listForTopic?sourceTaskTypeId=${topic.sourceTaskTypeId}`, { headers })).json();
     pipelineKey = pipelines.data.find((p: any) => p.pipelineId === PIPELINE_ID)?.pipelineKey ?? null;
@@ -141,7 +142,8 @@ test.describe('AI prompts in pipelines', () => {
     expect(refused.message).toContain('pipeline(s) run this prompt');
 
     // ── 4. Task: the step is a read-only card, the other fields are inputs ───────────────
-    await page.goto('/pipelines/new');
+    // New pipeline starts from a choice (AI Assistant, steps, a copy); the full form for a topic's pipeline is /form.
+    await page.goto('/pipelines/new/form');
     await page.getByRole('heading', { name: 'New pipeline' }).waitFor();
     await page.locator('#taskName').fill(TASK_NAME);
     await expect(page.locator('#taskProfile')).not.toHaveValue('');
@@ -178,9 +180,11 @@ test.describe('AI prompts in pipelines', () => {
     expect(steps.data[0].run.status, steps.data[0].run.error).toBe('ok');
     expect(steps.data[0].run.stepTag).toBe('summary');
 
-    await page.goto(`/operations/jobs/${jobId}/runs/${queueRow.jobQueueId}/logs`);
-    await expect(page.getByText('AI steps')).toBeVisible();
-    await expect(page.locator('.detail-panel .side-panel-list li').first()).toContainText('Answered');
-    await expect(page.locator('.detail-panel .side-panel-list li').first()).toContainText(PROMPT);
+    // The run's AI answers are a tab of the run page (UX review R1), one line each: outcome, prompt, step.
+    await page.goto(`/pipelines/schedules/${jobId}/runs/${queueRow.jobQueueId}`);
+    await page.getByRole('tab', { name: /^AI answers/ }).click();
+    const answer = page.locator('[data-test="ai-answers"] details.ai-answer').first();
+    await expect(answer).toContainText('Answered');
+    await expect(answer).toContainText(PROMPT);
   });
 });

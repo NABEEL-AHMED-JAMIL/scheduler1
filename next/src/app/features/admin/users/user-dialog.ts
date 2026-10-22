@@ -25,11 +25,22 @@ import { FormRow } from '../../../shared/ui/form-row';
  * ROLE_META is written user-first and Object.entries keeps that order, which is what puts the
  * least privilege at the top of the list.
  */
-const ROLES = Object.entries(ROLE_META).map(([value, meta]) => ({
+export const ROLES = Object.entries(ROLE_META).map(([value, meta]) => ({
   value: value as UserRole,
   label: meta.label,
   hint: meta.hint,
 }));
+
+/**
+ * The roles an administrator may set on a person (the dialog's and the Edit user page's picker; reasons on UserDialog.roles):
+ * on one's own row only the role held; a platform administrator any; a tenant administrator a tenant user, plus whatever
+ * the person already holds.
+ */
+export function grantableRoles(current: UserRole | undefined, self: boolean, platformAdmin: boolean) {
+  if (current && self) return ROLES.filter(r => r.value === current);
+  if (platformAdmin) return ROLES;
+  return ROLES.filter(r => r.value === 'TENANT_USER' || r.value === current);
+}
 
 @Component({
   selector: 'app-user-dialog',
@@ -75,16 +86,8 @@ export class UserDialog {
    * one option it does offer is the one the server accepts, which is what keeps the field
    * readable while you edit your own name.
    */
-  readonly roles = computed(() => {
-    const current = this.data.user?.userRole as UserRole | undefined;
-    if (current && this.isSelf()) {
-      return ROLES.filter(r => r.value === current);
-    }
-    if (this.auth.isPlatformAdmin()) {
-      return ROLES;
-    }
-    return ROLES.filter(r => r.value === 'TENANT_USER' || r.value === current);
-  });
+  readonly roles = computed(() =>
+    grantableRoles(this.data.user?.userRole as UserRole | undefined, this.isSelf(), this.auth.isPlatformAdmin()));
 
   /** E.164, owned by the phone component -- it validates against the same metadata the
       server does, so a second Validators rule here could only be a weaker copy. */

@@ -29,6 +29,9 @@ import { RunApprovalStore } from '../run-steps/run-approval.store';
 import { liveDuration } from '../run-steps/run-approval.model';
 import { stepKind } from '../run-steps/run-map';
 import { RUN_TABS, RunTab, runFacts, runStatusLook, runTabFromUrl, runTabUrl, startedBy } from '../run-steps/run-page.model';
+import { RunItems } from '../run-items/run-items';
+import { RunItemsApi } from '../run-items/run-items.api';
+import { ItemFilter, ItemsPage, filterOf, itemsQuery, refsOf } from '../run-items/run-items.model';
 
 export type { RunTab } from '../run-steps/run-page.model';
 /** The tab a `?tab=` value names on the bare run address (kept for the callers that read it). */
@@ -76,11 +79,13 @@ export function runHasAi(timeline: { steps?: { task: string }[]; aiSteps?: unkno
 @Component({
   selector: 'app-job-logs',
   imports: [PageHeader, RefreshButton, Icon, RouterLink, RankedBar, RunDecision, RunAiAnswers, RunStepsTable, RunMap,
-    RunOutputs, RunAiTrace, RunLog, RunApproval],
+    RunOutputs, RunAiTrace, RunLog, RunApproval, RunItems],
   templateUrl: './job-logs.html',
   // One read of the run's steps and outputs for the whole page: the summary, every tab, the step log panel.
   providers: [RunTimelineStore, RunApprovalStore],
   styles: `
+    .run-waiting { display: none !important; }
+    .run-pending { min-height: 40vh; }
     .run-top { display: grid; gap: 1rem; align-items: stretch; }
     @media (min-width: 1024px) { .run-top.has-next { grid-template-columns: minmax(0, 1fr) minmax(22rem, 26rem); } }
     /* Six facts: one row on their own, three by two beside the Next steps, so the strip fills the box's height evenly. */
@@ -193,13 +198,19 @@ export class JobLogs implements OnInit, OnDestroy {
    * analytics names them (the boards' "Made by", B5) -- for a reader who may open Dashboards.
    */
   readonly feeds = signal<{ id: number; name: string }[]>([]);
+  /** ZT §3.11 (CLS 0.16 at 1024): the boards have answered, or are not read -- the link row may be drawn at its height. */
+  readonly feedsKnown = signal(false);
   private readFeeds(): void {
     const job = Number(this.jobId());
-    if (!job || !this.auth.canOpen('analytics-dashboards')) return;
+    // ZT-A12: a platform administrator's own sign-in (no workspace) reads no workspace's boards; Analytics answers it 403.
+    if (!job || !this.auth.canOpen('analytics-dashboards') || (!!this.auth.isPlatformAdmin?.() && !this.auth.user?.()?.tenantId)) {
+      this.feedsKnown.set(true);
+      return;
+    }
     this.http.get<ApiResponse<{ analyticsDashboardId?: number | null; dashboardName?: string | null; pipelines?: { jobId: number }[] | null }[]>>(
       `${API_BASE}/analyticsWorkspace.json/fetchAllDashboards`).subscribe({
-        next: r => this.feeds.set(boardsFedBy(r?.status === API_SUCCESS ? r.data ?? [] : [], job)),
-        error: () => this.feeds.set([]),
+        next: r => { this.feeds.set(boardsFedBy(r?.status === API_SUCCESS ? r.data ?? [] : [], job)); this.feedsKnown.set(true); },
+        error: () => { this.feeds.set([]); this.feedsKnown.set(true); },
       });
   }
   /** The pipeline's name when its page is not the reader's to open: said once, in the link row, as text. */
@@ -209,10 +220,28 @@ export class JobLogs implements OnInit, OnDestroy {
   readonly store = inject(RunTimelineStore);
   /** The run's review as Next steps read it, for the header's one pill. */
   readonly review = signal<RunReviewView | null>(null);
+  /** MIG-416: the review's first answer (none required is an answer), then the page's body may be drawn. */
+  readonly reviewKnown = signal(false);
+  reviewRead(review: RunReviewView | null): void {
+    this.review.set(review);
+    this.reviewKnown.set(true);
+  }
+  /**
+   * Latched once the run, its review and its steps (or that it has none) have answered; a missing run or an error shows at once.
+   * ZT §3.11 (the browser budget on a workspace with longer names, CLS 0.16 at 1024): the boards it feeds and its cost too --
+   * "Feeds: ..." wrapped the header's link row to a second line under a drawn page, and Cost added a second row of facts.
+   */
+  private readonly topDrawn = signal(false);
+  readonly topReady = computed(() => this.topDrawn() || this.missing() || (!!this.error() && !this.run()));
+  protected readonly drawTop = effect(() => {
+    const steps = this.store.timeline() !== null || this.store.legacy() || this.store.readError();
+    if (!this.topDrawn() && !!this.run() && this.reviewKnown() && steps && this.feedsKnown() && this.costKnown()) this.topDrawn.set(true);
+  });
   /** The run's Approval steps: the request it waits at, the reader's task about it, the groups' names. */
   readonly approvals = inject(RunApprovalStore);
   /** The Next steps box is drawn (the run waits for an approval, or its results need a review): the strip shares the row with it. */
-  readonly hasNext = computed(() => !!this.approvals.waiting() || (!!this.review() && this.review()!.reviewStatus !== 'NOT_REQUIRED'));
+  readonly hasNext = computed(() => !!this.approvals.waiting() || (!!this.review() && this.review()!.reviewStatus !== 'NOT_REQUIRED'
+    && this.review()!.reviewStatus !== 'NOT_APPLICABLE'));
   /** The page's clock: a running run's Duration and the Next steps' "7 h ago" move with it. */
   readonly now = signal(Date.now());
   /** UX review 2026-10-12 (run page fix): the header's one status -- "Completed · waiting for review". */
@@ -234,18 +263,25 @@ export class JobLogs implements OnInit, OnDestroy {
   });
   /** UX review B9: what the run cost, for an administrator (Billing's runCost); null when unknown or not theirs to read. */
   readonly cost = signal<string | null>(null);
+  /** The cost has answered, or is not this reader's: the summary's facts are all known (ZT §3.11). */
+  readonly costKnown = signal(false);
   private costFor: string | null = null;
   private loadCost(): void {
     const id = this.jobQueueId().trim();
-    if (this.costFor === id || !this.auth.isTenantAdmin?.()) return;
+    if (!this.auth.isTenantAdmin?.()) {
+      this.costKnown.set(true);
+      return;
+    }
+    if (this.costFor === id) return;
     this.costFor = id;
     this.http.get<ApiResponse<{ cost?: number | null; currency?: string | null }>>(`${API_BASE}/billing.json/runCost`, { params: { jobQueueId: id } })
       .subscribe({
         next: r => {
           const cost = r.status === API_SUCCESS ? r.data?.cost : null;
           this.cost.set(typeof cost === 'number' ? formatMoney(cost, r.data?.currency || 'USD', cost > 0 && cost < 1 ? 4 : 2) : null);
+          this.costKnown.set(true);
         },
-        error: () => this.cost.set(null),
+        error: () => { this.cost.set(null); this.costKnown.set(true); },
       });
   }
 
@@ -280,6 +316,9 @@ export class JobLogs implements OnInit, OnDestroy {
     { id: 'map' as RunTab, label: 'Map', icon: 'layers' },
     ...(this.hasAi() || (!this.aiKnown() && this.tab() === 'ai')
       ? [{ id: 'ai' as RunTab, label: this.aiSteps().length ? `AI answers (${this.aiSteps().length})` : 'AI answers', icon: 'sparkle' }] : []),
+    // MIG-420: only a run of a pipeline that works item by item has Items; until Core has said, kept when the address asks.
+    ...(this.items()?.itemRun || (!this.itemsRead() && this.tab() === 'items')
+      ? [{ id: 'items' as RunTab, label: this.items()?.itemRun ? `Items (${this.items()!.summary.items.toLocaleString('en-GB')})` : 'Items', icon: 'table' }] : []),
     { id: 'outputs' as RunTab, label: this.store.outputList().length ? `Outputs (${this.store.outputList().length})` : 'Outputs', icon: 'file' },
     { id: 'log' as RunTab, label: this.logs().length ? `Log (${this.logs().length.toLocaleString('en-GB')})` : 'Log', icon: 'terminal' },
   ]);
@@ -293,9 +332,42 @@ export class JobLogs implements OnInit, OnDestroy {
   setTab(tab: RunTab): void {
     if (!RUN_TABS.includes(tab)) return;
     this.tab.set(tab);
-    const { commands, queryParams } = runTabUrl(this.jobId(), this.jobQueueId(), tab);
+    const { commands, queryParams } = runTabUrl(this.jobId(), this.jobQueueId(), tab, this.itemStatus());
     const url = this.router.serializeUrl(this.router.createUrlTree(commands, { queryParams }));
     this.location.replaceState(url);
+  }
+
+  /**
+   * MIG-420: the run's items, first page, asked once with the run (and again while a running run has none yet): whether
+   * the run has an Items tab at all, and the tab's first answer. A run of a pipeline that does not work item by item --
+   * a big table read in one go -- answers itemRun false, and has no tab.
+   */
+  private readonly itemsApi = inject(RunItemsApi);
+  readonly items = signal<ItemsPage | null>(null);
+  readonly itemsRead = signal(false);
+  /** The Items tab's filter, kept in the address (?tab=items&status=failed opens it filtered). */
+  readonly itemStatus = signal<ItemFilter>(filterOf(this.activated.snapshot?.queryParamMap?.get('status')));
+  /** MIG-421: a Task inbox task's link names its items (?tab=items&items=2,6,9): the tab shows only them. */
+  readonly itemRefs = signal<string[]>(refsOf(this.activated.snapshot?.queryParamMap?.get('items')));
+  /** The status the first answer was asked for: the tab draws it only while it shows that one. */
+  private readonly itemsAskedFor = signal<ItemFilter>('all');
+  readonly itemsFirst = computed(() => this.itemsAskedFor() === this.itemStatus() ? this.items() : null);
+  private itemsAsking = false;
+  private readItems(): void {
+    const id = Number(this.jobQueueId());
+    if (!id || this.itemsAsking || (this.itemsRead() && (this.items()?.itemRun || !this.stillRunning()))) return;
+    this.itemsAsking = true;
+    const status = this.itemStatus();
+    this.itemsApi.list(itemsQuery(id, { status, page: 0, size: 50 })).subscribe({
+      next: page => { this.itemsAsking = false; this.itemsAskedFor.set(status); this.items.set(page); this.itemsRead.set(true); },
+      // A reader the items are not for (a platform administrator's own sign-in), or an older Core: no tab.
+      error: () => { this.itemsAsking = false; this.items.set(null); this.itemsRead.set(true); },
+    });
+  }
+
+  itemStatusChanged(status: ItemFilter): void {
+    this.itemStatus.set(status);
+    if (this.tab() === 'items') this.setTab('items');
   }
 
   showStepInLog(stepKey: string): void {
@@ -331,7 +403,11 @@ export class JobLogs implements OnInit, OnDestroy {
   constructor() {
     // A link to this page's other address (/logs, ?tab=) or to another run lands on this same page: it follows the address.
     const navigations = this.router.events.subscribe(event => {
-      if (event instanceof NavigationEnd) this.tab.set(this.tabOfAddress());
+      if (event instanceof NavigationEnd) {
+        this.tab.set(this.tabOfAddress());
+        this.itemStatus.set(filterOf(this.activated.snapshot?.queryParamMap?.get('status')));
+        this.itemRefs.set(refsOf(this.activated.snapshot?.queryParamMap?.get('items')));
+      }
     });
     inject(DestroyRef).onDestroy(() => navigations.unsubscribe());
     let shown: string | null = null;
@@ -340,13 +416,18 @@ export class JobLogs implements OnInit, OnDestroy {
       if (shown !== null && shown !== key) untracked(() => {
         this.logs.set([]); this.job.set(null); this.run.set(null); this.review.set(null); this.aiSteps.set([]);
         this.aiStepsLoadedFor = null; this.aiStepsRead.set(false); this.costFor = null; this.cost.set(null); this.missing.set(false);
+        this.items.set(null); this.itemsRead.set(false);
         this.load();
       });
       shown = key;
     });
     // The run's steps are read with each read of the run, so a running run's steps move with its entries.
     effect(() => {
-      if (this.loads() > 0 && !this.missing()) untracked(() => this.store.load(this.jobQueueId().trim()));
+      if (this.loads() > 0 && !this.missing()) untracked(() => { this.store.load(this.jobQueueId().trim()); this.readItems(); });
+    });
+    // ?tab=items on a run with no items opens the Steps, as ?tab=ai does on a run with no AI steps.
+    effect(() => {
+      if (this.tab() === 'items' && this.itemsRead() && !this.items()?.itemRun) untracked(() => this.setTab('steps'));
     });
     // ?tab=ai on a run with no AI steps opens the Steps, quietly, once the page knows (the address follows).
     effect(() => {
@@ -605,7 +686,8 @@ export class JobLogs implements OnInit, OnDestroy {
 
   private readBackfill(): void {
     const run = Number(this.jobQueueId());
-    if (!run || !this.canOpenSchedule()) return;
+    // F3: the link goes to Backfills, a tab of its own (jobs:backfills): not asked of someone it is closed to.
+    if (!run || !this.canOpenSchedule() || !(this.auth.canOpenTab?.('jobs', 'jobs:backfills') ?? true)) return;
     this.http.get<ApiResponse<{ backfillId: number; date: string | null } | null>>(`${API_BASE}/sourceJob.json/backfills/ofRun`,
       { params: { jobQueueId: String(run) } }).subscribe({
         next: r => this.backfill.set(r?.status === 'SUCCESS' && r.data?.backfillId ? r.data : null),

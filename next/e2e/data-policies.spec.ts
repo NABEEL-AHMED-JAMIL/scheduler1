@@ -1,5 +1,5 @@
 import { test, expect, APIRequestContext, Browser, Page, TestInfo } from '@playwright/test';
-import { hasToken, NEEDS, sessionFor, tokenFor } from './support/session';
+import { hasToken, NEEDS, sessionFor, tokenFor, pageWith } from './support/session';
 import { lendPages } from './support/workspace';
 import { hasFixtures, riverside } from './support/fixtures';
 import { join } from 'path';
@@ -31,11 +31,8 @@ async function sessionOf(request: APIRequestContext, token: string, extraPages: 
 }
 
 async function pageAs(browser: Browser, session: Record<string, unknown>): Promise<Page> {
-  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
-  const page = await context.newPage();
-  await page.goto('/');
-  await page.evaluate(user => window.localStorage.setItem('etl_auth_user', JSON.stringify(user)), session);
-  return page;
+  // Seeded before the app loads (support/session.ts pageWith): a dead stored session can no longer sign it out.
+  return pageWith(browser, session, { viewport: { width: 1440, height: 900 } });
 }
 
 async function shot(page: Page, info: TestInfo, name: string): Promise<void> {
@@ -122,8 +119,9 @@ test.describe('MIG-254: Administration › Data policies', () => {
     try {
       const reader = await pageAs(browser, await sessionOf(request, tokenFor('user', { newSignIn: true })!));
       await reader.goto('/administration/data-policies');
-      await expect(reader.locator('[data-read-only]')).toContainText('Only a workspace administrator can change the data policy.');
-      await expect(reader.locator('[data-level="internal"]')).toContainText('Keep run files');
+      await expect(reader.locator('[data-read-only]', { hasText: 'data policy' })).toContainText('Only a workspace administrator can change the data policy.');
+      // The levels are the table's columns and the rules its rows: Keep run files, read for the Internal level.
+      await expect(reader.getByRole('row').filter({ hasText: 'Keep run files' }).locator('[data-level="internal"]')).toBeVisible();
       await expect(reader.locator('[data-level] select, [data-level] input')).toHaveCount(0);
       await expect(reader.getByRole('button', { name: 'Save policy' })).toHaveCount(0);
       await shot(reader, info, 'data-policies-member');
@@ -141,6 +139,8 @@ test.describe('MIG-254: Administration › Data policies', () => {
   test('the AI Assistant names the policy it works under', async ({ browser, request }) => {
     const page = await pageAs(browser, await sessionOf(request, tokenFor('admin')!));
     await page.goto('/ai/assistant');
+    // The policy is in the Result's Context tab.
+    await page.getByRole('tab', { name: 'Context' }).click();
     const context = page.locator('[data-context]');
     await expect(context).not.toContainText('None configured');
     await expect(context.getByRole('link', { name: /Saved|Partly saved|Defaults \(not saved\)/ })).toHaveAttribute('href', '/administration/data-policies');

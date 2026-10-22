@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { provideZonelessChangeDetection, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { HttpClient } from '@angular/common/http';
+import { WorkspaceDirectory } from '../../../core/workspaces/workspace-directory';
 import { Dialog } from '@angular/cdk/dialog';
 import { provideRouter } from '@angular/router';
 import { of, Subject } from 'rxjs';
@@ -34,7 +34,8 @@ function stubApi(overrides: Partial<Record<keyof ApiCollectionsApi, unknown>> = 
   };
 }
 
-function screenWith(opts: { admin?: boolean; platform?: boolean; api?: ReturnType<typeof stubApi>; confirm?: boolean } = {}) {
+/** `platform`: as a platform administrator, with the workspace this session picked last (null: none yet). */
+function screenWith(opts: { admin?: boolean; platform?: { remembered: number | null }; api?: ReturnType<typeof stubApi>; confirm?: boolean } = {}) {
   const api = opts.api ?? stubApi();
   const toast = { success: vi.fn(), error: vi.fn() };
   const opened: { component: unknown; data: unknown }[] = [];
@@ -51,11 +52,11 @@ function screenWith(opts: { admin?: boolean; platform?: boolean; api?: ReturnTyp
       provideZonelessChangeDetection(),
       provideRouter([]),
       { provide: ApiCollectionsApi, useValue: api },
-      { provide: HttpClient, useValue: { get: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [{ tenantId: 2924, tenantName: 'Claude Demo' }] })) } },
+      ...(opts.platform ? [{ provide: WorkspaceDirectory, useValue: { picks: () => true, remembered: () => opts.platform!.remembered } }] : []),
       { provide: Dialog, useValue: dialog },
       { provide: ToastService, useValue: toast },
       { provide: AuthService, useValue: {
-        isTenantAdmin: () => opts.admin ?? true, canBuild: () => opts.admin ?? true, builderLocked: () => false, isPlatformAdmin: () => opts.platform ?? false, user: signal({ appUserId: 4537 }),
+        isTenantAdmin: () => opts.admin ?? true, canBuild: () => opts.admin ?? true, builderLocked: () => false, isPlatformAdmin: () => !!opts.platform, isManagedSession: () => false, user: signal({ appUserId: 4537 }),
       } },
     ],
   });
@@ -69,7 +70,7 @@ describe('API Collections list -- reading', () => {
     const { api } = screenWith();
     const screen = TestBed.runInInjectionContext(() => new ApiCollections());
     screen.ngOnInit();
-    expect(api.list).toHaveBeenCalledWith('', 1, 50);
+    expect(api.list).toHaveBeenCalledWith('', 1, 50, null);
     expect(screen.rows().map(r => r.collectionId)).toEqual([1000, 1001]);
     expect(screen.total()).toBe(2);
     const tiles = Object.fromEntries(screen.kpis().map(k => [k.label, k.value]));
@@ -85,7 +86,7 @@ describe('API Collections list -- reading', () => {
     screen.onSearch('cli');
     screen.onSearch('clinic');
     vi.advanceTimersByTime(400);
-    expect(api.list).toHaveBeenLastCalledWith('clinic', 1, 50);
+    expect(api.list).toHaveBeenLastCalledWith('clinic', 1, 50, null);
     expect(api.list).toHaveBeenCalledTimes(3);
   });
 
@@ -105,11 +106,43 @@ describe('API Collections list -- reading', () => {
     expect(screen.loading()).toBe(false);
   });
 
-  it('names each workspace for a platform administrator', () => {
-    screenWith({ platform: true });
+});
+
+describe('API Collections list -- a platform administrator', () => {
+  it('asks for a workspace first and reads nothing', () => {
+    const { api } = screenWith({ platform: { remembered: null } });
     const screen = TestBed.runInInjectionContext(() => new ApiCollections());
     screen.ngOnInit();
-    expect(screen.filtered().map(r => r.tenantName)).toEqual(['Claude Demo', 'Claude Demo']);
+    expect(screen.needsWorkspace()).toBe(true);
+    expect(api.list).not.toHaveBeenCalled();
+  });
+
+  it('reads, makes, imports, changes and deletes in the workspace picked', async () => {
+    // The dialogs close with nothing here: a closed one with an answer would navigate.
+    const first = screenWith({ platform: { remembered: null }, confirm: false });
+    let screen = TestBed.runInInjectionContext(() => new ApiCollections());
+    screen.ngOnInit();
+    screen.pickWorkspace(2960);
+    expect(first.api.list).toHaveBeenCalledWith('', 1, 50, 2960);
+    screen.create();
+    screen.importFiles();
+    screen.edit(ROWS[0] as never);
+    expect(first.opened.map(o => (o.data as { tenantId?: number }).tenantId)).toEqual([2960, 2960, 2960]);
+    const { api } = screenWith({ platform: { remembered: 2960 } });
+    screen = TestBed.runInInjectionContext(() => new ApiCollections());
+    screen.ngOnInit();
+    screen.setStatus(ROWS[0] as never);
+    expect(api.saveCollection).toHaveBeenCalledWith(expect.objectContaining({ collectionId: ROWS[0].collectionId }), 2960);
+    await screen.remove(ROWS[0] as never);
+    expect(api.deleteCollection).toHaveBeenCalledWith(ROWS[0].collectionId, 2960);
+  });
+
+  it('opens on the workspace this session picked last', () => {
+    const { api } = screenWith({ platform: { remembered: 2960 } });
+    const screen = TestBed.runInInjectionContext(() => new ApiCollections());
+    screen.ngOnInit();
+    expect(screen.needsWorkspace()).toBe(false);
+    expect(api.list).toHaveBeenCalledWith('', 1, 50, 2960);
   });
 });
 
@@ -122,7 +155,7 @@ describe('API Collections list -- writing', () => {
     expect(api.version).not.toHaveBeenCalled();
     expect(api.saveCollection).toHaveBeenCalledWith({
       collectionId: 1000, name: 'LIVE-CHECK 0928 httpbin', description: 'MIG-227 live check', sensitivity: 'INTERNAL', status: 'Inactive',
-    });
+    }, null);
   });
 
   it('sends back the word the collection was given (MIG-243), not the level it is read as', () => {
@@ -130,10 +163,10 @@ describe('API Collections list -- writing', () => {
     const screen = TestBed.runInInjectionContext(() => new ApiCollections());
     screen.ngOnInit();
     screen.setStatus({ ...ROWS[0], sensitivity: 'sensitive', sensitivityLabel: 'PHI' });
-    expect(api.saveCollection).toHaveBeenCalledWith(expect.objectContaining({ sensitivity: 'PHI' }));
+    expect(api.saveCollection).toHaveBeenCalledWith(expect.objectContaining({ sensitivity: 'PHI' }), null);
     const { sensitivityLabel: _dropped, ...unlabelled } = ROWS[0];
     screen.setStatus({ ...unlabelled, sensitivity: 'internal' });
-    expect(api.saveCollection).toHaveBeenLastCalledWith(expect.objectContaining({ sensitivity: null }));
+    expect(api.saveCollection).toHaveBeenLastCalledWith(expect.objectContaining({ sensitivity: null }), null);
   });
 
   it('lists who still uses a collection the service would not delete', async () => {

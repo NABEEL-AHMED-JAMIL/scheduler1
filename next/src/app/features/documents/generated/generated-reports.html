@@ -2,7 +2,7 @@
   <app-page-header>
     <div class="page-head">
       <div>
-        <h1 class="page-title">Generated reports</h1>
+        <h1 class="page-title">Reports from pipelines</h1>
         <p class="page-subtitle">
           Documents and files made from your data: renders saved to a bucket, and what recent runs put out.
         </p>
@@ -34,7 +34,7 @@
       <div class="search-field w-72 max-w-full">
         <app-icon name="search" size="0.95em" />
         <input class="input" placeholder="Find by name, type or pipeline" aria-label="Find a report"
-               [value]="query()" (input)="query.set($any($event.target).value); pager.goTo(1, filtered().length)" />
+               [value]="query()" (input)="search($any($event.target).value)" />
       </div>
     </ng-container>
 

@@ -271,7 +271,7 @@ describe('Connector Hub model', () => {
     expect(scheduleText(15)).toBe('Every 15 min');
     expect(scheduleText(60)).toBe('Hourly');
     expect(scheduleText(1440)).toBe('Daily');
-    expect(lagText(4)).toBe('4 s');
+    expect(lagText(4)).toBe('4 sec');
     expect(lagText(720)).toBe('12 min');
     expect(lagText(null)).toBe('—');
     // A naive time is Chicago wall-clock (instantOf): 23:51:30 Chicago is 04:51:30Z.

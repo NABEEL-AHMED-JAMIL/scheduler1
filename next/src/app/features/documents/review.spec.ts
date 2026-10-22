@@ -106,7 +106,7 @@ async function screenWith(opts: { api?: ReturnType<typeof stubApi>; dialogAnswer
       { provide: DocumentsApi, useValue: api },
       { provide: Dialog, useValue: dialog },
       { provide: ToastService, useValue: toast },
-      { provide: AuthService, useValue: { user: signal({ appUserId: 4537 }) } },
+      { provide: AuthService, useValue: { user: signal({ appUserId: 4537, tenantId: 2924 }) } },
     ],
   });
   const router = TestBed.inject(Router);
@@ -175,9 +175,11 @@ describe('DocumentReview -- reading', () => {
   });
 
   it('says so when the document cannot be read', async () => {
-    const api = stubApi(INVOICE, { review: vi.fn(() => throwError(() => new HttpErrorResponse({ status: 404, error: { status: 'ERROR', message: 'No extraction 1005.' } }))) });
+    // A 404 is "not here" (ZT-D10); a document the service cannot read now says the service's words, with a retry.
+    const api = stubApi(INVOICE, { review: vi.fn(() => throwError(() => new HttpErrorResponse({ status: 503, error: { status: 'ERROR', message: 'Document Intelligence is not answering.' } }))) });
     const { el } = await screenWith({ api });
-    expect(el.querySelector('[role="alert"]')?.textContent).toContain('No extraction 1005.');
+    expect(el.querySelector('[role="alert"]')?.textContent).toContain('Document Intelligence is not answering.');
+    expect(el.querySelector('[role="alert"]')?.textContent).toContain('Try again');
   });
 });
 
@@ -361,6 +363,64 @@ describe('DocumentReview -- corrections and decisions', () => {
     expect(el.textContent).toContain('Let go');
     screen.claim();
     expect(api.unclaim).toHaveBeenCalledWith(1005);
+  });
+});
+
+describe('DocumentReview -- zero-tolerance documents (ZT-D)', () => {
+  it('ZT-D1: names an uploaded document by the file it arrived as, not its stored key ("original.pdf")', async () => {
+    const api = stubApi(INVOICE, { read: vi.fn(() => ok({ ocrDocumentId: 1001, sourceBucket: 'etl-documents',
+      sourceKey: 'ocr/2960/1067/original.pdf', originalName: 'referral-ZT-R2001.pdf', status: 'Done', pageCount: 1 })) });
+    const { el } = await screenWith({ api });
+    expect(el.querySelector('h1')?.textContent?.trim()).toBe('referral-ZT-R2001.pdf');
+  });
+
+  it('ZT-D2: says approved values go to Documents › Approved data, the tab\'s name', async () => {
+    const { el } = await screenWith();
+    expect(el.textContent).toContain('Documents › Approved data');
+    expect(el.textContent).not.toContain('Document Intelligence › Dataset');
+  });
+
+  it('ZT-D7: ends a rejection whose reason ends its sentence with one full stop', async () => {
+    const rejected = { ...CORRECTED, status: 'Rejected', reviewedBy: 99, reviewedByName: 'Sam Reviewer', dateReviewed: '2026-09-29T05:04:08.939+00:00',
+      rejectReason: 'PO-77113 is not an open purchase order.' };
+    const { el } = await screenWith({ api: stubApi(rejected) });
+    const note = el.querySelector('[data-test="view-only"]')?.textContent ?? '';
+    expect(note).toContain('“PO-77113 is not an open purchase order.” This view is read-only.');
+    const { el: plain } = await screenWith({ api: stubApi({ ...rejected, rejectReason: 'Blurred' }) });
+    expect(plain.querySelector('[data-test="view-only"]')?.textContent).toContain('“Blurred”. This view is read-only.');
+  });
+});
+
+describe('DocumentReview -- a link that is not here (ZT-D10)', () => {
+  it('says a document another workspace\'s link names is not here, with the way back and no retry', async () => {
+    const api = stubApi(INVOICE, { review: vi.fn(() => throwError(() => new HttpErrorResponse({ status: 404,
+      error: { status: 'ERROR', message: 'No extraction 1185.' } }))) });
+    const { el } = await screenWith({ api });
+    expect(el.querySelector('[data-test="document-missing"]')?.textContent).toContain('This document isn\'t here');
+    expect(el.querySelector('[data-test="document-missing"] a')?.getAttribute('href')).toBe('/review/documents');
+    expect(el.textContent).not.toContain('No extraction 1185.');
+    expect(el.textContent).not.toContain('Try again');
+    expect(el.querySelector('h1')?.textContent?.trim()).toBe('Document not found');
+  });
+});
+
+describe('DocumentReview -- a sign-in with no workspace (ZT-D11)', () => {
+  it('a platform administrator\'s own sign-in reviews no workspace\'s document here, and makes no call', async () => {
+    const api = stubApi();
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [provideZonelessChangeDetection(), provideRouter([]),
+        { provide: ActivatedRoute, useValue: { paramMap: of(convertToParamMap({ extractionId: '1185' })) } },
+        { provide: DocumentsApi, useValue: api }, { provide: Dialog, useValue: { openDialogs: [], open: vi.fn() } },
+        { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn(), info: vi.fn() } },
+        { provide: AuthService, useValue: { user: signal({ appUserId: 4639, tenantId: null }) } }],
+    });
+    const fixture = TestBed.createComponent(DocumentReview);
+    await fixture.whenStable();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.textContent).toContain('Documents are a workspace\'s, and this sign-in has none.');
+    expect(api.review).not.toHaveBeenCalled();
+    expect(api.read).not.toHaveBeenCalled();
   });
 });
 

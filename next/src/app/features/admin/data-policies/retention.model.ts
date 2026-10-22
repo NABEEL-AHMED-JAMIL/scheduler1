@@ -2,7 +2,7 @@ import { formatSize } from '../../../shared/ui/format-size';
 
 /** MIG-354: the classes of a workspace's data a retention policy keeps for a number of days. */
 export type DataClassKey = 'RUN_OUTPUTS' | 'RUN_LOGS' | 'FILES' | 'DOCUMENTS' | 'FORM_SUBMISSIONS' | 'AI_CONVERSATIONS' | 'NOTIFICATIONS'
-  | 'ANALYTICS' | 'AUDIT';
+  | 'REPORTS' | 'ANALYTICS' | 'AUDIT';
 
 /** Days per class; null keeps it forever. */
 export type ClassDays = Partial<Record<DataClassKey, number | null>>;

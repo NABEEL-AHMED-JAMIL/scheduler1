@@ -8,6 +8,7 @@ import { KafkaTlsSection } from './kafka-tls-section';
 import { KafkaSecret, KafkaSecretKind, KafkaSecretService } from './kafka-secret.service';
 import { KafkaProfile } from './kafka-connections';
 import { profilePayload } from './kafka-profile-form';
+import { AuthService } from '../../../core/auth/auth.service';
 
 /**
  * The upload flow, exercised through the rendered section.
@@ -89,12 +90,15 @@ class Host {
   });
 }
 
-function render(setUp: (host: Host) => void = () => {}) {
+function render(setUp: (host: Host) => void = () => {}, platformAdmin = false) {
   TestBed.resetTestingModule();
   const secrets = new FakeSecretService();
   const fixture = TestBed.configureTestingModule({
     imports: [Host],
-    providers: [{ provide: KafkaSecretService, useValue: secrets }],
+    providers: [
+      { provide: KafkaSecretService, useValue: secrets },
+      { provide: AuthService, useValue: { isPlatformAdmin: signal(platformAdmin) } },
+    ],
   }).createComponent(Host);
   setUp(fixture.componentInstance);
   fixture.detectChanges();
@@ -645,5 +649,29 @@ describe('what the screen says about the files', () => {
     // The section header plus one on each of the two cards, which is the point: "Required" above
     // a pair of cards says nothing about whether both of them are.
     expect(required).toHaveLength(3);
+  });
+});
+
+describe('switching the hostname check off', () => {
+  // Vulnerabilities review 2026-10-13, C5: Core refuses it from anyone but a platform administrator.
+  const options = (fixture: { nativeElement: HTMLElement }) =>
+    Array.from(fixture.nativeElement.querySelectorAll('#sslEndpointIdentificationAlgorithm option'))
+      .map(o => (o as HTMLOptionElement).textContent!.trim());
+
+  it('is not offered to a workspace administrator, and says who can', () => {
+    const { fixture, text } = render();
+    expect(options(fixture)).toEqual(['Verify the hostname (recommended)']);
+    expect(text()).toContain('Only a platform administrator can switch the hostname check off.');
+  });
+
+  it('is offered to a platform administrator', () => {
+    const { fixture, text } = render(() => {}, true);
+    expect(options(fixture)).toEqual(['Verify the hostname (recommended)', 'Skip the check']);
+    expect(text()).not.toContain('Only a platform administrator can switch the hostname check off.');
+  });
+
+  it('still shows a profile that was saved with the check off', () => {
+    const { fixture } = render(host => host.profile.set({ sslEndpointIdentificationAlgorithm: '' } as KafkaProfile));
+    expect(options(fixture)).toContain('Skip the check');
   });
 });

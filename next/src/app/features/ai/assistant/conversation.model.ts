@@ -222,6 +222,20 @@ export function relativeTime(text: string | null | undefined, now: Date, timeZon
   return `${Number(day)} ${month}`;
 }
 
+/**
+ * A row's time under its day group's header (owner 2026-10-13: every row said "Yesterday" under YESTERDAY). The header
+ * already names the day, so a row says the time: Today keeps "now" / "5 min" / "14:05", Yesterday says "14:05", This
+ * week "Thu 14:05", Older the date ("3 Oct"). Pinned has no day header, so its rows keep the relative time.
+ */
+export function rowTime(text: string | null | undefined, group: ListGroup['id'], now: Date, timeZone: string): string {
+  if (group === 'pinned' || group === 'today' || group === 'older') return relativeTime(text, now, timeZone);
+  const at = instantOf(text);
+  if (!at) return '';
+  const clock = new Intl.DateTimeFormat('en-GB', { timeZone, hour: '2-digit', minute: '2-digit', hour12: false }).format(at);
+  if (group === 'yesterday') return clock;
+  return `${new Intl.DateTimeFormat('en-GB', { timeZone, weekday: 'short' }).format(at)} ${clock}`;
+}
+
 /** The console's month names (time-format.ts writes "24 Sep 2026"; ICU's en-GB now says "Sept"). */
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 

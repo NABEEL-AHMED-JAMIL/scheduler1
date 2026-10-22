@@ -15,9 +15,14 @@
 
   <!-- UX review 2026-10-12 (D1): what waits for the reader's review, first, with the way there. -->
   <app-waiting-for-review />
+  <!-- MIG-420: the recent runs whose items failed, with the way to them and Retry. -->
+  <app-needs-attention />
 
   <!-- MIG-324: a new workspace's way to its first run, until one has completed. -->
   <app-get-started />
+
+  <!-- Owner 2026-10-20: the way to the console's main parts, named and gated as the menu has them. -->
+  <app-quick-links />
 
   @if (error()) {
     <!-- Every read was refused for the same reason (a date the server will not take): one
@@ -87,14 +92,18 @@
         <div class="card p-4">
           <div class="flex flex-wrap items-baseline gap-2 mb-4">
             <h2 class="text-sm font-semibold">Runs by hour</h2>
-            <span class="text-xs text-[color:var(--text-muted)]">
-              Click any cell to see which schedules ran in that hour
+            <span class="text-xs text-[color:var(--text-muted)]" data-test="heat-hint">
+              @if (ownSignIn()) {
+                Which schedules ran in an hour shows in a workspace's "Work in this workspace"
+              } @else {
+                Click any cell to see which schedules ran in that hour
+              }
             </span>
           </div>
           @if (errors().hourly; as reason) {
             <app-load-error [message]="reason" (retry)="retry('hourly')" />
           } @else {
-            <app-heatmap [data]="heatCells()" [selected]="selectedHeat()" (cellClicked)="onHeatCell($event)" />
+            <app-heatmap [data]="heatCells()" [selected]="selectedHeat()" [interactive]="!ownSignIn()" (cellClicked)="onHeatCell($event)" />
           }
         </div>
       </div>

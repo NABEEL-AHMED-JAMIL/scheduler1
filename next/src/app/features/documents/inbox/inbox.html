@@ -1,11 +1,13 @@
-<div class="page">
-  <!-- UX review B4 (IN1): one place for the settings -- the Settings card beside the upload, with its own Change. -->
-  <app-page-header title="File drop"
-                   subtitle="Upload files for this workspace's pipelines. Each file is checked, stored in the workspace's bucket, and starts every schedule set to start when a matching file arrives.">
-    @if (!noWorkspace()) {
-      <app-refresh-button [loading]="loading()" (refresh)="load()" />
-    }
-  </app-page-header>
+<div [class.page]="!embedded" [class.space-y-5]="embedded">
+  @if (!embedded) {
+    <!-- UX review B4 (IN1): one place for the settings -- the Settings card beside the upload, with its own Change. -->
+    <app-page-header title="File drop"
+                     subtitle="Upload files for this workspace's pipelines. Each file is checked, stored in the workspace's bucket, and starts every schedule set to start when a matching file arrives.">
+      @if (!noWorkspace()) {
+        <app-refresh-button [loading]="loading()" (refresh)="load()" />
+      }
+    </app-page-header>
+  }
   <app-managed-banner what="file drop settings" />
 
   @if (noWorkspace()) {
@@ -30,7 +32,11 @@
       <section class="card p-4 lg:col-span-2 flex flex-col gap-3 min-w-0" aria-labelledby="inboxUploadHeading">
         <div class="flex flex-wrap items-baseline justify-between gap-2">
           <h2 id="inboxUploadHeading" class="text-base font-semibold">Upload</h2>
-          <p class="text-xs text-[color:var(--text-muted)]">{{ capText() }}</p>
+          <div class="flex items-center gap-2">
+            <p class="text-xs text-[color:var(--text-muted)]">{{ capText() }}</p>
+            <!-- As a section of Intake the page has no header of its own: its refresh is here. -->
+            @if (embedded) { <app-refresh-button [loading]="loading()" (refresh)="load()" /> }
+          </div>
         </div>
         <app-file-dropzone [multiple]="true" [disabled]="settings()?.connectionActive === false"
                            prompt="Drop files here" hint="Several at once is fine: they are sent one by one."

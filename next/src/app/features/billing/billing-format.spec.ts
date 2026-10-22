@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { BYTES_PER_GB, addMoney, formatTotals, daysOverdue, formatBytes, formatMoney, formatMoneyRound, formatQuantity, formatUnitPrice, localIsoDate, moneyDigits, monthShort, pluralUnit, priceDigits, shiftDay, workspaceLabels, yearMonth } from './billing-format';
+import { BYTES_PER_GB, addMoney, formatTotals, daysOverdue, formatBytes, formatMoney, formatMoneyCell, formatMoneyExact, formatMoneyRound, formatQuantity, formatUnitPrice, localIsoDate, moneyDigits, monthShort, pluralUnit, priceDigits, shiftDay, workspaceLabels, yearMonth, zonedStamp } from './billing-format';
 
 /** The one way billing figures read, on every billing screen. */
 describe('billing-format', () => {
@@ -53,7 +53,7 @@ describe('billing-format', () => {
     expect(formatBytes(0)).toBe('0 B');
     expect(formatQuantity(131000000000, 'byte')).toBe('122 GB');
     expect(formatQuantity(0.5, 'GB-hour')).toBe('21.33 MB · day');
-    expect(formatQuantity(0.3, 'minute')).toBe('18 s');
+    expect(formatQuantity(0.3, 'minute')).toBe('18 sec');
     expect(formatQuantity(16596, 'token')).toBe('16,596');
     expect(formatQuantity(0.005, 'run')).toBe('0.005');
   });
@@ -128,5 +128,21 @@ describe('workspaceLabels', () => {
     expect(shiftDay('2027-01-01', -1)).toBe('2026-12-31');
     expect(shiftDay('2026-03-08', 1)).toBe('2026-03-09');
     expect(shiftDay('2026-10-06T23:30:00Z', -1)).toBe('2026-10-06T23:30:00Z');
+  });
+
+  // Cost & usage redesign (2026-10-19): a run's cost reads in cents, "<$0.01" under a cent, the exact figure on its tooltip.
+  it('writes a cell in cents, a real amount under a cent as <$0.01, and the exact amount to the fifth place', () => {
+    expect(formatMoneyCell(0.82)).toBe('$0.82');
+    expect(formatMoneyCell(0.002)).toBe('<$0.01');
+    expect(formatMoneyCell(0)).toBe('$0.00');
+    expect(formatMoneyCell(0.005)).toBe('<$0.01');
+    expect(formatMoneyCell(0.01)).toBe('$0.01');
+    expect(formatMoneyExact(0.002)).toBe('$0.00200');
+  });
+
+  it('stamps an instant 24-hour in the workspace\'s zone, not the browser\'s', () => {
+    // 00:26 UTC on the 20th is 19:26 on the 19th in Chicago.
+    expect(zonedStamp(new Date('2026-10-20T00:26:00Z'), 'America/Chicago')).toBe('19 Oct, 19:26');
+    expect(zonedStamp(new Date('2026-10-20T00:26:00Z'), 'UTC')).toBe('20 Oct, 00:26');
   });
 });

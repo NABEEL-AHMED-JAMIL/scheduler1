@@ -17,14 +17,14 @@ describe('StatStrip', () => {
 
   describe('rendering', () => {
     it('draws one list item per tile with its label and value', () => {
-      const { host, cells } = render([{ label: 'Runs', value: 12 }, { label: 'Average', value: '4m 2s' }]);
+      const { host, cells } = render([{ label: 'Runs', value: 12 }, { label: 'Average', value: '4 min 2 sec' }]);
       expect(host.getAttribute('role')).toBe('list');
       expect(host.classList).toContain('stat-strip');
       expect(cells.length).toBe(2);
       expect(cells.every(c => c.getAttribute('role') === 'listitem')).toBe(true);
       expect(cells[0].querySelector('.stat-strip-value')!.textContent!.trim()).toBe('12');
       expect(cells[0].querySelector('.stat-strip-label')!.textContent!.trim()).toBe('Runs');
-      expect(cells[1].querySelector('.stat-strip-value')!.textContent!.trim()).toBe('4m 2s');
+      expect(cells[1].querySelector('.stat-strip-value')!.textContent!.trim()).toBe('4 min 2 sec');
     });
 
     it('puts the label before the value in the DOM, so it is read "Runs, 12"', () => {

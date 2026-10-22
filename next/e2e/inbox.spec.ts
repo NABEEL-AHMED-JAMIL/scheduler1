@@ -64,8 +64,10 @@ test.describe('Inbox (live storage-service)', () => {
 
   test('shows the configured inbox, its limit and its arrivals', async ({ browser, request }, info) => {
     const page = await signedIn(browser, request);
-    await page.goto('/documents/file-drop');
-    await expect(page.getByRole('heading', { name: 'Inbox', level: 1 })).toBeVisible();
+    await page.goto('/documents/intake/file-drop');
+    // The inbox is Documents › Intake › File drop since 2026-10-20 (§0.1).
+    await expect(page.getByRole('heading', { name: 'Intake', level: 1 })).toBeVisible();
+    await expect(page.locator('[data-test="intake-sections"] [aria-current="page"]')).toHaveText('File drop');
     await expect(page.getByText(label).first()).toBeVisible();
     await expect(page.getByText(/Up to \d+ MB a file/).first()).toBeVisible();
     // The newest arrival the service reports, whatever put it there: a fixed name (live-customers.csv) fell off the
@@ -79,7 +81,7 @@ test.describe('Inbox (live storage-service)', () => {
 
   test('uploads a small JSON file and lists it', async ({ browser, request }, info) => {
     const page = await signedIn(browser, request);
-    await page.goto('/documents/file-drop');
+    await page.goto('/documents/intake/file-drop');
     const name = `E2E-inbox-${Date.now()}.json`;
     uploaded.push(name);
     await page.locator('app-file-dropzone input[type=file]').setInputFiles({
@@ -96,13 +98,24 @@ test.describe('Inbox (live storage-service)', () => {
 
   test('shows the service\'s refusal for an executable, word for word', async ({ browser, request }, info) => {
     const page = await signedIn(browser, request);
-    await page.goto('/documents/file-drop');
+    await page.goto('/documents/intake/file-drop');
+    // The service's answer, read as it passes (route.fetch + fulfill: the real service answers, nothing is faked). Reading
+    // it from a waitForResponse raced the page, which had already taken the body (final-regression 10-20).
+    let refusal = '';
+    await page.route('**/storage.json/inbox/upload', async route => {
+      const response = await route.fetch();
+      refusal = (await response.json().catch(() => ({})))?.message ?? '';
+      await route.fulfill({ response });
+    });
     await page.locator('app-file-dropzone input[type=file]').setInputFiles({
       name: 'E2E-evil.exe', mimeType: 'application/octet-stream', buffer: Buffer.from('MZ not really a program'),
     });
+    // The service's own words (platform-commons' InboxFileCheck since MIG-406), and the page shows exactly those.
+    await expect.poll(() => refusal, { timeout: 15_000 }).not.toBe('');
+    expect(refusal).toBe('\'E2E-evil.exe\': .exe files are not accepted.');
     const row = page.getByRole('list', { name: 'Uploads' }).locator('li').filter({ hasText: 'E2E-evil.exe' });
     await expect(row).toHaveAttribute('data-state', 'refused');
-    await expect(row.getByRole('alert')).toHaveText('\'E2E-evil.exe\': .exe files are not accepted in the inbox.');
+    await expect(row.getByRole('alert')).toHaveText(refusal);
     await expect(page.getByRole('table').getByText('E2E-evil.exe')).toHaveCount(0);
     await shot(page, info, 'inbox-refused');
   });
@@ -110,10 +123,10 @@ test.describe('Inbox (live storage-service)', () => {
   test('the settings dialog opens, and Cancel changes nothing', async ({ browser, request }, info) => {
     const page = await signedIn(browser, request);
     const writes = settingsWrites(page);
-    await page.goto('/documents/file-drop');
-    await page.getByRole('button', { name: 'Inbox settings' }).click();
+    await page.goto('/documents/intake/file-drop');
+    await page.getByRole('region', { name: 'Settings' }).getByRole('button', { name: 'Change' }).click();
     const dialog = page.getByRole('dialog');
-    await expect(dialog.getByRole('heading', { name: 'Inbox settings' })).toBeVisible();
+    await expect(dialog.getByRole('heading', { name: 'File drop settings' })).toBeVisible();
     await expect(dialog.getByLabel(/Storage connection/)).toHaveValue(riverside().storageAlias);
     await expect(dialog.getByRole('button', { name: 'Turn off' })).toBeVisible();
     await shot(page, info, 'inbox-settings');
@@ -125,7 +138,7 @@ test.describe('Inbox (live storage-service)', () => {
 
   test('a phone stacks upload, settings and arrivals', async ({ browser, request }, info) => {
     const page = await signedIn(browser, request, 390);
-    await page.goto('/documents/file-drop');
+    await page.goto('/documents/intake/file-drop');
     await expect(page.getByRole('heading', { name: 'Upload' })).toBeVisible();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(0);

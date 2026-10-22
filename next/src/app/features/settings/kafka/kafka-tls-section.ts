@@ -6,6 +6,7 @@ import {
   ControlContainer, FormGroup, FormGroupDirective, ReactiveFormsModule, Validators,
 } from '@angular/forms';
 import { API_SUCCESS } from '../../../core/api/api.config';
+import { AuthService } from '../../../core/auth/auth.service';
 import { Field } from '../../../shared/ui/field';
 import { Icon } from '../../../shared/ui/icon';
 import { ToastService } from '../../../shared/ui/toast.service';
@@ -355,9 +356,18 @@ const STORE_FIELDS: Record<'truststore' | 'keystore', StoreFields> = {
               <select id="sslEndpointIdentificationAlgorithm" class="input"
                       formControlName="sslEndpointIdentificationAlgorithm">
                 <option [value]="verifyHostname">Verify the hostname (recommended)</option>
-                <option [value]="skipHostnameCheck">Skip the check</option>
+                @if (canSkipHostnameCheck()) {
+                  <option [value]="skipHostnameCheck">Skip the check</option>
+                }
               </select>
             </app-field>
+
+            @if (!canSkipHostnameCheck()) {
+              <p class="field-note flex items-start gap-1.5 sm:col-span-2">
+                <app-icon name="info" size="0.9em" class="mt-px shrink-0" />
+                <span>Only a platform administrator can switch the hostname check off.</span>
+              </p>
+            }
 
             @if (form().get('sslEndpointIdentificationAlgorithm')?.value === skipHostnameCheck) {
               <p class="field-note text-warn-500 flex items-start gap-1.5 sm:col-span-2">
@@ -507,6 +517,14 @@ export class KafkaTlsSection implements OnInit {
 
   private readonly secrets = inject(KafkaSecretService);
   private readonly toast = inject(ToastService);
+  private readonly auth = inject(AuthService);
+
+  /**
+   * Switching the hostname check off is a platform administrator's call (vulnerabilities review 2026-10-13, C5; Core
+   * refuses it from anyone else). A profile already saved that way still shows its setting.
+   */
+  readonly canSkipHostnameCheck = computed(() => this.auth.isPlatformAdmin()
+    || this.profile()?.sslEndpointIdentificationAlgorithm === SKIP_HOSTNAME_CHECK);
 
   readonly verifyHostname = VERIFY_HOSTNAME;
   readonly skipHostnameCheck = SKIP_HOSTNAME_CHECK;

@@ -35,6 +35,12 @@ export interface ManagedAction {
   builderAction?: boolean;
   correlationId?: string | null;
   createdAt?: string | null;
+  /**
+   * ZT-A12 follow-up (owner 2026-10-21): a data read in a managed session -- what was opened, exported or downloaded
+   * ("board", "run output", ...) and which one ("41", "8913:csv"). Both null on a change.
+   */
+  readKind?: string | null;
+  readId?: string | number | null;
 }
 
 export interface ActionsPage extends ApiResponse<ManagedAction[]> {
@@ -46,7 +52,12 @@ export interface ActionsQuery {
   appUserId?: number | null;
   beforeId?: number | null;
   limit?: number;
+  /** Only the data reads, or only the changes; both when left out (Identity's `kind`). */
+  kind?: ActivityKind | null;
 }
+
+/** Identity's `?kind=` on the managed-service activity: `reads` or `changes` (both by default). */
+export type ActivityKind = 'reads' | 'changes';
 
 /** A person as appUser.json/listUsers returns them: enough to pick a staff member. */
 export interface StaffCandidate {
@@ -98,6 +109,7 @@ export class ManagedServiceApi {
     if (query.appUserId) params = params.set('appUserId', query.appUserId);
     if (query.beforeId) params = params.set('beforeId', query.beforeId);
     if (query.limit) params = params.set('limit', query.limit);
+    if (query.kind) params = params.set('kind', query.kind);
     return this.http.get<ActionsPage>(`${this.base}/actions`, { params });
   }
 

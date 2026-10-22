@@ -105,9 +105,9 @@ describe('Run history stat strips', () => {
       { jobQueueId: 3, jobId: 41, jobStatus: 'Failed', startTime: at(0), endTime: at(3700 - 0) },
     ] as any[]);
     expect(h.durationTiles()).toEqual([
-      { label: 'Fastest', value: '5s' },
-      { label: 'Median',  value: '1m 30s' },
-      { label: 'Slowest', value: '1h 2m' },
+      { label: 'Fastest', value: '5 sec' },
+      { label: 'Median',  value: '1 min 30 sec' },
+      { label: 'Slowest', value: '1 h 2 min' },
     ]);
   });
 
@@ -196,5 +196,45 @@ describe('Run history and assistant dock on a phone', () => {
     expect(button).toContain('aria-label="Ask about this schedule"');
     expect(button).toMatch(/<span class="hidden sm:inline">Ask about this schedule<\/span>/);
     expect(button).toMatch(/<span class="sm:hidden">Ask<\/span>/);
+  });
+});
+
+describe('JobHistory -- what started a run (ZT-P15)', () => {
+  it('says a form, a backfill and the timetable in words that read', () => {
+    const component = history();
+    expect(component.triggerWord('form')).toBe('started by a form submitted');
+    expect(component.triggerWord('backfill')).toBe('started by a backfill');
+    expect(component.triggerWord('workflow')).toBe('started by a workflow');
+    expect(component.triggerWord('schedule')).toBe('started by its timetable');
+  });
+});
+
+/**
+ * MIG-416 (the browser budget, CLS 0.29 at 1024): the review list above, the facets and the runs answered at different
+ * times and each pushed the explorer down. It is drawn once all three have answered, and stays drawn.
+ */
+describe('Runs explorer drawn once, when its parts have answered (MIG-416)', () => {
+  it('waits for the runs, the facets and the review list, then never hides again', () => {
+    posts.length = 0;
+    const h = history({});
+    TestBed.tick();
+    expect(h.explorerReady()).toBe(false);
+    h.load();
+    TestBed.tick();
+    expect(h.loading()).toBe(false);
+    expect(h.facetsSettled()).toBe(true);
+    expect(h.explorerReady()).toBe(false);
+    h.reviewSettled.set(true);
+    TestBed.tick();
+    expect(h.explorerReady()).toBe(true);
+    h.loading.set(true);
+    TestBed.tick();
+    expect(h.explorerReady()).toBe(true);
+  });
+
+  it('is never held on a schedule\'s own runs, which have no review list or facets', () => {
+    const h = history({ jobId: '41' });
+    TestBed.tick();
+    expect(h.explorerReady()).toBe(true);
   });
 });

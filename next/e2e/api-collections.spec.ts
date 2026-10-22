@@ -1,5 +1,5 @@
 import { test, expect, Browser, Page, Response } from '@playwright/test';
-import { canSignIn, NEEDS, Session, sessionFor } from './support/session';
+import { canSignIn, NEEDS, Session, sessionFor, pageWith } from './support/session';
 
 /**
  * MIG-247: API Collections end to end, as a workspace administrator -- create a collection, give it an
@@ -27,11 +27,8 @@ const IMPORT_ENV_SECRET = `e2e-import-env-${STAMP}`;
 const SECRETS = [SECRET, IMPORT_TOKEN, IMPORT_ENV_SECRET];
 
 async function pageAs(browser: Browser, s: Session): Promise<Page> {
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  await page.goto('/');
-  await page.evaluate(user => window.localStorage.setItem('etl_auth_user', JSON.stringify(user)), s.data);
-  return page;
+  // Seeded before the app loads (support/session.ts pageWith): a dead stored session can no longer sign it out.
+  return pageWith(browser, s.data);
 }
 
 /** Every gateway response whose body holds one of the secrets: must stay empty. */

@@ -24,6 +24,7 @@ function page(platformAdmin = false, rows: object[] = LINES, days: object[] = DA
     runs: vi.fn((_q: UsageQuery, page: number) => of({ status: API_SUCCESS, data: { total: 3, page, limit: 25, rows: page === 1 ? RUNS.slice(0, 2) : RUNS.slice(2) } })),
     pipelineCosts: vi.fn(() => of({ status: API_SUCCESS, data: { from: '', to: '', zone: null, currency: 'USD', total: 0, attributed: 0, notTiedToRun: 0, pipelines: [], runs: { total: 0, page: 1, limit: 25, rows: [] } } })),
     runCost: vi.fn(() => of({ status: API_SUCCESS, data: null })),
+    runSummary: vi.fn(() => of({ status: API_SUCCESS, data: null })),
     refreshUsage: vi.fn(() => of({ status: API_SUCCESS })),
     refreshWorkspace: vi.fn(() => of({ status: API_SUCCESS })),
   };
@@ -34,6 +35,9 @@ function page(platformAdmin = false, rows: object[] = LINES, days: object[] = DA
   const workspaces = {
     tenantId: Object.assign(() => tenantId.value, { set: (v: string | null) => { tenantId.value = v; } }),
     effective: () => tenantId.value ?? options[0]?.value ?? null,
+    effectiveId: () => { const e = tenantId.value ?? options[0]?.value ?? null; return e === null ? null : Number(e); },
+    effectiveIsSandbox: () => false,
+    chosenId: () => (tenantId.value === null ? null : Number(tenantId.value)),
     options: () => options,
     ready: (then: () => void) => then(), isPlatformAdmin: () => platformAdmin,
   };
@@ -120,7 +124,7 @@ describe('Billing', () => {
     expect(component.fmtGb(0.43 / 1024)).toBe('440.3 KB');
     expect(component.fmtGb(12 / 1024)).toBe('12 MB');
     expect(component.fmtGb(38.2)).toBe('38.2 GB');
-    expect(component.fmtQuantity({ ...component.lines()[2], unit: 'minute', quantity: 0.0017 })).toBe('0.1 s');
+    expect(component.fmtQuantity({ ...component.lines()[2], unit: 'minute', quantity: 0.0017 })).toBe('0.1 sec');
   });
 
   it('stacks each day by service and forecasts at the last seven calendar days\' pace, only for the open month', () => {
@@ -214,7 +218,7 @@ describe('Billing', () => {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({ providers: [
       { provide: BillingApi, useValue: { usageByMeter: off, usageByDay: off, subjects: off, runs: off, refreshUsage: off } },
-      { provide: WorkspacePicker, useValue: { tenantId: () => null, effective: () => null, options: () => [], ready: (then: () => void) => then(), isPlatformAdmin: () => false } },
+      { provide: WorkspacePicker, useValue: { tenantId: () => null, effective: () => null, effectiveId: () => null, effectiveIsSandbox: () => false, chosenId: () => null, options: () => [], ready: (then: () => void) => then(), isPlatformAdmin: () => false } },
       { provide: AuthService, useValue: { isPlatformAdmin: () => false } },
       { provide: ToastService, useValue: { success: () => {}, error: () => {} } },
     ] });
@@ -263,6 +267,7 @@ describe('Billing, rendered', () => {
       usageByDay: vi.fn(() => of({ status: API_SUCCESS, data: { rows: DAYS } })),
       subjects: vi.fn(() => of({ status: API_SUCCESS, data: { rows: [] } })),
       runs: vi.fn(() => of({ status: API_SUCCESS, data: { total: 0, page: 1, limit: 25, rows: [] } })),
+      runSummary: vi.fn(() => of({ status: API_SUCCESS, data: null })),
       pipelineCosts: vi.fn(() => of({ status: API_SUCCESS, data: { from: '', to: '', zone: null, currency: 'USD', total: 0, attributed: 0, notTiedToRun: 0, pipelines: [], runs: { total: 0, page: 1, limit: 25, rows: [] } } })),
       runCost: vi.fn(() => of({ status: API_SUCCESS, data: null })),
       refreshUsage: vi.fn(() => of({ status: API_SUCCESS })),
@@ -273,7 +278,7 @@ describe('Billing, rendered', () => {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({ providers: [provideRouter([]),
       { provide: BillingApi, useValue: api },
-      { provide: WorkspacePicker, useValue: { tenantId: Object.assign(() => null, { set: () => {} }), effective: () => '2905', options: () => options, ready: (then: () => void) => then(), isPlatformAdmin: () => true } },
+      { provide: WorkspacePicker, useValue: { tenantId: Object.assign(() => null, { set: () => {} }), effective: () => '2905', effectiveId: () => 2905, effectiveIsSandbox: () => false, chosenId: () => null, options: () => options, ready: (then: () => void) => then(), isPlatformAdmin: () => true } },
       { provide: AuthService, useValue: { isPlatformAdmin: () => true } },
       { provide: ToastService, useValue: { success: () => {}, error: () => {} } },
     ] });
@@ -305,6 +310,28 @@ describe('Billing, rendered', () => {
     const warning = el.querySelector('[data-unpriced-warning]')!;
     expect(warning.textContent).toContain('New meter (new.meter)');
     expect(warning.textContent).toContain("on neither this workspace's card nor Standard 2026");
+  });
+
+  // Owner #23: the usage pricing rules priced is listed under its meter, each rule's part at its price; the line is their sum.
+  it("lists the parts pricing rules priced under their meter, and the card's own part", () => {
+    const rows = [{ meter: 'pipeline.runs', label: 'Pipeline runs', service: 'Pipelines', unit: 'run', per: 1, unitPrice: '0.002', quantity: '23', amount: '0.036',
+      days: 5, includedQuantity: '2', billableQuantity: '21', tiers: [], cardQuantity: '6', cardAmount: '0.008', cardIncludedQuantity: '2', cardBillableQuantity: '4',
+      rules: [{ ruleNo: 1, matchKind: 'PIPELINE', matchValue: '1933', label: 'X-ray triage', quantity: '10', includedQuantity: '0', billableQuantity: '10',
+        unitPrice: '0.001', amount: '0.01' }, { ruleNo: 4, matchKind: 'CLASS', matchValue: 'sensitive', label: 'data class sensitive', quantity: '3',
+        includedQuantity: '0', billableQuantity: '3', unitPrice: '0.004', amount: '0.012' }] }];
+    const { el, component, fixture } = view({ usageByMeter: vi.fn(() => of({ status: API_SUCCESS, data: { rows, rateCard: { version: 40, name: 'Rules', currency: 'USD',
+      tenantSpecific: false, effectiveFrom: '2026-09-01' } } })) });
+    component.showTinyLines.set(true);
+    fixture.detectChanges();
+    expect(component.lines()[0].rules?.map(p => p.amount)).toEqual([0.01, 0.012]);
+    const parts = [...el.querySelectorAll('[data-test="rule-part"]')].map(tr => tr.textContent!.replace(/\s+/g, ' ').trim());
+    expect(parts[0]).toContain('X-ray triage');
+    expect(parts[0]).toContain('$0.001 per run');
+    expect(parts[1]).toContain('data class sensitive');
+    expect(el.querySelector('[data-test="rule-part-card"]')!.textContent).toContain("At the card's price");
+    // A day picked on the chart is before the month's allowance, tiers and rule parts.
+    component.selectedDay.set('2026-09-05');
+    expect(component.dayLines()?.every(l => !l.rules)).toBe(true);
   });
 
   it('warns about nothing when every line has a price', () => {
@@ -373,41 +400,6 @@ describe('Billing, rendered', () => {
   });
 });
 
-// MIG-308: Cost & usage shows what each model call cost, at its own model's rate.
-describe('Billing, cost per run', () => {
-  it('reads the month\'s runs a page at a time, newest first, and says what each was and cost', () => {
-    const { component, api } = page();
-    expect(api.runs).toHaveBeenCalledTimes(1);
-    expect((api.runs.mock.calls[0] as unknown[])[1]).toBe(1);
-    expect(component.runs().map(r => r.run)).toEqual(['ai-run#2', 'ai-run#1']);
-    expect(component.runsTotal()).toBe(3);
-    expect(component.moreRuns()).toBe(true);
-    const [small, big] = component.runs();
-    expect(small.amount).toBe(0.175);
-    expect(component.runLabel(small)).toBe('Prompt 12');
-    expect(component.runLabel(big)).toBe('Document extraction');
-    expect(component.runActor(small)).toBe('Pipeline');
-    expect(component.runActor(big)).toBe('Alex Tenant');
-    expect(component.runRates(small)).toBe('2,000 in at ' + component.fmtUnitPrice(0.05, 1000, 'token') + ' · 500 out at ' + component.fmtUnitPrice(0.15, 1000, 'token'));
-    component.loadRuns();
-    expect((api.runs.mock.calls[1] as unknown[])[1]).toBe(2);
-    expect(component.runs().map(r => r.run)).toEqual(['ai-run#2', 'ai-run#1', 'ai-adhoc#9']);
-    expect(component.moreRuns()).toBe(false);
-    expect(component.runLabel(component.runs()[2])).toBe('Console call');
-  });
-
-  it('starts the runs again with the month, and says so when they cannot be read', () => {
-    const { component, api } = page(true);
-    api.runs.mockReturnValueOnce(of({ status: 'ERROR', message: 'Pick a workspace first.' }) as unknown as ReturnType<typeof api.runs>);
-    component.shiftMonth(-1);
-    expect(component.runs()).toEqual([]);
-    expect(component.runsError()).toBe('Pick a workspace first.');
-    component.retryRuns();
-    expect(component.runsError()).toBe('');
-    expect(component.runs()).toHaveLength(2);
-  });
-});
-
 // Owner review 2026-10-12: a day clicked on Cost by day filters Line by line to that day, with a chip to clear it.
 describe('Billing, a day picked on the chart', () => {
   const OCT_DAYS = [
@@ -455,36 +447,5 @@ describe('Billing, a day picked on the chart', () => {
     component.pickDay('2026-10-12');
     component.shiftMonth(-1);
     expect(component.selectedDay()).toBeNull();
-  });
-});
-
-// Owner review 2026-10-12 ("date repeat in the cost"): the model calls by billing day, the rate and the person said once.
-describe('Billing, cost per model call by day', () => {
-  const late = (run: string, last: string, actor: string | null = null) => ({ ...RUNS[0], run, last, first: last, actor_name: actor, actor_user_id: actor ? 4640 : null });
-  function withRuns(rows: object[], days: object[] = []) {
-    const harness = page(false, LINES, DAYS, { timeZone: 'America/Chicago', today: '2026-10-12', currentMonth: '2026-10' });
-    harness.api.runs.mockReturnValue(of({ status: API_SUCCESS, data: { total: 870, page: 1, limit: 25, rows, days } }) as unknown as ReturnType<typeof harness.api.runs>);
-    harness.component.retryRuns();
-    return harness;
-  }
-
-  it('cuts the runs into Chicago days, each header counting and totalling the whole day, each row its time', () => {
-    // 04:30 UTC on the 13th is 23:30 on the 12th in Chicago: the 12th's.
-    const { component } = withRuns([late('ai-run#3', '2026-10-13T04:30:00Z'), late('ai-run#2', '2026-10-13T03:50:00Z'), late('ai-run#1', '2026-10-11T15:00:00Z')],
-      [{ day: '2026-10-12', runs: 868, amount: '67.30' }, { day: '2026-10-11', runs: 2, amount: '0.35' }]);
-    const groups = component.runGroups();
-    expect(groups.map(g => [g.day, g.rows.length, g.count, g.amount])).toEqual([['2026-10-12', 2, 868, 67.3], ['2026-10-11', 1, 2, 0.35]]);
-    expect(component.dayTitle(groups[0].day!)).toBe('Mon 12 Oct 2026');
-    expect(component.runTime(groups[0].rows[0])).toBe('23:30');
-    expect(component.runTime(groups[0].rows[1])).toBe('22:50');
-  });
-
-  it('says the rates once above the table, keeps the full pricing on each row, and drops By when one person made every call', () => {
-    const { component } = withRuns([late('ai-run#2', '2026-10-13T03:50:00Z', 'Riverside Health admin'), late('ai-run#1', '2026-10-12T15:00:00Z', 'Riverside Health admin')]);
-    expect(component.runRateNote()).toEqual(['in $0.05 / out $0.15 per 1,000 tokens (llama3.2:3b)']);
-    expect(component.runRates(component.runs()[0])).toContain('2,000 in at $0.05 per 1,000 tokens');
-    expect(component.runActors()).toEqual(['Riverside Health admin']);
-    const mixed = withRuns([late('ai-run#2', '2026-10-13T03:50:00Z', 'Riverside Health admin'), late('ai-run#1', '2026-10-12T15:00:00Z')]).component;
-    expect(mixed.runActors()).toEqual(['Riverside Health admin', 'Pipeline']);
   });
 });

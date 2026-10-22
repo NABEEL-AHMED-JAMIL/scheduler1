@@ -10,6 +10,8 @@
         </p>
       </div>
       <div class="flex items-center gap-2">
+        <!-- Owner #5: THE workspace selector; the lists, the KPIs and a new row's owner follow it. -->
+        <app-workspace-select [allowAll]="true" [value]="workspaceFilter()" (valueChange)="pickWorkspace($event)" />
         <app-refresh-button [loading]="tabLoading()" (refresh)="refresh()" />
         @if (canManage()) {
           @switch (tab()) {

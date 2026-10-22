@@ -119,7 +119,7 @@
                     <a class="link-inline" [routerLink]="['/pipelines', c.taskDetailId, 'edit']" (click)="$event.stopPropagation()">{{ c.pipelineId || c.pipelineName }}</a>
                   } @else if (c.pipelineName) {
                     <span class="text-[color:var(--text-secondary)]">{{ c.pipelineName }}</span>
-                  } @else { <span class="text-[color:var(--text-muted)]">—</span> }
+                  } @else { <span class="cp-muted text-[color:var(--text-muted)]">—</span> }
                 </td>
                 <td class="cp-wide text-right tabular-nums">{{ c.messageCount ?? 0 }}</td>
                 <td class="text-right whitespace-nowrap" [title]="c.dateUpdated | serverTime: 'dateTime'">{{ time(c) }}</td>

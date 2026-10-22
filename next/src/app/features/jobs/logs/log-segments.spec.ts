@@ -55,12 +55,12 @@ describe('logSegments', () => {
  * no name for stays as written, so an old line reads as it always did.
  */
 describe('nameIds', () => {
-  const NAMES: LogNames = { groups: new Map([['1063', 'Reviewer']]), requests: new Map([['1006', { taskId: 1136 }]]) };
-  const LINE = 'Step 2/3 <approve> (approval) waits for approval by the group 1063 (request 1006): Approve 3 bulk-review test rows of run 8298';
+  const NAMES: LogNames = { teams: new Map([['1063', 'Reviewer']]), requests: new Map([['1006', { taskId: 1136 }]]) };
+  const LINE = 'Step 2/3 <approve> (approval) waits for approval by the team 1063 (request 1006): Approve 3 bulk-review test rows of run 8298';
 
-  it('puts the group\'s name for its id, and links the request to the reader\'s task', () => {
+  it('puts the team\'s name for its id, and links the request to the reader\'s task', () => {
     expect(nameIds([{ text: LINE }], NAMES)).toEqual([
-      { text: 'Step 2/3 <approve> (approval) waits for approval by the Reviewer group (' },
+      { text: 'Step 2/3 <approve> (approval) waits for approval by the Reviewer team (' },
       { text: 'request 1006', link: { url: '/review/approvals', query: { task: '1136' }, title: 'Open this request in Review › Approvals' } },
       { text: '): Approve 3 bulk-review test rows of run 8298' },
     ]);
@@ -72,15 +72,15 @@ describe('nameIds', () => {
   });
 
   it('keeps an id it has no name for, and a line with no names, as written', () => {
-    const none: LogNames = { groups: new Map(), requests: new Map() };
+    const none: LogNames = { teams: new Map(), requests: new Map() };
     expect(nameIds([{ text: LINE }], none)).toEqual([{ text: LINE }]);
     expect(nameIds([{ text: LINE }], null)).toEqual([{ text: LINE }]);
   });
 
   it('leaves the paths it was given alone', () => {
-    const segments = logSegments('Wrote out/request 1006.csv for the group 1063', 'b');
+    const segments = logSegments('Wrote out/request 1006.csv for the team 1063', 'b');
     const named = nameIds(segments, NAMES);
     expect(named.filter(s => s.path).map(s => s.text)).toEqual(segments.filter(s => s.path).map(s => s.text));
-    expect(named.map(s => s.text).join('')).toContain('the Reviewer group');
+    expect(named.map(s => s.text).join('')).toContain('the Reviewer team');
   });
 });

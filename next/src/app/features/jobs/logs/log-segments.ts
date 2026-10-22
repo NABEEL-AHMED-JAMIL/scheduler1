@@ -9,17 +9,17 @@ export interface LogSegment {
 
 /** What the reader may put to the ids a run's lines name (run page polish 2026-10-12). */
 export interface LogNames {
-  /** An access profile's id to its name: "the group 1063" reads "the Reviewer group". */
-  groups: ReadonlyMap<string, string>;
+  /** A team's id to its name: "the team 6" reads "the Wound care team" (F4). */
+  teams: ReadonlyMap<string, string>;
   /** An approval request's id to the reader's Task inbox task about it: "request 1006" opens that task. */
   requests: ReadonlyMap<string, { taskId: number }>;
 }
 
-/** The ids Core writes into an Approval step's lines: "the group 1063", "the role TENANT_USER", "request 1006". */
-const IDS = /\bthe group (\d+)\b|\bthe role (TENANT_USER|TENANT_ADMIN)\b|\brequest (\d+)\b/g;
+/** The ids Core writes into an Approval step's lines: "the team 6", "the role TENANT_USER", "request 1006". */
+const IDS = /\bthe team (\d+)\b|\bthe role (TENANT_USER|TENANT_ADMIN)\b|\brequest (\d+)\b/g;
 
 /**
- * The ids in a line's text put as the reader knows them: a group by its name, a role as the people it names, a request
+ * The ids in a line's text put as the reader knows them: a team by its name, a role as the people it names, a request
  * as a link to the reader's task about it. An id with no name stays as written, so an old line reads as it always did.
  * Paths (and links) already found are left alone.
  */
@@ -31,9 +31,9 @@ export function nameIds(segments: LogSegment[], names: LogNames | null | undefin
     let from = 0;
     let text = '';
     for (const match of segment.text.matchAll(IDS)) {
-      const [whole, group, role, request] = match;
+      const [whole, team, role, request] = match;
       let said: string | null = null;
-      if (group && names.groups.has(group)) said = `the ${names.groups.get(group)} group`;
+      if (team && names.teams.has(team)) said = `the ${names.teams.get(team)} team`;
       else if (role) said = role === 'TENANT_USER' ? 'the workspace users' : 'the workspace administrators';
       else if (request && names.requests.has(request)) {
         out.push({ text: text + segment.text.slice(from, match.index) });

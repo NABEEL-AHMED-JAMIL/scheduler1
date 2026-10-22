@@ -374,8 +374,8 @@ export class ReportPivot {
     seconds.forEach(s => { bins[Math.min(11, Math.floor((s / max) * 12))]++; });
     const peak = bins.reduce((a, b) => (b > a ? b : a), 1);
     return bins.map((count, i) => {
-      // A bin's middle is only roughly where its runs sit, so "near 6s" rather than "near 5.8s";
-      // below a second it keeps its milliseconds, where a whole second would read "near 0s".
+      // A bin's middle is only roughly where its runs sit, so "near 6 sec" rather than "near 5.8 sec";
+      // below a second it keeps its milliseconds, where a whole second would read "near 0 sec".
       const middle = ((i + 0.5) / 12) * max;
       return {
         height: Math.round((count / peak) * 100),

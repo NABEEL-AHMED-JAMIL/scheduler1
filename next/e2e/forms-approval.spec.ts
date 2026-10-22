@@ -70,7 +70,9 @@ test.describe('Forms: approval and dataset (live)', () => {
   test('the form names its approval workflow in the builder', async ({ browser }) => {
     const page = await pageAs(browser);
     await page.goto('/forms/builder');
-    await page.getByRole('button', { name: `Edit ${FORM_NAME}` }).click();
+    // A form's actions are in its row's ⋮ menu (UX review 2026-10-12, A6): the name fills it in.
+    await page.getByRole('button', { name: `Actions for ${FORM_NAME}` }).click();
+    await page.getByRole('menuitem', { name: `Edit ${FORM_NAME}` }).click();
     await expect(page.locator('[data-form-editor]')).toContainText(`starts workflow "${WORKFLOW_NAME}"`);
     await page.locator('[data-tab="settings"]').click();
     await expect(page.locator('#formWorkflow')).toHaveValue(WORKFLOW_KEY);

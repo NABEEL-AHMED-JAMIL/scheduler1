@@ -1,0 +1,34 @@
+/* The template library's cards (MIG-404, Figma frame 2): the first page on top -- the server's picture of it, or a
+   page outline while it comes -- then the name, the versions, who made it and the next step. */
+:host { display: block; }
+.rst-grid { display: grid; gap: 1rem; padding: 1rem; grid-template-columns: repeat(auto-fill, minmax(17.5rem, 1fr)); }
+@media (min-width: 1800px) { .rst-grid { grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr)); } }
+.rst-card { display: flex; flex-direction: column; min-width: 0; overflow: hidden; background: var(--surface-raised);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-card); }
+.rst-card:hover { border-color: var(--border-strong); }
+.rst-thumb { position: relative; display: flex; justify-content: center; align-items: flex-start; height: 11rem; overflow: hidden; padding-top: 1rem;
+  background: var(--surface-sunken); border-bottom: 1px solid var(--border-subtle); }
+.rst-thumb img { width: 9.5rem; box-shadow: 0 1px 4px color-mix(in oklab, var(--text-primary) 16%, transparent); }
+.rst-cat { position: absolute; top: 0.625rem; left: 0.625rem; }
+.rst-paper { display: flex; flex-direction: column; gap: 0.4rem; width: 9.5rem; height: 13rem; padding: 0.875rem; background: var(--surface-raised);
+  box-shadow: 0 1px 4px color-mix(in oklab, var(--text-primary) 12%, transparent); }
+.rst-paper > i { height: 0.375rem; border-radius: var(--radius-sm); background: var(--border-subtle); }
+.rst-paper > i:first-child { width: 60%; height: 0.5rem; background: var(--border-strong); }
+.rst-paper > b { height: 3rem; border-radius: var(--radius-sm); background: color-mix(in oklab, var(--accent-mark) 22%, var(--surface-sunken)); }
+.rst-body { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.875rem 1rem 1rem; flex: 1; }
+/* A starter's first page before it has a picture of its own (drawing 2): a page sketched in print colours -- paper, a
+   header rule, the title, three figures and a small bar chart in the workspace's brand colour -- in either theme. */
+.rst-sketch { display: flex; flex-direction: column; gap: 0.45rem; width: 9.5rem; height: 13rem; padding: 0.75rem 0.8rem; background: var(--signature-paper);
+  box-shadow: 0 1px 4px color-mix(in oklab, var(--text-primary) 16%, transparent); }
+.rst-sk-head { display: flex; justify-content: space-between; align-items: center; padding-bottom: 0.3rem; border-bottom: 1px solid var(--print-ink); }
+.rst-sk-head > i { display: block; height: 0.25rem; border-radius: var(--radius-sm); background: var(--print-ink-soft); }
+.rst-sk-head > i:first-child { width: 45%; } .rst-sk-head > i:last-child { width: 18%; }
+.rst-sk-title { display: block; width: 55%; height: 0.4rem; border-radius: var(--radius-sm); background: var(--print-ink); }
+.rst-sk-kpis { display: flex; gap: 0.5rem; } .rst-sk-kpis > i { display: block; width: 1.3rem; height: 0.3rem; background: var(--print-ink); }
+.rst-sk-bars { display: flex; align-items: flex-end; gap: 0.2rem; height: 1.5rem; }
+.rst-sk-bars > i, .rst-sk-bars > b { display: block; width: 0.6rem; height: 40%;
+  background: color-mix(in oklab, var(--rst-brand, var(--print-brand)) 38%, var(--signature-paper)); }
+.rst-sk-bars > i:nth-child(2) { height: 55%; } .rst-sk-bars > i:nth-child(3) { height: 48%; }
+.rst-sk-bars > i:nth-child(4) { height: 70%; } .rst-sk-bars > i:nth-child(5) { height: 62%; }
+.rst-sk-bars > b { height: 90%; background: var(--rst-brand, var(--print-brand)); }
+.rst-sk-line { display: block; height: 0.2rem; background: var(--print-rule); }

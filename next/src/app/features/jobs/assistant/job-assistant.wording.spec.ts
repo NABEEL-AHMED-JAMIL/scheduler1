@@ -90,7 +90,7 @@ describe('the schedule and run lengths, on the console clock', () => {
     const runs: JobRun[] = [
       { jobQueueId: 1, jobStatus: 'Completed', startTime: '2026-09-01T09:00:00', endTime: '2026-09-01T09:01:00' },
     ];
-    expect(textOf(answerFor('stats', weekly, runs))).toContain('Runs take 1m on average.');
+    expect(textOf(answerFor('stats', weekly, runs))).toContain('Runs take 1 min on average.');
   });
 });
 

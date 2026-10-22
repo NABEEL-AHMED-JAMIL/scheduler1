@@ -64,8 +64,14 @@ const IMAGE_MIME: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpe
                                   <option value="false" [selected]="row[c.key] === false">No</option>
                                 </select>
                               }
+                              @case ('date') {
+                                <!-- ZT-F1: a day as the console writes it ("19 Oct 2026"), not the computer's locale ("10/19/2026"). -->
+                                <app-date-field class="date-field-sm" [inputId]="idPrefix() + '-' + f.key + '-' + r + '-' + c.key"
+                                                [label]="c.label + ', row ' + (r + 1)" [value]="cellText(row, c.key)" [inactive]="disabled()"
+                                                [clearable]="true" (valueChange)="setCell(f.key, r, c.key, $event)" />
+                              }
                               @default {
-                                <input class="input input-sm" [type]="c.type === 'date' ? 'date' : c.type === 'email' ? 'email' : 'text'"
+                                <input class="input input-sm" [type]="c.type === 'email' ? 'email' : 'text'"
                                        [attr.inputmode]="c.type === 'number' ? 'decimal' : null" [disabled]="disabled()"
                                        [value]="cellText(row, c.key)" [attr.aria-label]="c.label + ', row ' + (r + 1)"
                                        (input)="setCell(f.key, r, c.key, $any($event.target).value)" />

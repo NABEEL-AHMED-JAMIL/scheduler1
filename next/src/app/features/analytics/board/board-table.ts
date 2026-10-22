@@ -19,6 +19,9 @@ export interface TableSource {
   connection2?: string | null;
   path2?: string | null;
   sql: string;
+  /** ZT-A13: the board and the tile, sent with each page and the export (a Saved Analyses reader runs the tile's own statement). */
+  boardId?: number | null;
+  widgetId?: number | null;
 }
 
 /** What a table tells its tile after each read. */

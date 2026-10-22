@@ -1,12 +1,13 @@
 import { test, expect, APIRequestContext, Browser, Page, TestInfo } from '@playwright/test';
 import { api, authOf, canSignIn, NEEDS, pageAs as signedIn, Session, sessionFor } from './support/session';
-import { bestEffort, deleteObject, getJson, keptRun as keptRunOf, outputsOf, Output, tasks } from './support/workspace';
+import { bestEffort, deleteObject, getJson, keptRun as keptRunOf, outputsOf, Output, runsOf, tasks } from './support/workspace';
+import { waitOnOwnerData } from './support/owner-data';
 import { hasFixtures, NEEDS_FIXTURES, pipeline, riverside } from './support/fixtures';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
 /**
- * MIG-253: Documents -- the converter's Dataset → PDF and From an execution, Reports as generated outputs, and
+ * MIG-253: Documents -- the converter's PDF from a dataset and PDF from a run, Reports as generated outputs, and
  * Storage's file details, as Riverside Health's administrator, against the live media-service render (MIG-232) and
  * Core's run outputs.
  *
@@ -39,7 +40,7 @@ async function keptRun(request: APIRequestContext): Promise<{ run: number; datas
     const outputs = await outputsOf(request, s, pinned);
     return { run: pinned, dataset: outputs.find(o => o.name === KEPT)?.runDatasetId ?? 0 };
   }
-  return keptRunOf(request, s, pipeline('readmission').jobId, KEPT);
+  return keptRunOf(request, s, pipeline('readmission').jobId, KEPT, ['readmission']);
 }
 
 async function pageAs(browser: Browser, s: Session, width = 1440): Promise<Page> {
@@ -127,11 +128,12 @@ test.describe('Documents: converter, Reports and file details (live)', () => {
     if (s && BUCKET) await bestEffort(`delete ${BUCKET}/reports/${SAVED}.pdf`, () => deleteObject(request, s, BUCKET, `reports/${SAVED}.pdf`));
   });
 
-  test('Dataset → PDF: two pasted rows, the default layout, a PDF preview, and the download', async ({ browser }, info) => {
+  test('PDF from a dataset: two pasted rows, the default layout, a PDF preview, and the download', async ({ browser }, info) => {
     const page = await pageAs(browser, s);
     const renders = await recordRenders(page);
     await page.goto('/tools/converter');
-    await page.getByRole('button', { name: 'Dataset → PDF' }).click();
+    // The source is a pressed button in the "Choose a source" group, named as the Generated reports button is.
+    await page.getByRole('group', { name: 'Choose a source' }).getByRole('button', { name: 'PDF from a dataset' }).click();
     await page.locator('#render-rows').fill('[{"region":"North","revenue":1234.5},{"region":"South","revenue":980}]');
     await expect(page.getByText('2 rows · 2 columns: region, revenue')).toBeVisible();
     await page.locator('#render-title').fill('E2E regions');
@@ -156,7 +158,7 @@ test.describe('Documents: converter, Reports and file details (live)', () => {
   /** The schedule → its latest kept run → that run's kept statistics, picked in the converter. */
   async function pickKeptRun(page: Page): Promise<void> {
     await page.goto('/tools/converter');
-    await page.getByRole('button', { name: 'From an execution' }).click();
+    await page.getByRole('group', { name: 'Choose a source' }).getByRole('button', { name: 'PDF from a run' }).click();
     await page.locator('#render-schedule').fill(SCHEDULE.split(' ').slice(0, 2).join(' '));
     await page.getByRole('option', { name: new RegExp(`^${SCHEDULE.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`) }).click();
     await page.locator('#render-run').selectOption(String(RUN));
@@ -167,7 +169,7 @@ test.describe('Documents: converter, Reports and file details (live)', () => {
     await expect(page.getByText(`${ROWS} rows from run #${RUN}, ready to render.`)).toBeVisible();
   }
 
-  test('From an execution: the kept run\'s dataset previewed as a PDF', async ({ browser }, info) => {
+  test('PDF from a run: the kept run\'s dataset previewed as a PDF', async ({ browser }, info) => {
     const page = await pageAs(browser, s);
     const renders = await recordRenders(page);
     await pickKeptRun(page);
@@ -179,7 +181,7 @@ test.describe('Documents: converter, Reports and file details (live)', () => {
     await shot(page, info, 'documents-execution-preview');
   });
 
-  test('From an execution: the kept run\'s PDF saved to the workspace\'s bucket, under reports/', async ({ browser }) => {
+  test('PDF from a run: the kept run\'s PDF saved to the workspace\'s bucket, under reports/', async ({ browser }) => {
     const page = await pageAs(browser, s);
     test.skip(!(await bucketReadable(page.request)), `${BUCKET} cannot be listed (LocalStack down): saving is not checked.`);
     const renders = await recordRenders(page);
@@ -195,24 +197,36 @@ test.describe('Documents: converter, Reports and file details (live)', () => {
     await expect(page.locator('[data-render-result]').getByRole('link', { name: 'Open in storage' })).toBeVisible();
   });
 
-  test('Reports lists the kept run\'s outputs and the saved PDF, and previews the run\'s dataset', async ({ browser }, info) => {
+  test('Reports lists the kept run\'s outputs and the saved PDF, and previews the run\'s dataset', async ({ browser, request }, info) => {
+    // Reports reads each schedule's newest three runs. Once the daily readmission runs after the kept one have failed for
+    // want of their Kaggle input, the kept run is older than that and the page rightly does not list it: waiting on owner data.
+    const newest = (await runsOf(request, s, pipeline('readmission').jobId)).slice(0, 3).map(r => r.jobQueueId);
+    if (!newest.includes(RUN)) await waitOnOwnerData(request, s, 'readmission');
     const page = await pageAs(browser, s);
     const renders = await recordRenders(page);
     const bucket = await bucketReadable(page.request);
-    await page.goto('/data/reports');
+    // MIG-403: a pipeline's generated files are Reports › From pipelines (/data/reports opens Report Studio's Library, which
+    // lists reports, not run outputs: the 10-20 failure was this page, before any run was looked for).
+    await page.goto('/reports/from-pipelines');
+    await expect(page.getByRole('textbox', { name: 'Find a report' })).toBeVisible();
     const rows = page.locator('table tbody tr');
+    if (bucket) await expect(rows.filter({ hasText: `${SAVED}.pdf` })).toBeVisible();
+    else await expect(page.getByRole('alert')).toContainText(`${BUCKET}/reports/ could not be read`);
+    await expect(page.locator('[data-reports-reach]')).toContainText('recent runs');
+    // The kept run's schedule need not be among the ten most recently run (final-regression 10-20: it was the eleventh):
+    // found by its name, as a person looks for it -- Find reads the schedules it names beyond the recent ones.
+    await page.getByRole('textbox', { name: 'Find a report' }).fill(SCHEDULE);
     const run = rows.filter({ has: page.getByRole('link', { name: `Run #${RUN}` }) });
     await expect(run.first()).toBeVisible();
     expect(await run.count()).toBeGreaterThanOrEqual(2);
     await expect(run.filter({ hasText: `Kept by run #${RUN}` }).first()).toContainText('Ready');
     await expect(run.filter({ hasText: `Kept by run #${RUN}` }).first()).toContainText(TASK);
     await expect(run.filter({ hasText: `${UPLOAD.bucket}/${UPLOAD.key}` })).toContainText('In storage');
-    if (bucket) await expect(rows.filter({ hasText: `${SAVED}.pdf` })).toBeVisible();
-    else await expect(page.getByRole('alert')).toContainText(`${BUCKET}/reports/ could not be read`);
-    await expect(page.locator('[data-reports-reach]')).toContainText('recent runs');
     await shot(page, info, 'documents-reports');
 
-    await run.filter({ hasText: `Kept by run #${RUN}` }).getByRole('button', { name: `Preview ${KEPT}` }).click();
+    // A row's actions are in its ⋮ menu (UX final RP1).
+    await run.filter({ hasText: `Kept by run #${RUN}` }).getByRole('button', { name: `Actions for ${KEPT}` }).click();
+    await page.getByRole('menuitem', { name: 'Preview' }).click();
     expect((await nextRender(renders, 0)).status).toBe('SUCCESS');
     const dialog = page.getByRole('dialog', { name: `Preview of ${KEPT}` });
     await expect(dialog.locator('canvas').first()).toBeVisible();

@@ -110,9 +110,11 @@ export const PINNED: Record<string, unknown> = {
       "Search this topic’s registry tasks…",
       "Source",
       "Status *(required)",
+      "Tags",
       "The customer (through the API)",
       "Topic *(required)",
-      "XML configuration *(required)"
+      "XML configuration *(required)",
+      "research, pilot"
     ],
     "links": [
       "/pipelines",

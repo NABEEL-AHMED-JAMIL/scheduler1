@@ -39,6 +39,8 @@ import { DocumentsApi } from '../../documents/documents.service';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
 import { RunFacetsRail } from './run-facets-rail';
+import { RunItemsApi } from '../run-items/run-items.api';
+import { ItemCounts, countsLine } from '../run-items/run-items.model';
 import { ExplorerFilter, NO_FILTER, RUN_WINDOWS, RunExplorerApi, RunFacets, activeCount, explorerBody, histogramBars } from './run-explorer';
 
 /**
@@ -51,6 +53,8 @@ const HISTORY_WINDOW = 500;
 const APPROVALS_WINDOW = '200';
 /** Runs Executions shows when it is opened without a job: the newest of the last day. */
 export const RECENT_WINDOW = 200;
+/** Run statuses after which a run's items do not change. */
+const RUN_ENDED = ['Completed', 'Failed', 'Interrupt', 'Skip', 'Missed', 'Stop'];
 
 interface JobQueue {
   jobQueueId: number;
@@ -71,7 +75,11 @@ interface JobQueue {
 }
 
 const TRIGGER_WORDS: Record<string, string> = {
-  schedule: 'on its timetable', manual: 'Run now', file: 'a file arrived', document: 'a document approved', retry: 'a retry', api: 'the API',
+  // ZT-P15: "started by on its timetable" read wrong; a form's and a backfill's runs were "a file arrived" / "on its timetable".
+  schedule: 'its timetable', manual: 'Run now', file: 'a file arrived', document: 'a document approved', form: 'a form submitted', backfill: 'a backfill',
+  retry: 'a retry', api: 'the API',
+  // V220: a workflow request's run of the pipeline, beside the job's own runs.
+  workflow: 'a workflow',
 };
 
 @Component({
@@ -82,6 +90,8 @@ const TRIGGER_WORDS: Record<string, string> = {
   // UX review 2026-10-12 (B2/B3): this screen's own rules, in its lazy chunk rather than the console's first download.
   styles: `
 /* UX review 2026-10-12 (B3): Runs as an explorer -- the facets rail at the left, the histogram and the list beside it. */
+.explorer-waiting { display: none !important; }
+.explorer-pending { min-height: 60vh; }
 .runs-explorer { display: grid; grid-template-columns: 15rem minmax(0, 1fr); gap: 1rem; align-items: start; }
 .runs-explorer-rail { position: sticky; top: 1rem; max-height: calc(100vh - 2rem); overflow-y: auto; }
 @media (max-width: 1023px) { .runs-explorer { grid-template-columns: minmax(0, 1fr); } .runs-explorer-rail { position: static; max-height: none; } }
@@ -172,6 +182,15 @@ export class JobHistory {
   readonly explorerFilter = signal<ExplorerFilter>(NO_FILTER);
   readonly facets = signal<RunFacets | null>(null);
   readonly facetsLoading = signal(false);
+  /** MIG-416: the facets' first answer (or that there are none to ask for), the review list's, and the runs': then the explorer shows. */
+  readonly facetsSettled = signal(false);
+  readonly reviewSettled = signal(false);
+  /** Latched: once drawn, a refresh or a new filter never hides the explorer again. */
+  private readonly explorerDrawn = signal(false);
+  readonly explorerReady = computed(() => !this.explorer() || this.explorerDrawn());
+  protected readonly drawExplorer = effect(() => {
+    if (!this.explorerDrawn() && this.facetsSettled() && this.reviewSettled() && !this.loading()) this.explorerDrawn.set(true);
+  });
   readonly facetsUnavailable = signal(false);
   private facetsRequest?: Subscription;
   readonly histogram = computed(() => histogramBars(this.facets()));
@@ -194,16 +213,17 @@ export class JobHistory {
   private loadFacets(): void {
     this.facetsRequest?.unsubscribe();
     // The counts are Runs by date's (page queue): a reader holding Schedules alone gets the list without them, not a 403.
-    if (typeof this.auth.canOpen === 'function' && !this.auth.canOpen('queue')) { this.facets.set(null); this.facetsUnavailable.set(true); return; }
+    if (typeof this.auth.canOpen === 'function' && !this.auth.canOpen('queue')) { this.facets.set(null); this.facetsUnavailable.set(true); this.facetsSettled.set(true); return; }
     this.facetsLoading.set(true);
     this.facetsRequest = this.explorerApi.facets(explorerBody(this.explorerFilter(), RECENT_WINDOW)).subscribe({
       next: r => {
         this.facetsLoading.set(false);
+        this.facetsSettled.set(true);
         const ok = r.status === API_SUCCESS && !!r.data && typeof r.data === 'object';
         this.facets.set(ok ? (r.data as RunFacets) : null);
         this.facetsUnavailable.set(!ok);
       },
-      error: () => { this.facetsLoading.set(false); this.facets.set(null); this.facetsUnavailable.set(true); },
+      error: () => { this.facetsLoading.set(false); this.facetsSettled.set(true); this.facets.set(null); this.facetsUnavailable.set(true); },
     });
   }
   /** The server has runs older than the ones loaded; Load older reads the next window. */
@@ -263,6 +283,37 @@ export class JobHistory {
    */
   readonly pager = createPager<JobQueue>();
   readonly paged = computed(() => this.pager.slice(this.filtered()));
+
+  /**
+   * MIG-420: "48 of 50 done · 2 failed ›" for the runs of a pipeline that works item by item, read for the page's runs
+   * (runItems/counts answers only the runs that have items). A finished run's counts are asked once; a running run's
+   * again with each read of the list. The column is there only when a run on the page has items.
+   */
+  private readonly itemsApi = inject(RunItemsApi);
+  readonly itemCounts = signal<ReadonlyMap<number, ItemCounts>>(new Map());
+  private readonly countsAsked = new Set<number>();
+  readonly hasItems = computed(() => this.paged().some(run => this.itemCounts().has(run.jobQueueId)));
+  itemsLine(run: JobQueue) { return countsLine(this.itemCounts().get(run.jobQueueId)); }
+  protected readonly readCounts = effect(() => {
+    const page = this.paged();
+    untracked(() => {
+      // The counts are the run page's to read (Schedules or Runs by date); a screen test may stand in a partial session.
+      const can = (key: 'jobs' | 'queue') => typeof this.auth.canOpen === 'function' && this.auth.canOpen(key);
+      if (!can('jobs') && !can('queue')) return;
+      const ids = page.filter(run => !this.countsAsked.has(run.jobQueueId) || !RUN_ENDED.includes(run.jobStatus))
+        .map(run => run.jobQueueId).filter(id => Number.isInteger(id));
+      if (!ids.length) return;
+      ids.forEach(id => this.countsAsked.add(id));
+      this.itemsApi.counts(ids).subscribe({
+        next: counts => this.itemCounts.update(map => {
+          const next = new Map(map);
+          for (const [id, c] of Object.entries(counts ?? {})) if (c?.items) next.set(Number(id), c);
+          return next;
+        }),
+        error: () => { /* the column is left out, as for a run without items */ },
+      });
+    });
+  });
   goToPage(next: number): void { this.pager.goTo(next, this.filtered().length); }
   setPageSize(size: number): void { this.pager.setSize(size); }
 

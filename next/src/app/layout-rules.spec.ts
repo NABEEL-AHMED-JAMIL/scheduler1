@@ -83,6 +83,12 @@ describe('layout rules', () => {
     }
   });
 
+  /** ZT-M13: "Administrators" in a 1024-wide strip broke as "ADMINISTRATOR / S"; a label hyphenates instead. */
+  it('hyphenates a long strip label rather than cutting the word anywhere', async () => {
+    const { css } = await sources();
+    expect(rule(css, '.stat-strip-label')).toMatch(/(^|[\s;])hyphens\s*:\s*auto/);
+  });
+
   /**
    * One scale for a card's padding: 16px for content (p-4), a one-line bar (px-4 py-2.5), a
    * list of rows (py-1), an empty or error state (p-8 and up), or none when the card is built
@@ -142,5 +148,15 @@ describe('layout rules', () => {
       });
     }
     expect(off).toEqual([]);
+  });
+  /**
+   * ZT-M (Kafka & Topics, 2026-10-21): a fixed-layout table gives its Actions column the width it declares, so a column
+   * narrower than its header cut "ACTIONS" to "ACTIC" at every width. The header is uppercase 11px with the cell's padding:
+   * 4.5rem at least.
+   */
+  it('gives a fixed table\'s Actions column room for its header', async () => {
+    const { css } = await sources();
+    const width = /width:\s*([\d.]+)rem/.exec(rule(css, '.kafka-table .kc-act'))?.[1];
+    expect(Number(width)).toBeGreaterThanOrEqual(4.5);
   });
 });

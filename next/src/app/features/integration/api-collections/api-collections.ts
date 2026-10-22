@@ -1,9 +1,8 @@
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { Router, RouterLink } from '@angular/router';
-import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
+import { API_SUCCESS } from '../../../core/api/api.config';
 import { AuthService } from '../../../core/auth/auth.service';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { Icon } from '../../../shared/ui/icon';
@@ -15,9 +14,7 @@ import { Pagination } from '../../../shared/ui/pagination';
 import { PAGE_SIZES } from '../../../shared/ui/pager';
 import { DataText } from '../../../shared/ui/data-text';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
-import { ComboboxOption } from '../../../shared/ui/combobox';
 import { confirmWith } from '../../../shared/ui/confirm';
-import { workspaceName } from '../../../shared/ui/workspace-name';
 import { CollectionRow, sourceLabel } from './api-collections.model';
 import { ApiCollectionsApi, usersOf } from './api-collections.service';
 import { CollectionDialog, CollectionDialogData } from './collection-dialog';
@@ -28,6 +25,8 @@ import { SensitivityTag } from '../../../shared/ui/sensitivity';
 import { ManagedBanner } from '../../../shared/ui/managed-banner';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
+import { WorkspaceSelect } from '../../../shared/ui/workspace-select';
+import { WorkspaceDirectory } from '../../../core/workspaces/workspace-directory';
 
 /**
  * API Collections (MIG-247, Integration menu, page key api-collections): the workspace's reusable APIs.
@@ -36,16 +35,21 @@ import { RefreshButton } from '../../../shared/ui/refresh-button';
  * Every member who holds the page reads the list; New collection, Import and each row's Edit, Activate and
  * Delete are a workspace administrator's (integration-service answers those only for TENANT_ADMIN), so a
  * tenant user never sees a control the service would refuse. The service pages and searches the list.
+ *
+ * A platform administrator has no workspace of his own: he picks one in the header (the shared workspace selector, opening
+ * on this session's last pick) and, until he does, the page asks for one and reads nothing. Every call then names that
+ * workspace (integration-service answers his calls that name none with a 400), and New collection and Import make it
+ * there. A workspace's people see no selector.
  */
 @Component({
   selector: 'app-api-collections',
   imports: [RefreshButton, PageHeader, Icon, SensitivityTag, TableShell, StatusPill, StatStrip, ViewToggle, Pagination, DataText, ServerTimePipe, CdkMenu, CdkMenuItem,
-    CdkMenuTrigger, RouterLink, ManagedBanner],
+    CdkMenuTrigger, RouterLink, ManagedBanner, WorkspaceSelect],
   templateUrl: './api-collections.html',
 })
 export class ApiCollections implements OnInit {
   private readonly api = inject(ApiCollectionsApi);
-  private readonly http = inject(HttpClient);
+  private readonly directory = inject(WorkspaceDirectory);
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);
   private readonly auth = inject(AuthService);
@@ -61,18 +65,15 @@ export class ApiCollections implements OnInit {
   readonly page = signal(1);
   readonly size = signal(PAGE_SIZES[0]);
   readonly canManage = computed(() => this.auth.canBuild());
-  readonly isPlatformAdmin = computed(() => this.auth.isPlatformAdmin());
-  private readonly tenants = signal<ComboboxOption[]>([]);
+  /** The workspace a platform administrator picked (this session's last choice to start with); null for anyone else. */
+  readonly tenantId = signal<number | null>(this.directory.remembered());
+  /** A platform administrator who has not picked a workspace yet: the page asks for one and reads nothing. */
+  readonly needsWorkspace = computed(() => this.directory.picks() && this.tenantId() === null);
 
   readonly sourceLabel = sourceLabel;
 
-  /** The page's rows with the state filter applied, each named by its workspace for a platform administrator. */
-  readonly filtered = computed(() => {
-    const names = new Map(this.tenants().map(t => [t.value, t.label]));
-    return this.rows()
-      .filter(r => !this.statusFilter() || r.status === this.statusFilter())
-      .map(r => this.isPlatformAdmin() ? { ...r, tenantName: r.tenantName ?? names.get(String(r.tenantId)) ?? null } : r);
-  });
+  /** The page's rows with the state filter applied. */
+  readonly filtered = computed(() => this.rows().filter(r => !this.statusFilter() || r.status === this.statusFilter()));
   readonly hasFilters = computed(() => !!this.search().trim() || !!this.statusFilter());
   readonly emptyMessage = computed(() => this.hasFilters() ? 'No collection matches the current filters.'
     : this.canManage() ? 'No API collections yet. Create one, or import a Postman or Bruno collection, then add and test its APIs.'
@@ -98,27 +99,36 @@ export class ApiCollections implements OnInit {
   }
 
   ngOnInit(): void {
-    this.load();
-    if (this.isPlatformAdmin()) {
-      this.http.get<ApiResponse<{ tenantId: number; tenantName: string }[]>>(`${API_BASE}/tenant.json/listTenants`).subscribe({
-        next: r => { if (r.status === API_SUCCESS) this.tenants.set((r.data ?? []).map(t => ({ value: String(t.tenantId), label: t.tenantName }))); },
-        error: () => { /* the ids stand in for the names */ },
-      });
-    }
+    if (!this.needsWorkspace()) this.load();
+  }
+
+  /** A platform administrator's pick: nothing of the last workspace stays on screen while the new one is read. */
+  pickWorkspace(id: number | null): void {
+    this.tenantId.set(id);
+    this.rows.set([]);
+    this.total.set(0);
+    this.page.set(1);
+    if (id !== null) this.load();
   }
 
   load(): void {
     this.loading.set(true);
     this.error.set('');
-    this.api.list(this.search(), this.page(), this.size()).subscribe({
+    const asked = this.tenantId();
+    this.api.list(this.search(), this.page(), this.size(), asked).subscribe({
       next: r => {
+        if (asked !== this.tenantId()) return;
         this.loading.set(false);
         if (r.status !== API_SUCCESS) { this.error.set(r.message); return; }
         const rows = r.data ?? [];
         this.rows.set(rows);
         this.total.set(r.paging?.totalRecord ?? rows.length);
       },
-      error: err => { this.loading.set(false); this.error.set(err?.error?.message || 'Could not load the API collections.'); },
+      error: err => {
+        if (asked !== this.tenantId()) return;
+        this.loading.set(false);
+        this.error.set(err?.error?.message || 'Could not load the API collections.');
+      },
     });
   }
 
@@ -137,22 +147,20 @@ export class ApiCollections implements OnInit {
   goTo(page: number): void { this.page.set(page); this.load(); }
   setSize(size: number): void { this.size.set(size); this.page.set(1); this.load(); }
 
-  workspace(row: CollectionRow): string { return workspaceName(row); }
-
   create(): void {
-    const data: CollectionDialogData = { tenants: this.isPlatformAdmin() ? this.tenants() : undefined };
+    const data: CollectionDialogData = { tenantId: this.tenantId() };
     this.dialog.open<number | null>(CollectionDialog, { data }).closed.subscribe(id => {
       if (id) this.router.navigate(['/connections/api-collections', id]);
     });
   }
 
   edit(row: CollectionRow): void {
-    const data: CollectionDialogData = { collection: row };
+    const data: CollectionDialogData = { collection: row, tenantId: this.tenantId() };
     this.dialog.open<number | null>(CollectionDialog, { data }).closed.subscribe(id => { if (id) this.load(); });
   }
 
   importFiles(): void {
-    const data: ImportDialogData = { tenants: this.isPlatformAdmin() ? this.tenants() : undefined };
+    const data: ImportDialogData = { tenantId: this.tenantId() };
     this.dialog.open<{ collectionId: number; open: boolean } | null>(ImportDialog, { data }).closed.subscribe(done => {
       if (!done) return;
       if (done.open) this.router.navigate(['/connections/api-collections', done.collectionId]);
@@ -163,7 +171,7 @@ export class ApiCollections implements OnInit {
   /** Active ↔ Inactive. The save replaces the default auth, so it is read back from the current version first. */
   setStatus(row: CollectionRow): void {
     const status = row.status === 'Active' ? 'Inactive' : 'Active';
-    saveCollectionKeepingAuth(this.api, row, { status }).subscribe({
+    saveCollectionKeepingAuth(this.api, row, { status }, this.tenantId()).subscribe({
       next: r => { if (r.status === API_SUCCESS) { this.toast.success(status === 'Active' ? `${row.name} is active.` : `${row.name} is inactive.`); this.load(); } else this.toast.error(r.message); },
       error: err => this.toast.error(err?.error?.message || 'The collection could not be changed.'),
     });
@@ -176,7 +184,7 @@ export class ApiCollections implements OnInit {
       confirmLabel: 'Delete collection', danger: true,
     });
     if (!ok) return;
-    this.api.deleteCollection(row.collectionId).subscribe({
+    this.api.deleteCollection(row.collectionId, this.tenantId()).subscribe({
       next: r => {
         if (r.status === API_SUCCESS) { this.toast.success(r.message); this.load(); return; }
         const users = usersOf(r);

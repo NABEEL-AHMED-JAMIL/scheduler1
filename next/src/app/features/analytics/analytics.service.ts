@@ -1,6 +1,6 @@
 import type { BoardFilterOutcome, BoardFilterWire } from './board/board-filters';
 import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, of, tap } from 'rxjs';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import type { PinChartRequest } from './charts/chart-answer';
@@ -215,6 +215,12 @@ export interface QueryRequest {
   path2?: string;
   /** A dashboard tile's board filters (board/board-filters.ts): the server narrows the dataset before the statement. */
   boardFilters?: BoardFilterWire[];
+  /**
+   * ZT-A13: the board and the tile this run is (a dashboard tile's). A reader whose only Analytics page is Saved Analyses is run
+   * the tile's own saved statement or analysis by the server, whatever else the request carries; anyone else is unaffected.
+   */
+  boardId?: number;
+  widgetId?: number;
 }
 
 /**
@@ -509,6 +515,12 @@ export interface AnalysisRequest {
   /** A dashboard tile's board filters: the dataset is narrowed by them before the analysis reads it. */
   boardFilters?: BoardFilterWire[];
   /**
+   * ZT-A13: the board and the tile this run is (a dashboard tile's). A reader whose only Analytics page is Saved Analyses is run
+   * the tile's own saved statement or analysis by the server, whatever else the request carries; anyone else is unaffected.
+   */
+  boardId?: number;
+  widgetId?: number;
+  /**
    * The drill steps already taken, oldest first, echoed back exactly as the server sent them.
    *
    * THE DRILL STATE LIVES HERE AND NOWHERE ELSE ON THIS SIDE. The endpoints are stateless, so the
@@ -727,6 +739,13 @@ export interface Dashboard {
   /** Present on fetchDashboardById, in display order. Absent on the listing. */
   widgets?: DashboardWidget[];
   /**
+   * ZT-M7: on the listing, what the board's card says -- its widgets and the distinct files they read -- so the
+   * Dashboards page draws its cards without opening a board (in a managed session each open is an audited read).
+   * Absent from an older server.
+   */
+  widgetCount?: number;
+  fileCount?: number;
+  /**
    * UX review B5: the pipelines whose output this board reads, the newest run first, from the catalog's lineage
    * (analytics-service DashboardSources). Read-only; absent from an older server.
    */
@@ -867,6 +886,10 @@ function analysisBody(request: AnalysisRequest): Record<string, unknown> {
   if (request.sort) body['sort'] = { ...request.sort };
   if (request.queryId) body['queryId'] = request.queryId;
   if (request.boardFilters?.length) body['boardFilters'] = request.boardFilters;
+  if (request.boardId != null && request.widgetId != null) {
+    body['boardId'] = request.boardId;
+    body['widgetId'] = request.widgetId;
+  }
   // Echoed, not rebuilt. Sent even on a plain /analyze, because a re-run of a drilled analysis
   // is still the drilled analysis -- dropping the trail there would climb back out of it while
   // the breadcrumb bar went on saying otherwise.
@@ -901,10 +924,11 @@ export class AnalyticsService {
   private readonly workspace = `${API_BASE}/analyticsWorkspace.json`;
   private readonly datasets = `${API_BASE}/analyticsDataset.json`;
 
-  schema(connection: string, path: string): Observable<ApiResponse<DatasetSchema>> {
-    return this.http.get<ApiResponse<DatasetSchema>>(`${this.base}/schema`, {
-      params: { connection, path },
-    });
+  /** ZT-A13: on a board, its id -- a Saved Analyses reader may read the columns of the board's own datasets only. */
+  schema(connection: string, path: string, boardId?: number): Observable<ApiResponse<DatasetSchema>> {
+    const params: Record<string, string> = { connection, path };
+    if (boardId != null) params['boardId'] = String(boardId);
+    return this.http.get<ApiResponse<DatasetSchema>>(`${this.base}/schema`, { params });
   }
 
   /**
@@ -1028,7 +1052,11 @@ export class AnalyticsService {
       body['connection2'] = request.connection2;
       body['path2'] = request.path2;
     }
-    return this.http.post<ApiResponse<QueryResult>>(`${this.base}/query`, body);
+    if (request.boardId != null && request.widgetId != null) {
+      body['boardId'] = request.boardId;
+      body['widgetId'] = request.widgetId;
+    }
+    return this.http.post<ApiResponse<QueryResult>>(`${this.base}/query`, body, { params: tileParams(request) });
   }
 
   // ---- the analysis: document 07's canvas ------------------------------------------------
@@ -1049,7 +1077,7 @@ export class AnalyticsService {
    */
   analyze(request: AnalysisRequest): Observable<ApiResponse<AnalysisResult>> {
     return this.http.post<ApiResponse<AnalysisResult>>(
-      `${this.base}/analyze`, analysisBody(request));
+      `${this.base}/analyze`, analysisBody(request), { params: tileParams(request) });
   }
 
   /**
@@ -1362,4 +1390,17 @@ export class AnalyticsService {
     Observable<ApiResponse<WriteBackResult>> {
     return this.http.post<ApiResponse<WriteBackResult>>(`${this.exports}/writeBack`, request);
   }
+}
+
+/**
+ * ZT-M7: a board's tile names its board and itself in the query string as well as the body. In a managed session the
+ * audit reads it there (before the body is read): the board's one "Opened board" row stands for every tile and refresh,
+ * and the server then runs the tile's own statement. Nothing for a request that is not a tile.
+ */
+export function tileParams(request: { boardId?: number | null; widgetId?: number | null }): HttpParams {
+  let params = new HttpParams();
+  if (request.boardId != null && request.widgetId != null) {
+    params = params.set('boardId', request.boardId).set('widgetId', request.widgetId);
+  }
+  return params;
 }

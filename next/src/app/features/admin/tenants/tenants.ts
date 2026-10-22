@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, Injector, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 
 import { Router } from '@angular/router';
@@ -6,6 +6,10 @@ import { Dialog } from '@angular/cdk/dialog';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { MineFilter, isMine } from '../../../shared/ui/mine-filter';
 import { ManagedServiceApi } from '../managed-service/managed-service.api';
+import { ManagedSession } from '../managed-service/managed-session';
+import { BillingApi, WorkspaceFigure } from '../../billing/billing.service';
+import { formatBytes, formatMoney } from '../../billing/billing-format';
+import { WorkspaceDirectory } from '../../../core/workspaces/workspace-directory';
 import { AuthService } from '../../../core/auth/auth.service';
 import { StatusPill } from '../../../shared/ui/status-pill';
 import { StatTile } from '../../../shared/ui/stat-tile';
@@ -63,6 +67,15 @@ export interface Tenant {
   managementMode?: ManagementMode | null;
   /** MIG-336: the workspace this one is the sandbox of; null for an ordinary workspace. */
   sandboxOf?: number | null;
+  /** Owner #19 (2026-10-19), Core's: runs this month (Chicago's month), how many failed, alerts open now; absent when unknown. */
+  runsThisMonth?: number | null;
+  failedRunsThisMonth?: number | null;
+  openAlerts?: number | null;
+  /** Owner #19, billing's (billing.json/workspaceFigures): cost this month so far, storage on the last billed day, its plan. */
+  costThisMonth?: number | null;
+  storageBytes?: number | null;
+  plan?: string | null;
+  planOwn?: boolean;
 }
 
 /** MIG-336: the sandbox tenant.json/addSandbox made. */
@@ -116,6 +129,16 @@ export class Tenants implements OnInit {
     { key: 'sourceTaskTypeCount', label: 'Topics', icon: 'layers' },
     { key: 'bucketCount', label: 'Buckets', icon: 'cloud' },
     { key: 'kafkaProfileCount', label: 'Kafka', icon: 'server' },
+  ];
+
+  /** Owner #19: the figures columns of the table, each sortable. */
+  readonly figureColumns: { key: keyof Tenant; label: string; title: string }[] = [
+    { key: 'userCount', label: 'Users', title: 'People in the workspace' },
+    { key: 'sourceTaskCount', label: 'Pipelines', title: 'Pipelines, and the schedules that run them' },
+    { key: 'runsThisMonth', label: 'Runs', title: 'Runs this month (Chicago), and how many failed' },
+    { key: 'storageBytes', label: 'Storage', title: 'Written less deleted, as metered' },
+    { key: 'costThisMonth', label: 'Cost', title: 'This month so far, as each workspace\'s bill counts it (after its allowances)' },
+    { key: 'openAlerts', label: 'Alerts', title: 'Alerts open now' },
   ];
 
   /**
@@ -191,7 +214,8 @@ export class Tenants implements OnInit {
   readonly filtered = computed(() => {
     const term = this.search().trim().toLowerCase();
     const status = this.statusFilter();
-    const rows = this.tenants().filter(tenant => {
+    const rows = this.rows().filter(tenant => {
+      if (status === 'MANAGED') return tenant.managementMode === 'MANAGED';
       if (status && tenant.status !== status) return false;
       if (!term) return true;
       return `${tenant.tenantName} ${tenant.tenantCode}`.toLowerCase().includes(term);
@@ -212,23 +236,73 @@ export class Tenants implements OnInit {
     !!this.search().trim() || !!this.statusFilter() || this.onlyMine());
 
   readonly stats = computed(() => {
-    const rows = this.tenants();
+    const rows = this.rows();
     const total = (key: keyof Tenant) =>
       rows.reduce((sum, row) => sum + (Number(row[key]) || 0), 0);
     return {
       tenants: rows.length,
       active: rows.filter(row => row.status === 'Active').length,
       suspended: rows.filter(row => row.status === 'Suspended' || row.status === 'Inactive').length,
+      managed: rows.filter(row => row.managementMode === 'MANAGED').length,
       users: total('userCount'),
       jobs: total('sourceJobCount'),
       tasks: total('sourceTaskCount'),
+      runs: total('runsThisMonth'),
+      failed: total('failedRunsThisMonth'),
+      alerts: total('openAlerts'),
+      alerting: rows.filter(row => Number(row.openAlerts) > 0).length,
+      cost: total('costThisMonth'),
       empty: rows.filter(row => this.resourceTotal(row) === 0).length,
     };
   });
 
+  /** Owner #19: billing's figures per workspace (cost this month, storage, plan); none when billing cannot say. */
+  readonly figures = signal<ReadonlyMap<number, WorkspaceFigure>>(new Map());
+  readonly figuresMonth = signal('');
+  readonly figuresError = signal('');
+  /** The workspaces with billing's figures on them. */
+  readonly rows = computed<Tenant[]>(() => {
+    const figures = this.figures();
+    return this.tenants().map(t => {
+      const f = figures.get(t.tenantId);
+      return f ? { ...t, costThisMonth: Number(f.costThisMonth), storageBytes: f.storageBytes == null ? null : Number(f.storageBytes), plan: f.plan,
+        planOwn: !!f.planOwn } : t;
+    });
+  });
+  money(v: number | null | undefined): string { return v == null ? '—' : formatMoney(Number(v)); }
+  storage(bytes: number | null | undefined): string { return bytes == null ? '—' : formatBytes(Number(bytes)); }
+  /** Active, Suspended or Inactive, and Managed beside it: the state in words. */
+  stateTone(t: Tenant): string {
+    return t.status === 'Active' ? 'pill-ok' : t.status === 'Suspended' ? 'pill-warn' : 'pill-neutral';
+  }
+
+  private readonly injector = inject(Injector);
+
+  /** Owner #20: "Work in this workspace" -- a managed session there (a grant first, if this staff member holds none). */
+  workIn(tenant: Tenant): void {
+    this.injector.get(WorkspaceDirectory).choose(tenant.tenantId);
+    void this.injector.get(ManagedSession).workIn(tenant.tenantId, tenant.tenantName);
+  }
+
+  private readFigures(): void {
+    if (typeof this.auth.isPlatformAdmin === 'function' && !this.auth.isPlatformAdmin()) return;
+    let billing: BillingApi | null = null;
+    try { billing = this.injector.get(BillingApi, null); } catch { billing = null; }
+    billing?.workspaceFigures?.()?.subscribe({
+      next: r => {
+        if (r?.status !== API_SUCCESS || !r.data) { this.figuresError.set(r?.message || 'Billing could not say what the workspaces cost.'); return; }
+        this.figures.set(new Map((r.data.workspaces ?? []).map(f => [f.tenantId, f])));
+        this.figuresMonth.set(r.data.month ?? '');
+        this.figuresError.set('');
+      },
+      error: () => this.figuresError.set('Billing could not say what the workspaces cost.'),
+    });
+  }
+
   ngOnInit(): void {
     this.listTenants();
     this.readManaged();
+    this.readFigures();
   }
 
   private readManaged(): void {

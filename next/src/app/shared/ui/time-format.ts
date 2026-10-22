@@ -6,7 +6,7 @@
  * Angular's US "Sep 24, 2026" in a few places, raw "2026-09-24" in others, and five ways to write
  * how long a run took. Templates name a format here rather than spell one out; the serverTime pipe
  * understands the names, and turns Angular's 12-hour and US presets into these, so a 12-hour clock
- * cannot come back by accident.
+ * cannot come back by accident. Durations spell their unit out ("15 sec", "3 min 20 sec", owner 2026-10-20).
  *
  * @author Nabeel Ahmed
  */
@@ -99,40 +99,61 @@ export function axisHour(hour: number | string): string {
 }
 
 /**
- * How long something took, from seconds: 420ms, 25.3s, 3m 20s, 1h 5m. Rounds the total before
- * splitting it, so 119.6 s is "2m" rather than "1m 60s". Nothing measured, or a negative (the
- * reports' "did not finish" mark), is a dash.
+ * How long something took, from seconds, with the unit spelled out (owner, 2026-10-20: "14.9s" read as fourteen
+ * minutes): "420 ms", "1.4 sec", "15 sec", "3 min 20 sec", "1 h 5 min", "2 d 3 h". One decimal under ten seconds,
+ * whole seconds from ten to a minute. Rounds the total before splitting it, so 119.6 s is "2 min" rather than
+ * "1 min 60 sec", and 9.96 s is "10 sec". Nothing measured, or a negative (the reports' "did not finish" mark), is a
+ * dash; zero is "0 sec".
  */
 export function formatDuration(seconds: number | null | undefined): string {
   if (seconds === null || seconds === undefined || !Number.isFinite(seconds) || seconds < 0) return '—';
-  if (seconds === 0) return '0s';
-  if (seconds < 1) return `${Math.round(seconds * 1000)}ms`;
-  if (seconds < 60) {
-    const tenths = Math.round(seconds * 10) / 10;
-    if (tenths < 60) return `${tenths}s`;
-  }
+  if (seconds === 0) return '0 sec';
+  const ms = Math.round(seconds * 1000);
+  if (ms < 1000) return `${ms} ms`;
+  const tenths = Math.round(seconds * 10) / 10;
+  if (tenths < 10) return `${tenths} sec`;
   const total = Math.round(seconds);
+  if (total < 60) return `${total} sec`;
   if (total < 3600) {
     const minutes = Math.floor(total / 60);
     const rest = total % 60;
-    return rest ? `${minutes}m ${rest}s` : `${minutes}m`;
+    return rest ? `${minutes} min ${rest} sec` : `${minutes} min`;
   }
   const minutesTotal = Math.round(total / 60);
-  const hours = Math.floor(minutesTotal / 60);
-  const minutes = minutesTotal % 60;
-  return minutes ? `${hours}h ${minutes}m` : `${hours}h`;
+  if (minutesTotal < 24 * 60) {
+    const hours = Math.floor(minutesTotal / 60);
+    const minutes = minutesTotal % 60;
+    return minutes ? `${hours} h ${minutes} min` : `${hours} h`;
+  }
+  const hoursTotal = Math.round(total / 3600);
+  const days = Math.floor(hoursTotal / 24);
+  const hours = hoursTotal % 24;
+  return hours ? `${days} d ${hours} h` : `${days} d`;
 }
 
 /**
- * The same, short enough for a bar label: 25s, 1m, 3.4m, 2h. A run shorter than a second is "<1s",
- * never "0" -- the run chart used to plot minutes, so a 25 second run was labelled 0.
+ * The same, short enough for a bar label: "<1 sec", "25 sec", "3.4 min", "2 h". A run shorter than a second is
+ * "<1 sec", never "0" -- the run chart used to plot minutes, so a 25 second run was labelled 0.
  */
 export function compactDuration(seconds: number | null | undefined): string {
   if (seconds === null || seconds === undefined || !Number.isFinite(seconds) || seconds < 0) return '—';
-  if (seconds === 0) return '0s';
-  if (seconds < 1) return '<1s';
-  if (seconds < 59.5) return `${Math.round(seconds)}s`;
+  if (seconds === 0) return '0 sec';
+  if (seconds < 1) return '<1 sec';
+  if (seconds < 59.5) return `${Math.round(seconds)} sec`;
   const oneDecimal = (n: number) => String(Math.round(n * 10) / 10);
-  if (seconds < 3600) return `${oneDecimal(seconds / 60)}m`;
-  return `${oneDecimal(seconds / 3600)}h`;
+  if (seconds < 3600) return `${oneDecimal(seconds / 60)} min`;
+  return `${oneDecimal(seconds / 3600)} h`;
+}
+
+/**
+ * A counter that ticks while something runs, from whole seconds: "45 sec", "2 min 05 sec", "1 h 02 min". The smaller
+ * unit keeps two digits past the first minute, so the line does not change width every ten seconds.
+ */
+export function elapsedDuration(seconds: number | null | undefined): string {
+  if (seconds === null || seconds === undefined || !Number.isFinite(seconds) || seconds < 0) return '—';
+  const s = Math.floor(seconds);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  if (s < 60) return `${s} sec`;
+  if (s < 3600) return `${Math.floor(s / 60)} min ${pad(s % 60)} sec`;
+  return `${Math.floor(s / 3600)} h ${pad(Math.floor(s / 60) % 60)} min`;
 }

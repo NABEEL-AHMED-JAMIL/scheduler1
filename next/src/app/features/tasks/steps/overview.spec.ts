@@ -17,6 +17,8 @@ const TASKS: StepTaskEntry[] = [
   { code: 'save_file', name: 'Save File', kind: 'Output', backingService: 'core' },
   { code: 'render_pdf', name: 'Render PDF', kind: 'Output', backingService: 'media-service' },
   { code: 'new_writer', name: 'A writer registered tomorrow', kind: 'Output', backingService: 'somewhere' },
+  { code: 'transcribe_audio', name: 'Transcribe audio', kind: 'Process', backingService: 'media-service', aiToolName: 'transcribe_audio' },
+  { code: 'convert_file', name: 'Convert file', kind: 'Process', backingService: 'media-service', aiToolName: 'convert_file' },
 ];
 const task = (code: string) => TASKS.find(t => t.code === code);
 
@@ -40,6 +42,13 @@ describe('stageOf', () => {
     expect(stageOf({ task: 'approval' }, task('approval'))).toBe('review');
     expect(stageOf({ task: 'transform' }, task('transform'))).toBe('transform');
     expect(stageOf({ task: 'new_writer' }, task('new_writer'))).toBe('write');
+  });
+
+  it('puts the steps that turn files into rows (media-service, kind Process) under Transform, with the registry or without', () => {
+    for (const code of ['transcribe_audio', 'convert_file']) {
+      expect(stageOf({ task: code }, task(code)), code).toBe('transform');
+      expect(stageOf({ task: code }), code).toBe('transform');
+    }
   });
 
   it('falls back on the code while the registry is not read yet', () => {

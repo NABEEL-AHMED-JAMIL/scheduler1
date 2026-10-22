@@ -8,6 +8,7 @@
       </p>
       </div>
       <div class="flex items-center gap-2">
+        <app-workspace-select [allowAll]="true" [value]="workspaceFilter() ? +workspaceFilter() : null" (valueChange)="workspaceFilter.set($event === null ? '' : '' + $event); pager.reset()" />
         <app-refresh-button [loading]="loading()" (refresh)="load()" />
         <!-- The list is TENANT_USER and stays open; everything that writes a task is TENANT_ADMIN.
              Both routes behind these links are guarded, so for a tenant user they only ever led to
@@ -30,15 +31,6 @@
                    (retry)="load()">
     <ng-container toolbar>
       <app-view-toggle [(value)]="view" key="tasks" cardsIcon="layers" />
-      <!-- A platform administrator's list holds every workspace; the options are the workspaces
-           in it, so nothing offered narrows to an empty list. -->
-      @if (seesWorkspaces()) {
-        <div class="max-w-48 w-48">
-          <app-combobox id="tasks-tenant" ariaLabel="Filter by workspace" [selected]="workspaceFilter()"
-                        (selectedChange)="workspaceFilter.set($event); pager.reset()"
-                        placeholder="All workspaces" clearLabel="All workspaces" [options]="workspaceOptions()" />
-        </div>
-      }
       <!-- Topic first, then the pipelines on it -- the same two-step pick the task editor uses,
            so the list can be narrowed the way tasks are actually organised. -->
       <div class="max-w-48 w-48">

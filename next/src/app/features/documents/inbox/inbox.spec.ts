@@ -3,7 +3,7 @@ import { provideZonelessChangeDetection, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { HttpEventType } from '@angular/common/http';
 import { Dialog } from '@angular/cdk/dialog';
-import { provideRouter } from '@angular/router';
+import { ActivatedRoute, provideRouter } from '@angular/router';
 import { Observable, Subject, of, throwError } from 'rxjs';
 import { AuthService } from '../../../core/auth/auth.service';
 import { ToastService } from '../../../shared/ui/toast.service';
@@ -40,7 +40,7 @@ function stubApi(settings: InboxSettings = SETTINGS) {
   };
 }
 
-function screenWith(opts: { admin?: boolean; settings?: InboxSettings; closeWith?: unknown; api?: ReturnType<typeof stubApi>; tenantId?: number | null } = {}) {
+function screenWith(opts: { admin?: boolean; settings?: InboxSettings; closeWith?: unknown; api?: ReturnType<typeof stubApi>; tenantId?: number | null; embedded?: boolean } = {}) {
   const api = opts.api ?? stubApi(opts.settings);
   const toast = { success: vi.fn(), error: vi.fn() };
   const opened: { component: unknown; data: unknown }[] = [];
@@ -55,6 +55,7 @@ function screenWith(opts: { admin?: boolean; settings?: InboxSettings; closeWith
     providers: [
       provideZonelessChangeDetection(),
       provideRouter([]),
+      ...(opts.embedded ? [{ provide: ActivatedRoute, useValue: { snapshot: { data: { embedded: true } } } }] : []),
       { provide: InboxApi, useValue: api },
       { provide: Dialog, useValue: dialog },
       { provide: ToastService, useValue: toast },
@@ -87,6 +88,12 @@ describe('Inbox -- reading', () => {
     expect(api.colleagues).not.toHaveBeenCalled();
     screen.load();
     expect(api.settings).not.toHaveBeenCalled();
+  });
+
+  /** Owner 2026-10-20 (§0.1): the file drop is a section of Documents › Intake, whose page draws the header. */
+  it('draws no header of its own as a section of Intake, and its own header on its own', () => {
+    expect(screenWith({ embedded: true }).screen.embedded).toBe(true);
+    expect(screenWith().screen.embedded).toBe(false);
   });
 
   it('names uploaders from the member list for an administrator', () => {

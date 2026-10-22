@@ -828,6 +828,136 @@
      }
     }
    },
+   "/runs/{runId}/items": {
+    "get": {
+     "tags": [
+      "runs"
+     ],
+     "operationId": "listRunItems",
+     "summary": "The run's items: each file, recording, document or row it processed one by one, with its status.",
+     "description": "A pipeline that works item by item (a step per recording, per file, per document, per row of a per-row call, or one that splits a PDF into its pages) keeps one item per thing it processed: its status (running, done, failed), the step it failed at and why in words, how many of its sub-items (a document's pages) failed, and the files its steps made for it, by file id (GET /v1/files/{fileId} downloads one). In the run's order, cursor paging; parentId lists one item's sub-items. Any other run -- one that reads a table whole -- has no items: an empty list. An item retried in a later attempt shows its latest version (attempt). Never a bucket, a key in a bucket or a storage key.\n",
+     "security": [
+      {
+       "clientCredentials": [
+        "runs:read"
+       ]
+      }
+     ],
+     "parameters": [
+      {
+       "$ref": "#/components/parameters/RunId"
+      },
+      {
+       "$ref": "#/components/parameters/Limit"
+      },
+      {
+       "$ref": "#/components/parameters/Cursor"
+      },
+      {
+       "name": "status",
+       "in": "query",
+       "schema": {
+        "type": "string",
+        "enum": [
+         "running",
+         "done",
+         "failed"
+        ]
+       },
+       "description": "failed takes in an item with failed sub-items."
+      },
+      {
+       "name": "parentId",
+       "in": "query",
+       "schema": {
+        "type": "string"
+       },
+       "description": "An item's id: its sub-items."
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "The items.",
+       "content": {
+        "application/json": {
+         "schema": {
+          "$ref": "#/components/schemas/RunItemPage"
+         }
+        }
+       }
+      },
+      "400": {
+       "$ref": "#/components/responses/BadRequest"
+      },
+      "401": {
+       "$ref": "#/components/responses/Unauthorized"
+      },
+      "403": {
+       "$ref": "#/components/responses/Forbidden"
+      },
+      "404": {
+       "$ref": "#/components/responses/NotFound"
+      },
+      "429": {
+       "$ref": "#/components/responses/TooManyRequests"
+      }
+     }
+    }
+   },
+   "/runs/{runId}/items/{itemKey}": {
+    "get": {
+     "tags": [
+      "runs"
+     ],
+     "operationId": "getRunItem",
+     "summary": "One item of a run, with each of its steps.",
+     "description": "The item by its id (\"2\"; a sub-item \"3.12\") -- or by its key, when the key has no '/'. As listRunItems lists it, with steps: each step's status for this item (done, failed, not_run, shared -- a combining step whose output belongs to many items, sharedBy saying how many -- or left_out, when a filter left the item out), its message, rows and files.\n",
+     "security": [
+      {
+       "clientCredentials": [
+        "runs:read"
+       ]
+      }
+     ],
+     "parameters": [
+      {
+       "$ref": "#/components/parameters/RunId"
+      },
+      {
+       "name": "itemKey",
+       "in": "path",
+       "required": true,
+       "schema": {
+        "type": "string"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "The item.",
+       "content": {
+        "application/json": {
+         "schema": {
+          "$ref": "#/components/schemas/RunItem"
+         }
+        }
+       }
+      },
+      "401": {
+       "$ref": "#/components/responses/Unauthorized"
+      },
+      "403": {
+       "$ref": "#/components/responses/Forbidden"
+      },
+      "404": {
+       "$ref": "#/components/responses/NotFound"
+      },
+      "429": {
+       "$ref": "#/components/responses/TooManyRequests"
+      }
+     }
+    }
+   },
    "/runs/{runId}/review": {
     "get": {
      "tags": [
@@ -946,7 +1076,7 @@
      ],
      "operationId": "createViewLink",
      "summary": "A signed, read-only link to the run's page (15 minutes) to embed in a portal.",
-     "description": "A link to the console's page /embed/runs/{token}: the run's status and times, its steps, the files it made (each with a download) and its review, read-only, with no console navigation and no sign-in. Open it on its own or show it in an iframe: only the origins the API client's frame allow-list names may frame it (Integration › API Clients; the page answers Content-Security-Policy frame-ancestors with them, 'none' when there are none), and it refuses everything once it has expired. Append `?theme=light` or `dark`, and `accent=<hex colour>` (e.g. 0b6bcb), to fit the portal. The link opens that one run only: no other run, no file it does not list, nothing of the API. A revoked client's links end at once. Nothing is stored and nothing is billed but this call, so no Idempotency-Key: each call answers a new link. Give each visitor a fresh link rather than a long-lived one.\n",
+     "description": "A link to the console's page /embed/runs/{token}: the run's status and times, its steps, the files it made (each with a download) and its review, read-only, with no console navigation and no sign-in. Open it on its own or show it in an iframe: only the origins the API client's frame allow-list names may frame it (Developers › API Clients; the page answers Content-Security-Policy frame-ancestors with them, 'none' when there are none), and it refuses everything once it has expired. Append `?theme=light` or `dark`, and `accent=<hex colour>` (e.g. 0b6bcb), to fit the portal. The link opens that one run only: no other run, no file it does not list, nothing of the API. A revoked client's links end at once. Nothing is stored and nothing is billed but this call, so no Idempotency-Key: each call answers a new link. Give each visitor a fresh link rather than a long-lived one.\n",
      "security": [
       {
        "clientCredentials": [
@@ -2722,7 +2852,7 @@
     "workspace-not-ready": {
      "status": 409,
      "title": "Conflict",
-     "description": "The workspace has no inbox for API uploads yet; an administrator chooses one under Documents > Inbox.",
+     "description": "The workspace has no inbox for API uploads yet; an administrator chooses one under Documents › Intake › File drop.",
      "operations": [
       "uploadFile",
       "startRun"
@@ -2865,11 +2995,13 @@
     },
     "ReviewStatus": {
      "type": "string",
+     "description": "not_applicable: the pipeline asks for a review, but the run ended without results (failed, skipped, interrupted or missed) -- nothing waits for a reviewer.",
      "enum": [
       "not_required",
       "pending",
       "approved",
-      "rejected"
+      "rejected",
+      "not_applicable"
      ]
     },
     "Pipeline": {
@@ -3403,7 +3535,7 @@
       },
       "task": {
        "type": "string",
-       "description": "The step's task, e.g. read_file, validate, save_file; legacy for a run without steps."
+       "description": "The step's task, e.g. read_file, validate, save_file, generate_report; legacy for a run without steps."
       },
       "status": {
        "type": "string",
@@ -3500,6 +3632,271 @@
       },
       "review": {
        "$ref": "#/components/schemas/Review"
+      }
+     }
+    },
+    "RunItemPage": {
+     "type": "object",
+     "required": [
+      "runId",
+      "summary",
+      "data",
+      "nextCursor"
+     ],
+     "properties": {
+      "runId": {
+       "type": "string"
+      },
+      "summary": {
+       "type": "object",
+       "required": [
+        "items",
+        "done",
+        "failed",
+        "running"
+       ],
+       "description": "Over the run's items (not sub-items): failed counts an item with failed sub-items.",
+       "properties": {
+        "items": {
+         "type": "integer"
+        },
+        "done": {
+         "type": "integer"
+        },
+        "failed": {
+         "type": "integer"
+        },
+        "running": {
+         "type": "integer"
+        }
+       }
+      },
+      "data": {
+       "type": "array",
+       "items": {
+        "$ref": "#/components/schemas/RunItem"
+       }
+      },
+      "nextCursor": {
+       "type": [
+        "string",
+        "null"
+       ]
+      }
+     }
+    },
+    "RunItem": {
+     "type": "object",
+     "required": [
+      "id",
+      "key",
+      "name",
+      "status",
+      "attempt",
+      "files"
+     ],
+     "properties": {
+      "id": {
+       "type": "string",
+       "description": "The item's id in the run: \"2\", a sub-item \"3.12\". The same in every attempt."
+      },
+      "key": {
+       "type": "string",
+       "description": "What names the item: the file's path in the run's own folder, a document id, a row's key."
+      },
+      "name": {
+       "type": "string"
+      },
+      "parentId": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "A sub-item's item (a page's document)."
+      },
+      "status": {
+       "type": "string",
+       "enum": [
+        "running",
+        "done",
+        "failed"
+       ]
+      },
+      "failedStep": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "The key of the step it failed at."
+      },
+      "failedStepName": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "reason": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Why it failed, in words."
+      },
+      "attempt": {
+       "type": "integer",
+       "description": "The run attempt this version of the item is from: a retried item's latest."
+      },
+      "startedAt": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "format": "date-time"
+      },
+      "endedAt": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "format": "date-time"
+      },
+      "durationMs": {
+       "type": [
+        "integer",
+        "null"
+       ]
+      },
+      "subItems": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "properties": {
+        "total": {
+         "type": "integer"
+        },
+        "done": {
+         "type": "integer"
+        },
+        "failed": {
+         "type": "integer"
+        }
+       }
+      },
+      "files": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "required": [
+         "fileId",
+         "name"
+        ],
+        "properties": {
+         "fileId": {
+          "type": "string",
+          "description": "GET /v1/files/{fileId} downloads it."
+         },
+         "name": {
+          "type": "string"
+         },
+         "step": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "format": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "bytes": {
+          "type": [
+           "integer",
+           "null"
+          ]
+         },
+         "expiresAt": {
+          "type": [
+           "string",
+           "null"
+          ],
+          "format": "date-time"
+         }
+        }
+       }
+      },
+      "steps": {
+       "type": "array",
+       "description": "getRunItem only.",
+       "items": {
+        "type": "object",
+        "required": [
+         "key",
+         "status"
+        ],
+        "properties": {
+         "key": {
+          "type": "string"
+         },
+         "name": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "task": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "status": {
+          "type": "string",
+          "enum": [
+           "done",
+           "failed",
+           "not_run",
+           "shared",
+           "left_out"
+          ]
+         },
+         "message": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "rows": {
+          "type": [
+           "integer",
+           "null"
+          ]
+         },
+         "files": {
+          "type": "integer"
+         },
+         "sharedBy": {
+          "type": [
+           "integer",
+           "null"
+          ]
+         },
+         "durationMs": {
+          "type": [
+           "integer",
+           "null"
+          ]
+         },
+         "reusedFromAttempt": {
+          "type": [
+           "integer",
+           "null"
+          ]
+         }
+        }
+       }
       }
      }
     },
@@ -4619,6 +5016,58 @@
   },
   {
    "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "$id": "https://platform/events/run.item.completed.json",
+   "title": "run.item.completed",
+   "description": "One item of a run finished -- done or failed -- in an attempt: a recording, file, document or row the pipeline works on one by one. Sent for each item as its attempt ends, so a customer's system gets every result; a retried item is sent again with its new attempt.",
+   "type": "object",
+   "required": [
+    "id",
+    "type",
+    "createdAt",
+    "workspaceId",
+    "data"
+   ],
+   "properties": {
+    "id": {
+     "type": "string"
+    },
+    "type": {
+     "const": "run.item.completed"
+    },
+    "createdAt": {
+     "type": "string",
+     "format": "date-time"
+    },
+    "workspaceId": {
+     "type": "string"
+    },
+    "data": {
+     "type": "object",
+     "required": [
+      "runId",
+      "pipelineId",
+      "attempt",
+      "item"
+     ],
+     "properties": {
+      "runId": {
+       "type": "string"
+      },
+      "pipelineId": {
+       "type": "string"
+      },
+      "attempt": {
+       "type": "integer"
+      },
+      "item": {
+       "$ref": "#/components/schemas/RunItem"
+      }
+     }
+    }
+   }
+  },
+  {
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
    "$id": "https://platform/events/run.review.decided.json",
    "title": "run.review.decided",
    "description": "A party decided on a run's results; review.status is the state after it.",
@@ -4841,7 +5290,13 @@
    "slug": "quickstart",
    "title": "Quickstart",
    "summary": "Sandbox keys, a token, a pipeline, a file, a run and its results: the whole loop in ten minutes.",
-   "markdown": "# Quickstart\n\nFrom nothing to a finished run and its results, in your sandbox. Every step is one call; each sample comes in curl,\nPython and Node.js, and every one of them is run against the live API before the docs ship.\n\n## Before you start\n\n**A sandbox and a test key.** Your sandbox is a workspace of its own with sample pipelines and data. Nothing you do there\ntouches your organisation's real data, and nothing there is billed. Ask your account team to create it once; after that\nyour workspace administrator makes keys for it in the console, under **Integration › API Clients › Sandbox › New test\nkey**. A test key's client id starts with `cl_test_` and only works in the sandbox: the same calls with it against your\nreal workspace's pipelines answer 404.\n\nFor this guide, give the key the scopes `pipelines:read`, `runs:read`, `runs:write`, `files:read` and `files:write`.\nThe secret is shown once: copy it into your environment, never into code.\n\n```bash\nexport API_URL=\"https://your-console-host/v1\"      # the API's address, as the Developer portal shows it\nexport CLIENT_ID=\"cl_test_...\"                     # your test key's client id\nexport CLIENT_SECRET=\"cs_...\"                      # its secret, shown once\n```\n\n**Tools.** curl and [jq](https://jqlang.org/); Python 3.9+ with `pip install requests`; or Node.js 18+ (its built-in\n`fetch`). Save a Node sample as a `.mjs` file and run it with `node`.\n\n## 1. Get an access token\n\nExchange the client's id and secret for a token (OAuth 2.0 client credentials). It lasts 15 minutes; ask for a new one\nwhen it ends, or when a call answers 401.\n\n<!-- sample id=\"token\" sets=\"TOKEN=access_token\" expect='{\"token_type\":\"Bearer\"}' -->\n```bash\ncurl -sS --fail-with-body \"$API_URL/oauth/token\" \\\n  -d grant_type=client_credentials \\\n  -d client_id=\"$CLIENT_ID\" \\\n  --data-urlencode client_secret=\"$CLIENT_SECRET\"\n```\n\n```python\nimport json, os\nimport requests\n\nanswer = requests.post(f\"{os.environ['API_URL']}/oauth/token\", data={\n    \"grant_type\": \"client_credentials\",\n    \"client_id\": os.environ[\"CLIENT_ID\"],\n    \"client_secret\": os.environ[\"CLIENT_SECRET\"],\n})\nanswer.raise_for_status()\nprint(json.dumps(answer.json(), indent=2))\n```\n\n```javascript\nconst answer = await fetch(`${process.env.API_URL}/oauth/token`, {\n  method: 'POST',\n  body: new URLSearchParams({\n    grant_type: 'client_credentials',\n    client_id: process.env.CLIENT_ID,\n    client_secret: process.env.CLIENT_SECRET,\n  }),\n});\nif (!answer.ok) throw new Error(`${answer.status} ${await answer.text()}`);\nconsole.log(JSON.stringify(await answer.json(), null, 2));\n```\n\nKeep the `access_token` from the answer:\n\n```bash\nexport TOKEN=\"eyJ...\"    # access_token\n```\n\n## 2. Find a pipeline\n\nA pipeline is what a run does. The sandbox has two samples; this guide uses **Sample orders**, which takes an order\nrecord and keeps it as a file. Its `inputContract` says what a record must look like.\n\n<!-- sample id=\"pipelines\" sets=\"PIPELINE_ID=data[name=Sample+orders].id\" -->\n```bash\ncurl -sS --fail-with-body \"$API_URL/pipelines\" -H \"Authorization: Bearer $TOKEN\"\n```\n\n```python\nimport json, os\nimport requests\n\nanswer = requests.get(f\"{os.environ['API_URL']}/pipelines\",\n                      headers={\"Authorization\": f\"Bearer {os.environ['TOKEN']}\"})\nanswer.raise_for_status()\nprint(json.dumps(answer.json(), indent=2))\n```\n\n```javascript\nconst answer = await fetch(`${process.env.API_URL}/pipelines`, {\n  headers: { Authorization: `Bearer ${process.env.TOKEN}` },\n});\nif (!answer.ok) throw new Error(`${answer.status} ${await answer.text()}`);\nconsole.log(JSON.stringify(await answer.json(), null, 2));\n```\n\nKeep its id:\n\n```bash\nexport PIPELINE_ID=\"...\"    # the id of \"Sample orders\"\n```\n\n## 3. Upload a file\n\nFiles a run should read are uploaded first; the answer is a `file_id`. Every creating `POST` takes an\n`Idempotency-Key`: send the same key again and you get the same answer, never a second file (see\n[Idempotency](idempotency)).\n\n<!-- sample id=\"upload\" sets=\"FILE_ID=id\" expect='{\"role\":\"input\"}' -->\n```bash\nprintf 'order_id,amount\\nORD-1001,12.50\\n' > order.csv\ncurl -sS --fail-with-body \"$API_URL/files\" \\\n  -H \"Authorization: Bearer $TOKEN\" \\\n  -H \"Idempotency-Key: $(uuidgen)\" \\\n  -F \"file=@order.csv;type=text/csv\"\n```\n\n```python\nimport json, os, uuid\nimport requests\n\nanswer = requests.post(f\"{os.environ['API_URL']}/files\",\n                       headers={\"Authorization\": f\"Bearer {os.environ['TOKEN']}\", \"Idempotency-Key\": str(uuid.uuid4())},\n                       files={\"file\": (\"order.csv\", b\"order_id,amount\\nORD-1001,12.50\\n\", \"text/csv\")})\nanswer.raise_for_status()\nprint(json.dumps(answer.json(), indent=2))\n```\n\n```javascript\nimport { randomUUID } from 'node:crypto';\n\nconst form = new FormData();\nform.append('file', new Blob(['order_id,amount\\nORD-1001,12.50\\n'], { type: 'text/csv' }), 'order.csv');\nconst answer = await fetch(`${process.env.API_URL}/files`, {\n  method: 'POST',\n  headers: { Authorization: `Bearer ${process.env.TOKEN}`, 'Idempotency-Key': randomUUID() },\n  body: form,\n});\nif (!answer.ok) throw new Error(`${answer.status} ${await answer.text()}`);\nconsole.log(JSON.stringify(await answer.json(), null, 2));\n```\n\nKeep the file id:\n\n```bash\nexport FILE_ID=\"01J...\"    # id\n```\n\n## 4. Start a run\n\nSend the record and the file ids. The record is checked against the pipeline's input contract first: a record it refuses\nis a 422 that names each field (see [Errors](errors)), and nothing starts. `reference` is your own id for this work; it is\nechoed back on the run and in its events. The answer is 202 with the queued run.\n\n<!-- sample id=\"start\" sets=\"RUN_ID=id\" expect='{\"status\":\"queued\",\"reference\":\"po-1001\"}' -->\n```bash\ncurl -sS --fail-with-body \"$API_URL/pipelines/$PIPELINE_ID/runs\" \\\n  -H \"Authorization: Bearer $TOKEN\" \\\n  -H \"Idempotency-Key: $(uuidgen)\" \\\n  -H \"Content-Type: application/json\" \\\n  -d \"{\\\"record\\\": {\\\"order_id\\\": \\\"ORD-1001\\\", \\\"amount\\\": 12.5, \\\"customer\\\": \\\"Quickstart\\\"},\n       \\\"files\\\": [\\\"$FILE_ID\\\"], \\\"reference\\\": \\\"po-1001\\\"}\"\n```\n\n```python\nimport json, os, uuid\nimport requests\n\nanswer = requests.post(\n    f\"{os.environ['API_URL']}/pipelines/{os.environ['PIPELINE_ID']}/runs\",\n    headers={\"Authorization\": f\"Bearer {os.environ['TOKEN']}\", \"Idempotency-Key\": str(uuid.uuid4())},\n    json={\"record\": {\"order_id\": \"ORD-1001\", \"amount\": 12.5, \"customer\": \"Quickstart\"},\n          \"files\": [os.environ[\"FILE_ID\"]], \"reference\": \"po-1001\"})\nanswer.raise_for_status()\nprint(json.dumps(answer.json(), indent=2))\n```\n\n```javascript\nimport { randomUUID } from 'node:crypto';\n\nconst answer = await fetch(`${process.env.API_URL}/pipelines/${process.env.PIPELINE_ID}/runs`, {\n  method: 'POST',\n  headers: {\n    Authorization: `Bearer ${process.env.TOKEN}`,\n    'Idempotency-Key': randomUUID(),\n    'Content-Type': 'application/json',\n  },\n  body: JSON.stringify({\n    record: { order_id: 'ORD-1001', amount: 12.5, customer: 'Quickstart' },\n    files: [process.env.FILE_ID],\n    reference: 'po-1001',\n  }),\n});\nif (!answer.ok) throw new Error(`${answer.status} ${await answer.text()}`);\nconsole.log(JSON.stringify(await answer.json(), null, 2));\n```\n\nKeep the run id:\n\n```bash\nexport RUN_ID=\"...\"    # id\n```\n\nOne run of a pipeline is in flight at a time: a second start while one runs is a 409 (`/problems/run-in-flight`).\n\n## 5. Follow the run\n\nRead the run until its status settles: `queued` and `running` move on; `completed`, `failed`, `skipped` and\n`interrupted` are final. Polling every few seconds is fine for a script; a portal should use\n[webhooks](webhooks) instead.\n\n<!-- sample id=\"follow\" expect='{\"status\":\"completed\"}' -->\n```bash\nwhile :; do\n  run=$(curl -sS --fail-with-body \"$API_URL/runs/$RUN_ID\" -H \"Authorization: Bearer $TOKEN\")\n  status=$(echo \"$run\" | jq -r .status)\n  if [ \"$status\" != queued ] && [ \"$status\" != running ]; then echo \"$run\"; break; fi\n  sleep 3\ndone\n```\n\n```python\nimport json, os, time\nimport requests\n\nwhile True:\n    answer = requests.get(f\"{os.environ['API_URL']}/runs/{os.environ['RUN_ID']}\",\n                          headers={\"Authorization\": f\"Bearer {os.environ['TOKEN']}\"})\n    answer.raise_for_status()\n    run = answer.json()\n    if run[\"status\"] not in (\"queued\", \"running\"):\n        break\n    time.sleep(3)\nprint(json.dumps(run, indent=2))\n```\n\n```javascript\nlet run;\nfor (;;) {\n  const answer = await fetch(`${process.env.API_URL}/runs/${process.env.RUN_ID}`, {\n    headers: { Authorization: `Bearer ${process.env.TOKEN}` },\n  });\n  if (!answer.ok) throw new Error(`${answer.status} ${await answer.text()}`);\n  run = await answer.json();\n  if (run.status !== 'queued' && run.status !== 'running') break;\n  await new Promise(resolve => setTimeout(resolve, 3000));\n}\nconsole.log(JSON.stringify(run, null, 2));\n```\n\nTimes are RFC 3339 in UTC (`2026-10-06T14:00:00Z`). `GET /runs/{runId}/steps` lists what each step did.\n\n**When a run fails**, its `message` and its steps say where and why. Once the cause is fixed -- the API a step called is\nback, or the pipeline's failed step was corrected -- `POST /runs/{runId}/retry` (with an `Idempotency-Key`) runs it again\nas its next attempt, from the step that failed: the steps before it are not run again (their kept outputs are reused and\nnot billed twice), and the run keeps its id. Send `{\"from\": \"start\"}` to run every step again instead. A retry that cannot\nresume -- a step before the failed one changed, a file it read changed, or its kept outputs expired (after 24 hours unless\nthe pipeline keeps them longer) -- is a 409 whose `type` says which; [Errors](errors) lists them.\n\n## 6. Read the results\n\nThe run's outputs are its manifest: the files it was given (role `input`) and the files it made (`result`, `report`),\neach with its id, size and sha256.\n\n<!-- sample id=\"outputs\" sets=\"RESULT_FILE_ID=files[role=result].id\" expect='{\"status\":\"completed\"}' -->\n```bash\ncurl -sS --fail-with-body \"$API_URL/runs/$RUN_ID/outputs\" -H \"Authorization: Bearer $TOKEN\"\n```\n\n```python\nimport json, os\nimport requests\n\nanswer = requests.get(f\"{os.environ['API_URL']}/runs/{os.environ['RUN_ID']}/outputs\",\n                      headers={\"Authorization\": f\"Bearer {os.environ['TOKEN']}\"})\nanswer.raise_for_status()\nprint(json.dumps(answer.json(), indent=2))\n```\n\n```javascript\nconst answer = await fetch(`${process.env.API_URL}/runs/${process.env.RUN_ID}/outputs`, {\n  headers: { Authorization: `Bearer ${process.env.TOKEN}` },\n});\nif (!answer.ok) throw new Error(`${answer.status} ${await answer.text()}`);\nconsole.log(JSON.stringify(await answer.json(), null, 2));\n```\n\nTo download one, see [Files and file links](files). Next: be told when runs finish instead of asking, with\n[Webhooks](webhooks).\n\n## Going live\n\nWhen your integration works in the sandbox, your workspace administrator makes an ordinary key (`cl_...`) under\n**Integration › API Clients** with the same scopes. Change `CLIENT_ID` and `CLIENT_SECRET`, and use your real pipelines'\nids; nothing else changes.\n"
+   "markdown": "# Quickstart\n\nFrom nothing to a finished run and its results, in your sandbox. Every step is one call; each sample comes in curl,\nPython and Node.js, and every one of them is run against the live API before the docs ship.\n\n## Before you start\n\n**A sandbox and a test key.** Your sandbox is a workspace of its own with sample pipelines and data. Nothing you do there\ntouches your organisation's real data, and nothing there is billed. Ask your account team to create it once; after that\nyour workspace administrator makes keys for it in the console, under **Developers › API Clients › Sandbox › New test\nkey**. A test key's client id starts with `cl_test_` and only works in the sandbox: the same calls with it against your\nreal workspace's pipelines answer 404. [The sandbox](sandbox) says what is in it.\n\nFor this guide, give the key the scopes `pipelines:read`, `runs:read`, `runs:write`, `files:read` and `files:write`.\nThe secret is shown once: copy it into your environment, never into code.\n\n```bash\nexport API_URL=\"https://your-console-host/v1\"      # the API's address, as the Developer portal shows it\nexport CLIENT_ID=\"cl_test_...\"                     # your test key's client id\nexport CLIENT_SECRET=\"cs_...\"                      # its secret, shown once\n```\n\n**Tools.** curl and [jq](https://jqlang.org/); Python 3.9+ with `pip install requests`; or Node.js 18+ (its built-in\n`fetch`). Save a Node sample as a `.mjs` file and run it with `node`.\n\n## 1. Get an access token\n\nExchange the client's id and secret for a token (OAuth 2.0 client credentials). It lasts 15 minutes; ask for a new one\nwhen it ends, or when a call answers 401.\n\n<!-- sample id=\"token\" sets=\"TOKEN=access_token\" expect='{\"token_type\":\"Bearer\"}' -->\n```bash\ncurl -sS --fail-with-body \"$API_URL/oauth/token\" \\\n  -d grant_type=client_credentials \\\n  -d client_id=\"$CLIENT_ID\" \\\n  --data-urlencode client_secret=\"$CLIENT_SECRET\"\n```\n\n```python\nimport json, os\nimport requests\n\nanswer = requests.post(f\"{os.environ['API_URL']}/oauth/token\", data={\n    \"grant_type\": \"client_credentials\",\n    \"client_id\": os.environ[\"CLIENT_ID\"],\n    \"client_secret\": os.environ[\"CLIENT_SECRET\"],\n})\nanswer.raise_for_status()\nprint(json.dumps(answer.json(), indent=2))\n```\n\n```javascript\nconst answer = await fetch(`${process.env.API_URL}/oauth/token`, {\n  method: 'POST',\n  body: new URLSearchParams({\n    grant_type: 'client_credentials',\n    client_id: process.env.CLIENT_ID,\n    client_secret: process.env.CLIENT_SECRET,\n  }),\n});\nif (!answer.ok) throw new Error(`${answer.status} ${await answer.text()}`);\nconsole.log(JSON.stringify(await answer.json(), null, 2));\n```\n\nKeep the `access_token` from the answer:\n\n```bash\nexport TOKEN=\"eyJ...\"    # access_token\n```\n\n## 2. Find a pipeline\n\nA pipeline is what a run does. The sandbox has two samples; this guide uses **Sample orders**, which takes an order\nrecord and keeps it as a file. Its `inputContract` says what a record must look like.\n\n<!-- sample id=\"pipelines\" sets=\"PIPELINE_ID=data[name=Sample+orders].id\" -->\n```bash\ncurl -sS --fail-with-body \"$API_URL/pipelines\" -H \"Authorization: Bearer $TOKEN\"\n```\n\n```python\nimport json, os\nimport requests\n\nanswer = requests.get(f\"{os.environ['API_URL']}/pipelines\",\n                      headers={\"Authorization\": f\"Bearer {os.environ['TOKEN']}\"})\nanswer.raise_for_status()\nprint(json.dumps(answer.json(), indent=2))\n```\n\n```javascript\nconst answer = await fetch(`${process.env.API_URL}/pipelines`, {\n  headers: { Authorization: `Bearer ${process.env.TOKEN}` },\n});\nif (!answer.ok) throw new Error(`${answer.status} ${await answer.text()}`);\nconsole.log(JSON.stringify(await answer.json(), null, 2));\n```\n\nKeep its id:\n\n```bash\nexport PIPELINE_ID=\"...\"    # the id of \"Sample orders\"\n```\n\n## 3. Upload a file\n\nFiles a run should read are uploaded first; the answer is a `file_id`. Every creating `POST` takes an\n`Idempotency-Key`: send the same key again and you get the same answer, never a second file (see\n[Idempotency](idempotency)).\n\n<!-- sample id=\"upload\" sets=\"FILE_ID=id\" expect='{\"role\":\"input\"}' -->\n```bash\nprintf 'order_id,amount\\nORD-1001,12.50\\n' > order.csv\ncurl -sS --fail-with-body \"$API_URL/files\" \\\n  -H \"Authorization: Bearer $TOKEN\" \\\n  -H \"Idempotency-Key: $(uuidgen)\" \\\n  -F \"file=@order.csv;type=text/csv\"\n```\n\n```python\nimport json, os, uuid\nimport requests\n\nanswer = requests.post(f\"{os.environ['API_URL']}/files\",\n                       headers={\"Authorization\": f\"Bearer {os.environ['TOKEN']}\", \"Idempotency-Key\": str(uuid.uuid4())},\n                       files={\"file\": (\"order.csv\", b\"order_id,amount\\nORD-1001,12.50\\n\", \"text/csv\")})\nanswer.raise_for_status()\nprint(json.dumps(answer.json(), indent=2))\n```\n\n```javascript\nimport { randomUUID } from 'node:crypto';\n\nconst form = new FormData();\nform.append('file', new Blob(['order_id,amount\\nORD-1001,12.50\\n'], { type: 'text/csv' }), 'order.csv');\nconst answer = await fetch(`${process.env.API_URL}/files`, {\n  method: 'POST',\n  headers: { Authorization: `Bearer ${process.env.TOKEN}`, 'Idempotency-Key': randomUUID() },\n  body: form,\n});\nif (!answer.ok) throw new Error(`${answer.status} ${await answer.text()}`);\nconsole.log(JSON.stringify(await answer.json(), null, 2));\n```\n\nKeep the file id:\n\n```bash\nexport FILE_ID=\"01J...\"    # id\n```\n\n## 4. Start a run\n\nSend the record and the file ids. The record is checked against the pipeline's input contract first: a record it refuses\nis a 422 that names each field (see [Errors](errors)), and nothing starts. `reference` is your own id for this work; it is\nechoed back on the run and in its events. The answer is 202 with the queued run.\n\n<!-- sample id=\"start\" sets=\"RUN_ID=id\" expect='{\"status\":\"queued\",\"reference\":\"po-1001\"}' -->\n```bash\ncurl -sS --fail-with-body \"$API_URL/pipelines/$PIPELINE_ID/runs\" \\\n  -H \"Authorization: Bearer $TOKEN\" \\\n  -H \"Idempotency-Key: $(uuidgen)\" \\\n  -H \"Content-Type: application/json\" \\\n  -d \"{\\\"record\\\": {\\\"order_id\\\": \\\"ORD-1001\\\", \\\"amount\\\": 12.5, \\\"customer\\\": \\\"Quickstart\\\"},\n       \\\"files\\\": [\\\"$FILE_ID\\\"], \\\"reference\\\": \\\"po-1001\\\"}\"\n```\n\n```python\nimport json, os, uuid\nimport requests\n\nanswer = requests.post(\n    f\"{os.environ['API_URL']}/pipelines/{os.environ['PIPELINE_ID']}/runs\",\n    headers={\"Authorization\": f\"Bearer {os.environ['TOKEN']}\", \"Idempotency-Key\": str(uuid.uuid4())},\n    json={\"record\": {\"order_id\": \"ORD-1001\", \"amount\": 12.5, \"customer\": \"Quickstart\"},\n          \"files\": [os.environ[\"FILE_ID\"]], \"reference\": \"po-1001\"})\nanswer.raise_for_status()\nprint(json.dumps(answer.json(), indent=2))\n```\n\n```javascript\nimport { randomUUID } from 'node:crypto';\n\nconst answer = await fetch(`${process.env.API_URL}/pipelines/${process.env.PIPELINE_ID}/runs`, {\n  method: 'POST',\n  headers: {\n    Authorization: `Bearer ${process.env.TOKEN}`,\n    'Idempotency-Key': randomUUID(),\n    'Content-Type': 'application/json',\n  },\n  body: JSON.stringify({\n    record: { order_id: 'ORD-1001', amount: 12.5, customer: 'Quickstart' },\n    files: [process.env.FILE_ID],\n    reference: 'po-1001',\n  }),\n});\nif (!answer.ok) throw new Error(`${answer.status} ${await answer.text()}`);\nconsole.log(JSON.stringify(await answer.json(), null, 2));\n```\n\nKeep the run id:\n\n```bash\nexport RUN_ID=\"...\"    # id\n```\n\nOne run of a pipeline is in flight at a time: a second start while one runs is a 409 (`/problems/run-in-flight`).\n\n## 5. Follow the run\n\nRead the run until its status settles: `queued` and `running` move on; `completed`, `failed`, `skipped` and\n`interrupted` are final. Polling every few seconds is fine for a script; a portal should use\n[webhooks](webhooks) instead.\n\n<!-- sample id=\"follow\" expect='{\"status\":\"completed\"}' -->\n```bash\nwhile :; do\n  run=$(curl -sS --fail-with-body \"$API_URL/runs/$RUN_ID\" -H \"Authorization: Bearer $TOKEN\")\n  status=$(echo \"$run\" | jq -r .status)\n  if [ \"$status\" != queued ] && [ \"$status\" != running ]; then echo \"$run\"; break; fi\n  sleep 3\ndone\n```\n\n```python\nimport json, os, time\nimport requests\n\nwhile True:\n    answer = requests.get(f\"{os.environ['API_URL']}/runs/{os.environ['RUN_ID']}\",\n                          headers={\"Authorization\": f\"Bearer {os.environ['TOKEN']}\"})\n    answer.raise_for_status()\n    run = answer.json()\n    if run[\"status\"] not in (\"queued\", \"running\"):\n        break\n    time.sleep(3)\nprint(json.dumps(run, indent=2))\n```\n\n```javascript\nlet run;\nfor (;;) {\n  const answer = await fetch(`${process.env.API_URL}/runs/${process.env.RUN_ID}`, {\n    headers: { Authorization: `Bearer ${process.env.TOKEN}` },\n  });\n  if (!answer.ok) throw new Error(`${answer.status} ${await answer.text()}`);\n  run = await answer.json();\n  if (run.status !== 'queued' && run.status !== 'running') break;\n  await new Promise(resolve => setTimeout(resolve, 3000));\n}\nconsole.log(JSON.stringify(run, null, 2));\n```\n\nTimes are RFC 3339 in UTC (`2026-10-06T14:00:00Z`). `GET /runs/{runId}/steps` lists what each step did.\n\n**When a run fails**, its `message` and its steps say where and why. Once the cause is fixed -- the API a step called is\nback, or the pipeline's failed step was corrected -- `POST /runs/{runId}/retry` (with an `Idempotency-Key`) runs it again\nas its next attempt, from the step that failed: the steps before it are not run again (their kept outputs are reused and\nnot billed twice), and the run keeps its id. Send `{\"from\": \"start\"}` to run every step again instead. A retry that cannot\nresume -- a step before the failed one changed, a file it read changed, or its kept outputs expired (after 24 hours unless\nthe pipeline keeps them longer) -- is a 409 whose `type` says which; [Errors](errors) lists them.\n\n## 6. Read the results\n\nThe run's outputs are its manifest: the files it was given (role `input`) and the files it made (`result`, `report`),\neach with its id, size and sha256.\n\n<!-- sample id=\"outputs\" sets=\"RESULT_FILE_ID=files[role=result].id\" expect='{\"status\":\"completed\"}' -->\n```bash\ncurl -sS --fail-with-body \"$API_URL/runs/$RUN_ID/outputs\" -H \"Authorization: Bearer $TOKEN\"\n```\n\n```python\nimport json, os\nimport requests\n\nanswer = requests.get(f\"{os.environ['API_URL']}/runs/{os.environ['RUN_ID']}/outputs\",\n                      headers={\"Authorization\": f\"Bearer {os.environ['TOKEN']}\"})\nanswer.raise_for_status()\nprint(json.dumps(answer.json(), indent=2))\n```\n\n```javascript\nconst answer = await fetch(`${process.env.API_URL}/runs/${process.env.RUN_ID}/outputs`, {\n  headers: { Authorization: `Bearer ${process.env.TOKEN}` },\n});\nif (!answer.ok) throw new Error(`${answer.status} ${await answer.text()}`);\nconsole.log(JSON.stringify(await answer.json(), null, 2));\n```\n\nTo download one, see [Files and file links](files). Next: be told when runs finish instead of asking, with\n[Webhooks](webhooks).\n\n## Going live\n\nWhen your integration works in the sandbox, your workspace administrator makes an ordinary key (`cl_...`) under\n**Developers › API Clients** with the same scopes. Change `CLIENT_ID` and `CLIENT_SECRET`, and use your real pipelines'\nids; nothing else changes.\n"
+  },
+  {
+   "slug": "sandbox",
+   "title": "The sandbox",
+   "summary": "A workspace of your own to test in: its sample pipelines, test keys, what they can reach, and going live.",
+   "markdown": "# The sandbox\n\nBuild and test your integration against a workspace of its own, with sample pipelines and data, before it touches your\norganisation's real pipelines. Nothing in the sandbox is billed.\n\n## What is in it\n\nYour account team creates the sandbox once, on request; your workspace administrators then see it in the console under\n**Developers › API Clients › Sandbox**. It holds:\n\n| | |\n|---|---|\n| Pipelines | **Sample orders** (takes an order record and keeps it as a file) and **Sample orders with review** (the same, and its result waits for your decision through the API). |\n| Data contract | `sample_order`: what an order record must look like -- `order_id` (`ORD-` and digits) and `amount` required, `customer` optional. `GET /pipelines` lists it as each pipeline's `inputContract`. |\n| Event route | `sample.order.created`: send it to `POST /events` and it starts **Sample orders**. |\n\nThe sandbox is a workspace like any other: runs, files, webhooks, events, retries, view links, rate-limit headers and\nproblem types all behave as they do in your real workspace. It has rate limits of its own, so a test run never uses up\nyour real clients' calls.\n\n## Test keys\n\nA sandbox key is a **test key**: its client id starts with `cl_test_`. Your workspace administrator makes one in the\nconsole under **Developers › API Clients › Sandbox › New test key**, picks its scopes, and copies the secret, which is\nshown once. Revoke it or make it a new secret there, as with any key.\n\n- A test key acts only in the sandbox. Your real workspace's pipelines, runs and files are `404` to it, exactly as\n  another organisation's are.\n- An ordinary key (`cl_...`) gets no token for the sandbox, and a test key gets none outside it: `POST /oauth/token`\n  answers `401`.\n- Nothing a test key does is billed. The sandbox is a workspace of its own, so what you make there never shows in your\n  real workspace.\n\nCheck which kind of key you hold and what its sandbox offers: the token from the [Quickstart](quickstart), step 1, and\nthe sandbox's pipelines.\n\n<!-- sample id=\"what-is-here\" expect='{\"testKey\":true}' -->\n```bash\ncurl -sS --fail-with-body \"$API_URL/pipelines\" -H \"Authorization: Bearer $TOKEN\" \\\n  | jq '{testKey: (env.CLIENT_ID | startswith(\"cl_test_\")), pipelines: [.data[] | {id, name, emits}]}'\n```\n\n```python\nimport json, os\nimport requests\n\nanswer = requests.get(f\"{os.environ['API_URL']}/pipelines\",\n                      headers={\"Authorization\": f\"Bearer {os.environ['TOKEN']}\"})\nanswer.raise_for_status()\nprint(json.dumps({\n    \"testKey\": os.environ[\"CLIENT_ID\"].startswith(\"cl_test_\"),\n    \"pipelines\": [{\"id\": p[\"id\"], \"name\": p[\"name\"], \"emits\": p[\"emits\"]} for p in answer.json()[\"data\"]],\n}, indent=2))\n```\n\n```javascript\nconst answer = await fetch(`${process.env.API_URL}/pipelines`, {\n  headers: { Authorization: `Bearer ${process.env.TOKEN}` },\n});\nif (!answer.ok) throw new Error(`${answer.status} ${await answer.text()}`);\nconst { data } = await answer.json();\nconsole.log(JSON.stringify({\n  testKey: process.env.CLIENT_ID.startsWith('cl_test_'),\n  pipelines: data.map(p => ({ id: p.id, name: p.name, emits: p.emits })),\n}, null, 2));\n```\n\n## A good order to try things in\n\n1. The [Quickstart](quickstart): a token, **Sample orders**, a file, a run and its outputs.\n2. [Webhooks](webhooks): subscribe, verify the signature, and send yourself `sample.order.created`.\n3. **Sample orders with review**: start a run, receive `run.review.requested` when it completes, and decide it yourself\n   with `POST /runs/{runId}/review` (scope `reviews:write`); `run.review.decided` follows.\n4. [Errors](errors), [Idempotency](idempotency) and [Rate limits and quotas](limits): send a bad record, the same\n   request twice, and a burst of calls, and see what your client does with the answers.\n\nUse only made-up records in the sandbox, as its samples do. It is for testing an integration, not for keeping data.\n\n## Going live\n\nWhen your integration works in the sandbox, your workspace administrator makes an ordinary key under\n**Developers › API Clients** with the same scopes. Change `CLIENT_ID` and `CLIENT_SECRET`, and use your real pipelines'\nids; the calls, the answers and the events are the same. Keep the test key for your own tests: it never reaches your\nreal data.\n"
   },
   {
    "slug": "webhooks",
@@ -4854,6 +5309,18 @@
    "title": "Files and file links",
    "summary": "Upload for a run, download what a run made through a short-lived signed link.",
    "markdown": "# Files and file links\n\nFiles go in through `POST /files` (see the [Quickstart](quickstart), step 3) and come out through short-lived signed\nlinks. You never see a bucket, a storage key or a connection: a file is its id (a 26-character ULID), the only id of a\nfile you will ever be given.\n\n| | |\n|---|---|\n| Upload | `POST /files`, multipart, field `file`, at most 100 MB, with an `Idempotency-Key`. Scope `files:write`. Uploading starts nothing. |\n| Describe | `GET /files/{fileId}/meta`: name, role, content type, bytes, sha256, created and expiry times. Scope `files:read`. |\n| Download | `GET /files/{fileId}`: a `302` to a signed link on this API, valid 5 minutes, that needs no token. Scope `files:read`. |\n\nA run's manifest (`GET /runs/{runId}/outputs`) lists its files by id. The examples below use the file the quickstart's\nrun made:\n\n```bash\nexport RESULT_FILE_ID=\"01J...\"    # from the manifest: the file with role \"result\"\n```\n\n## Describe a file\n\n<!-- sample id=\"meta\" expect='{\"role\":\"result\"}' -->\n```bash\ncurl -sS --fail-with-body \"$API_URL/files/$RESULT_FILE_ID/meta\" -H \"Authorization: Bearer $TOKEN\"\n```\n\n```python\nimport json, os\nimport requests\n\nanswer = requests.get(f\"{os.environ['API_URL']}/files/{os.environ['RESULT_FILE_ID']}/meta\",\n                      headers={\"Authorization\": f\"Bearer {os.environ['TOKEN']}\"})\nanswer.raise_for_status()\nprint(json.dumps(answer.json(), indent=2))\n```\n\n```javascript\nconst answer = await fetch(`${process.env.API_URL}/files/${process.env.RESULT_FILE_ID}/meta`, {\n  headers: { Authorization: `Bearer ${process.env.TOKEN}` },\n});\nif (!answer.ok) throw new Error(`${answer.status} ${await answer.text()}`);\nconsole.log(JSON.stringify(await answer.json(), null, 2));\n```\n\n## Download it\n\nFollow the redirect. The signed link carries its own proof, so a client that drops the `Authorization` header on a\nredirect still works; check the bytes against the `sha256` the manifest and `meta` give.\n\n<!-- sample id=\"download\" -->\n```bash\ncurl -sS --fail-with-body -L -o result.json \"$API_URL/files/$RESULT_FILE_ID\" -H \"Authorization: Bearer $TOKEN\"\nshasum -a 256 result.json\n```\n\n```python\nimport hashlib, json, os\nimport requests\n\nanswer = requests.get(f\"{os.environ['API_URL']}/files/{os.environ['RESULT_FILE_ID']}\",\n                      headers={\"Authorization\": f\"Bearer {os.environ['TOKEN']}\"})\nanswer.raise_for_status()\nwith open(\"result.json\", \"wb\") as f:\n    f.write(answer.content)\nprint(json.dumps({\"bytes\": len(answer.content), \"sha256\": hashlib.sha256(answer.content).hexdigest()}))\n```\n\n```javascript\nimport { createHash } from 'node:crypto';\nimport { writeFile } from 'node:fs/promises';\n\nconst answer = await fetch(`${process.env.API_URL}/files/${process.env.RESULT_FILE_ID}`, {\n  headers: { Authorization: `Bearer ${process.env.TOKEN}` },\n});\nif (!answer.ok) throw new Error(`${answer.status} ${await answer.text()}`);\nconst bytes = Buffer.from(await answer.arrayBuffer());\nawait writeFile('result.json', bytes);\nconsole.log(JSON.stringify({ bytes: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex') }));\n```\n\n## Hand a link to someone else\n\nDon't follow the redirect, and you get the link itself as `{url, expiresAt}` (also in `Location`). It opens the file\nwith no token for 5 minutes, so a browser can download it directly: give it to your user's browser rather than\nproxying the bytes. Ask again for a fresh one when it has expired (410, `/problems/link-expired`).\n\n<!-- sample id=\"link\" sets=\"LINK_URL=url\" -->\n```bash\ncurl -sS \"$API_URL/files/$RESULT_FILE_ID\" -H \"Authorization: Bearer $TOKEN\" -H \"Accept: application/json\"\n```\n\n```python\nimport json, os\nimport requests\n\nanswer = requests.get(f\"{os.environ['API_URL']}/files/{os.environ['RESULT_FILE_ID']}\",\n                      headers={\"Authorization\": f\"Bearer {os.environ['TOKEN']}\"}, allow_redirects=False)\nassert answer.status_code == 302, answer.text\nprint(json.dumps(answer.json(), indent=2))\n```\n\n```javascript\nconst answer = await fetch(`${process.env.API_URL}/files/${process.env.RESULT_FILE_ID}`, {\n  headers: { Authorization: `Bearer ${process.env.TOKEN}` },\n  redirect: 'manual',\n});\nif (answer.status !== 302) throw new Error(`${answer.status} ${await answer.text()}`);\nconsole.log(JSON.stringify(await answer.json(), null, 2));\n```\n\nThe `url` is relative to the API's host (`/v1/files/{fileId}/content?token=...`): prefix your API host's origin.\n\n## Expiry\n\nA file a run made can have an expiry (the pipeline keeps its results for a while). Past it, the manifest still lists the\nfile with `\"expired\": true`, and a download is 410 (`/problems/file-expired`): run the pipeline again for a new one.\n"
+  },
+  {
+   "slug": "run-items",
+   "title": "Run items",
+   "summary": "Each file, recording, document or row a pipeline processed one by one: its status, why it failed, its files, and being told as each finishes.",
+   "markdown": "# Run items\n\nA pipeline that works **item by item** -- a step per recording, per file, per document, per row of a per-row Call API,\none file or report per row, or a **Split pages** step that turns a PDF into its pages -- keeps one **item** per thing it\nprocessed. Each item has its own status, the step it failed at and why in words, its files, and (a document's pages) its\nown sub-items. A pipeline that reads a table whole has no items; its run's steps and outputs are as before.\n\n| | |\n|---|---|\n| List | `GET /runs/{runId}/items` -- in the run's order, `limit` and `cursor` as every list ([Paging](paging)), `status` (`running`, `done`, `failed`; `failed` takes in a document with a failed page), `parentId` (one item's sub-items). Scope `runs:read`. |\n| One | `GET /runs/{runId}/items/{itemKey}` -- by its `id` (`\"2\"`, a page `\"3.12\"`), or by its `key` when the key has no `/`; with each of its `steps`. Scope `runs:read`. |\n| Its files | each item's `files`, by file id: `GET /files/{fileId}` downloads one ([Files](files)). |\n| Told when one finishes | the webhook event `run.item.completed`, data `{runId, pipelineId, attempt, item}` ([Webhooks](webhooks)). |\n\n## The failed items of a run\n\n```bash\ncurl -sS --fail-with-body \"$API_URL/runs/$RUN_ID/items?status=failed\" -H \"Authorization: Bearer $TOKEN\"\n```\n\n```json\n{\n  \"runId\": \"8814\",\n  \"summary\": { \"items\": 50, \"done\": 48, \"failed\": 2, \"running\": 0 },\n  \"data\": [\n    {\n      \"id\": \"2\", \"key\": \"voice-intake/call-b.m4a\", \"name\": \"call-b.m4a\", \"parentId\": null,\n      \"status\": \"failed\", \"failedStep\": \"insight\", \"failedStepName\": \"Call insight\",\n      \"reason\": \"The model's answer did not match the step's schema.\", \"attempt\": 1,\n      \"subItems\": null,\n      \"files\": [ { \"fileId\": \"01J...\", \"name\": \"call-b-transcript.txt\", \"step\": \"transcribe\", \"format\": \"txt\", \"bytes\": 4210 } ]\n    }\n  ],\n  \"nextCursor\": null\n}\n```\n\n## What a step did for an item\n\n`steps[].status` is `done`, `failed`, `not_run` (an earlier step failed for it), `left_out` (a filter left the item out:\nit ends there) or `shared` -- a join, aggregate or dedupe whose output belongs to many items at once, `sharedBy` saying\nhow many. A shared output is never one item's: read it from the run's outputs.\n\n## Retries\n\nA workspace retries failed items in the console (the run page's Items tab: Retry failed items, Retry this item, Retry\nfrom the failed step, Retry page). That is a new attempt of the run in which only those items run again; each per-row\ncall is keyed by its item (an AI prompt's by the item and what it asks), so the other items are neither called nor\nbilled again. Retrying from the failed step runs each item from the step it failed at: a step an item had already\npassed is not run for it again, and its earlier output there is reused. The run's outputs stay whole: a step over the\nwhole table (a join, an aggregate, a file of every row) reads every item's rows in the retry, the other items' as they\nwere. A retried item's `attempt` is the new one, and `run.item.completed` is sent for it again; its earlier\nversion is kept in the console for audit.\n\nA report a **Generate report** step made for an item (one report per row) is kept for that item as soon as it is made,\neven when a later row of the same step fails. A retry that reaches the step makes only the reports it needs -- the\nretried items' -- and reuses the others: the same row, design and settings give the same report version, not made or\nbilled again (only reports actually made are metered).\n\n## Scanned pages\n\nA **Read text from pages** step reads the page images Split pages made with the platform's own OCR, by default only the\npages with no text layer of their own. Each page stays a sub-item of its document (`parentId`) with its own status; a page\nthe reader was less sure of than the step's threshold is marked to be checked by hand, and the workspace's reviewers get\none Task inbox task naming the pages to check. Each page read is metered as `ocr.pages`.\n\n## Limits\n\nA run keeps at most 1,000 items and 10,000 sub-items; a run with more keeps none and its log says so. An item's data and\nfiles are kept as long as the run's own (the pipeline's retention); after that the item is listed with its status and\nits files are listed as expired.\n"
+  },
+  {
+   "slug": "reports",
+   "title": "Reports from a pipeline",
+   "summary": "A pipeline's Generate report step makes a branded PDF: be told it is there, find it in the run's outputs, download it.",
+   "markdown": "# Reports from a pipeline\n\nA pipeline can make a finished, branded report from the rows it has: its **Generate report** step fills a Report Studio\ndesign with them and keeps the PDF with the run. Through the API you start the run as usual, are told when the PDF is\nthere, and download it like any file a run made.\n\n## How the step makes a report\n\nThe report is designed in the console, by your workspace's people, in one of two ways:\n\n- **Design the report here**: a design that belongs to the step, made in Report Studio's designer from the step's own\n  data (the rows of the step before it, from the pipeline's latest run).\n- **Use a saved template**: a published template of the workspace, its latest version or a pinned one.\n\nEach run then makes one report from the rows that reach the step -- tables, charts, KPI tiles, QR codes, watermarks and\nthe workspace's brand, as the design says -- and keeps its PDF with the run. The rows pass on unchanged to the steps after\nit. The same report is also a new version in the console's **See results › Reports › Library**, where people approve and\nsign it.\n\nBefore it makes the report, the step checks that the rows still have the fields the design reads. When they do not, or\nthe design's own checks refuse the data, the step fails and the run's `message` says why (`run.failed`) -- unless the\nstep is set to carry on with a warning, in which case the run completes **without** a report. Look for the report in the\noutputs rather than assuming it is there.\n\n## 1. Find a pipeline that makes files\n\n`GET /pipelines` says what each pipeline's runs send: one that makes files -- a report, a CSV, a file kept in a bucket --\nlists `file.available` in `emits`.\n\n<!-- sample id=\"makers\" -->\n```bash\ncurl -sS --fail-with-body \"$API_URL/pipelines\" -H \"Authorization: Bearer $TOKEN\" \\\n  | jq '{makeFiles: [.data[] | select(.emits | index(\"file.available\")) | {id, name}]}'\n```\n\n```python\nimport json, os\nimport requests\n\nanswer = requests.get(f\"{os.environ['API_URL']}/pipelines\",\n                      headers={\"Authorization\": f\"Bearer {os.environ['TOKEN']}\"})\nanswer.raise_for_status()\nmakers = [{\"id\": p[\"id\"], \"name\": p[\"name\"]} for p in answer.json()[\"data\"] if \"file.available\" in p[\"emits\"]]\nprint(json.dumps({\"makeFiles\": makers}, indent=2))\n```\n\n```javascript\nconst answer = await fetch(`${process.env.API_URL}/pipelines`, {\n  headers: { Authorization: `Bearer ${process.env.TOKEN}` },\n});\nif (!answer.ok) throw new Error(`${answer.status} ${await answer.text()}`);\nconst { data } = await answer.json();\nconst makeFiles = data.filter(p => p.emits.includes('file.available')).map(p => ({ id: p.id, name: p.name }));\nconsole.log(JSON.stringify({ makeFiles }, null, 2));\n```\n\nStart a run of it as the [Quickstart](quickstart) does (step 4): a record, files, or both.\n\n## 2. Be told when the report is there\n\nSubscribe a webhook to `file.available` (see [Webhooks](webhooks)). Each file a run makes sends one event once the file\nis kept; a report's PDF has the `role` `report`:\n\n```json\n{\n  \"id\": \"...\",\n  \"type\": \"file.available\",\n  \"createdAt\": \"2026-10-20T14:05:12Z\",\n  \"workspaceId\": \"...\",\n  \"data\": {\n    \"runId\": \"48213\",\n    \"file\": {\n      \"id\": \"01JB7Q...\",\n      \"name\": \"Monthly-summary-2026-10.pdf\",\n      \"role\": \"report\",\n      \"contentType\": \"application/pdf\",\n      \"bytes\": 184320,\n      \"sha256\": \"9f2c...\",\n      \"createdAt\": \"2026-10-20T14:05:12Z\",\n      \"expiresAt\": \"2026-10-21T14:05:12Z\"\n    }\n  }\n}\n```\n\n`run.completed` follows once the whole run is done. If you would rather not run a receiver, follow the run\n(`GET /runs/{runId}`) until it is `completed` and read its outputs.\n\n## 3. Read the report from the run's outputs\n\nThe run's manifest lists every file it made; the reports are the files with the `role` `report`. `step` is the key of\nthe step that made each one.\n\n<!-- sample id=\"report-files\" expect='{\"status\":\"completed\"}' -->\n```bash\ncurl -sS --fail-with-body \"$API_URL/runs/$RUN_ID/outputs\" -H \"Authorization: Bearer $TOKEN\" \\\n  | jq '{status, reports: [.files[] | select(.role == \"report\") | {id, name, step, bytes, sha256}]}'\n```\n\n```python\nimport json, os\nimport requests\n\nanswer = requests.get(f\"{os.environ['API_URL']}/runs/{os.environ['RUN_ID']}/outputs\",\n                      headers={\"Authorization\": f\"Bearer {os.environ['TOKEN']}\"})\nanswer.raise_for_status()\nmanifest = answer.json()\nreports = [{k: f.get(k) for k in (\"id\", \"name\", \"step\", \"bytes\", \"sha256\")}\n           for f in manifest[\"files\"] if f[\"role\"] == \"report\"]\nprint(json.dumps({\"status\": manifest[\"status\"], \"reports\": reports}, indent=2))\n```\n\n```javascript\nconst answer = await fetch(`${process.env.API_URL}/runs/${process.env.RUN_ID}/outputs`, {\n  headers: { Authorization: `Bearer ${process.env.TOKEN}` },\n});\nif (!answer.ok) throw new Error(`${answer.status} ${await answer.text()}`);\nconst manifest = await answer.json();\nconst reports = manifest.files.filter(f => f.role === 'report')\n  .map(({ id, name, step, bytes, sha256 }) => ({ id, name, step, bytes, sha256 }));\nconsole.log(JSON.stringify({ status: manifest.status, reports }, null, 2));\n```\n\nDownload one with `GET /files/{fileId}` ([Files and file links](files)) and compare its sha256 with the manifest's. It is\nkept for the pipeline's retention, like every file a run makes.\n\n## Approval and signing happen in the console\n\nThe PDF in a run's outputs is the report **as it was generated**: nobody has approved it yet, and it carries no approval\nsignature. In the console, someone allowed to approve reports -- never the one who generated that version (for a\npipeline's report, the owner of the schedule that ran it) -- approves it in **Reports › Library**. The approval\ncertifies the PDF with a digital signature in the approver's name, and the console's **Verify** says whether a file is\none of the workspace's approved reports, unchanged.\n\nA version can also be marked **Void** with a reason: it stays in the library, and every copy served from then on says\nVOID. The file a run kept is not changed by either.\n\nNot in the API yet: no call lists the Reports library, downloads a version's approved and signed PDF, or verifies a\nfile, and no event says that a report was approved, signed or voided. Until there is, a person downloads the signed PDF\nfrom the console. The [Changelog](changelog) will say when that changes.\n\n## Billing\n\nEach report version is metered as one document conversion (`convert.documents`), the same whether a person made it in\nthe console or a pipeline's step did; the run itself is billed as any run.\n"
   },
   {
    "slug": "idempotency",
@@ -4883,31 +5350,35 @@
    "slug": "embedding",
    "title": "Embedding a run view",
    "summary": "Show a run's progress and results inside your own portal with a signed, 15-minute link.",
-   "markdown": "# Embedding a run view\n\nShow a run's progress and results inside your own portal without building the screen: ask for a **view link** and put\nit in an iframe. The page shows the run's status and times, its steps, the files it made (each with a download) and its\nreview, and refreshes itself while the run moves. It has no console navigation, needs no sign-in, sends no cookies, and\nshows that one run only.\n\n## 1. Allow your portal's origin\n\nA view may be framed only by the origins your API client allows. Your workspace administrator sets them on the client,\nunder **Integration › API Clients › Change › Sites that may embed its run views**: `https://portal.example.com`, `https://*.example.com`,\nor plain `http://localhost:<port>` while you build. With none, the link still opens on its own but no page can frame it.\n\n## 2. Ask for a link\n\n`POST /runs/{runId}/view-links` (scope `runs:read`) answers `{url, expiresAt}`: a signed link that lasts 15 minutes,\nor less if you ask (`{\"expiresInSeconds\": 60..900}`). Nothing is stored, so there is no `Idempotency-Key`: each call is\na new link. Ask for it when your page is shown, never in advance.\n\n<!-- sample id=\"view-link\" sets=\"VIEW_URL=url\" -->\n```bash\ncurl -sS --fail-with-body -X POST \"$API_URL/runs/$RUN_ID/view-links\" \\\n  -H \"Authorization: Bearer $TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"expiresInSeconds\": 600}'\n```\n\n```python\nimport json, os\nimport requests\n\nanswer = requests.post(f\"{os.environ['API_URL']}/runs/{os.environ['RUN_ID']}/view-links\",\n                       headers={\"Authorization\": f\"Bearer {os.environ['TOKEN']}\"}, json={\"expiresInSeconds\": 600})\nanswer.raise_for_status()\nprint(json.dumps(answer.json(), indent=2))\n```\n\n```javascript\nconst answer = await fetch(`${process.env.API_URL}/runs/${process.env.RUN_ID}/view-links`, {\n  method: 'POST',\n  headers: { Authorization: `Bearer ${process.env.TOKEN}`, 'Content-Type': 'application/json' },\n  body: JSON.stringify({ expiresInSeconds: 600 }),\n});\nif (!answer.ok) throw new Error(`${answer.status} ${await answer.text()}`);\nconsole.log(JSON.stringify(await answer.json(), null, 2));\n```\n\nMake this call from your server: your API token never goes to the browser, only the link does.\n\n## 3. Frame it\n\n```html\n<iframe\n  src=\"VIEW_URL?theme=light&accent=%230f766e\"\n  title=\"Order processing\"\n  style=\"width: 100%; height: 640px; border: 0\"\n  referrerpolicy=\"no-referrer\"></iframe>\n```\n\n- `theme=light` or `theme=dark` fits your page (otherwise the visitor's preference); `accent=<hex colour>` colours its\n  highlights.\n- When the link expires the page says so and reads nothing more: ask for a new link and set the iframe's `src` again.\n- Revoking or expiring the API client ends its links at once (410, `/problems/link-ended`).\n\n## What it costs\n\nMaking a link is one counted call (`api.calls`). What the page reads and the files it downloads are signed links: not\ncounted, not billed as calls.\n"
+   "markdown": "# Embedding a run view\n\nShow a run's progress and results inside your own portal without building the screen: ask for a **view link** and put\nit in an iframe. The page shows the run's status and times, its steps, the files it made (each with a download) and its\nreview, and refreshes itself while the run moves. It has no console navigation, needs no sign-in, sends no cookies, and\nshows that one run only.\n\n## 1. Allow your portal's origin\n\nA view may be framed only by the origins your API client allows. Your workspace administrator sets them on the client,\nunder **Developers › API Clients › Change › Sites that may embed its run views**: `https://portal.example.com`, `https://*.example.com`,\nor plain `http://localhost:<port>` while you build. With none, the link still opens on its own but no page can frame it.\n\n## 2. Ask for a link\n\n`POST /runs/{runId}/view-links` (scope `runs:read`) answers `{url, expiresAt}`: a signed link that lasts 15 minutes,\nor less if you ask (`{\"expiresInSeconds\": 60..900}`). Nothing is stored, so there is no `Idempotency-Key`: each call is\na new link. Ask for it when your page is shown, never in advance.\n\n<!-- sample id=\"view-link\" sets=\"VIEW_URL=url\" -->\n```bash\ncurl -sS --fail-with-body -X POST \"$API_URL/runs/$RUN_ID/view-links\" \\\n  -H \"Authorization: Bearer $TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"expiresInSeconds\": 600}'\n```\n\n```python\nimport json, os\nimport requests\n\nanswer = requests.post(f\"{os.environ['API_URL']}/runs/{os.environ['RUN_ID']}/view-links\",\n                       headers={\"Authorization\": f\"Bearer {os.environ['TOKEN']}\"}, json={\"expiresInSeconds\": 600})\nanswer.raise_for_status()\nprint(json.dumps(answer.json(), indent=2))\n```\n\n```javascript\nconst answer = await fetch(`${process.env.API_URL}/runs/${process.env.RUN_ID}/view-links`, {\n  method: 'POST',\n  headers: { Authorization: `Bearer ${process.env.TOKEN}`, 'Content-Type': 'application/json' },\n  body: JSON.stringify({ expiresInSeconds: 600 }),\n});\nif (!answer.ok) throw new Error(`${answer.status} ${await answer.text()}`);\nconsole.log(JSON.stringify(await answer.json(), null, 2));\n```\n\nMake this call from your server: your API token never goes to the browser, only the link does.\n\n## 3. Frame it\n\n```html\n<iframe\n  src=\"VIEW_URL?theme=light&accent=%230f766e\"\n  title=\"Order processing\"\n  style=\"width: 100%; height: 640px; border: 0\"\n  referrerpolicy=\"no-referrer\"></iframe>\n```\n\n- `theme=light` or `theme=dark` fits your page (otherwise the visitor's preference); `accent=<hex colour>` colours its\n  highlights.\n- When the link expires the page says so and reads nothing more: ask for a new link and set the iframe's `src` again.\n- Revoking or expiring the API client ends its links at once (410, `/problems/link-ended`).\n\n## What it costs\n\nMaking a link is one counted call (`api.calls`). What the page reads and the files it downloads are signed links: not\ncounted, not billed as calls.\n"
   }
  ],
- "changelog": "# Customer API changelog\n\nAdditive changes stay in /v1; a breaking change goes to /v2, with v1 kept at least 12 months and announced by\n`Deprecation` and `Sunset` headers.\n\n## v1.0.0-draft, MIG-347 (2026-10-13): backfills and a pipeline's run parameters\n\n- New, additive: `POST /pipelines/{pipelineId}/backfills` (scope `runs:write`, `Idempotency-Key` required) runs a\n  pipeline once for each day, hour or week of a past range -- `from`, `to`, `step` (`daily` by default), `concurrency`\n  (1 to 4, 2 by default), `rerunCompleted` and the pipeline's `parameters` -- a few at a time, beside the pipeline's own\n  runs. Days are counted in the workspace's billing time zone. At most 366 periods; at most 3 open backfills a workspace.\n  202 with the `Backfill` and `Location: /v1/backfills/{backfillId}`.\n- New: `GET /backfills/{backfillId}` (`runs:read`): its status, counts, why it waits, when it should end, and its first\n  100 periods with each one's run id. `POST /backfills/{backfillId}/cancel` (`runs:write`, `Idempotency-Key`): nothing\n  more is queued; runs already started finish.\n- New problem types (409): `too-many-backfills`, `backfill-overlaps`, `nothing-to-run`, `pipeline-not-backfillable`,\n  `backfill-closed`; and 422 `invalid-parameters`.\n- Additive: `GET /pipelines` and `GET /pipelines/{pipelineId}` list a pipeline's `parameters` (name, type, label,\n  required, default, choices). Every step of a run reads `{{param.name}}`, and `{{run.date}}`, `{{run.windowStart}}`\n  and `{{run.windowEnd}}` -- the day the run is for and its bounds.\n- A backfill's runs are runs: `GET /runs` lists them, their events (`run.*`) are sent as any run's, and they are billed as\n  any run. No cost estimate is in the API: what a workspace is billed is its administrators' to read in the console.\n\n## v1.0.0-draft, MIG-355 (2026-10-13): the `alert.opened` and `alert.resolved` event types\n\n- New in the catalogue: `alert.opened` (one of the workspace's alert rules fired; sent once per alert, never repeated\n  while it stays open) and `alert.resolved` (the alert cleared by itself, or a person resolved it). Only rules that ask\n  for the webhook channel send them, and every Active webhook of the workspace that subscribes to the type receives them.\n- `data`: `alertId`, `ruleId`, `ruleName`, `kind` (`run_failed`, `schedule_missed`, `run_slow`, `review_waiting`),\n  `severity` (`warning`, `critical`), `state` (`open`, `resolved`), `subject` (e.g. `pipeline:2976`), `pipelineId` and\n  `runId` (or null), `title`, `detail`, `occurrences`, `firstSeenAt`, `lastSeenAt`, `resolvedAt` and `resolvedHow`\n  (`auto`, `manual`, or null while open). The platform's own alerts never reach a webhook.\n- Signed, retried, logged and billed (`webhook.deliveries`) like every other delivery.\n\n## v1.0.0-draft, ADR-027 and bulk review (2026-10-12): a PDF's full data beside it\n\n- Additive: a run whose pipeline makes a PDF (the `render_pdf` step) now lists **two** files for that step in\n  `GET /runs/{runId}/outputs`: the PDF (role `report`) and the full data as `<name>-data.csv` (role `result`, `rows`\n  set). A PDF prints at most the step's first rows of a big table (5,000 unless the step says otherwise) and says where\n  the rest are; the CSV holds every row. The step's `attachFullData` setting (on by default) turns the CSV off. Both are\n  downloaded with `GET /files/{fileId}` and kept for the pipeline's retention like any made file. The CSV is not billed\n  as a conversion.\n- Fixed: big uploads (`POST /files`) stream through the gateway again. A GET retry added the same day made the gateway\n  hold every request body in memory, and a few-hundred-MB upload answered 500.\n- Unchanged for the API: a workspace administrator may now decide many runs' internal review at once in the console\n  (bulk review). Each run is still decided on its own and sends the same `run.review.decided` event; the customer\n  party's decision (`POST /runs/{runId}/review`) is never taken in bulk.\n\n## v1.0.0-draft, MIG-346 (2026-10-12): the `run.step.sent` event type\n\n- New in the catalogue: `run.step.sent`. A pipeline's **Send webhook** step sends its rows or a summary to ONE webhook\n  of the workspace, which the step names; only that webhook receives it, even when others subscribe to the type. A\n  webhook must subscribe to `run.step.sent` (and be active) for a step to send to it.\n- `data`: `runId`, `pipelineId`, `stepKey`, `stepName` (or null), `attempt`, `mode` (`rows` or `summary`), `rowCount`,\n  `sentAt`; with `columns` and `rows` for `rows`, `fields` (label to value) for `summary`, and `truncated` when the\n  step sent fewer rows than it had. One event is at most 1 MiB.\n- It is signed, retried, logged in the webhook's delivery log and billed (`webhook.deliveries`) like every other\n  delivery. A step tried again sends the same event id: deduplicate on `Webhook-Id` as usual.\n\n## v1.0.0-draft, MIG-345 (2026-10-07): retry a failed run from the step that failed\n\n- Served: `POST /runs/{runId}/retry` (scope `runs:write`, `Idempotency-Key` required). It runs a failed run again as its\n  next attempt -- the same run id, `attempt` one higher -- and answers **202** with the Run and `Location: /v1/runs/{runId}`.\n  Optional body `{\"from\": \"failed_step\"}` (the default) or `{\"from\": \"start\"}`; anything else is 422 at `from`.\n- `failed_step` resumes at the first step of the latest attempt that did not complete. The steps before it are not run\n  again: their kept outputs are reused and their work is not billed again. The failed step and every step after it run on\n  the pipeline as it is now, so a fix to the failed step (or a later one) is what the retry runs.\n- A retry that cannot be done is **409** problem+json whose `type` is the reason: `/problems/run-not-failed`,\n  `run-in-flight`, `pipeline-inactive`, `workspace-paused`, and for a resume `pipeline-changed` (the source or a step\n  before the failed one changed: its key, task, input or settings; its name, retries, timeout and on-error may),\n  `input-changed` (a file a reused step read changed since, judged by its sha256, or is gone), `outputs-expired` (a reused\n  step's kept output is past the pipeline's retention, 24 hours unless set) and `not-resumable` (no step to resume from,\n  inputs that cannot be checked, or 20 attempts). New in `components.x-problem-types`.\n- Additive: the Run has `retry` -- `{from, fromStep, previousAttempt, reusedSteps, requestedThrough}` when someone retried\n  the current attempt (through the API or the console), else null -- and a Step has `reusedFromAttempt`, the attempt whose\n  output a step that was not run again reused (such a step has no times of its own). `GET /runs/{runId}/outputs` lists the\n  files the reused steps made beside the attempt's own.\n- Events: a retry's attempt sends `run.started` and then `run.completed` or `run.failed` like any attempt, each with the\n  new `attempt` and its `retry`.\n- Billing: a run is one run on the bill however many attempts it takes (`pipeline.runs` is counted once per run); what the\n  re-run steps do (AI tokens, storage reads, ...) is metered as usual, and the reused steps meter nothing. A resume reads\n  each file a reused step read once more to compare its sha256: that read is billed as any pipeline read.\n\n## v1.0.0-draft, H9 (2026-10-07): the quota month is the bill's month\n\n- A workspace's monthly quota of calls counts the bill's month: a calendar month in the workspace's billing time zone\n  (America/Chicago unless set), where it was UTC's. `Quota-Remaining`, `Quota-Reset`, `Retry-After` and\n  `/problems/quota-exceeded` follow it; the problem's `detail` names the date calls are taken again and the zone. A zone\n  change starts with a month, never in the middle of one. The month's name (\"2026-10\") is the same, so no counter restarts.\n\n## v1.0.0-draft, MIG-343 (2026-10-06): response timeouts\n\n- A call whose service does not answer within 30 seconds (120 for `POST /files` and a file's content, the upload\n  included) is answered **504** `/problems/timeout`, with the request id; one whose service cannot be reached, **502**\n  `/problems/bad-gateway`. Both are additive problem types (`components.x-problem-types`). Before, such a call waited\n  without end.\n- A download is never cut while it keeps flowing; one that stops sending for 30 seconds is ended (the status was\n  already sent, so the body ends short).\n- Retry both with the same `Idempotency-Key`: a timed-out write may have been made.\n\n## v1.0.0-draft, MIG-336 (2026-10-06): the developer portal and the sandbox\n\n- The contract lists its problem types: `components.x-problem-types`, each `/problems/<kind>` with its status, what it\n  means and, where only some operations answer it, which. Nothing a service answers changed.\n- A **sandbox** per organisation, on request: a workspace of its own with sample pipelines (`Sample orders`, `Sample\n  orders with review`), the data contract `sample_order` and the event route `sample.order.created`. Its keys are **test\n  keys**, client ids beginning `cl_test_`, made by the organisation's administrators (Integration › API Clients ›\n  Sandbox). A test key acts only in the sandbox: the organisation's real pipelines, runs and files are 404 to it, as\n  another workspace's are. A test key outside a sandbox, or an ordinary key inside one, gets no token (401). Nothing in a\n  sandbox is billed; its calls still carry the rate-limit headers and count against its own limits.\n- The **developer portal** in the console (Integration › Developer portal): this reference, guides (quickstart, webhooks,\n  files, idempotency, paging, errors, limits, embedding) with samples in curl, Python and Node.js, the event types, the\n  problem types, this changelog, and downloads of the OpenAPI document and a Postman collection. Every sample is run\n  against the live API in a sandbox (`tests/customer-api/docs_check.py`).\n\n## v1.0.0-draft, MIG-335 (2026-10-06): the embeddable run view\n\n- Served: `POST /runs/{runId}/view-links` (scope `runs:read`): 201 `{url, expiresAt}`, a signed link, valid 15 minutes,\n  to a read-only page of the run on the console (`/embed/runs/{token}`): its status and times, its steps, the files it\n  made with a download each, its review. No console navigation, no sign-in, no cookies. Optional body\n  `{\"expiresInSeconds\": 60..900}` for a shorter life (422 outside it). No `Idempotency-Key`: nothing is stored, each call\n  answers a new link. A run that is not the workspace's is 404.\n- Framing: only the origins the API client's frame allow-list names may show the page in an iframe (set in Integration ›\n  API Clients; in a workspace our team manages, our team sets it); the page answers Content-Security-Policy\n  `frame-ancestors` with them, `'none'` when there are none. Append `?theme=light|dark` and `accent=<hex>` to fit a portal.\n- New, signed (`security: []`, `x-signed-link: true`): `GET /embed/runs/{token}` -- what the page shows (`RunView`), for the\n  link's holder; `GET /embed/runs/{token}/frame` -- where it may be framed (`RunViewFrame`, and the `Embed-Frame-Ancestors`\n  header). 410 once expired (`/problems/link-expired`) or when the client that made the link was revoked or has expired\n  (`/problems/link-ended`); 404 for a token this API did not make, or one changed to name another run.\n- A view link opens that one run only: it is no access token for the API, no file link, and names no other run. The\n  downloads it carries are ordinary signed file links that end no later than the view.\n- Billing: making a link is a counted call (`api.calls`); the page's reads and downloads are signed links, not counted and\n  not billed as calls (a download is a storage read, as before).\n\n## v1.0.0-draft, MIG-337 (2026-10-06): rate limits, a monthly quota, and metering\n\n- Every call that needs a token is held to two token buckets -- its client's (by default 600 calls a minute, burst 100)\n  and its workspace's over all its clients (1,200 a minute, burst 200) -- and, when the workspace has one, a monthly quota\n  of calls (a calendar month in UTC). A workspace administrator may give a client a lower limit of its own; the platform\n  sets a workspace's bounds and quota.\n- Every answer to a counted call carries `RateLimit-Limit`, `RateLimit-Remaining`, `RateLimit-Reset` and\n  `RateLimit-Policy` (e.g. `600;w=60;burst=100;scope=client`), for the bucket that allows fewer calls now. With a quota:\n  `Quota-Limit`, `Quota-Remaining`, `Quota-Reset`, and `Quota-Warning` from 80% used.\n- Past a limit: 429 problem+json with `Retry-After` -- `/problems/rate-limited` (seconds until one call is allowed) or\n  `/problems/quota-exceeded` (seconds until the month ends). Nothing is done, nothing is billed. If the limits cannot be\n  counted the answer is 503 with `Retry-After` (fail closed).\n- Written down: `TooManyRequests` on every operation that needs a token, and the headers above (`components.headers`).\n- Billing: each counted call is `api.calls`, each webhook delivery that arrives `webhook.deliveries`, on the workspace's\n  invoice ($0.10 per 1,000 each on the Standard card). The token endpoint and signed links are not counted.\n\n## v1.0.0-draft, MIG-333 (2026-10-06): the event catalogue and webhooks served\n\n- Served: `GET /event-types`, `GET /webhooks`, `POST /webhooks`, `GET|PATCH|DELETE /webhooks/{webhookId}`,\n  `POST /webhooks/{webhookId}/rotate-secret`, `GET /webhooks/{webhookId}/deliveries`,\n  `POST /webhooks/{webhookId}/deliveries/{deliveryId}/redeliver` (integration-service).\n- The platform sends `run.started`, `run.completed`, `run.failed`, `run.review.requested`, `run.review.decided`,\n  `file.available` and `form.submission.received`. The catalogue's schemas are self-contained (no `$ref`).\n- What a receiver gets is written down (`webhooks.event`): `Webhook-Delivery` beside `Webhook-Id` and\n  `Webhook-Signature`; one `v1` per secret in force for 24 hours after a rotation; the retry schedule (10 s, 30 s, 90 s\n  ... at most an hour apart, for 24 hours); a webhook failing for 3 days is paused; delivery at least once, deduplicate on\n  `Webhook-Id`, order by `createdAt`.\n- `POST /webhooks`: the URL must be https to a public address -- a private, loopback, link-local or metadata one is 422\n  at `url`; at most 20 webhooks a workspace (409); only events after it is made are sent; `Location`. In a workspace our\n  team manages, making, changing, removing and rotating are 403 (`/problems/managed-workspace`).\n- `PATCH /webhooks/{id}`: `active: true` also clears a pause the platform made. `POST .../redeliver` answers 202 with the\n  new `Delivery` (409 when the webhook is paused).\n- `Webhook` has `updatedAt`, `failingSince`, `lastSuccessAt`, `secretRotatedAt`, `previousSecretValidUntil`. `Delivery`\n  has `lastAttemptAt`, `deliveredAt`, `error` and `redeliveryOf`; `attempt` is the attempts made.\n- 400, 401, 403, 404, 409 and 422 written down where they happen.\n\n## v1.0.0-draft, MIG-334 (2026-10-06): the read side served\n\n- Served: `GET /runs`, `GET /runs/{runId}`, `GET /runs/{runId}/steps`, `GET /runs/{runId}/outputs`,\n  `GET /runs/{runId}/review`, `POST /runs/{runId}/review`, `GET /files/{fileId}`, `GET /files/{fileId}/meta`, and the\n  new `GET /files/{fileId}/content`. `POST /runs/{runId}/retry` and `POST /runs/{runId}/view-links` stay planned.\n- New: `GET /files/{fileId}/content?token=` -- the signed link `GET /files/{fileId}` redirects to; no access token\n  (`security: []`, `x-signed-link: true`), 410 once expired. `GET /files/{fileId}` answers `{url, expiresAt}` beside\n  its 302 (`FileLink`), and 410 for a made file past its expiry (the `Gone` response).\n- `GET /runs` takes `createdAfter`; a filter that is not RFC 3339 with an offset is 400.\n- `Run` has `attempt`. `Step` has `durationMs`, `name` may be null, and its status may be `interrupted`. The steps'\n  answer says `runId` and `attempt`.\n- `Manifest` is what a run holds today: `runId`, `pipelineId`, `status` (the run's), `attempt`, `generatedAt`, `files`\n  (`ManifestFile`: a `File` with `step`, `rows` and `expired`) and `review`. The draft's `pipeline`, `contract`,\n  `totals` and `records` are out until something writes per-record results; they come back as added fields.\n- `File`: `sha256` and `contentType` may be null (a file a run made before files carried one).\n- `Review` has `decidedAt` and `rerunRunId`, and in the answer to a decision with `rerun`, `rerun {queued, runId,\n  message}`. A decision the run's state refuses is 409 `/problems/review-not-open`.\n- More of the answers are written down: 400, 401 and 403 where they happen.\n\n## v1.0.0-draft, MIG-332 (2026-10-06): served\n\n- Served: `POST /oauth/token`, `GET /pipelines`, `GET /pipelines/{pipelineId}`, `POST /pipelines/{pipelineId}/runs`,\n  `POST /files`, `POST /events`. Every other operation is a 404 at the edge until its card lands.\n- `POST /events` answers `workflows` (the workflow requests it started) and `notStarted` (what a route names that did\n  not start, and why) beside `started`; `type` has a pattern.\n- More of the answers the served operations give are written down: 400, 401, 403 and 409 on `POST /files`; 400, 401,\n  403, 413 and 503 on `POST /events`; 503 (`Unavailable`, with `Retry-After`) where an input contract cannot be read.\n- The token endpoint's problems also carry OAuth's own `error` code (`invalid_client`, `invalid_scope`, ...).\n\n## v1.0.0-draft (2026-10-06)\n\n- The first draft: auth (client credentials), pipelines, runs, steps, outputs, files, reviews, forms, events in,\n  event types, webhooks. Not served yet; built card by card (MIG-332..338).\n",
+ "changelog": "# Customer API changelog\n\nAdditive changes stay in /v1; a breaking change goes to /v2, with v1 kept at least 12 months and announced by\n`Deprecation` and `Sunset` headers.\n\n## v1.0.0-draft, Run Items v2 polish (2026-10-22): a page's rotation\n\n- Additive: **Read text from pages** (`ocr_pages`) adds `ocr_rotation`: how far the page was turned, clockwise in degrees\n  (0, 90, 180 or 270), to be read upright -- 0 for a page read as it came and for a page with its own text layer, null for\n  a page that could not be read. The engine's guess of a page's orientation is checked against the words read: a page it\n  turned, or one read unsurely, is read the other way up as well and the surer reading is kept, so a handwritten page is\n  no longer read upside down. A turned page's `ocr_note` says so (\"Turned 180° to be read upright.\").\n\n## v1.0.0-draft, Run Items v2 (2026-10-22): reports kept on retry, Read text from pages\n\n- Additive: a new pipeline step, **Read text from pages** (`ocr_pages`): the page images an earlier step made (Split pages)\n  read with the platform's own OCR -- only the pages with no text layer by default, or every page -- adding `ocr_text`,\n  `ocr_sureness` (0-100), `ocr_source` (`ocr` or `text-layer`), `ocr_words`, `ocr_status` (`ok`, `check` or `failed`) and\n  `ocr_note`. A page read less surely than the step's threshold is `check`: the workspace is asked to check it by hand in\n  its Task inbox. Each page is still a sub-item of its document (`GET /runs/{runId}/items?parentId=`), with its own status.\n  A page read is metered as `ocr.pages` (a page with its own text layer is not read, and not metered).\n- Changed (billing only): with **Generate report**'s one report per row, each report is kept for its item as soon as it is\n  made, even when a later row fails; a retry makes only the reports the retried items need and reuses the others (same\n  row, design, version and settings: the same report version, not made or billed again).\n- Unchanged: every path, answer shape, problem type and event.\n\n## v1.0.0-draft, Run Items (2026-10-22): each item a pipeline processes, with its status and files\n\n- Additive: **`GET /runs/{runId}/items`** (`runs:read`) -- a run's items: each recording, file, document or row its pipeline\n  works on one by one (a step per recording, per file, per document, per row of a per-row Call API, one file or report per\n  row, or **Split pages**), in order, cursor paging, filtered by `status` (`running`, `done`, `failed`) and `parentId` (a\n  document's pages). Each item says the step it failed at and why, how many of its sub-items failed, and the files its\n  steps made for it by file id (`GET /files/{fileId}`). A run that reads a table whole has no items: an empty list.\n- Additive: **`GET /runs/{runId}/items/{itemKey}`** -- one item by its id (`\"2\"`, a page `\"3.12\"`) or by a key with no `/`,\n  with each of its steps for that item: `done`, `failed`, `not_run`, `shared` (a join, aggregate or dedupe whose output\n  belongs to many items, `sharedBy` saying how many) or `left_out` (a filter left it out).\n- Additive: the webhook event **`run.item.completed`**, one per item as its attempt ends (done or failed), data\n  `{runId, pipelineId, attempt, item}`; a retried item is sent again with its new attempt. Signed and retried as every event.\n- Additive: a new pipeline step, **Split pages** (`split_pages`): each row's PDF into one row per page, with the page's text\n  and its image kept with the run; every page is a sub-item of its document.\n- A retry of some items (the console's Retry failed items) is a new attempt of the run in which only those items run again;\n  each per-row call is keyed by its item, so only the retried calls are made, and billed, again.\n- Unchanged: every other path, answer shape, problem type and event.\n\n## v1.0.0-draft, file-a-row steps (2026-10-20): Transcribe audio, Convert file, one file per row\n\n- Additive: two pipeline steps take one file per row from the workspace's own bucket -- **Transcribe audio**\n  (`transcribe_audio`: a recording to text, with its language and length) and **Convert file** (`convert_file`: a document\n  to PDF, text, docx, csv... as Tools › Converter converts it). Both can read the files a run was started for (an inbox),\n  so an inbox pipeline needs no read step. Converted files written to a bucket or kept with the run are listed in\n  `GET /runs/{runId}/outputs` like any file a run made (a kept one is downloaded with `GET /files/{fileId}`).\n- Additive: **Save File** and **Upload to bucket** can write **one file per row**, named from the row's columns\n  (`insights/{{file_stem}}.json`); each such file is its own entry in `GET /runs/{runId}/outputs`, so one run over a folder\n  lists one output per file. `file.available` is sent for each kept file, as before.\n- Additive: **Read S3** can read **only the files written since the job's last completed run** (`since: last_run`), so a\n  scheduled pipeline reads each new file once; and **Generate report** can make **one report per row** (`perRow`), each a\n  report of its own in the library and its own PDF entry in `GET /runs/{runId}/outputs`.\n- Metering: a transcription is billed as `ai.transcript.minutes` and a conversion as `convert.documents`, to the run's\n  workspace, once per file per run attempt -- the console's Transcript and Converter tools bill the same meters.\n- Unchanged: every path, answer shape, problem type and event; a pipeline without these steps or options runs as before.\n\n## v1.0.0-draft, Report Studio phase 5 (2026-10-20): a Generate report step's PDF in a run's outputs\n\n- Additive: a pipeline's new **Generate report** step (`generate_report`) makes a Report Studio report from the rows it\n  reads -- with a design made inside the step, or a published template of the workspace -- and keeps its PDF with the\n  run. `GET /runs/{runId}/outputs` lists that PDF (role `report`, `contentType` `application/pdf`, `step` the step's\n  key), `file.available` is sent for it, and `GET /pipelines` lists `file.available` in `emits` for a pipeline that has\n  such a step. Download it with `GET /files/{fileId}`, like any file a run made. New guide:\n  [Reports from a pipeline](reports).\n- The PDF is the report as it was generated, before anyone approved it. Approving and signing it, verifying a file and\n  voiding a version are done in the console (Reports › Library); no /v1 call or event covers the Reports library yet.\n- When the report's checks refuse the step's data, the step fails and the run's `message` says why (`run.failed`), or,\n  with the step set to carry on with a warning, the run completes without a report file. Each report version is metered\n  as one document conversion (`convert.documents`).\n- Unchanged: a `render_pdf` step still lists its PDF and its full-data CSV, as on 2026-10-12.\n\n## v1.0.0-draft, MIG-389 (2026-10-20): the platform on Spring Boot 4.1.1\n\n- Unchanged for the API: every service behind /v1, and the gateway, moved to Spring Boot 4.1.1 (the gateway to Spring\n  Cloud Gateway 5.0.3). No path, answer, header, problem type, limit or event changed.\n- Docs: a guide to the [sandbox](sandbox) -- its sample pipelines, test keys and what they reach. The console's menu\n  names are today's in every guide: API Clients and the Developer portal are under **Developers** (they were under\n  Integration when the entries below were written).\n\n## v1.0.0-draft, AI hard-workflow test (2026-10-13): a failed run's review is `not_applicable`\n\n- Additive: `ReviewStatus` has a fifth value, `not_applicable`. A run of a pipeline that asks for a review, which ended\n  without results -- `failed`, `skipped`, `interrupted` or `missed` -- and that nobody decided, said `pending` before, as if\n  it waited for a reviewer; it says `not_applicable` now, in `GET /runs`, `GET /runs/{runId}`, its review and the\n  `run.*` events. A completed run's review is unchanged, and only a completed run can be decided.\n\n## v1.0.0-draft, MIG-347 (2026-10-13): backfills and a pipeline's run parameters\n\n- New, additive: `POST /pipelines/{pipelineId}/backfills` (scope `runs:write`, `Idempotency-Key` required) runs a\n  pipeline once for each day, hour or week of a past range -- `from`, `to`, `step` (`daily` by default), `concurrency`\n  (1 to 4, 2 by default), `rerunCompleted` and the pipeline's `parameters` -- a few at a time, beside the pipeline's own\n  runs. Days are counted in the workspace's billing time zone. At most 366 periods; at most 3 open backfills a workspace.\n  202 with the `Backfill` and `Location: /v1/backfills/{backfillId}`.\n- New: `GET /backfills/{backfillId}` (`runs:read`): its status, counts, why it waits, when it should end, and its first\n  100 periods with each one's run id. `POST /backfills/{backfillId}/cancel` (`runs:write`, `Idempotency-Key`): nothing\n  more is queued; runs already started finish.\n- New problem types (409): `too-many-backfills`, `backfill-overlaps`, `nothing-to-run`, `pipeline-not-backfillable`,\n  `backfill-closed`; and 422 `invalid-parameters`.\n- Additive: `GET /pipelines` and `GET /pipelines/{pipelineId}` list a pipeline's `parameters` (name, type, label,\n  required, default, choices). Every step of a run reads `{{param.name}}`, and `{{run.date}}`, `{{run.windowStart}}`\n  and `{{run.windowEnd}}` -- the day the run is for and its bounds.\n- A backfill's runs are runs: `GET /runs` lists them, their events (`run.*`) are sent as any run's, and they are billed as\n  any run. No cost estimate is in the API: what a workspace is billed is its administrators' to read in the console.\n\n## v1.0.0-draft, MIG-355 (2026-10-13): the `alert.opened` and `alert.resolved` event types\n\n- New in the catalogue: `alert.opened` (one of the workspace's alert rules fired; sent once per alert, never repeated\n  while it stays open) and `alert.resolved` (the alert cleared by itself, or a person resolved it). Only rules that ask\n  for the webhook channel send them, and every Active webhook of the workspace that subscribes to the type receives them.\n- `data`: `alertId`, `ruleId`, `ruleName`, `kind` (`run_failed`, `schedule_missed`, `run_slow`, `review_waiting`),\n  `severity` (`warning`, `critical`), `state` (`open`, `resolved`), `subject` (e.g. `pipeline:2976`), `pipelineId` and\n  `runId` (or null), `title`, `detail`, `occurrences`, `firstSeenAt`, `lastSeenAt`, `resolvedAt` and `resolvedHow`\n  (`auto`, `manual`, or null while open). The platform's own alerts never reach a webhook.\n- Signed, retried, logged and billed (`webhook.deliveries`) like every other delivery.\n\n## v1.0.0-draft, ADR-027 and bulk review (2026-10-12): a PDF's full data beside it\n\n- Additive: a run whose pipeline makes a PDF (the `render_pdf` step) now lists **two** files for that step in\n  `GET /runs/{runId}/outputs`: the PDF (role `report`) and the full data as `<name>-data.csv` (role `result`, `rows`\n  set). A PDF prints at most the step's first rows of a big table (5,000 unless the step says otherwise) and says where\n  the rest are; the CSV holds every row. The step's `attachFullData` setting (on by default) turns the CSV off. Both are\n  downloaded with `GET /files/{fileId}` and kept for the pipeline's retention like any made file. The CSV is not billed\n  as a conversion.\n- Fixed: big uploads (`POST /files`) stream through the gateway again. A GET retry added the same day made the gateway\n  hold every request body in memory, and a few-hundred-MB upload answered 500.\n- Unchanged for the API: a workspace administrator may now decide many runs' internal review at once in the console\n  (bulk review). Each run is still decided on its own and sends the same `run.review.decided` event; the customer\n  party's decision (`POST /runs/{runId}/review`) is never taken in bulk.\n\n## v1.0.0-draft, MIG-346 (2026-10-12): the `run.step.sent` event type\n\n- New in the catalogue: `run.step.sent`. A pipeline's **Send webhook** step sends its rows or a summary to ONE webhook\n  of the workspace, which the step names; only that webhook receives it, even when others subscribe to the type. A\n  webhook must subscribe to `run.step.sent` (and be active) for a step to send to it.\n- `data`: `runId`, `pipelineId`, `stepKey`, `stepName` (or null), `attempt`, `mode` (`rows` or `summary`), `rowCount`,\n  `sentAt`; with `columns` and `rows` for `rows`, `fields` (label to value) for `summary`, and `truncated` when the\n  step sent fewer rows than it had. One event is at most 1 MiB.\n- It is signed, retried, logged in the webhook's delivery log and billed (`webhook.deliveries`) like every other\n  delivery. A step tried again sends the same event id: deduplicate on `Webhook-Id` as usual.\n\n## v1.0.0-draft, MIG-345 (2026-10-07): retry a failed run from the step that failed\n\n- Served: `POST /runs/{runId}/retry` (scope `runs:write`, `Idempotency-Key` required). It runs a failed run again as its\n  next attempt -- the same run id, `attempt` one higher -- and answers **202** with the Run and `Location: /v1/runs/{runId}`.\n  Optional body `{\"from\": \"failed_step\"}` (the default) or `{\"from\": \"start\"}`; anything else is 422 at `from`.\n- `failed_step` resumes at the first step of the latest attempt that did not complete. The steps before it are not run\n  again: their kept outputs are reused and their work is not billed again. The failed step and every step after it run on\n  the pipeline as it is now, so a fix to the failed step (or a later one) is what the retry runs.\n- A retry that cannot be done is **409** problem+json whose `type` is the reason: `/problems/run-not-failed`,\n  `run-in-flight`, `pipeline-inactive`, `workspace-paused`, and for a resume `pipeline-changed` (the source or a step\n  before the failed one changed: its key, task, input or settings; its name, retries, timeout and on-error may),\n  `input-changed` (a file a reused step read changed since, judged by its sha256, or is gone), `outputs-expired` (a reused\n  step's kept output is past the pipeline's retention, 24 hours unless set) and `not-resumable` (no step to resume from,\n  inputs that cannot be checked, or 20 attempts). New in `components.x-problem-types`.\n- Additive: the Run has `retry` -- `{from, fromStep, previousAttempt, reusedSteps, requestedThrough}` when someone retried\n  the current attempt (through the API or the console), else null -- and a Step has `reusedFromAttempt`, the attempt whose\n  output a step that was not run again reused (such a step has no times of its own). `GET /runs/{runId}/outputs` lists the\n  files the reused steps made beside the attempt's own.\n- Events: a retry's attempt sends `run.started` and then `run.completed` or `run.failed` like any attempt, each with the\n  new `attempt` and its `retry`.\n- Billing: a run is one run on the bill however many attempts it takes (`pipeline.runs` is counted once per run); what the\n  re-run steps do (AI tokens, storage reads, ...) is metered as usual, and the reused steps meter nothing. A resume reads\n  each file a reused step read once more to compare its sha256: that read is billed as any pipeline read.\n\n## v1.0.0-draft, H9 (2026-10-07): the quota month is the bill's month\n\n- A workspace's monthly quota of calls counts the bill's month: a calendar month in the workspace's billing time zone\n  (America/Chicago unless set), where it was UTC's. `Quota-Remaining`, `Quota-Reset`, `Retry-After` and\n  `/problems/quota-exceeded` follow it; the problem's `detail` names the date calls are taken again and the zone. A zone\n  change starts with a month, never in the middle of one. The month's name (\"2026-10\") is the same, so no counter restarts.\n\n## v1.0.0-draft, MIG-343 (2026-10-06): response timeouts\n\n- A call whose service does not answer within 30 seconds (120 for `POST /files` and a file's content, the upload\n  included) is answered **504** `/problems/timeout`, with the request id; one whose service cannot be reached, **502**\n  `/problems/bad-gateway`. Both are additive problem types (`components.x-problem-types`). Before, such a call waited\n  without end.\n- A download is never cut while it keeps flowing; one that stops sending for 30 seconds is ended (the status was\n  already sent, so the body ends short).\n- Retry both with the same `Idempotency-Key`: a timed-out write may have been made.\n\n## v1.0.0-draft, MIG-336 (2026-10-06): the developer portal and the sandbox\n\n- The contract lists its problem types: `components.x-problem-types`, each `/problems/<kind>` with its status, what it\n  means and, where only some operations answer it, which. Nothing a service answers changed.\n- A **sandbox** per organisation, on request: a workspace of its own with sample pipelines (`Sample orders`, `Sample\n  orders with review`), the data contract `sample_order` and the event route `sample.order.created`. Its keys are **test\n  keys**, client ids beginning `cl_test_`, made by the organisation's administrators (Integration › API Clients ›\n  Sandbox). A test key acts only in the sandbox: the organisation's real pipelines, runs and files are 404 to it, as\n  another workspace's are. A test key outside a sandbox, or an ordinary key inside one, gets no token (401). Nothing in a\n  sandbox is billed; its calls still carry the rate-limit headers and count against its own limits.\n- The **developer portal** in the console (Integration › Developer portal): this reference, guides (quickstart, webhooks,\n  files, idempotency, paging, errors, limits, embedding) with samples in curl, Python and Node.js, the event types, the\n  problem types, this changelog, and downloads of the OpenAPI document and a Postman collection. Every sample is run\n  against the live API in a sandbox (`tests/customer-api/docs_check.py`).\n\n## v1.0.0-draft, MIG-335 (2026-10-06): the embeddable run view\n\n- Served: `POST /runs/{runId}/view-links` (scope `runs:read`): 201 `{url, expiresAt}`, a signed link, valid 15 minutes,\n  to a read-only page of the run on the console (`/embed/runs/{token}`): its status and times, its steps, the files it\n  made with a download each, its review. No console navigation, no sign-in, no cookies. Optional body\n  `{\"expiresInSeconds\": 60..900}` for a shorter life (422 outside it). No `Idempotency-Key`: nothing is stored, each call\n  answers a new link. A run that is not the workspace's is 404.\n- Framing: only the origins the API client's frame allow-list names may show the page in an iframe (set in Integration ›\n  API Clients; in a workspace our team manages, our team sets it); the page answers Content-Security-Policy\n  `frame-ancestors` with them, `'none'` when there are none. Append `?theme=light|dark` and `accent=<hex>` to fit a portal.\n- New, signed (`security: []`, `x-signed-link: true`): `GET /embed/runs/{token}` -- what the page shows (`RunView`), for the\n  link's holder; `GET /embed/runs/{token}/frame` -- where it may be framed (`RunViewFrame`, and the `Embed-Frame-Ancestors`\n  header). 410 once expired (`/problems/link-expired`) or when the client that made the link was revoked or has expired\n  (`/problems/link-ended`); 404 for a token this API did not make, or one changed to name another run.\n- A view link opens that one run only: it is no access token for the API, no file link, and names no other run. The\n  downloads it carries are ordinary signed file links that end no later than the view.\n- Billing: making a link is a counted call (`api.calls`); the page's reads and downloads are signed links, not counted and\n  not billed as calls (a download is a storage read, as before).\n\n## v1.0.0-draft, MIG-337 (2026-10-06): rate limits, a monthly quota, and metering\n\n- Every call that needs a token is held to two token buckets -- its client's (by default 600 calls a minute, burst 100)\n  and its workspace's over all its clients (1,200 a minute, burst 200) -- and, when the workspace has one, a monthly quota\n  of calls (a calendar month in UTC). A workspace administrator may give a client a lower limit of its own; the platform\n  sets a workspace's bounds and quota.\n- Every answer to a counted call carries `RateLimit-Limit`, `RateLimit-Remaining`, `RateLimit-Reset` and\n  `RateLimit-Policy` (e.g. `600;w=60;burst=100;scope=client`), for the bucket that allows fewer calls now. With a quota:\n  `Quota-Limit`, `Quota-Remaining`, `Quota-Reset`, and `Quota-Warning` from 80% used.\n- Past a limit: 429 problem+json with `Retry-After` -- `/problems/rate-limited` (seconds until one call is allowed) or\n  `/problems/quota-exceeded` (seconds until the month ends). Nothing is done, nothing is billed. If the limits cannot be\n  counted the answer is 503 with `Retry-After` (fail closed).\n- Written down: `TooManyRequests` on every operation that needs a token, and the headers above (`components.headers`).\n- Billing: each counted call is `api.calls`, each webhook delivery that arrives `webhook.deliveries`, on the workspace's\n  invoice ($0.10 per 1,000 each on the Standard card). The token endpoint and signed links are not counted.\n\n## v1.0.0-draft, MIG-333 (2026-10-06): the event catalogue and webhooks served\n\n- Served: `GET /event-types`, `GET /webhooks`, `POST /webhooks`, `GET|PATCH|DELETE /webhooks/{webhookId}`,\n  `POST /webhooks/{webhookId}/rotate-secret`, `GET /webhooks/{webhookId}/deliveries`,\n  `POST /webhooks/{webhookId}/deliveries/{deliveryId}/redeliver` (integration-service).\n- The platform sends `run.started`, `run.completed`, `run.failed`, `run.review.requested`, `run.review.decided`,\n  `file.available` and `form.submission.received`. The catalogue's schemas are self-contained (no `$ref`).\n- What a receiver gets is written down (`webhooks.event`): `Webhook-Delivery` beside `Webhook-Id` and\n  `Webhook-Signature`; one `v1` per secret in force for 24 hours after a rotation; the retry schedule (10 s, 30 s, 90 s\n  ... at most an hour apart, for 24 hours); a webhook failing for 3 days is paused; delivery at least once, deduplicate on\n  `Webhook-Id`, order by `createdAt`.\n- `POST /webhooks`: the URL must be https to a public address -- a private, loopback, link-local or metadata one is 422\n  at `url`; at most 20 webhooks a workspace (409); only events after it is made are sent; `Location`. In a workspace our\n  team manages, making, changing, removing and rotating are 403 (`/problems/managed-workspace`).\n- `PATCH /webhooks/{id}`: `active: true` also clears a pause the platform made. `POST .../redeliver` answers 202 with the\n  new `Delivery` (409 when the webhook is paused).\n- `Webhook` has `updatedAt`, `failingSince`, `lastSuccessAt`, `secretRotatedAt`, `previousSecretValidUntil`. `Delivery`\n  has `lastAttemptAt`, `deliveredAt`, `error` and `redeliveryOf`; `attempt` is the attempts made.\n- 400, 401, 403, 404, 409 and 422 written down where they happen.\n\n## v1.0.0-draft, MIG-334 (2026-10-06): the read side served\n\n- Served: `GET /runs`, `GET /runs/{runId}`, `GET /runs/{runId}/steps`, `GET /runs/{runId}/outputs`,\n  `GET /runs/{runId}/review`, `POST /runs/{runId}/review`, `GET /files/{fileId}`, `GET /files/{fileId}/meta`, and the\n  new `GET /files/{fileId}/content`. `POST /runs/{runId}/retry` and `POST /runs/{runId}/view-links` stay planned.\n- New: `GET /files/{fileId}/content?token=` -- the signed link `GET /files/{fileId}` redirects to; no access token\n  (`security: []`, `x-signed-link: true`), 410 once expired. `GET /files/{fileId}` answers `{url, expiresAt}` beside\n  its 302 (`FileLink`), and 410 for a made file past its expiry (the `Gone` response).\n- `GET /runs` takes `createdAfter`; a filter that is not RFC 3339 with an offset is 400.\n- `Run` has `attempt`. `Step` has `durationMs`, `name` may be null, and its status may be `interrupted`. The steps'\n  answer says `runId` and `attempt`.\n- `Manifest` is what a run holds today: `runId`, `pipelineId`, `status` (the run's), `attempt`, `generatedAt`, `files`\n  (`ManifestFile`: a `File` with `step`, `rows` and `expired`) and `review`. The draft's `pipeline`, `contract`,\n  `totals` and `records` are out until something writes per-record results; they come back as added fields.\n- `File`: `sha256` and `contentType` may be null (a file a run made before files carried one).\n- `Review` has `decidedAt` and `rerunRunId`, and in the answer to a decision with `rerun`, `rerun {queued, runId,\n  message}`. A decision the run's state refuses is 409 `/problems/review-not-open`.\n- More of the answers are written down: 400, 401 and 403 where they happen.\n\n## v1.0.0-draft, MIG-332 (2026-10-06): served\n\n- Served: `POST /oauth/token`, `GET /pipelines`, `GET /pipelines/{pipelineId}`, `POST /pipelines/{pipelineId}/runs`,\n  `POST /files`, `POST /events`. Every other operation is a 404 at the edge until its card lands.\n- `POST /events` answers `workflows` (the workflow requests it started) and `notStarted` (what a route names that did\n  not start, and why) beside `started`; `type` has a pattern.\n- More of the answers the served operations give are written down: 400, 401, 403 and 409 on `POST /files`; 400, 401,\n  403, 413 and 503 on `POST /events`; 503 (`Unavailable`, with `Retry-After`) where an input contract cannot be read.\n- The token endpoint's problems also carry OAuth's own `error` code (`invalid_client`, `invalid_scope`, ...).\n\n## v1.0.0-draft (2026-10-06)\n\n- The first draft: auth (client credentials), pipelines, runs, steps, outputs, files, reviews, forms, events in,\n  event types, webhooks. Not served yet; built card by card (MIG-332..338).\n",
  "sources": {
-  "openapi-v1.yaml": "81074444f39bdfeef037fc9475f16e9c482c24d1f34747f467ef4e03c2719327",
-  "CHANGELOG.md": "35580a89fe64f4753ae1dde241f7968754274d77d01e54b7f9886bca04fed458",
+  "openapi-v1.yaml": "dcbafbdd65eda5e17672a3cee4f9fa566a3c92b02922d1eb606d1d1464cbd142",
+  "CHANGELOG.md": "46094416a1276edb021eb35cf776b7462d2fe5df7044e0dfe4bfb9d36ac31548",
   "event-types/alert.opened.json": "64c845614a319d252bc454cb223bc4a46580a8d0f5917285f4fdfc73beb27fff",
   "event-types/alert.resolved.json": "aae869b277e46b82c02d625a32c2808f2d161a856e246ce987163c91caad38d9",
   "event-types/file.available.json": "2e82382c21fc8fbbae1731195b5448a6878f68f8bf568b966a7436ee61200310",
   "event-types/form.submission.received.json": "68a5c549e913f873d3a82e23e6ac9152ad48d22de39f79757e2c88b3f4251ed7",
   "event-types/run.completed.json": "6f5e8c4e998e3f1ac7b421ec9aa64bfacf6d2dd081ea0d7a871d116449f4fb09",
   "event-types/run.failed.json": "332a9301c5499dba32c25c7a84387020b97047b175447bdd8c56323ed6cd9b3d",
+  "event-types/run.item.completed.json": "dd6e62f772b213aa8240f55e57fd62abd36f95f9736c321edbe8be6baadbee32",
   "event-types/run.review.decided.json": "81323e98a5f07b6f9f4f076f548e213c43019f14636e8bd5afe05da70b1cb740",
   "event-types/run.review.requested.json": "a50cfc3fd25443be2831d90774d9d84e3a8c47334374387726d3fa644c5d240a",
   "event-types/run.started.json": "1045f9f637a811e91d2b3c855c12401fc05b804d87318b753d9fa14c3c85baed",
   "event-types/run.step.sent.json": "f8f8ec00c8fe62e0bd4525891d78ace81dd7d3d72b27ee84d0b0b17c436a7444",
-  "guides/index.json": "09b0069c00439f98d67e39215424dcd9b5fb113fa65420f221770a8e0c692442",
-  "guides/embedding.md": "2a56e7f5e651172d6d57c269fad88cfbd41f81d5651011a99de6666735679c94",
+  "guides/index.json": "14c75f2674cf08e86d3988731b20c3ba82b3544cd70a5e808033cc0319d46a18",
+  "guides/embedding.md": "c2b8f6316566199e933e71382baa51216cb670a83c056ef201962a8082e13fc5",
   "guides/errors.md": "d12be4c67612a3611cf13d108a0ed1cbc20166015fdca6f338c48e89ece85bd6",
   "guides/files.md": "b3f7f0065995b47b8213bb65f40f35357f2d8d64ddc6b593a21d7c3acb87bbfc",
+  "guides/generate-report.md": "8491b65632d18aa13e6c88f3ba0b2f98dc3cb0a73d78532048fdedd66525fe10",
   "guides/idempotency.md": "815b8c5da4dcd2baecab28893c47b1768d2648581826ddbdf1d9384cd830f6dd",
   "guides/limits.md": "ab1578bc158a0550771e29c885098faa6d8fded3a13690da9ab8522908dfa6ba",
   "guides/paging.md": "34fd42099ccfa42bec27b6135290a0c1c1f11d3ab60fcf5be242b32f77d789bb",
-  "guides/quickstart.md": "af96208bed7523f94dc1c11b245eef9187117d61a9c1450efef93a2df545fd77",
+  "guides/quickstart.md": "157f008a2ac5ab81415642a517a228b009c04f0fd0c6b03c54a5f679eec6c307",
+  "guides/run-items.md": "0d33020cc3e6a7ba1e336ace64f8f49f5b60e3e9545eb71d7dbfe04b7847e7f8",
+  "guides/sandbox.md": "d165dfdf19780033fbf9513b39b3507eac4fde93ec10d913de20b62659f6ba8e",
   "guides/webhooks.md": "54c80180555b81b55e341a53bdcfecd98977ede57c794afc400efaeb554117d6"
  }
 }

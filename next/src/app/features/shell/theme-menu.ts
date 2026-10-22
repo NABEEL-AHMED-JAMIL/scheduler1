@@ -16,8 +16,8 @@ import { ThemePreference } from '../../core/theme-preference';
     <div class="relative" (focusout)="onFocusOut($event)" (keydown)="onKey($event)">
       <button #trigger type="button" class="btn btn-ghost btn-icon" (click)="toggle()"
               aria-haspopup="menu" [attr.aria-expanded]="open()" aria-controls="theme-menu"
-              [title]="'Theme: ' + label()">
-        <app-icon [name]="themes.theme() === 'dark' ? 'moon' : 'sun'" size="1.05em" [label]="'Theme: ' + label()" />
+              [title]="'Theme: ' + label()" [attr.aria-label]="'Theme: ' + label()">
+        <app-icon [name]="themes.theme() === 'dark' ? 'moon' : 'sun'" size="1.05em" />
       </button>
       @if (open()) {
         <div #panel id="theme-menu" role="menu" aria-label="Theme"

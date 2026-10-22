@@ -1,3 +1,4 @@
+import { NeedsWorkspace } from '../../shared/ui/needs-workspace';
 import { Avatar } from '../../shared/ui/avatar';
 import { Component, HostListener, Injector, afterNextRender, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -13,7 +14,7 @@ import { DataText } from '../../shared/ui/data-text';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { confirmWith } from '../../shared/ui/confirm';
 import {
-  ExtractedField, OcrDocument, ReviewDetail, RuleOutcome, TableView, correctionsOf, documentFields, fieldName, fileName, isLow, lowLine,
+  ExtractedField, OcrDocument, ReviewDetail, RuleOutcome, TableView, correctionsOf, documentFields, documentName, fieldName, isLow, lowLine,
   nextInQueue, nextRowIndex, refusalText, ruleText, shortcutOf, skippedWhy, statusLabel, statusOf, stepIndex, tableViews, typeLabel,
   isNumberColumn, linesMinWidthRem,
 } from './documents.model';
@@ -48,7 +49,7 @@ interface NewRow { tableKey: string; rowIndex: number; values: Record<string, st
  */
 @Component({
   selector: 'app-document-review',
-  imports: [PageHeader, RouterLink, Icon, StatusPill, DataText, ServerTimePipe, PageViewer, ConfidenceBar, Avatar],
+  imports: [PageHeader, RouterLink, Icon, StatusPill, DataText, ServerTimePipe, PageViewer, ConfidenceBar, Avatar, NeedsWorkspace],
   templateUrl: './review.html',
   styles: [`
     .review-split { display: grid; gap: 1rem; align-items: start; grid-template-columns: minmax(0, 1fr); }
@@ -97,6 +98,10 @@ export class DocumentReview {
   readonly read = signal<OcrDocument | null>(null);
   readonly loading = signal(true);
   readonly error = signal('');
+  /** ZT-D11: a sign-in with no workspace (a platform administrator's own) reviews no workspace's document here; no call. */
+  readonly noWorkspace = computed(() => !this.auth.user()?.tenantId);
+  /** ZT-D10: the service has no such document for this workspace (deleted, or another workspace's link): said as that. */
+  readonly missing = signal(false);
   readonly busy = signal<Busy>('');
   /** What the reviewer has typed, by fieldId, until it is saved. */
   readonly edits = signal<Record<number, string>>({});
@@ -145,7 +150,7 @@ export class DocumentReview {
 
   readonly title = computed(() => {
     const r = this.read();
-    return r ? fileName(r.sourceKey) : this.detail() ? `Document ${this.detail()!.extractionId}` : 'Document';
+    return r ? documentName(r) : this.detail() ? `Document ${this.detail()!.extractionId}` : this.missing() ? 'Document not found' : 'Review a document';
   });
   readonly subtitle = computed(() => {
     const d = this.detail();
@@ -173,10 +178,12 @@ export class DocumentReview {
   // -------------------------------------------------------------------------------------------- reading
 
   load(): void {
+    if (this.noWorkspace()) { this.loading.set(false); return; }
     const id = this.extractionId();
     if (!id) { this.loading.set(false); this.error.set('No document named.'); return; }
     this.loading.set(true);
     this.error.set('');
+    this.missing.set(false);
     this.api.review(id).subscribe({
       next: r => {
         this.loading.set(false);
@@ -185,7 +192,11 @@ export class DocumentReview {
         this.readFile(r.data.ocrDocumentId);
         this.locate();
       },
-      error: err => { this.loading.set(false); this.error.set(refusalText(err, 'The document could not be read.')); },
+      error: err => {
+        this.loading.set(false);
+        if ((err as { status?: number })?.status === 404) { this.missing.set(true); return; }
+        this.error.set(refusalText(err, 'The document could not be read.'));
+      },
     });
   }
 
@@ -402,6 +413,11 @@ export class DocumentReview {
   }
 
   /** Who did it, by name: "you", their name, or (someone Identity no longer knows) their number. */
+  /** Whether a reason already ends its sentence, so the note after it adds no second full stop (ZT-D7). */
+  endsSentence(text: string | null | undefined): boolean {
+    return !!text && /[.!?…]["'”’)\]]*$/.test(text.trim());
+  }
+
   reviewer(id: number | null | undefined, name?: string | null): string {
     if (id == null) return 'someone';
     return id === this.me() ? 'you' : name || `user ${id}`;

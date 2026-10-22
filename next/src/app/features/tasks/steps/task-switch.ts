@@ -15,13 +15,15 @@ import { StepTaskEntry, TaskState } from './steps.model';
   selector: 'app-task-switch',
   host: { class: 'inline-flex items-center justify-end gap-1' },
   template: `
-    @if (task().overridden) {
+    @if (task().overridden && !task().blocked) {
       <button type="button" class="btn btn-ghost btn-sm" [attr.aria-label]="'Put ' + name() + ' back to its default'"
               [disabled]="busy()" (click)="switched.emit(null)">Default</button>
     }
+    <!-- Owner #16: a task a platform administrator blocked here cannot be switched by the workspace. -->
     <input #box type="checkbox" class="checkbox align-middle" role="switch" [checked]="!!task().enabled"
            [attr.aria-label]="'Switch ' + name() + ' on in this workspace'"
-           [disabled]="busy() || task().overridable === false || (task().available === false && !task().enabled)"
+           [title]="task().blocked ? 'Blocked by a platform administrator: only they can unblock it' : ''"
+           [disabled]="busy() || task().overridable === false || !!task().blocked || (task().available === false && !task().enabled)"
            (change)="switched.emit($any($event.target).checked)" />
   `,
 })
@@ -49,11 +51,11 @@ export class TaskSwitch {
   imports: [DataText],
   template: `
     <span class="pill" [class.pill-brand]="state() === 'On'" [class.pill-neutral]="state() === 'Off'"
-          [class.pill-warn]="state() === 'Unavailable'">{{ state() }}</span>
+          [class.pill-warn]="state() === 'Unavailable'" [class.pill-crit]="state() === 'Blocked'" data-test="task-state">{{ state() }}</span>
     @if (overridden()) { <span class="pill pill-neutral ml-1" title="This workspace switched it; Default puts it back">Switched here</span> }
     @if (reason()) {
       <app-data-text class="block mt-1 text-[color:var(--text-secondary)]" [value]="reason()"
-                     [label]="state() === 'Unavailable' ? 'Why it is unavailable' : 'Why it is off'" [lines]="2" />
+                     [label]="state() === 'Unavailable' ? 'Why it is unavailable' : state() === 'Blocked' ? 'Why it is blocked' : 'Why it is off'" [lines]="2" />
     }
   `,
 })

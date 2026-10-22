@@ -30,20 +30,18 @@ export const PINNED: Record<string, unknown> = {
       ]
     ],
     "fields": [
+      "All workspaces",
       "Filter by staff member",
-      "Filter by workspace",
-      "Include revoked"
+      "Include revoked",
+      "Workspace"
     ],
     "links": [
       "/platform",
-      "/platform/billing-analytics",
       "/platform/engine",
       "/platform/managed-service",
-      "/platform/rate-cards",
-      "/platform/reliability",
       "/platform/requests",
+      "/platform/service-health",
       "/platform/staff-activity",
-      "/platform/work-in-workspace",
       "/platform/workspaces"
     ]
   },
@@ -57,7 +55,7 @@ export const PINNED: Record<string, unknown> = {
     ],
     "headings": [
       "Our team's activity",
-      "Changes"
+      "Activity"
     ],
     "buttons": [
       "Load older",
@@ -67,11 +65,12 @@ export const PINNED: Record<string, unknown> = {
       [
         "When",
         "Staff member",
-        "Change",
+        "Change or read",
         "Service"
       ]
     ],
     "fields": [
+      "Changes or data reads",
       "Filter by staff member"
     ],
     "links": [
@@ -81,6 +80,7 @@ export const PINNED: Record<string, unknown> = {
       "/administration/data-policies",
       "/administration/security",
       "/administration/team-activity",
+      "/administration/teams",
       "/administration/users"
     ]
   },
@@ -146,7 +146,7 @@ export const PINNED: Record<string, unknown> = {
     ],
     "headings": [
       "Staff activity",
-      "Changes"
+      "Activity"
     ],
     "buttons": [
       "Columns",
@@ -158,56 +158,25 @@ export const PINNED: Record<string, unknown> = {
         "When",
         "Staff member",
         "Workspace",
-        "Change",
+        "Change or read",
         "Service"
       ]
     ],
     "fields": [
+      "All workspaces",
+      "Changes or data reads",
       "Filter by staff member",
-      "Filter by workspace"
+      "Workspace"
     ],
     "links": [
       "/platform",
-      "/platform/billing-analytics",
       "/platform/engine",
       "/platform/managed-service",
-      "/platform/rate-cards",
-      "/platform/reliability",
       "/platform/requests",
+      "/platform/service-health",
       "/platform/staff-activity",
-      "/platform/work-in-workspace",
       "/platform/workspaces"
     ]
   },
-  "the pages refuse a workspace administrator": "/unauthorized",
-  "work in a workspace, as a platform administrator": {
-    "url": "/platform/work-in-workspace",
-    "requests": [
-      "GET /notification.json/unreadCount",
-      "GET /notification.json/list?limit=20&page=1",
-      "GET /managedService.json/myWorkspaces"
-    ],
-    "headings": [
-      "Work in a workspace",
-      "Claude Demo"
-    ],
-    "buttons": [
-      "Refresh",
-      "Work in Claude Demo"
-    ],
-    "columns": [],
-    "fields": [],
-    "links": [
-      "/platform",
-      "/platform/billing-analytics",
-      "/platform/engine",
-      "/platform/managed-service",
-      "/platform/rate-cards",
-      "/platform/reliability",
-      "/platform/requests",
-      "/platform/staff-activity",
-      "/platform/work-in-workspace",
-      "/platform/workspaces"
-    ]
-  }
+  "the pages refuse a workspace administrator": "/unauthorized"
 };

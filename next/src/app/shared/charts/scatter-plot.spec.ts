@@ -79,4 +79,17 @@ describe('scatter plot axis labels', () => {
     expect(highX).toBe('500');
     expect(highY).toBe('2.5M');
   });
+
+  /** ZT-A1: a loss against sales sat below the drawing (cy past its foot), because both axes started at zero. */
+  it('ZT-A1: places a negative figure inside the drawing, with a dashed zero line and the low bound printed', () => {
+    const fixture = plot({ data: [{ label: 'a', x: 2018.41, y: -22.47 }, { label: 'b', x: 2815.84, y: 1113.61 }], height: 200 });
+    const host = fixture.nativeElement as HTMLElement;
+    for (const dot of Array.from(host.querySelectorAll('circle'))) {
+      const cy = Number(dot.getAttribute('cy'));
+      expect(cy).toBeGreaterThanOrEqual(0);
+      expect(cy).toBeLessThanOrEqual(200);
+    }
+    expect(host.querySelector('line[data-zero="y"]')).not.toBeNull();
+    expect(host.querySelector('.scatter-axis-low')?.textContent?.trim()).toBe('-22');
+  });
 });

@@ -1,5 +1,5 @@
 import { test, expect, APIRequestContext, Browser, Page, TestInfo } from '@playwright/test';
-import { hasToken, NEEDS, sessionFor, tokenFor } from './support/session';
+import { hasToken, NEEDS, sessionFor, tokenFor, pageWith } from './support/session';
 import { archiveForm, makeForm, submitForm } from './support/forms';
 import { ensureObject, getJson, outputsOf, postJson } from './support/workspace';
 import { hasFixtures, NEEDS_FIXTURES, pipeline, riverside } from './support/fixtures';
@@ -39,11 +39,8 @@ async function sessionOf(request: APIRequestContext, token: string): Promise<Rec
 }
 
 async function pageAs(browser: Browser, session: Record<string, unknown>, width = 1920, height = 1080): Promise<Page> {
-  const context = await browser.newContext({ viewport: { width, height } });
-  const page = await context.newPage();
-  await page.goto('/');
-  await page.evaluate(user => window.localStorage.setItem('etl_auth_user', JSON.stringify(user)), session);
-  return page;
+  // Seeded before the app loads (support/session.ts pageWith): a dead stored session can no longer sign it out.
+  return pageWith(browser, session, { viewport: { width, height } });
 }
 
 async function shot(page: Page, info: TestInfo, name: string): Promise<void> {
@@ -78,7 +75,8 @@ test.describe('Data Catalog', () => {
     expect(upload, `run ${run} uploaded a file`).toBeTruthy();
     LINEAGE_FILE = upload.name;
     const listed = ((await getJson(request, s, `/analyticsCatalog.json/list?q=${encodeURIComponent(upload.name)}`)).data ?? [])
-      .find((a: { path: string }) => a.path === upload.key);
+      // ZT-C2: the asset of that connection (a first read had filed a second one under the bucket's own name).
+      .find((a: { path: string; connection?: string }) => a.path === upload.key && (!a.connection || a.connection === upload.bucket));
     expect(listed, `the catalog lists ${upload.bucket}/${upload.key}`).toBeTruthy();
     const graph = (await getJson(request, s, `/analyticsCatalog.json/lineage?assetId=${listed.assetId}&depth=2`)).data;
     LINEAGE_NAMES = (graph?.nodes ?? []).filter((n: { kind: string }) => n.kind === 'file' || n.kind === 'pipeline')

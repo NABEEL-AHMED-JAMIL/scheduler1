@@ -23,12 +23,12 @@ export interface ReviewDecision {
 export interface RunReviewView {
   jobQueueId: number;
   jobId: number;
-  reviewStatus: 'NOT_REQUIRED' | 'PENDING' | 'APPROVED' | 'REJECTED';
+  reviewStatus: 'NOT_REQUIRED' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'NOT_APPLICABLE';
   required: ('internal' | 'customer')[];
   /** Absent in some answers (a run whose review row is new): read as none. */
   decisions?: ReviewDecision[];
   rerunJobQueueId?: number | null;
-  /** Whose Task inbox the internal review waits in: a role (TENANT_ADMIN, TENANT_USER) or a group (an access profile, by id). */
+  /** Whose Task inbox the internal review waits in: a role (TENANT_ADMIN, TENANT_USER) or a team (by id). */
   reviewers?: { kind?: string | null; value?: string | null } | null;
   you?: { party?: string | null; canDecide?: boolean; refusal?: string | null };
 }
@@ -52,7 +52,7 @@ const STATUS: Record<string, { label: string; tone: string; icon: string }> = {
   host: { class: 'contents' },
   template: `
     @if (review(); as r) {
-      @if (r.reviewStatus !== 'NOT_REQUIRED') {
+      @if (r.reviewStatus !== 'NOT_REQUIRED' && r.reviewStatus !== 'NOT_APPLICABLE') {
         <section class="card p-4 space-y-3" data-review aria-labelledby="run-review-heading">
           <div class="flex flex-wrap items-center gap-2">
             <h2 id="run-review-heading" class="text-sm font-semibold">Result review</h2>

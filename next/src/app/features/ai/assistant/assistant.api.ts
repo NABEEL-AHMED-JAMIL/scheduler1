@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Observable, catchError, of, throwError, timeout } from 'rxjs';
 import { API_BASE, ApiResponse } from '../../../core/api/api.config';
-import { AssistantAnswer, AssistantMessage, Conversation, RunProgress, ToolDef, ToolRun, ToolTrace } from './assistant.model';
+import { AssistantAnswer, AssistantMessage, Conversation, RunProgress, ToolChange, ToolDef, ToolRun, ToolTrace } from './assistant.model';
 
 /**
  * How long send and decide are waited for. Both are synchronous and a local model can take well
@@ -88,17 +88,25 @@ export class AssistantApi {
     return this.http.post<ApiResponse>(`${BASE()}/tools/setEnabled`, { toolName, enabled }, { params: withTenant({}, tenantId) });
   }
 
+  /**
+   * Owner item #15: a platform administrator enables, disables or blocks a tool for one workspace, or puts it back to the
+   * default. A blocked tool cannot be switched on by the workspace's administrator.
+   */
+  setPlatformState(toolName: string, state: 'enabled' | 'disabled' | 'blocked' | 'default', tenantId: number, reason?: string | null): Observable<ApiResponse> {
+    return this.http.post<ApiResponse>(`${BASE()}/tools/platformState`, { toolName, state, reason: reason || null }, { params: { tenantId } });
+  }
+
+  /** Owner item #15: who switched, blocked or unblocked a tool in the workspace, newest first. */
+  toolHistory(toolName?: string | null, tenantId?: number | null): Observable<ApiResponse<ToolChange[]>> {
+    return this.http.get<ApiResponse<ToolChange[]>>(`${BASE()}/tools/history`, { params: withTenant(toolName ? { toolName } : {}, tenantId) });
+  }
+
   trace(toolRunId: number, tenantId?: number | null): Observable<ApiResponse<ToolTrace>> {
     return this.http.get<ApiResponse<ToolTrace>>(`${BASE()}/tools/trace`, { params: withTenant({ toolRunId }, tenantId) });
   }
 
   runs(limit = 20, tenantId?: number | null): Observable<ApiResponse<ToolRun[]>> {
     return this.http.get<ApiResponse<ToolRun[]>>(`${BASE()}/tools/runs`, { params: withTenant({ limit }, tenantId) });
-  }
-
-  /** The workspaces a platform administrator may pick from (Identity's tenant.json/listTenants). */
-  workspaces(): Observable<ApiResponse<{ tenantId: number; tenantName: string }[]>> {
-    return this.http.get<ApiResponse<{ tenantId: number; tenantName: string }[]>>(`${API_BASE}/tenant.json/listTenants`);
   }
 
   dataset(datasetRef: string, offset = 0, limit = 50): Observable<ApiResponse<{ rows: Record<string, unknown>[]; offset: number; rowsKept: number }>> {

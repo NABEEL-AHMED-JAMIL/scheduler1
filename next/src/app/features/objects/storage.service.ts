@@ -54,6 +54,13 @@ export interface BrowseResponse {
   nextContinuationToken?: string;
 }
 
+/** storage.json/findObjects (owner #27): matches newest first, how many objects were looked at, and whether it stopped early. */
+export interface FindResponse {
+  objects: ObjectSummary[];
+  scanned: number;
+  truncated: boolean;
+}
+
 @Injectable({ providedIn: 'root' })
 export class StorageService {
   private readonly http = inject(HttpClient);
@@ -61,6 +68,17 @@ export class StorageService {
 
   buckets(): Observable<ApiResponse<BucketSummary[]>> {
     return this.http.get<ApiResponse<BucketSummary[]>>(`${this.base}/buckets`);
+  }
+
+  /**
+   * Owner #27: every file under a prefix, however deep, whose name holds `query`, of the given extensions -- the file
+   * picker's search. At most 200, from at most 5,000 looked at; `truncated` says it stopped.
+   */
+  findObjects(bucket: string, prefix: string, query: string, extensions: string[] = [], limit = 200)
+      : Observable<ApiResponse<FindResponse>> {
+    const params: Record<string, string | string[]> = { bucket, prefix, query, limit: String(limit) };
+    if (extensions.length) params['extensions'] = extensions;
+    return this.http.get<ApiResponse<FindResponse>>(`${this.base}/findObjects`, { params });
   }
 
   listObjects(bucket: string, prefix = '', continuationToken?: string, maxKeys = 100)
