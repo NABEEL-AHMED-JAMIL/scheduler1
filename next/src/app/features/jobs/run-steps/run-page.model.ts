@@ -7,9 +7,12 @@ import { RunOutput, StepDataset, StepExecution, StepTimeline, errorText } from '
  * says, the facts the summary strip adds to the header, and the steps table's rows. Pure, for the specs.
  */
 
-/** The run page's tabs: the steps as a table, the run map, the AI answers, what the run put out, and its log. */
-export type RunTab = 'steps' | 'map' | 'ai' | 'outputs' | 'log';
-export const RUN_TABS: readonly RunTab[] = ['steps', 'map', 'ai', 'outputs', 'log'];
+/**
+ * The run page's tabs: the steps as a table, the run map, the AI answers, the items of a pipeline that works item by
+ * item (MIG-420), what the run put out, and its log.
+ */
+export type RunTab = 'steps' | 'map' | 'ai' | 'items' | 'outputs' | 'log';
+export const RUN_TABS: readonly RunTab[] = ['steps', 'map', 'ai', 'items', 'outputs', 'log'];
 
 /**
  * The tab an address opens. `?tab=` wins when it names one; otherwise `/runs/8134/logs` opens the Log and the bare
@@ -20,11 +23,15 @@ export function runTabFromUrl(lastSegment: string | null | undefined, tab: strin
   return lastSegment === 'logs' ? 'log' : 'steps';
 }
 
-/** Where a tab lives: the Log at `/logs`, the Steps at the bare run, any other at the bare run with `?tab=`. */
-export function runTabUrl(jobId: string | number, jobQueueId: string | number, tab: RunTab):
+/**
+ * Where a tab lives: the Log at `/logs`, the Steps at the bare run, any other at the bare run with `?tab=`. The Items
+ * tab keeps a filter other than All as `&status=` (the run-finished mail links to `?tab=items&status=failed`).
+ */
+export function runTabUrl(jobId: string | number, jobQueueId: string | number, tab: RunTab, itemStatus?: string | null):
   { commands: (string | number)[]; queryParams: Record<string, string> } {
   const base: (string | number)[] = ['/pipelines/schedules', String(jobId).trim(), 'runs', String(jobQueueId).trim()];
   if (tab === 'log') return { commands: [...base, 'logs'], queryParams: {} };
+  if (tab === 'items' && itemStatus && itemStatus !== 'all') return { commands: base, queryParams: { tab, status: itemStatus } };
   return { commands: base, queryParams: tab === 'steps' ? {} : { tab } };
 }
 

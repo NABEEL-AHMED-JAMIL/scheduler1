@@ -39,6 +39,8 @@ import { DocumentsApi } from '../../documents/documents.service';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
 import { RunFacetsRail } from './run-facets-rail';
+import { RunItemsApi } from '../run-items/run-items.api';
+import { ItemCounts, countsLine } from '../run-items/run-items.model';
 import { ExplorerFilter, NO_FILTER, RUN_WINDOWS, RunExplorerApi, RunFacets, activeCount, explorerBody, histogramBars } from './run-explorer';
 
 /**
@@ -51,6 +53,8 @@ const HISTORY_WINDOW = 500;
 const APPROVALS_WINDOW = '200';
 /** Runs Executions shows when it is opened without a job: the newest of the last day. */
 export const RECENT_WINDOW = 200;
+/** Run statuses after which a run's items do not change. */
+const RUN_ENDED = ['Completed', 'Failed', 'Interrupt', 'Skip', 'Missed', 'Stop'];
 
 interface JobQueue {
   jobQueueId: number;
@@ -279,6 +283,37 @@ export class JobHistory {
    */
   readonly pager = createPager<JobQueue>();
   readonly paged = computed(() => this.pager.slice(this.filtered()));
+
+  /**
+   * MIG-420: "48 of 50 done · 2 failed ›" for the runs of a pipeline that works item by item, read for the page's runs
+   * (runItems/counts answers only the runs that have items). A finished run's counts are asked once; a running run's
+   * again with each read of the list. The column is there only when a run on the page has items.
+   */
+  private readonly itemsApi = inject(RunItemsApi);
+  readonly itemCounts = signal<ReadonlyMap<number, ItemCounts>>(new Map());
+  private readonly countsAsked = new Set<number>();
+  readonly hasItems = computed(() => this.paged().some(run => this.itemCounts().has(run.jobQueueId)));
+  itemsLine(run: JobQueue) { return countsLine(this.itemCounts().get(run.jobQueueId)); }
+  protected readonly readCounts = effect(() => {
+    const page = this.paged();
+    untracked(() => {
+      // The counts are the run page's to read (Schedules or Runs by date); a screen test may stand in a partial session.
+      const can = (key: 'jobs' | 'queue') => typeof this.auth.canOpen === 'function' && this.auth.canOpen(key);
+      if (!can('jobs') && !can('queue')) return;
+      const ids = page.filter(run => !this.countsAsked.has(run.jobQueueId) || !RUN_ENDED.includes(run.jobStatus))
+        .map(run => run.jobQueueId).filter(id => Number.isInteger(id));
+      if (!ids.length) return;
+      ids.forEach(id => this.countsAsked.add(id));
+      this.itemsApi.counts(ids).subscribe({
+        next: counts => this.itemCounts.update(map => {
+          const next = new Map(map);
+          for (const [id, c] of Object.entries(counts ?? {})) if (c?.items) next.set(Number(id), c);
+          return next;
+        }),
+        error: () => { /* the column is left out, as for a run without items */ },
+      });
+    });
+  });
   goToPage(next: number): void { this.pager.goTo(next, this.filtered().length); }
   setPageSize(size: number): void { this.pager.setSize(size); }
 

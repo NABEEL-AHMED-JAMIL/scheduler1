@@ -1,7 +1,8 @@
 <div class="page">
   <!-- UX review 2026-10-12 (A2, R1, R3, run page fix): the run as a detail page. One header -- the run and its schedule as
        the title, ONE status pill ("Completed · waiting for review"), a link row -- then a strip of the facts the header
-       does not say beside the Next steps (equal height), then tabs: Steps (a table), Map, AI answers, Outputs, Log. -->
+       does not say beside the Next steps (equal height), then tabs: Steps (a table), Map, AI answers, Items (MIG-420: a
+       pipeline that works item by item), Outputs, Log. -->
   <app-page-header [title]="heading()" [trail]="trail()" [crumb]="'Run #' + jobQueueId()">
     @if (statusLook(); as s) {
       <span pills class="pill pill-{{ s.tone }} run-status-pill" data-test="run-status"><app-icon [name]="s.icon" size="0.85em" />{{ s.label }}</span>
@@ -86,6 +87,14 @@
         <app-run-ai-trace />
         <app-run-ai-answers [answers]="aiSteps()" />
       </div>
+    }
+    @case ('items') {
+      @if (items()?.itemRun) {
+        <app-run-items [jobQueueId]="jobQueueId()" [first]="itemsFirst()" [initialStatus]="itemStatus()" [runDuration]="duration()"
+                       [canRetry]="canOpenSchedule()" [refreshKey]="loads()" (statusChange)="itemStatusChanged($event)" (retried)="refresh()" />
+      } @else {
+        <p class="card p-4 text-sm text-[color:var(--text-muted)]" aria-busy="true">Reading the run's items…</p>
+      }
     }
     @case ('outputs') {
       <app-run-outputs />

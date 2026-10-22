@@ -390,6 +390,8 @@
           <!-- Owner 2026-10-12: the status sits right before the message it explains, a fixed width so the badges line
                up; the pinned column keeps only the actions. -->
           <th class="w-32">Status</th>
+          <!-- MIG-420: a pipeline that works item by item says how its items went; the column is there only for such runs. -->
+          @if (hasItems()) { <th>Items</th> }
           <th>Message</th>
           <th class="text-right col-pin-right th-actions">Actions</th>
         </tr>
@@ -457,6 +459,25 @@
               {{ duration(run) || '—' }}
             </td>
             <td class="w-32 whitespace-nowrap" data-test="run-status"><app-status [label]="run.jobStatus" /></td>
+            @if (hasItems()) {
+              <td class="whitespace-nowrap text-xs" data-test="run-items">
+                @if (itemsLine(run); as c) {
+                  @if (run.jobId) {
+                    <a class="link-inline" [routerLink]="['/pipelines/schedules', run.jobId, 'runs', run.jobQueueId]" [queryParams]="{ tab: 'items' }"
+                       [attr.aria-label]="'Items of run #' + run.jobQueueId + ': ' + c.done">{{ c.done }}</a>
+                  } @else { <span>{{ c.done }}</span> }
+                  @if (c.running) { <span class="text-[color:var(--text-secondary)]"> · {{ c.running }}</span> }
+                  @if (c.failed) {
+                    <span class="text-[color:var(--text-secondary)]"> · </span>
+                    @if (run.jobId) {
+                      <a class="link-inline text-crit-500 font-medium" data-test="run-items-failed"
+                         [routerLink]="['/pipelines/schedules', run.jobId, 'runs', run.jobQueueId]" [queryParams]="{ tab: 'items', status: 'failed' }"
+                         [attr.aria-label]="'The failed items of run #' + run.jobQueueId + ': ' + c.failed">{{ c.failed }} ›</a>
+                    } @else { <span class="text-crit-500">{{ c.failed }}</span> }
+                  }
+                } @else { <span class="text-[color:var(--text-muted)]">—</span> }
+              </td>
+            }
             <td class="max-w-72 xl:max-w-96">
               @if (run.jobStatusMessage) {
                 <!-- A truncated line with a tooltip is unreadable for the messages that matter:
@@ -512,7 +533,7 @@
 
           @if (isMessageOpen(run.jobQueueId) && run.jobStatusMessage) {
             <tr>
-              <td [attr.colspan]="isAllJobs() ? 9 : 8" class="!p-0">
+              <td [attr.colspan]="(isAllJobs() ? 9 : 8) + (hasItems() ? 1 : 0)" class="!p-0">
                 <div class="detail-panel">
                   <div class="flex items-baseline gap-2 mb-1.5">
                     <h3 class="text-xs font-semibold uppercase tracking-wider

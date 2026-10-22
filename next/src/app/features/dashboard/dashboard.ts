@@ -1,4 +1,5 @@
 import { WaitingForReview } from './waiting-for-review';
+import { NeedsAttention } from './needs-attention';
 import { QuickLinks } from './quick-links';
 import { DateRange, DateRangePicker, RangePreset, presetRange, rangeKey, rangeText, restoreRange } from '../../shared/ui/date-range';
 import { BillingBrief } from '../billing/billing-brief';
@@ -56,7 +57,7 @@ import { PageHeader } from '../../shared/ui/page-header';
 import { RefreshButton } from '../../shared/ui/refresh-button';
 @Component({
   selector: 'app-dashboard',
-  imports: [RefreshButton, PageHeader, ServerTimePipe, Pagination, Icon, DateRangePicker, Donut, BarChart, Heatmap, BillingBrief, StatTile, TableShell, BlurLoader, LoadError, GetStarted, WaitingForReview, QuickLinks],
+  imports: [RefreshButton, PageHeader, ServerTimePipe, Pagination, Icon, DateRangePicker, Donut, BarChart, Heatmap, BillingBrief, StatTile, TableShell, BlurLoader, LoadError, GetStarted, WaitingForReview, NeedsAttention, QuickLinks],
   templateUrl: './dashboard.html',
 })
 export class Dashboard implements OnInit {

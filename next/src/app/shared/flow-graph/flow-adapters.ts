@@ -100,6 +100,8 @@ const TASK_ICONS: Record<string, string> = {
   // recording's text under the microphone, and a file in another format under the turning arrows -- 'file' already
   // stands for Read file, Render PDF and Generate report, so a conversion beside them would not read as one.
   transcribe_audio: 'mic', convert_file: 'refresh',
+  // MIG-420: a PDF into its pages, each a sub-item of its document.
+  split_pages: 'layers',
 };
 
 const strings = (v: unknown): string[] => (Array.isArray(v) ? v : [v]).filter((x): x is string => typeof x === 'string' && !!x);

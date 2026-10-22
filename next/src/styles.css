@@ -2356,6 +2356,14 @@ html.dark .lookup-rail-glyph.is-managed { background: color-mix(in oklab, var(--
 .side-panel-host { width: min(36rem, calc(100vw - 2rem)); max-height: 85vh; }
 .side-panel-host > * { display: block; }
 .side-panel-host.side-panel-wide { width: min(58rem, calc(100vw - 2rem)); }
+/* MIG-420: a run's item and its files slide over the right at full height -- 760 px beside the list on a big screen,
+   most of the width on a tablet, where the list behind would be too narrow to read anyway. */
+.side-panel-host.side-panel-item { position: fixed !important; top: 0; right: 0; bottom: 0; margin: 0 !important; height: 100dvh; max-height: none;
+  width: min(47.5rem, calc(100vw - 2rem)); }
+@media (max-width: 1279px) { .side-panel-host.side-panel-item { width: calc(100vw - 6rem); } }
+.side-panel-item .side-panel { max-height: none; height: 100%; border-radius: 0; border-width: 0 0 0 1px; animation: side-panel-item-slide 180ms ease-out; }
+@keyframes side-panel-item-slide { from { transform: translateX(1.5rem); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .side-panel-item .side-panel { animation: none; } }
 .side-panel { max-height: 85vh; display: flex; flex-direction: column; overflow: hidden; background: var(--surface-raised);
   border: 1px solid var(--border-strong); animation: side-panel-in 160ms ease-out; @apply rounded-card shadow-2xl; }
 .side-panel-head { display: flex; align-items: flex-start; gap: 0.75rem; padding: 1rem 1.25rem; border-bottom: 1px solid var(--border-subtle); }

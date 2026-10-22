@@ -451,7 +451,10 @@ export class Docs implements AfterViewInit {
       todo: [
         'Add a schedule: the pipeline, a frequency (see the reference below), a start, and optionally an end, retries and who hears about it.',
         'Or a trigger: a file dropped, an email in, a document approved, a form submitted.',
-        'Follow runs under Runs: Latest, By date, Analytics, Failed and Backfills. A run\'s page has the tabs Steps, Map, AI answers, Outputs and Log.',
+        'Follow runs under Runs: Latest, By date, Analytics, Failed and Backfills. A run\'s page has the tabs Steps, Map, AI answers, Items, Outputs and Log.',
+        'Items is there when the pipeline works item by item (each file, recording or document): every item with how it went at each step. '
+          + 'Filter by Done or Failed, search a name or a value such as risk = High, and Open an item to see its steps, why it failed and its data at each step. '
+          + 'A step that made many files (a page image per page) opens their list. Retry failed items runs only the failed ones again, from the step each failed at.',
         'On Outputs, View shows a file in place: a kept PDF in the PDF viewer, a kept table as a table, a file the run put in a bucket in the file preview. Download takes it away.',
         'Retry a failed run from the step that failed (Runs › Failed groups failures by their error), or run a schedule for each period of a past range (Backfills).',
       ],

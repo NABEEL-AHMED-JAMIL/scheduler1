@@ -29,6 +29,9 @@ import { RunApprovalStore } from '../run-steps/run-approval.store';
 import { liveDuration } from '../run-steps/run-approval.model';
 import { stepKind } from '../run-steps/run-map';
 import { RUN_TABS, RunTab, runFacts, runStatusLook, runTabFromUrl, runTabUrl, startedBy } from '../run-steps/run-page.model';
+import { RunItems } from '../run-items/run-items';
+import { RunItemsApi } from '../run-items/run-items.api';
+import { ItemFilter, ItemsPage, filterOf, itemsQuery } from '../run-items/run-items.model';
 
 export type { RunTab } from '../run-steps/run-page.model';
 /** The tab a `?tab=` value names on the bare run address (kept for the callers that read it). */
@@ -76,7 +79,7 @@ export function runHasAi(timeline: { steps?: { task: string }[]; aiSteps?: unkno
 @Component({
   selector: 'app-job-logs',
   imports: [PageHeader, RefreshButton, Icon, RouterLink, RankedBar, RunDecision, RunAiAnswers, RunStepsTable, RunMap,
-    RunOutputs, RunAiTrace, RunLog, RunApproval],
+    RunOutputs, RunAiTrace, RunLog, RunApproval, RunItems],
   templateUrl: './job-logs.html',
   // One read of the run's steps and outputs for the whole page: the summary, every tab, the step log panel.
   providers: [RunTimelineStore, RunApprovalStore],
@@ -313,6 +316,9 @@ export class JobLogs implements OnInit, OnDestroy {
     { id: 'map' as RunTab, label: 'Map', icon: 'layers' },
     ...(this.hasAi() || (!this.aiKnown() && this.tab() === 'ai')
       ? [{ id: 'ai' as RunTab, label: this.aiSteps().length ? `AI answers (${this.aiSteps().length})` : 'AI answers', icon: 'sparkle' }] : []),
+    // MIG-420: only a run of a pipeline that works item by item has Items; until Core has said, kept when the address asks.
+    ...(this.items()?.itemRun || (!this.itemsRead() && this.tab() === 'items')
+      ? [{ id: 'items' as RunTab, label: this.items()?.itemRun ? `Items (${this.items()!.summary.items.toLocaleString('en-GB')})` : 'Items', icon: 'table' }] : []),
     { id: 'outputs' as RunTab, label: this.store.outputList().length ? `Outputs (${this.store.outputList().length})` : 'Outputs', icon: 'file' },
     { id: 'log' as RunTab, label: this.logs().length ? `Log (${this.logs().length.toLocaleString('en-GB')})` : 'Log', icon: 'terminal' },
   ]);
@@ -326,9 +332,40 @@ export class JobLogs implements OnInit, OnDestroy {
   setTab(tab: RunTab): void {
     if (!RUN_TABS.includes(tab)) return;
     this.tab.set(tab);
-    const { commands, queryParams } = runTabUrl(this.jobId(), this.jobQueueId(), tab);
+    const { commands, queryParams } = runTabUrl(this.jobId(), this.jobQueueId(), tab, this.itemStatus());
     const url = this.router.serializeUrl(this.router.createUrlTree(commands, { queryParams }));
     this.location.replaceState(url);
+  }
+
+  /**
+   * MIG-420: the run's items, first page, asked once with the run (and again while a running run has none yet): whether
+   * the run has an Items tab at all, and the tab's first answer. A run of a pipeline that does not work item by item --
+   * a big table read in one go -- answers itemRun false, and has no tab.
+   */
+  private readonly itemsApi = inject(RunItemsApi);
+  readonly items = signal<ItemsPage | null>(null);
+  readonly itemsRead = signal(false);
+  /** The Items tab's filter, kept in the address (?tab=items&status=failed opens it filtered). */
+  readonly itemStatus = signal<ItemFilter>(filterOf(this.activated.snapshot?.queryParamMap?.get('status')));
+  /** The status the first answer was asked for: the tab draws it only while it shows that one. */
+  private readonly itemsAskedFor = signal<ItemFilter>('all');
+  readonly itemsFirst = computed(() => this.itemsAskedFor() === this.itemStatus() ? this.items() : null);
+  private itemsAsking = false;
+  private readItems(): void {
+    const id = Number(this.jobQueueId());
+    if (!id || this.itemsAsking || (this.itemsRead() && (this.items()?.itemRun || !this.stillRunning()))) return;
+    this.itemsAsking = true;
+    const status = this.itemStatus();
+    this.itemsApi.list(itemsQuery(id, { status, page: 0, size: 50 })).subscribe({
+      next: page => { this.itemsAsking = false; this.itemsAskedFor.set(status); this.items.set(page); this.itemsRead.set(true); },
+      // A reader the items are not for (a platform administrator's own sign-in), or an older Core: no tab.
+      error: () => { this.itemsAsking = false; this.items.set(null); this.itemsRead.set(true); },
+    });
+  }
+
+  itemStatusChanged(status: ItemFilter): void {
+    this.itemStatus.set(status);
+    if (this.tab() === 'items') this.setTab('items');
   }
 
   showStepInLog(stepKey: string): void {
@@ -364,7 +401,10 @@ export class JobLogs implements OnInit, OnDestroy {
   constructor() {
     // A link to this page's other address (/logs, ?tab=) or to another run lands on this same page: it follows the address.
     const navigations = this.router.events.subscribe(event => {
-      if (event instanceof NavigationEnd) this.tab.set(this.tabOfAddress());
+      if (event instanceof NavigationEnd) {
+        this.tab.set(this.tabOfAddress());
+        this.itemStatus.set(filterOf(this.activated.snapshot?.queryParamMap?.get('status')));
+      }
     });
     inject(DestroyRef).onDestroy(() => navigations.unsubscribe());
     let shown: string | null = null;
@@ -373,13 +413,18 @@ export class JobLogs implements OnInit, OnDestroy {
       if (shown !== null && shown !== key) untracked(() => {
         this.logs.set([]); this.job.set(null); this.run.set(null); this.review.set(null); this.aiSteps.set([]);
         this.aiStepsLoadedFor = null; this.aiStepsRead.set(false); this.costFor = null; this.cost.set(null); this.missing.set(false);
+        this.items.set(null); this.itemsRead.set(false);
         this.load();
       });
       shown = key;
     });
     // The run's steps are read with each read of the run, so a running run's steps move with its entries.
     effect(() => {
-      if (this.loads() > 0 && !this.missing()) untracked(() => this.store.load(this.jobQueueId().trim()));
+      if (this.loads() > 0 && !this.missing()) untracked(() => { this.store.load(this.jobQueueId().trim()); this.readItems(); });
+    });
+    // ?tab=items on a run with no items opens the Steps, as ?tab=ai does on a run with no AI steps.
+    effect(() => {
+      if (this.tab() === 'items' && this.itemsRead() && !this.items()?.itemRun) untracked(() => this.setTab('steps'));
     });
     // ?tab=ai on a run with no AI steps opens the Steps, quietly, once the page knows (the address follows).
     effect(() => {

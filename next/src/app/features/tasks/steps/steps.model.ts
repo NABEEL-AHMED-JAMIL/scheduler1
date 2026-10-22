@@ -677,6 +677,10 @@ export function outputColumns(definition: Definition, index: number, tasks: Step
       return fileRowColumns(definition, index, tasks, ['file_name', 'file_stem', 'converted_key', 'converted_pages', 'converted_bytes',
         'convert_status', ...(tracked ? ['convert_error'] : [])]);
     }
+    // MIG-420: Split pages -- a row per page of each PDF, with its text and its image kept with the run.
+    case 'split_pages':
+      return fileRowColumns(definition, index, tasks, ['file_name', 'file_stem', 'page', 'page_count', 'page_text', 'page_chars',
+        'page_image', 'page_status', 'page_error']);
     // Owner #16 (2026-10-19): the common tasks added to the registry.
     case 'unpivot': {
       const columns = input();
