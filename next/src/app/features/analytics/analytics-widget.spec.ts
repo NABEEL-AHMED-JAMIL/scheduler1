@@ -44,3 +44,24 @@ describe('AnalyticsWidget', () => {
     expect(fixture.componentInstance.refreshed).toBe(2);
   });
 });
+
+/** MIG-416 (CLS 0.27 at 1024): a waiting or running tile holds the height its drawing will take, when the board knows it. */
+@Component({ imports: [AnalyticsWidget], template: `<app-analytics-widget title="Rows" [state]="state()" [reserve]="reserve()"><p>THE CHART</p></app-analytics-widget>` })
+class Reserving { state = signal<WidgetState>('running'); reserve = signal<number | null>(260); }
+
+describe('AnalyticsWidget holding its drawing\'s height (MIG-416)', () => {
+  it('gives the skeleton the reserved height while queued and running, and nothing when none is known', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ imports: [Reserving] });
+    const fixture = TestBed.createComponent(Reserving);
+    fixture.detectChanges();
+    const busy = () => (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>('[aria-busy="true"]');
+    expect(busy()!.style.minHeight).toBe('260px');
+    fixture.componentInstance.state.set('queued');
+    fixture.detectChanges();
+    expect(busy()!.style.minHeight).toBe('260px');
+    fixture.componentInstance.reserve.set(null);
+    fixture.detectChanges();
+    expect(busy()!.style.minHeight).toBe('');
+  });
+});

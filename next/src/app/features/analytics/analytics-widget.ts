@@ -34,14 +34,14 @@ export type WidgetState = 'idle' | 'queued' | 'running' | 'failed' | 'stopped' |
           @case ('queued') {
             <!-- Waiting for a place among the tiles running now (a board runs three at once): the same skeleton, so
                  the board is drawn whole from the start and nothing moves when a tile's turn comes. -->
-            <div class="py-3 flex flex-col gap-2" aria-busy="true" [attr.aria-label]="'Waiting to run ' + title()">
+            <div class="py-3 flex flex-col gap-2" aria-busy="true" [attr.aria-label]="'Waiting to run ' + title()" [style.min-height.px]="reserve()">
               <span class="sr-only">Waiting to run {{ title() }}…</span>
               @for (line of skeletonLines; track line) { <span class="block h-3 rounded bg-sunken" [style.width.%]="line" aria-hidden="true"></span> }
             </div>
           }
           @case ('running') {
             <!-- A skeleton that keeps the tile's height, so a board does not reflow under a reader as each widget lands. -->
-            <div class="py-3 flex flex-col gap-2" aria-busy="true" [attr.aria-label]="'Running ' + title()">
+            <div class="py-3 flex flex-col gap-2" aria-busy="true" [attr.aria-label]="'Running ' + title()" [style.min-height.px]="reserve()">
               <span class="sr-only">Running {{ title() }}…</span>
               @for (line of skeletonLines; track line) { <span class="block h-3 rounded bg-sunken pulse" [style.width.%]="line" aria-hidden="true"></span> }
             </div>
@@ -93,6 +93,11 @@ export class AnalyticsWidget {
    * size) and the tile says it is busy -- the refresh icon turns and the card dims a shade.
    */
   readonly busy = input(false);
+  /**
+   * MIG-416 (CLS 0.27 at 1024): the height the tile's drawing will take, held by its skeleton while it waits and runs --
+   * a chart is drawn at a known height, and a short skeleton grew into it, moving every tile below. Null: the lines' own.
+   */
+  readonly reserve = input<number | null>(null);
   readonly error = input('');
   readonly emptyMessage = input('No rows in this result.');
   readonly refreshable = input(true);

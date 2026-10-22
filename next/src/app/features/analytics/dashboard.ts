@@ -1808,6 +1808,16 @@ export class Dashboards implements OnInit, OnDestroy {
     return Math.min(WIDGET_HEIGHT_MAX, Math.max(WIDGET_HEIGHT_MIN, Math.round(asked)));
   }
 
+  /**
+   * MIG-416: what a running tile's skeleton holds -- a chart's drawing height (every chart is drawn at heightOf) -- so the
+   * board does not move when it lands. Figures, tables and ranked lists take their rows' height: theirs is not known yet.
+   */
+  reserveOf(widget: DashboardWidget): number | null {
+    const kind = kindInfo(widget.visualizationType);
+    if (!kind || kind.category === 'Figures and tables' || kind.id === 'ranked' || kind.id === 'rankedShare') return null;
+    return this.heightOf(widget);
+  }
+
   /** Whether the author set this tile's height; when not, horizontal bars may grow to fit theirs. */
   hasOwnHeight(widget: DashboardWidget): boolean {
     const asked = widgetConfigOf(widget).height;

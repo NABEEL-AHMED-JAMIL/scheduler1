@@ -3085,3 +3085,19 @@ describe('the board\'s header holds still while it runs (e2e board-layout: a cli
     expect(orderOf(board, /\.dash-run-button \{[^}]*order: (\d+);/)).toBe(primary);
   });
 });
+
+/** MIG-416 (CLS 0.27 at 1024): a running chart tile holds its drawing's height; figures and tables hold none. */
+describe('what a running tile holds for its drawing', () => {
+  const tile = (visualizationType: string, widgetConfig = '{}') =>
+    ({ analyticsDashboardWidgetId: 1, widgetTitle: 't', visualizationType, widgetConfig }) as any;
+
+  it('holds a chart\'s own drawing height, the author\'s when set, and nothing for a figure, a table or a ranked list', () => {
+    const board = bareBoard();
+    expect(board.reserveOf(tile('bar'))).toBe(board.heightOf(tile('bar')));
+    expect(board.reserveOf(tile('barH'))).toBe(board.heightOf(tile('barH')));
+    expect(board.reserveOf(tile('line', JSON.stringify({ height: 320 })))).toBe(320);
+    for (const kind of ['kpi', 'kpiTrend', 'table', 'pivot', 'comparison', 'ranked', 'rankedShare', 'no-such-kind']) {
+      expect(board.reserveOf(tile(kind)), kind).toBeNull();
+    }
+  });
+});
