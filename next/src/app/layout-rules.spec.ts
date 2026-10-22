@@ -83,6 +83,12 @@ describe('layout rules', () => {
     }
   });
 
+  /** ZT-M13: "Administrators" in a 1024-wide strip broke as "ADMINISTRATOR / S"; a label hyphenates instead. */
+  it('hyphenates a long strip label rather than cutting the word anywhere', async () => {
+    const { css } = await sources();
+    expect(rule(css, '.stat-strip-label')).toMatch(/(^|[\s;])hyphens\s*:\s*auto/);
+  });
+
   /**
    * One scale for a card's padding: 16px for content (p-4), a one-line bar (px-4 py-2.5), a
    * list of rows (py-1), an empty or error state (p-8 and up), or none when the card is built

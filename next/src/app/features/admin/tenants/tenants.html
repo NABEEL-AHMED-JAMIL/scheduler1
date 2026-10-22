@@ -15,7 +15,7 @@
     <app-stat-tile label="Runs this month" [value]="stats().runs" icon="play" [tone]="stats().failed ? 'warn' : 'ok'"
                    [foot]="stats().failed + ' failed'" />
     <app-stat-tile label="Cost this month" [value]="money(stats().cost)" icon="chart" tone="info"
-                   [foot]="figuresError() ? 'billing did not answer' : 'so far, priced each day'" />
+                   [foot]="figuresError() ? 'billing did not answer' : 'so far, as billed'" />
     <app-stat-tile label="Alerts open" [value]="stats().alerts" icon="bell" [tone]="stats().alerts ? 'crit' : 'ok'"
                    [foot]="stats().alerting ? 'in ' + stats().alerting + ' workspaces' : 'none open'" />
   </div>

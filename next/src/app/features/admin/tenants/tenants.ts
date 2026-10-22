@@ -137,7 +137,7 @@ export class Tenants implements OnInit {
     { key: 'sourceTaskCount', label: 'Pipelines', title: 'Pipelines, and the schedules that run them' },
     { key: 'runsThisMonth', label: 'Runs', title: 'Runs this month (Chicago), and how many failed' },
     { key: 'storageBytes', label: 'Storage', title: 'Written less deleted, as metered' },
-    { key: 'costThisMonth', label: 'Cost', title: 'This month so far, priced each day' },
+    { key: 'costThisMonth', label: 'Cost', title: 'This month so far, as each workspace\'s bill counts it (after its allowances)' },
     { key: 'openAlerts', label: 'Alerts', title: 'Alerts open now' },
   ];
 

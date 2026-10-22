@@ -659,9 +659,10 @@
   }
   .stat-strip.is-md .stat-strip-value { font-size: 1.125rem; }
   .stat-strip-value.is-quiet { color: var(--text-muted); }
+  /* ZT-M13: a long word in a narrow cell is hyphenated ("ADMINIS-TRATORS"), not cut mid-word ("ADMINISTRATOR / S"). */
   .stat-strip-label {
     font-size: 11px; line-height: 1.25; text-transform: uppercase; letter-spacing: 0.025em;
-    color: var(--text-muted); overflow-wrap: anywhere;
+    color: var(--text-muted); overflow-wrap: anywhere; hyphens: auto; -webkit-hyphens: auto;
   }
   .stat-strip-foot { font-size: 11px; line-height: 1.25; color: var(--text-muted); overflow-wrap: anywhere; }
   .stat-strip-glyph { display: inline-flex; flex-shrink: 0; }
