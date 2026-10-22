@@ -52,6 +52,9 @@ export const CHILD_PAGE = 15;
     .ri-cell-none { color: var(--text-muted); }
     .ri-search { width: min(24rem, 100%); }
     .ri-field { max-width: 16rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    /* ZT-I15: at 1024 the table scrolls inside its card; Open stays at its right edge, over the row's own background. */
+    .ri-table .ri-open { position: sticky; right: 0; background: var(--surface-raised); }
+    .ri-table th.ri-open { background: var(--surface-sunken); }
   `,
   template: `
     <section class="flex flex-col gap-3" data-test="run-items" aria-label="Items">
@@ -126,7 +129,7 @@ export const CHILD_PAGE = 15;
             }
           </app-empty-state>
         } @else {
-          <div class="overflow-x-auto" [attr.aria-busy]="loading()">
+          <div class="overflow-x-auto relative" [attr.aria-busy]="loading()">
             <table class="ri-table" data-test="items-table">
               <thead>
                 <tr>
@@ -140,7 +143,7 @@ export const CHILD_PAGE = 15;
                     </th>
                   }
                   <th scope="col" class="text-right">Time</th>
-                  <th scope="col"><span class="sr-only">Open</span></th>
+                  <th scope="col" class="ri-open"><span class="sr-only">Open</span></th>
                 </tr>
               </thead>
               <tbody>
@@ -183,7 +186,7 @@ export const CHILD_PAGE = 15;
                       <td class="ri-field text-[color:var(--text-secondary)]" [title]="field(item, f)">{{ field(item, f) }}</td>
                     }
                     <td class="text-right tabular whitespace-nowrap text-[color:var(--text-secondary)]">{{ time(item) }}</td>
-                    <td class="text-right">
+                    <td class="text-right ri-open">
                       <button type="button" class="btn btn-default btn-xs" [attr.aria-label]="'Open ' + item.label" data-test="item-open" (click)="open(item)">Open</button>
                     </td>
                   </tr>
@@ -208,7 +211,7 @@ export const CHILD_PAGE = 15;
                         }
                         @for (f of fields(); track f) { <td class="ri-field text-[color:var(--text-secondary)]">{{ field(child, f) }}</td> }
                         <td class="text-right tabular whitespace-nowrap text-[color:var(--text-secondary)]">{{ time(child) }}</td>
-                        <td class="text-right whitespace-nowrap">
+                        <td class="text-right whitespace-nowrap ri-open">
                           @if (child.status === 'failed' && canRetry()) {
                             <button type="button" class="btn btn-default btn-xs" data-test="child-retry" [disabled]="retrying()"
                                     [attr.aria-label]="'Retry ' + child.label + ' of ' + item.label" (click)="retryChild(child)">Retry page</button>

@@ -74,6 +74,15 @@ describe('Run item panel', () => {
     expect(el.querySelector('[data-test="data-masked"]')?.textContent).toContain('patient_name');
   });
 
+  it('names where the item is once: its key holds its folder (ZT-I17)', () => {
+    const { el, detail, data$ } = mount();
+    detail('2', { item: { ...DETAIL('2').item, key: 'voice-intake/mig420-0231/call-b.m4a', label: 'call-b.m4a', folder: 'voice-intake/mig420-0231/' } });
+    data$();
+    const meta = el.querySelector('[data-test="item-meta"]')?.textContent?.trim() ?? '';
+    expect(meta.startsWith('voice-intake/mig420-0231/call-b.m4a · ')).toBe(true);
+    expect(meta).not.toContain('mig420-0231/voice-intake');
+  });
+
   it('shows the data as a table with the masked column marked, and moves to another step\'s data', () => {
     const { el, detail, data$, fixture, component } = mount();
     detail();

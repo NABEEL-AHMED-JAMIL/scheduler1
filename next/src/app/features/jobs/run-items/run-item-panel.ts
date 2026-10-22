@@ -266,7 +266,8 @@ export class RunItemPanel implements OnInit {
   readonly meta = computed(() => {
     const item = this.detail()?.item;
     if (!item) return '';
-    const where = `${item.folder ?? ''}${item.key && item.key !== item.label ? item.key : item.label}`;
+    // ZT-I17: an item's key already holds its folder; the folder only goes before a bare label.
+    const where = item.key && item.key !== item.label ? item.key : `${item.folder ?? ''}${item.label}`;
     const parts = [where];
     if (item.durationMs !== null && item.durationMs !== undefined) parts.push(itemTime(item.durationMs));
     if (item.fileCount) parts.push(`${item.fileCount} ${item.fileCount === 1 ? 'file' : 'files'}`);

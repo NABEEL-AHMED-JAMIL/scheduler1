@@ -69,6 +69,16 @@ describe('Run items tab', () => {
     expect(el.querySelector('tr[data-ref="1"] [data-cell="pages"]')?.textContent?.trim()).toBe('40 files ›');
   });
 
+  it('keeps a wide table inside its card at 1024: the scroll box holds its hidden header, and Open stays in view (ZT-I15)', () => {
+    const { el } = mount();
+    const box = el.querySelector('[data-test="items-table"]')!.parentElement!;
+    // An sr-only (absolute) header escaped a scroll box that was not its containing block and widened the page by 38 px.
+    expect(box.classList).toContain('overflow-x-auto');
+    expect(box.classList).toContain('relative');
+    expect(el.querySelector('thead th:last-child')?.classList).toContain('ri-open');
+    expect(el.querySelector('tr[data-ref="1"] td:last-child')?.classList).toContain('ri-open');
+  });
+
   it('asks for the failed ones, a search and the next page, and says the status for the address', () => {
     const { http, el, fixture, component } = mount();
     const statuses: string[] = [];
