@@ -124,4 +124,11 @@ describe('Report Studio screens (zero-tolerance)', () => {
   it('ZT-R22: Generation jobs keeps "v3 · 200 p." on one line', async () => {
     expect(await here('library.html')).toContain('<td class="text-xs whitespace-nowrap">@if (j.resultVersion) { v{{ j.resultVersion }}');
   });
+
+  it('ZT-R33: the AI assistant\'s proposal card wraps a long field path in its notes and changes, not past the panel', async () => {
+    const css = await here('designer/ai-panel.css');
+    const card = css.slice(css.indexOf('.rsa-card {'), css.indexOf('}', css.indexOf('.rsa-card {')));
+    expect(card).toContain('overflow-wrap: anywhere');
+    expect(card).toContain('min-width: 0');
+  });
 });
