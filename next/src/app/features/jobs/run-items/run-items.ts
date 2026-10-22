@@ -65,7 +65,7 @@ export const CHILD_PAGE = 15;
             @for (f of filters; track f) {
               <button type="button" class="btn btn-default btn-sm gap-1.5 ring-[color:var(--focus-ring)]" [class.ring-2]="status() === f"
                       [attr.aria-pressed]="status() === f" [attr.data-filter]="f" (click)="setStatus(f)">
-                {{ filterLabel[f] }}<span class="tabular font-semibold">{{ count(f) }}</span>
+                {{ filterLabel[f] + ' ' }}<span class="tabular font-semibold">{{ count(f) }}</span>
               </button>
             }
           </div>
