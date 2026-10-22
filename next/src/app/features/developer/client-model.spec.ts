@@ -27,6 +27,17 @@ describe('a client\'s coverage of the contract', () => {
     expect(start).not.toMatch(/CLIENT_SECRET="[^…]/);
     expect(quickStart(DOCS.spec, ops, coverageOf(ops, []), 'c', 'b')).toContain('holds no scope');
   });
+
+  it('takes for its first call a read that needs no id, when the client may make one (ZT-X6)', () => {
+    // A client with runs:read beside runs:write showed "GET /v1/backfills/123": an id the reader does not have.
+    const start = quickStart(DOCS.spec, ops, coverageOf(ops, ['runs:read', 'runs:write', 'files:write']), 'c', 'https://api.example/v1');
+    const second = start.split('# 2. ')[1] ?? '';
+    expect(second).toContain('curl -X GET "https://api.example/v1/runs"');
+    expect(second).not.toMatch(/\/\d+"/);
+    // Only calls that name an id: the first such read still stands, with its placeholder.
+    const files = quickStart(DOCS.spec, ops, coverageOf(ops, ['files:read']), 'c', 'https://api.example/v1');
+    expect(files).toMatch(/# 2\. .*\ncurl -X GET "https:\/\/api\.example\/v1\/files\//);
+  });
 });
 
 describe('the contract\'s scopes', () => {

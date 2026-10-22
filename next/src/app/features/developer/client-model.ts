@@ -35,8 +35,10 @@ export function contractScopes(operations: Operation[]): string[] {
  */
 export function quickStart(doc: OpenApiDoc, operations: Operation[], coverage: ClientCoverage, clientId: string, base: string): string {
   const token = operations.find(op => op.method === 'post' && op.path === '/oauth/token');
-  const first = coverage.allowed.find(op => op.access.kind === 'scopes' && op.method === 'get')
-    ?? coverage.allowed.find(op => op.access.kind === 'scopes');
+  // ZT-X6: a read that needs no id first (GET /runs), so the sample runs as written; one naming an id only when it must.
+  const scoped = coverage.allowed.filter(op => op.access.kind === 'scopes');
+  const first = scoped.find(op => op.method === 'get' && !op.path.includes('{'))
+    ?? scoped.find(op => op.method === 'get') ?? scoped[0];
   const lines = [`export CLIENT_ID="${clientId}"`, 'export CLIENT_SECRET="…"   # shown once, when the client was made or its secret rotated', ''];
   if (token) {
     lines.push('# 1. A token (it lasts minutes; ask again when it ends)', `TOKEN=$(${curlFor(doc, token, base)} | jq -r .access_token)`, '');
