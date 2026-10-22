@@ -28,7 +28,7 @@ const DETAIL = {
   ],
 } as unknown as TaskDetail;
 
-function screenWith(detail: TaskDetail = DETAIL, tenantId: number | null = 2924) {
+function screenWith(detail: TaskDetail = DETAIL, tenantId: number | null = 2924, requestsTab = true) {
   const api = {
     mine: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [TASK] })),
     groups: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [] })),
@@ -49,7 +49,7 @@ function screenWith(detail: TaskDetail = DETAIL, tenantId: number | null = 2924)
       { provide: WorkflowsApi, useValue: api },
       { provide: ToastService, useValue: toast },
       { provide: TaskCountService, useValue: { refresh: vi.fn(), count: signal(1), overdue: signal(0), mine: signal(0), groups: signal(0), done: signal(0), requests: signal(0) } },
-      { provide: AuthService, useValue: { canOpen: () => true, user: signal({ appUserId: 4537, tenantId }) } },
+      { provide: AuthService, useValue: { canOpen: () => true, canOpenTab: () => requestsTab, user: signal({ appUserId: 4537, tenantId }) } },
     ],
   });
   const fixture = TestBed.createComponent(TaskInbox);
@@ -58,6 +58,16 @@ function screenWith(detail: TaskDetail = DETAIL, tenantId: number | null = 2924)
 }
 
 describe('Task inbox', () => {
+  it('F3: neither shows nor reads My requests for a person granted the inbox\'s other tabs only', () => {
+    const { api, el } = screenWith(DETAIL, 2924, false);
+    expect(api.requests).not.toHaveBeenCalled();
+    expect(el.querySelector('[data-test="tab-requests"]')).toBeNull();
+    expect(api.mine).toHaveBeenCalled();
+    const full = screenWith();
+    expect(full.api.requests).toHaveBeenCalled();
+    expect(full.el.querySelector('[data-test="tab-requests"]')).not.toBeNull();
+  });
+
   it('opens the first task with its request, in words, and the decisions', () => {
     const { api, el } = screenWith();
     expect(api.task).toHaveBeenCalledWith(501);

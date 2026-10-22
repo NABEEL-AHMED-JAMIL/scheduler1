@@ -41,8 +41,10 @@
       <app-icon name="users" />My groups <span class="pill pill-neutral">{{ groupsCount() }}</span></button>
     <button type="button" class="tab" role="tab" [attr.aria-selected]="tab() === 'done'" [class.tab-active]="tab() === 'done'" (click)="pick('done')" data-test="tab-done">
       <app-icon name="checkCircle" />Done <span class="pill pill-neutral">{{ doneCount() }}</span></button>
-    <button type="button" class="tab" role="tab" [attr.aria-selected]="tab() === 'requests'" [class.tab-active]="tab() === 'requests'" (click)="pick('requests')" data-test="tab-requests">
-      <app-icon name="send" />My requests <span class="pill pill-neutral">{{ requestsCount() }}</span></button>
+    @if (showsRequests()) {
+      <button type="button" class="tab" role="tab" [attr.aria-selected]="tab() === 'requests'" [class.tab-active]="tab() === 'requests'" (click)="pick('requests')" data-test="tab-requests">
+        <app-icon name="send" />My requests <span class="pill pill-neutral">{{ requestsCount() }}</span></button>
+    }
   </div>
 
   @if (error()) {

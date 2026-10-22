@@ -622,7 +622,8 @@ export class JobLogs implements OnInit, OnDestroy {
 
   private readBackfill(): void {
     const run = Number(this.jobQueueId());
-    if (!run || !this.canOpenSchedule()) return;
+    // F3: the link goes to Backfills, a tab of its own (jobs:backfills): not asked of someone it is closed to.
+    if (!run || !this.canOpenSchedule() || !(this.auth.canOpenTab?.('jobs', 'jobs:backfills') ?? true)) return;
     this.http.get<ApiResponse<{ backfillId: number; date: string | null } | null>>(`${API_BASE}/sourceJob.json/backfills/ofRun`,
       { params: { jobQueueId: String(run) } }).subscribe({
         next: r => this.backfill.set(r?.status === 'SUCCESS' && r.data?.backfillId ? r.data : null),

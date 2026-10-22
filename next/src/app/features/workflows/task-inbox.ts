@@ -62,6 +62,14 @@ export interface FieldView { label: string; value: string; view: ValueView; }
 export class TaskInbox implements OnInit {
   private readonly api = inject(WorkflowsApi);
   readonly auth = inject(AuthService);
+  /**
+   * F3 (MIG-400): My requests is a tab of its own (task-inbox:requests); a person granted the inbox's other tabs only is
+   * never shown it, and its list -- refused to them -- is not read.
+   */
+  readonly showsRequests = computed(() => { this.auth.pageKeys?.(); return this.auth.canOpenTab?.('task-inbox', 'task-inbox:requests') ?? true; });
+  private tabs(): InboxTab[] {
+    return this.showsRequests() ? TABS : TABS.filter(t => t !== 'requests');
+  }
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   readonly toast = inject(ToastService);
@@ -313,8 +321,9 @@ export class TaskInbox implements OnInit {
     this.now.set(Date.now());
     this.loading.set(true);
     this.error.set('');
-    let pending = TABS.length;
-    for (const tab of TABS) {
+    const tabs = this.tabs();
+    let pending = tabs.length;
+    for (const tab of tabs) {
       this.readPage(tab, null, rows => {
         this.setRows(tab, rows);
         // The inbox opens on the first task, My requests on the newest.
@@ -358,7 +367,7 @@ export class TaskInbox implements OnInit {
 
   private dropSearchAll(): void {
     const searched = this.searched();
-    const tabs = TABS.filter(t => searched[t]);
+    const tabs = this.tabs().filter(t => searched[t]);
     if (!tabs.length) return;
     this.searched.set(perTab(''));
     for (const tab of tabs) this.readPage(tab, null, rows => this.setRows(tab, rows), () => {});
@@ -371,7 +380,7 @@ export class TaskInbox implements OnInit {
   private refreshKeeping(left: number | null): void {
     this.now.set(Date.now());
     const before = this.next();
-    for (const tab of TABS) {
+    for (const tab of this.tabs()) {
       const keep = this.rowsOf(tab);
       this.readPage(tab, null, rows => {
         const gone = tab === 'done' || tab === 'requests' ? null : left;
