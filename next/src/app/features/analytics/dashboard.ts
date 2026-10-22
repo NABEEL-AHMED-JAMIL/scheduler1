@@ -1818,6 +1818,11 @@ export class Dashboards implements OnInit, OnDestroy {
     return this.heightOf(widget);
   }
 
+  /** ZT §3.11: a figure tile's skeleton holds a figure card of the size it will draw (the row layout's at a quarter width). */
+  reserveKpiOf(widget: DashboardWidget): 'lg' | 'md' | null {
+    return kindInfo(widget.visualizationType)?.id === 'kpi' ? (this.spanOf(widget) === 3 ? 'lg' : 'md') : null;
+  }
+
   /** Whether the author set this tile's height; when not, horizontal bars may grow to fit theirs. */
   hasOwnHeight(widget: DashboardWidget): boolean {
     const asked = widgetConfigOf(widget).height;

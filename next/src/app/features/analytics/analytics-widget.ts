@@ -1,5 +1,6 @@
 import { Component, input, output } from '@angular/core';
 import { Icon } from '../../shared/ui/icon';
+import { KpiCard } from '../../shared/charts/kpi-card';
 
 /** Where a widget is in its life. */
 export type WidgetState = 'idle' | 'queued' | 'running' | 'failed' | 'stopped' | 'empty' | 'ready';
@@ -12,7 +13,7 @@ export type WidgetState = 'idle' | 'queued' | 'running' | 'failed' | 'stopped' |
  */
 @Component({
   selector: 'app-analytics-widget',
-  imports: [Icon],
+  imports: [Icon, KpiCard],
   template: `
     <div class="card widget min-w-0" [class.widget-busy]="state() === 'running' || busy()" [attr.aria-busy]="busy() ? 'true' : null">
       <div class="widget-head">
@@ -34,16 +35,24 @@ export type WidgetState = 'idle' | 'queued' | 'running' | 'failed' | 'stopped' |
           @case ('queued') {
             <!-- Waiting for a place among the tiles running now (a board runs three at once): the same skeleton, so
                  the board is drawn whole from the start and nothing moves when a tile's turn comes. -->
-            <div class="py-3 flex flex-col gap-2" aria-busy="true" [attr.aria-label]="'Waiting to run ' + title()" [style.min-height.px]="reserve()">
+            <div class="flex flex-col gap-2" [class.py-3]="!reserveKpi()" [class.relative]="!!reserveKpi()" aria-busy="true" [attr.aria-label]="'Waiting to run ' + title()" [style.min-height.px]="reserve()">
               <span class="sr-only">Waiting to run {{ title() }}…</span>
-              @for (line of skeletonLines; track line) { <span class="block h-3 rounded bg-sunken" [style.width.%]="line" aria-hidden="true"></span> }
+              <!-- ZT §3.11: a figure's own card, unseen, holds the height the figure will take at this width. -->
+              @if (reserveKpi(); as size) { <app-kpi-card class="kpi-reserve" aria-hidden="true" value="0" label="·" caption="·" [size]="size" /> }
+              <div class="flex flex-col gap-2" [class.kpi-reserve-lines]="!!reserveKpi()">
+                @for (line of skeletonLines; track line) { <span class="block h-3 rounded bg-sunken" [style.width.%]="line" aria-hidden="true"></span> }
+              </div>
             </div>
           }
           @case ('running') {
             <!-- A skeleton that keeps the tile's height, so a board does not reflow under a reader as each widget lands. -->
-            <div class="py-3 flex flex-col gap-2" aria-busy="true" [attr.aria-label]="'Running ' + title()" [style.min-height.px]="reserve()">
+            <div class="flex flex-col gap-2" [class.py-3]="!reserveKpi()" [class.relative]="!!reserveKpi()" aria-busy="true" [attr.aria-label]="'Running ' + title()" [style.min-height.px]="reserve()">
               <span class="sr-only">Running {{ title() }}…</span>
-              @for (line of skeletonLines; track line) { <span class="block h-3 rounded bg-sunken pulse" [style.width.%]="line" aria-hidden="true"></span> }
+              <!-- ZT §3.11: a figure's own card, unseen, holds the height the figure will take at this width. -->
+              @if (reserveKpi(); as size) { <app-kpi-card class="kpi-reserve" aria-hidden="true" value="0" label="·" caption="·" [size]="size" /> }
+              <div class="flex flex-col gap-2" [class.kpi-reserve-lines]="!!reserveKpi()">
+                @for (line of skeletonLines; track line) { <span class="block h-3 rounded bg-sunken pulse" [style.width.%]="line" aria-hidden="true"></span> }
+              </div>
             </div>
           }
           @case ('failed') {
@@ -80,6 +89,8 @@ export type WidgetState = 'idle' | 'queued' | 'running' | 'failed' | 'stopped' |
     .widget-note { font-size: 12px; color: var(--text-muted); }
     .widget-state { display: flex; flex-direction: column; align-items: center; gap: 0.35rem; text-align: center; padding: 1.25rem 0.5rem; }
     .widget-busy { opacity: 0.92; }
+    .kpi-reserve { visibility: hidden; }
+    .kpi-reserve-lines { position: absolute; inset: 0.75rem 0 auto 0; }
   `,
 })
 export class AnalyticsWidget {
@@ -98,6 +109,12 @@ export class AnalyticsWidget {
    * a chart is drawn at a known height, and a short skeleton grew into it, moving every tile below. Null: the lines' own.
    */
   readonly reserve = input<number | null>(null);
+  /**
+   * ZT §3.11 (CLS 0.12-0.62 at 1024 on Riverside's board): a figure tile's skeleton held three lines (154 px a tile) and its
+   * figure took 240, moving every row below. A figure's size is set by its width (the card is its own container), so the
+   * skeleton holds an unseen card of that size: 'lg' for a quarter-width tile's centred figure, 'md' otherwise.
+   */
+  readonly reserveKpi = input<'lg' | 'md' | null>(null);
   readonly error = input('');
   readonly emptyMessage = input('No rows in this result.');
   readonly refreshable = input(true);

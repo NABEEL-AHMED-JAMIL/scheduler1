@@ -369,7 +369,7 @@
               }
               <app-analytics-widget [class]="spanClass(widget)" [attr.data-span]="spanOf(widget)" [attr.data-widget]="widget.analyticsDashboardWidgetId"
                                     [style.height.px]="heldHeight(widget)" [class.is-held]="heldHeight(widget) !== null" [title]="widget.widgetTitle" [subtitle]="shortSourceOf(widget)" [subtitleTitle]="sourceOf(widget)"
-                                    [state]="table ? 'ready' : stateOf(run)" [reserve]="table ? null : reserveOf(widget)" [busy]="table ? tableReads()[widget.analyticsDashboardWidgetId!]?.state === 'running' : updating(run)" [error]="run?.error || ''" (refresh)="runOne(widget)">
+                                    [state]="table ? 'ready' : stateOf(run)" [reserve]="table ? null : reserveOf(widget)" [reserveKpi]="table ? null : reserveKpiOf(widget)" [busy]="table ? tableReads()[widget.analyticsDashboardWidgetId!]?.state === 'running' : updating(run)" [error]="run?.error || ''" (refresh)="runOne(widget)">
                 <ng-container actions>
                   @if (canEdit() || (shown && hasMoreRows(shown))) {
                     <button type="button" class="btn btn-ghost btn-icon btn-xs" [cdkMenuTriggerFor]="tileMenu" [attr.aria-label]="'Actions for ' + widget.widgetTitle"

@@ -3100,4 +3100,13 @@ describe('what a running tile holds for its drawing', () => {
       expect(board.reserveOf(tile(kind)), kind).toBeNull();
     }
   });
+
+  it('holds a figure card for a figure tile: the large one at a quarter width, and none for any other kind (ZT §3.11)', () => {
+    const board = bareBoard();
+    const quarter = JSON.stringify({ span: 3 });
+    expect(board.reserveKpiOf(tile('kpi', quarter)), 'quarter').toBe('lg');
+    expect(board.reserveKpiOf(tile('kpi', JSON.stringify({ span: 6 }))), 'half').toBe('md');
+    expect(board.reserveKpiOf(tile('kpi'))).toBe(board.spanOf(tile('kpi')) === 3 ? 'lg' : 'md');
+    for (const kind of ['kpiTrend', 'bar', 'table', 'no-such-kind']) expect(board.reserveKpiOf(tile(kind)), kind).toBeNull();
+  });
 });
