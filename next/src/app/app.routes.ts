@@ -901,6 +901,8 @@ export const routes: Routes = [
         path: 'administration/teams',
         title: 'Teams',
         loadComponent: () => import('./features/admin/teams/teams').then(m => m.Teams),
+        // ZT-M16: a workspace's teams are its data -- the platform administrator's own sign-in opens them in a managed session.
+        data: { workspaceData: workspace('A workspace\'s teams are', 'see and change its teams', 'users') },
       },
       {
         path: 'administration/access-profiles',

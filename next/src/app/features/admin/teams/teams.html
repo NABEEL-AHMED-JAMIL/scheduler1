@@ -9,12 +9,9 @@
         </p>
       </div>
       <div class="flex items-center gap-2">
-        @if (canPickTenant()) {
-          <app-workspace-select data-testid="tenant-picker" [value]="tenantId()" (valueChange)="pickTenant($event === null ? '' : '' + $event)" />
-        }
         <app-refresh-button [loading]="loading()" [disableWhileLoading]="false" (refresh)="load()" />
         @if (admin()) {
-          <button type="button" class="btn btn-primary btn-sm" (click)="startCreate()" [disabled]="needsWorkspace()" data-testid="new-team">
+          <button type="button" class="btn btn-primary btn-sm" (click)="startCreate()" data-testid="new-team">
             <app-icon name="plus" />New team
           </button>
         }
@@ -22,168 +19,164 @@
     </div>
   </app-page-header>
 
-  @if (needsWorkspace()) {
-    <div class="card p-4 text-sm text-[color:var(--text-muted)]" data-testid="pick-workspace">Pick a workspace to see its teams.</div>
-  } @else {
-    <div class="grid grid-cols-2 md:grid-cols-4 stat-strip stat-row is-md is-start" role="list">
-      <app-stat-tile label="Teams" [value]="stats().teams" icon="users" tone="info" foot="in this workspace" />
-      <app-stat-tile label="People in teams" [value]="stats().people" icon="user" tone="info" foot="each counted once" />
-      <app-stat-tile label="Leads" [value]="stats().leads" icon="shield" tone="info" foot="add and remove members" />
-      <app-stat-tile label="Without a lead" [value]="stats().unled" icon="alert" [tone]="stats().unled ? 'warn' : 'info'"
-                     [foot]="stats().unled ? 'only an administrator changes them' : 'every team has one'" />
-    </div>
+  <div class="grid grid-cols-2 md:grid-cols-4 stat-strip stat-row is-md is-start" role="list">
+    <app-stat-tile label="Teams" [value]="stats().teams" icon="users" tone="info" foot="in this workspace" />
+    <app-stat-tile label="People in teams" [value]="stats().people" icon="user" tone="info" foot="each counted once" />
+    <app-stat-tile label="Leads" [value]="stats().leads" icon="shield" tone="info" foot="add and remove members" />
+    <app-stat-tile label="Without a lead" [value]="stats().unled" icon="alert" [tone]="stats().unled ? 'warn' : 'info'"
+                   [foot]="stats().unled ? 'only an administrator changes them' : 'every team has one'" />
+  </div>
 
-    <div class="grid gap-4 lg:grid-cols-[minmax(18rem,1fr)_2fr] items-start">
-      <section class="card p-4 flex flex-col gap-3" aria-labelledby="teams-list">
-        <div class="flex items-center justify-between gap-2">
-          <h2 id="teams-list" class="section-title">All teams</h2>
-          @if (admin()) {
-            <label class="text-xs flex items-center gap-1.5">
-              <input type="checkbox" [checked]="withArchived()" (change)="toggleArchived()" data-testid="show-archived" />Show archived
-            </label>
-          }
-        </div>
+  <div class="grid gap-4 lg:grid-cols-[minmax(18rem,1fr)_2fr] items-start">
+    <section class="card p-4 flex flex-col gap-3" aria-labelledby="teams-list">
+      <div class="flex items-center justify-between gap-2">
+        <h2 id="teams-list" class="section-title">All teams</h2>
+        @if (admin()) {
+          <label class="text-xs flex items-center gap-1.5">
+            <input type="checkbox" [checked]="withArchived()" (change)="toggleArchived()" data-testid="show-archived" />Show archived
+          </label>
+        }
+      </div>
 
-        @if (creating()) {
-          <form class="flex flex-col gap-2 rounded-md border border-[color:var(--border-subtle)] p-3" (submit)="$event.preventDefault(); create()"
-                data-testid="create-form">
-            <label class="text-xs font-medium" for="team-name">Name</label>
-            <input id="team-name" class="input input-sm" maxlength="100" [value]="draftName()" (input)="draftName.set($any($event.target).value)"
-                   data-testid="team-name" placeholder="Wound care nurses" />
-            <label class="text-xs font-medium" for="team-description">Description <span class="text-[color:var(--text-muted)]">(optional)</span></label>
-            <input id="team-description" class="input input-sm" maxlength="500" [value]="draftDescription()"
-                   (input)="draftDescription.set($any($event.target).value)" data-testid="team-description" />
+      @if (creating()) {
+        <form class="flex flex-col gap-2 rounded-md border border-[color:var(--border-subtle)] p-3" (submit)="$event.preventDefault(); create()"
+              data-testid="create-form">
+          <label class="text-xs font-medium" for="team-name">Name</label>
+          <input id="team-name" class="input input-sm" maxlength="100" [value]="draftName()" (input)="draftName.set($any($event.target).value)"
+                 data-testid="team-name" placeholder="Wound care nurses" />
+          <label class="text-xs font-medium" for="team-description">Description <span class="text-[color:var(--text-muted)]">(optional)</span></label>
+          <input id="team-description" class="input input-sm" maxlength="500" [value]="draftDescription()"
+                 (input)="draftDescription.set($any($event.target).value)" data-testid="team-description" />
+          <div class="flex justify-end gap-2">
+            <button type="button" class="btn btn-default btn-sm" (click)="creating.set(false)">Cancel</button>
+            <button type="submit" class="btn btn-primary btn-sm" [disabled]="busy() || !draftName().trim()" data-testid="create-team">Make team</button>
+          </div>
+        </form>
+      }
+
+      @if (!loading() && teams().length === 0) {
+        <p class="text-sm text-[color:var(--text-muted)]" data-testid="no-teams">
+          No teams yet.@if (admin()) { Make one, then name who is in it.} @else { An administrator makes them.}
+        </p>
+      }
+      <ul class="flex flex-col gap-1.5" data-testid="team-list">
+        @for (t of teams(); track t.teamId) {
+          <li>
+            <button type="button" class="w-full text-left rounded-md border px-3 py-2 flex flex-col gap-0.5"
+                    [class]="t.teamId === selectedId() ? 'w-full text-left rounded-md border px-3 py-2 flex flex-col gap-0.5 border-[color:var(--color-accent)] bg-[color:var(--accent-soft)]'
+                                                        : 'w-full text-left rounded-md border px-3 py-2 flex flex-col gap-0.5 border-[color:var(--border-subtle)]'"
+                    [attr.aria-current]="t.teamId === selectedId() ? 'true' : null" (click)="select(t)" [attr.data-team]="t.teamId">
+              <span class="flex items-center gap-2 font-medium">
+                {{ t.name }}
+                @if (t.status === 'ARCHIVED') { <span class="pill pill-neutral">Archived</span> }
+              </span>
+              <span class="text-xs text-[color:var(--text-muted)]">{{ t.memberCount }} {{ t.memberCount === 1 ? 'person' : 'people' }} · {{ leadNames(t) }}</span>
+            </button>
+          </li>
+        }
+      </ul>
+    </section>
+
+    @if (selected(); as team) {
+      <section class="card p-4 flex flex-col gap-4" aria-labelledby="team-title" data-testid="team-detail">
+        @if (editing()) {
+          <form class="flex flex-col gap-2" (submit)="$event.preventDefault(); save()" data-testid="edit-form">
+            <label class="text-xs font-medium" for="edit-name">Name</label>
+            <input id="edit-name" class="input input-sm" maxlength="100" [value]="draftName()" (input)="draftName.set($any($event.target).value)" />
+            <label class="text-xs font-medium" for="edit-description">Description</label>
+            <input id="edit-description" class="input input-sm" maxlength="500" [value]="draftDescription()"
+                   (input)="draftDescription.set($any($event.target).value)" />
             <div class="flex justify-end gap-2">
-              <button type="button" class="btn btn-default btn-sm" (click)="creating.set(false)">Cancel</button>
-              <button type="submit" class="btn btn-primary btn-sm" [disabled]="busy() || !draftName().trim()" data-testid="create-team">Make team</button>
+              <button type="button" class="btn btn-default btn-sm" (click)="editing.set(false)">Cancel</button>
+              <button type="submit" class="btn btn-primary btn-sm" [disabled]="busy() || !draftName().trim()" data-testid="save-team">Save</button>
             </div>
           </form>
+        } @else {
+          <div class="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <h2 id="team-title" class="section-title">{{ team.name }}</h2>
+              <p class="text-sm text-[color:var(--text-muted)]">{{ team.description || 'No description.' }}</p>
+            </div>
+            @if (admin() && team.status === 'ACTIVE') {
+              <div class="flex gap-2">
+                <button type="button" class="btn btn-default btn-sm" (click)="startEdit()" data-testid="edit-team"><app-icon name="edit" />Rename</button>
+                <button type="button" class="btn btn-danger btn-sm" (click)="archive()" data-testid="archive-team"><app-icon name="lock" />Archive</button>
+              </div>
+            }
+          </div>
         }
 
-        @if (!loading() && teams().length === 0) {
-          <p class="text-sm text-[color:var(--text-muted)]" data-testid="no-teams">
-            No teams yet.@if (admin()) { Make one, then name who is in it.} @else { An administrator makes them.}
+        @if (team.leadCount === 0 && team.status === 'ACTIVE') {
+          <p class="text-xs rounded-md border border-[color:var(--border-subtle)] p-2" role="note" data-testid="no-lead">
+            This team has no lead, so only an administrator changes who is in it.
           </p>
         }
-        <ul class="flex flex-col gap-1.5" data-testid="team-list">
-          @for (t of teams(); track t.teamId) {
-            <li>
-              <button type="button" class="w-full text-left rounded-md border px-3 py-2 flex flex-col gap-0.5"
-                      [class]="t.teamId === selectedId() ? 'w-full text-left rounded-md border px-3 py-2 flex flex-col gap-0.5 border-[color:var(--color-accent)] bg-[color:var(--accent-soft)]'
-                                                          : 'w-full text-left rounded-md border px-3 py-2 flex flex-col gap-0.5 border-[color:var(--border-subtle)]'"
-                      [attr.aria-current]="t.teamId === selectedId() ? 'true' : null" (click)="select(t)" [attr.data-team]="t.teamId">
-                <span class="flex items-center gap-2 font-medium">
-                  {{ t.name }}
-                  @if (t.status === 'ARCHIVED') { <span class="pill pill-neutral">Archived</span> }
-                </span>
-                <span class="text-xs text-[color:var(--text-muted)]">{{ t.memberCount }} {{ t.memberCount === 1 ? 'person' : 'people' }} · {{ leadNames(t) }}</span>
-              </button>
-            </li>
-          }
-        </ul>
-      </section>
 
-      @if (selected(); as team) {
-        <section class="card p-4 flex flex-col gap-4" aria-labelledby="team-title" data-testid="team-detail">
-          @if (editing()) {
-            <form class="flex flex-col gap-2" (submit)="$event.preventDefault(); save()" data-testid="edit-form">
-              <label class="text-xs font-medium" for="edit-name">Name</label>
-              <input id="edit-name" class="input input-sm" maxlength="100" [value]="draftName()" (input)="draftName.set($any($event.target).value)" />
-              <label class="text-xs font-medium" for="edit-description">Description</label>
-              <input id="edit-description" class="input input-sm" maxlength="500" [value]="draftDescription()"
-                     (input)="draftDescription.set($any($event.target).value)" />
-              <div class="flex justify-end gap-2">
-                <button type="button" class="btn btn-default btn-sm" (click)="editing.set(false)">Cancel</button>
-                <button type="submit" class="btn btn-primary btn-sm" [disabled]="busy() || !draftName().trim()" data-testid="save-team">Save</button>
-              </div>
-            </form>
-          } @else {
-            <div class="flex flex-wrap items-start justify-between gap-2">
-              <div>
-                <h2 id="team-title" class="section-title">{{ team.name }}</h2>
-                <p class="text-sm text-[color:var(--text-muted)]">{{ team.description || 'No description.' }}</p>
-              </div>
-              @if (admin() && team.status === 'ACTIVE') {
-                <div class="flex gap-2">
-                  <button type="button" class="btn btn-default btn-sm" (click)="startEdit()" data-testid="edit-team"><app-icon name="edit" />Rename</button>
-                  <button type="button" class="btn btn-danger btn-sm" (click)="archive()" data-testid="archive-team"><app-icon name="lock" />Archive</button>
-                </div>
+        <div class="overflow-x-auto">
+          <table class="table-modern text-sm" data-testid="members">
+            <thead><tr><th>Person</th><th>Role in the team</th><th class="text-right"><span class="sr-only">Actions</span></th></tr></thead>
+            <tbody>
+              @for (m of team.members; track m.appUserId) {
+                <tr [attr.data-member]="m.appUserId">
+                  <td>
+                    <span class="font-medium">{{ nameOf(m) }}</span>
+                    @if (m.username && m.fullName) { <span class="block text-xs text-[color:var(--text-muted)]">{{ m.username }}</span> }
+                  </td>
+                  <td>
+                    @if (admin() && team.status === 'ACTIVE') {
+                      <select class="input input-sm w-auto" [value]="m.teamRole" (change)="setRole(m, $any($event.target).value)"
+                              [attr.aria-label]="'Role of ' + nameOf(m)" [attr.data-role]="m.appUserId">
+                        <option value="LEAD">Lead</option>
+                        <option value="MEMBER">Member</option>
+                      </select>
+                    } @else {
+                      <span class="pill" [class]="m.teamRole === 'LEAD' ? 'pill pill-info' : 'pill pill-neutral'">{{ m.teamRole === 'LEAD' ? 'Lead' : 'Member' }}</span>
+                    }
+                  </td>
+                  <td class="text-right">
+                    @if (mayRemove(m)) {
+                      <button type="button" class="btn btn-ghost btn-sm" (click)="remove(m)" [attr.data-remove]="m.appUserId"
+                              [attr.aria-label]="'Remove ' + nameOf(m)"><app-icon name="close" />Remove</button>
+                    }
+                  </td>
+                </tr>
+              } @empty {
+                <tr><td colspan="3" class="text-[color:var(--text-muted)]">Nobody is in this team yet.</td></tr>
               }
+            </tbody>
+          </table>
+        </div>
+
+        @if (mayChangeMembers()) {
+          <div class="flex flex-wrap items-end gap-2" data-testid="add-member">
+            <div class="flex flex-col gap-1">
+              <label class="text-xs font-medium" for="add-person">Add a person</label>
+              <select id="add-person" class="input input-sm w-auto min-w-56" (change)="addPerson.set(+$any($event.target).value || null)"
+                      data-testid="add-person">
+                <option value="" [selected]="addPerson() === null">Choose someone</option>
+                @for (p of addable(); track p.userId) { <option [value]="p.userId" [selected]="addPerson() === p.userId">{{ p.fullName || p.username }}</option> }
+              </select>
             </div>
-          }
-
-          @if (team.leadCount === 0 && team.status === 'ACTIVE') {
-            <p class="text-xs rounded-md border border-[color:var(--border-subtle)] p-2" role="note" data-testid="no-lead">
-              This team has no lead, so only an administrator changes who is in it.
-            </p>
-          }
-
-          <div class="overflow-x-auto">
-            <table class="table-modern text-sm" data-testid="members">
-              <thead><tr><th>Person</th><th>Role in the team</th><th class="text-right"><span class="sr-only">Actions</span></th></tr></thead>
-              <tbody>
-                @for (m of team.members; track m.appUserId) {
-                  <tr [attr.data-member]="m.appUserId">
-                    <td>
-                      <span class="font-medium">{{ nameOf(m) }}</span>
-                      @if (m.username && m.fullName) { <span class="block text-xs text-[color:var(--text-muted)]">{{ m.username }}</span> }
-                    </td>
-                    <td>
-                      @if (admin() && team.status === 'ACTIVE') {
-                        <select class="input input-sm w-auto" [value]="m.teamRole" (change)="setRole(m, $any($event.target).value)"
-                                [attr.aria-label]="'Role of ' + nameOf(m)" [attr.data-role]="m.appUserId">
-                          <option value="LEAD">Lead</option>
-                          <option value="MEMBER">Member</option>
-                        </select>
-                      } @else {
-                        <span class="pill" [class]="m.teamRole === 'LEAD' ? 'pill pill-info' : 'pill pill-neutral'">{{ m.teamRole === 'LEAD' ? 'Lead' : 'Member' }}</span>
-                      }
-                    </td>
-                    <td class="text-right">
-                      @if (mayRemove(m)) {
-                        <button type="button" class="btn btn-ghost btn-sm" (click)="remove(m)" [attr.data-remove]="m.appUserId"
-                                [attr.aria-label]="'Remove ' + nameOf(m)"><app-icon name="close" />Remove</button>
-                      }
-                    </td>
-                  </tr>
-                } @empty {
-                  <tr><td colspan="3" class="text-[color:var(--text-muted)]">Nobody is in this team yet.</td></tr>
-                }
-              </tbody>
-            </table>
-          </div>
-
-          @if (mayChangeMembers()) {
-            <div class="flex flex-wrap items-end gap-2" data-testid="add-member">
+            @if (admin()) {
               <div class="flex flex-col gap-1">
-                <label class="text-xs font-medium" for="add-person">Add a person</label>
-                <select id="add-person" class="input input-sm w-auto min-w-56" (change)="addPerson.set(+$any($event.target).value || null)"
-                        data-testid="add-person">
-                  <option value="" [selected]="addPerson() === null">Choose someone</option>
-                  @for (p of addable(); track p.userId) { <option [value]="p.userId" [selected]="addPerson() === p.userId">{{ p.fullName || p.username }}</option> }
+                <label class="text-xs font-medium" for="add-role">As</label>
+                <select id="add-role" class="input input-sm w-auto" (change)="addRole.set($any($event.target).value)" data-testid="add-role">
+                  <option value="MEMBER" [selected]="addRole() === 'MEMBER'">Member</option>
+                  <option value="LEAD" [selected]="addRole() === 'LEAD'">Lead</option>
                 </select>
               </div>
-              @if (admin()) {
-                <div class="flex flex-col gap-1">
-                  <label class="text-xs font-medium" for="add-role">As</label>
-                  <select id="add-role" class="input input-sm w-auto" (change)="addRole.set($any($event.target).value)" data-testid="add-role">
-                    <option value="MEMBER" [selected]="addRole() === 'MEMBER'">Member</option>
-                    <option value="LEAD" [selected]="addRole() === 'LEAD'">Lead</option>
-                  </select>
-                </div>
-              }
-              <button type="button" class="btn btn-primary btn-sm" [disabled]="busy() || !addPerson()" (click)="add()" data-testid="add">
-                <app-icon name="plus" />Add
-              </button>
-              @if (!admin()) {
-                <p class="text-xs text-[color:var(--text-muted)] w-full">As the team's lead you add and remove members; an administrator names its leads.</p>
-              }
-            </div>
-          }
-        </section>
-      } @else if (teams().length) {
-        <section class="card p-4 text-sm text-[color:var(--text-muted)]">Choose a team to see who is in it.</section>
-      }
-    </div>
-  }
+            }
+            <button type="button" class="btn btn-primary btn-sm" [disabled]="busy() || !addPerson()" (click)="add()" data-testid="add">
+              <app-icon name="plus" />Add
+            </button>
+            @if (!admin()) {
+              <p class="text-xs text-[color:var(--text-muted)] w-full">As the team's lead you add and remove members; an administrator names its leads.</p>
+            }
+          </div>
+        }
+      </section>
+    } @else if (teams().length) {
+      <section class="card p-4 text-sm text-[color:var(--text-muted)]">Choose a team to see who is in it.</section>
+    }
+  </div>
 </div>

@@ -4,7 +4,6 @@ import { ActivatedRoute } from '@angular/router';
 import { API_SUCCESS } from '../../../core/api/api.config';
 import { AuthService } from '../../../core/auth/auth.service';
 import { Team, TeamMember, TeamRole, TeamsApi, refusal } from '../../../core/teams/teams.api';
-import { WorkspaceDirectory } from '../../../core/workspaces/workspace-directory';
 import { Colleague, WorkflowsApi } from '../../workflows/workflows.api';
 import { confirmWith } from '../../../shared/ui/confirm';
 import { Icon } from '../../../shared/ui/icon';
@@ -12,7 +11,6 @@ import { PageHeader } from '../../../shared/ui/page-header';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
 import { StatTile } from '../../../shared/ui/stat-tile';
 import { ToastService } from '../../../shared/ui/toast.service';
-import { WorkspaceSelect } from '../../../shared/ui/workspace-select';
 
 /**
  * Administration > Teams (F4, MIG-401): the people of a workspace who work together. A team is what a workflow task, an
@@ -23,7 +21,7 @@ import { WorkspaceSelect } from '../../../shared/ui/workspace-select';
  */
 @Component({
   selector: 'app-teams',
-  imports: [PageHeader, RefreshButton, StatTile, Icon, WorkspaceSelect],
+  imports: [PageHeader, RefreshButton, StatTile, Icon],
   templateUrl: './teams.html',
 })
 export class Teams implements OnInit {
@@ -32,13 +30,13 @@ export class Teams implements OnInit {
   private readonly toast = inject(ToastService);
   private readonly dialog = inject(Dialog);
   private readonly route = inject(ActivatedRoute);
-  private readonly directory = inject(WorkspaceDirectory);
   readonly auth = inject(AuthService);
 
+  /**
+   * The workspace's administrator (a managed session is one too). The platform administrator's own sign-in never opens this
+   * page: a workspace's teams are its data (ZT-M16; the route's workspaceData card).
+   */
   readonly admin = computed(() => this.auth.isTenantAdmin());
-  readonly canPickTenant = computed(() => this.auth.isPlatformAdmin());
-  readonly tenantId = signal<number | null>(null);
-  readonly needsWorkspace = computed(() => this.canPickTenant() && !this.tenantId());
 
   readonly teams = signal<Team[]>([]);
   readonly people = signal<Colleague[]>([]);
@@ -80,29 +78,12 @@ export class Teams implements OnInit {
   });
 
   ngOnInit(): void {
-    if (this.canPickTenant()) {
-      const linked = Number(this.route.snapshot.queryParamMap.get('tenantId'));
-      const remembered = this.directory.remembered();
-      if (Number.isFinite(linked) && linked > 0) this.pickTenant(String(linked));
-      else if (remembered !== null) this.pickTenant(String(remembered));
-      return;
-    }
     this.load();
   }
 
-  pickTenant(value: string): void {
-    const id = Number(value);
-    this.tenantId.set(Number.isFinite(id) && id > 0 ? id : null);
-    this.teams.set([]);
-    this.people.set([]);
-    this.selectedId.set(null);
-    if (this.tenantId()) this.load();
-  }
-
   load(): void {
-    if (this.needsWorkspace()) return;
     this.loading.set(true);
-    this.api.list(this.tenantId(), this.admin() && this.withArchived()).subscribe({
+    this.api.list(null, this.admin() && this.withArchived()).subscribe({
       next: r => {
         this.loading.set(false);
         if (r.status !== API_SUCCESS) {
@@ -121,7 +102,7 @@ export class Teams implements OnInit {
         this.toast.error(refusal(e, 'The teams could not be read.'));
       },
     });
-    this.workflows.colleagues(this.tenantId()).subscribe({
+    this.workflows.colleagues().subscribe({
       next: r => this.people.set(r.status === API_SUCCESS ? r.data ?? [] : []),
       error: () => this.people.set([]),
     });
@@ -157,7 +138,7 @@ export class Teams implements OnInit {
     const name = this.draftName().trim();
     if (!name) return;
     this.busy.set(true);
-    this.api.create(name, this.draftDescription().trim(), this.tenantId()).subscribe({
+    this.api.create(name, this.draftDescription().trim()).subscribe({
       next: r => {
         this.busy.set(false);
         if (r.status !== API_SUCCESS) {

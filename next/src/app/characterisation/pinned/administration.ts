@@ -48,7 +48,8 @@ export const PINNED: Record<string, unknown> = {
       "/administration/data-policies",
       "/administration/security",
       "/administration/teams",
-      "/administration/users"
+      "/administration/users",
+      "/platform/workspaces"
     ]
   },
   "access profiles, as a workspace administrator": {

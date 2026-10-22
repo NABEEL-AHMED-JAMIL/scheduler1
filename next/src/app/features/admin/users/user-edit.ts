@@ -24,6 +24,7 @@ import { AccountSecurityApi, METHOD_LABEL, OUTCOME_LABEL, PersonSession, PersonS
 import { pictureProblem } from '../../profile/picture-check';
 import { AccessPerson, AccessProfile, AccessProfilesService } from '../access-profiles/access-profiles.service';
 import { Team, TeamsApi, refusal } from '../../../core/teams/teams.api';
+import { isOwnPlatformSignIn } from '../../../core/auth/workspace-data';
 import { PreviewGroup, menuPreview, previewSize } from '../access-profiles/page-groups';
 import { announceReset } from './reset-password-announce';
 import { ResetPasswordData, ResetPasswordDialog, ResetPasswordResult } from './reset-password-dialog';
@@ -122,6 +123,8 @@ export class UserEdit implements OnInit {
     return this.teams().filter(t => !t.members.some(m => m.appUserId === id));
   });
   readonly joinTeamId = signal<number | null>(null);
+  /** ZT-M16: a workspace's teams are a managed session's to read, never the platform administrator's own sign-in. */
+  readonly ownSignIn = computed(() => isOwnPlatformSignIn(this.auth));
   readonly teamBusy = signal(false);
   readonly standing = signal<PersonStanding | null>(null);
   readonly sessions = signal<PersonSession[] | null>(null);
@@ -313,7 +316,7 @@ export class UserEdit implements OnInit {
     const tenant = this.auth.isPlatformAdmin() ? person.tenantId ?? null : null;
     this.profilesApi.pages().subscribe({ next: r => { if (r.status === API_SUCCESS) this.catalogue.set(r.data ?? []); }, error: () => {} });
     if (person.tenantId != null) {
-      this.loadTeams(tenant);
+      if (!this.ownSignIn()) this.loadTeams(tenant);
       this.profilesApi.list(tenant).subscribe({ next: r => { if (r.status === API_SUCCESS) this.profiles.set(r.data ?? []); }, error: () => {} });
       if (person.userRole === 'TENANT_USER') {
         this.profilesApi.people(tenant).subscribe({

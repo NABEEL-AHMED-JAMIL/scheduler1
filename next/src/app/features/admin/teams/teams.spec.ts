@@ -7,7 +7,6 @@ import { of, throwError } from 'rxjs';
 import { API_SUCCESS } from '../../../core/api/api.config';
 import { AuthService } from '../../../core/auth/auth.service';
 import { Team, TeamsApi } from '../../../core/teams/teams.api';
-import { WorkspaceDirectory } from '../../../core/workspaces/workspace-directory';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { WorkflowsApi } from '../../workflows/workflows.api';
 import { Teams } from './teams';
@@ -40,7 +39,6 @@ function mount(opts: { admin?: boolean; me?: number } = {}) {
       { userId: 43, fullName: 'Cara Clerk', username: 'cara@x' }] }) } },
     { provide: ToastService, useValue: toast },
     { provide: Dialog, useValue: dialog },
-    { provide: WorkspaceDirectory, useValue: { remembered: () => null } },
     { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({}) } } },
     { provide: AuthService, useValue: { isTenantAdmin: signal(admin), isPlatformAdmin: signal(false), user: signal({ appUserId: opts.me ?? 1 }) } },
   ] });
@@ -88,7 +86,7 @@ describe('Teams', () => {
     name.dispatchEvent(new Event('input'));
     fixture.detectChanges();
     (el.querySelector('[data-testid="create-team"]') as HTMLButtonElement).click();
-    expect(api.create).toHaveBeenCalledWith('Intake', '', null);
+    expect(api.create).toHaveBeenCalledWith('Intake', '');
   });
 
   it('lets a lead add and remove members only, and says why a refusal came', async () => {

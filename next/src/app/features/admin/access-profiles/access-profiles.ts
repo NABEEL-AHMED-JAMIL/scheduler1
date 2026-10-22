@@ -18,6 +18,8 @@ import { AccessGrants } from './access-grants';
 import { AccessDelegation } from '../../../core/auth/access-delegation';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
+import { NeedsWorkspace } from '../../../shared/ui/needs-workspace';
+import { isOwnPlatformSignIn } from '../../../core/auth/workspace-data';
 
 /** A profile's pages arranged the way the menu arranges them, for the card. */
 interface CardSection { section: string; opens: string[]; withholds: string[]; }
@@ -31,7 +33,7 @@ interface CardSection { section: string; opens: string[]; withholds: string[]; }
  */
 @Component({
   selector: 'app-access-profiles',
-  imports: [WorkspaceSelect, RefreshButton, PageHeader, Icon, StatTile, CdkMenu, CdkMenuItem, CdkMenuTrigger, AccessPeopleGrid, AccessGrants],
+  imports: [WorkspaceSelect, RefreshButton, PageHeader, Icon, StatTile, CdkMenu, CdkMenuItem, CdkMenuTrigger, AccessPeopleGrid, AccessGrants, NeedsWorkspace],
   templateUrl: './access-profiles.html',
 })
 export class AccessProfiles implements OnInit {
@@ -50,6 +52,8 @@ export class AccessProfiles implements OnInit {
    * does. A tenant administrator never sees the picker -- its workspace is the only one it can reach.
    */
   readonly canPickTenant = computed(() => this.auth.isPlatformAdmin());
+  /** ZT-M16: the platform administrator's own sign-in reads no person's effective access, delegation or change log. */
+  readonly ownSignIn = computed(() => isOwnPlatformSignIn(this.auth));
   readonly tenantId = signal<number | null>(null);
 
   readonly profiles = signal<AccessProfile[]>([]);

@@ -1383,6 +1383,14 @@ export const PINNED: Record<string, unknown> = {
     {
       "path": "/administration/teams",
       "title": "Teams",
+      "guards": [
+        "ownSignInOnly"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/administration/teams",
+      "title": "Teams",
       "guards": [],
       "lazy": true
     },

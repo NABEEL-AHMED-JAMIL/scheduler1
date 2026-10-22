@@ -248,7 +248,10 @@
     }
   }
 
-  @if (!needsWorkspace()) {
+  @if (ownSignIn()) {
+    <!-- ZT-M16: a person's effective access, delegations and the change log are the workspace's data. -->
+    <app-needs-workspace what="Granting pages and tabs to a person is" todo="grant them, delegate granting and read the change log" icon="shield" />
+  } @else if (!needsWorkspace()) {
     <app-access-grants [people]="people()" [tenantId]="tenantId()" (needPeople)="needPeople()" />
   }
 </div>
