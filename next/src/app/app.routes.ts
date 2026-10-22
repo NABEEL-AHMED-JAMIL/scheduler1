@@ -1,6 +1,6 @@
 import { Routes, Route } from '@angular/router';
 import { unsavedChangesGuard } from './shared/ui/unsaved-changes.guard';
-import { anonymousOnly, authGuard, pageGuard, passwordChangeGuard, roleGuard } from './core/auth/auth.guard';
+import { accessManagerGuard, anonymousOnly, authGuard, pageGuard, passwordChangeGuard, roleGuard } from './core/auth/auth.guard';
 import { Shell } from './features/shell/shell';
 import { toFirstTab } from './core/nav/nav-access';
 import { toFirstSection } from './features/documents/intake/intake-sections';
@@ -172,7 +172,7 @@ export const routes: Routes = [
         title: 'Sources',
         loadComponent: () =>
           import('./features/integration/sources/sources').then(m => m.Sources),
-        data: { pageKey: 'sources', view: 'sources', workspaceData: workspace('Sources are', 'see and test the sources its pipelines read', 'database') },
+        data: { pageKey: 'sources', tabKey: 'sources:sources', view: 'sources', workspaceData: workspace('Sources are', 'see and test the sources its pipelines read', 'database') },
         canActivate: [pageGuard],
       },
       {
@@ -182,7 +182,7 @@ export const routes: Routes = [
         title: 'Database connections',
         loadComponent: () =>
           import('./features/integration/sources/sources').then(m => m.Sources),
-        data: { pageKey: 'sources', view: 'connections', workspaceData: workspace('Database connections are', 'see, test and change its database connections', 'database') },
+        data: { pageKey: 'sources', tabKey: 'sources:databases', view: 'connections', workspaceData: workspace('Database connections are', 'see, test and change its database connections', 'database') },
         canActivate: [pageGuard],
       },
       {
@@ -190,7 +190,7 @@ export const routes: Routes = [
         title: 'Data contracts',
         loadComponent: () =>
           import('./features/integration/sources/sources').then(m => m.Sources),
-        data: { pageKey: 'sources', view: 'contracts', workspaceData: workspace('Data contracts are', 'see and change its data contracts', 'shield') },
+        data: { pageKey: 'sources', tabKey: 'sources:contracts', view: 'contracts', workspaceData: workspace('Data contracts are', 'see and change its data contracts', 'shield') },
         canActivate: [pageGuard],
       },
       {
@@ -264,7 +264,7 @@ export const routes: Routes = [
         path: 'pipelines/schedules',
         title: 'Schedules & triggers',
         loadComponent: () => import('./features/jobs/jobs').then(m => m.Jobs),
-        data: { pageKey: 'jobs', workspaceData: workspace('Schedules are', 'see, change and run its schedules', 'calendar') },
+        data: { pageKey: 'jobs', tabKey: 'jobs:schedules', workspaceData: workspace('Schedules are', 'see, change and run its schedules', 'calendar') },
         canActivate: [pageGuard],
       },
       {
@@ -331,7 +331,7 @@ export const routes: Routes = [
         path: 'runs/by-date',
         title: 'Runs by date',
         loadComponent: () => import('./features/queue/queue').then(m => m.Queue),
-        data: { pageKey: 'queue', workspaceData: workspace('Runs are', 'see its runs by date', 'calendar') },
+        data: { pageKey: 'queue', tabKey: 'queue:by-date', workspaceData: workspace('Runs are', 'see its runs by date', 'calendar') },
         canActivate: [pageGuard],
       },
       {
@@ -339,7 +339,7 @@ export const routes: Routes = [
         path: 'runs/failed',
         title: 'Failed runs',
         loadComponent: () => import('./features/runs/failed/failed-runs').then(m => m.FailedRuns),
-        data: { pageKey: 'queue', workspaceData: workspace('Failed runs are', 'see and retry its failed runs', 'alert') },
+        data: { pageKey: 'queue', tabKey: 'queue:failed', workspaceData: workspace('Failed runs are', 'see and retry its failed runs', 'alert') },
         canActivate: [pageGuard],
       },
       {
@@ -347,7 +347,7 @@ export const routes: Routes = [
         path: 'runs/backfills',
         title: 'Backfills',
         loadComponent: () => import('./features/runs/backfills/backfills').then(m => m.Backfills),
-        data: { pageKey: 'jobs', workspaceData: workspace('Backfills are', 'see and start its backfills', 'history') },
+        data: { pageKey: 'jobs', tabKey: 'jobs:backfills', workspaceData: workspace('Backfills are', 'see and start its backfills', 'history') },
         canActivate: [pageGuard],
       },
       {
@@ -367,7 +367,7 @@ export const routes: Routes = [
         path: 'documents/in',
         title: 'Documents in',
         loadComponent: () => import('./features/documents/intelligence').then(m => m.DocumentIntelligence),
-        data: { pageKey: 'document-intelligence', view: 'overview' },
+        data: { pageKey: 'document-intelligence', tabKey: 'document-intelligence:in', view: 'overview' },
         canActivate: [pageGuard],
       },
       {
@@ -376,7 +376,7 @@ export const routes: Routes = [
         path: 'documents/types',
         title: 'Document types',
         loadComponent: () => import('./features/documents/intelligence').then(m => m.DocumentIntelligence),
-        data: { pageKey: 'document-intelligence', view: 'types' },
+        data: { pageKey: 'document-intelligence', tabKey: 'document-intelligence:types', view: 'types' },
         canActivate: [pageGuard],
       },
       {
@@ -384,7 +384,7 @@ export const routes: Routes = [
         path: 'documents/approved-data',
         title: 'Approved data',
         loadComponent: () => import('./features/documents/intelligence').then(m => m.DocumentIntelligence),
-        data: { pageKey: 'document-intelligence', view: 'dataset' },
+        data: { pageKey: 'document-intelligence', tabKey: 'document-intelligence:approved-data', view: 'dataset' },
         canActivate: [pageGuard],
       },
       {
@@ -649,14 +649,14 @@ export const routes: Routes = [
         path: 'review/approvals',
         title: 'Approvals',
         loadComponent: () => import('./features/workflows/task-inbox').then(m => m.TaskInbox),
-        data: { pageKey: 'task-inbox' },
+        data: { pageKey: 'task-inbox', tabKey: 'task-inbox:approvals' },
         canActivate: [pageGuard],
       },
       {
         path: 'review/requests',
         title: 'My requests',
         loadComponent: () => import('./features/workflows/task-inbox').then(m => m.TaskInbox),
-        data: { pageKey: 'task-inbox' },
+        data: { pageKey: 'task-inbox', tabKey: 'task-inbox:requests' },
         canActivate: [pageGuard],
       },
       {
@@ -664,7 +664,7 @@ export const routes: Routes = [
         path: 'review/runs',
         title: 'Runs to review',
         loadComponent: () => import('./features/review/runs-to-review').then(m => m.RunsToReview),
-        data: { pageKey: 'task-inbox' },
+        data: { pageKey: 'task-inbox', tabKey: 'task-inbox:runs' },
         canActivate: [pageGuard],
       },
       {
@@ -700,7 +700,7 @@ export const routes: Routes = [
         path: 'pipelines/prompts',
         title: 'Prompts',
         loadComponent: () => import('./features/ai/prompts/prompts').then(m => m.Prompts),
-        data: { pageKey: 'ai-prompts', workspaceData: workspace('Prompts are', 'see, try and change its prompts', 'sparkle') },
+        data: { pageKey: 'ai-prompts', tabKey: 'ai-prompts:prompts', workspaceData: workspace('Prompts are', 'see, try and change its prompts', 'sparkle') },
         canActivate: [pageGuard],
       },
       {
@@ -725,14 +725,14 @@ export const routes: Routes = [
         title: 'AI Assistant',
         // Its pages (the assistant, and All conversations) are in its own lazy route table.
         loadChildren: () => import('./features/ai/assistant/assistant.routes').then(m => m.routes),
-        data: { pageKey: 'ai-prompts', workspaceData: workspace('The AI Assistant is', 'describe and run its pipelines in plain language', 'sparkle') },
+        data: { pageKey: 'ai-prompts', tabKey: 'ai-prompts:assistant', workspaceData: workspace('The AI Assistant is', 'describe and run its pipelines in plain language', 'sparkle') },
         canActivate: [pageGuard],
       },
       {
         path: 'settings/tools',
         title: 'Tool Registry',
         loadComponent: () => import('./features/ai/tools/tool-registry').then(m => m.ToolRegistry),
-        data: { pageKey: 'ai-prompts' },
+        data: { pageKey: 'ai-prompts', tabKey: 'ai-prompts:tools' },
         canActivate: [pageGuard],
       },
       {
@@ -901,8 +901,8 @@ export const routes: Routes = [
         title: 'Page access',
         loadComponent: () =>
           import('./features/admin/access-profiles/access-profiles').then(m => m.AccessProfiles),
-        data: { minRole: 'TENANT_ADMIN' },
-        canActivate: [roleGuard],
+        // F3: an administrator, or a member with an access delegation (the people they reach, what they may grant).
+        canActivate: [accessManagerGuard],
       },
       {
         // Owner 2026-10-19 #3: a profile is made and changed on a page of its own, for a catalogue of fifty-odd pages.

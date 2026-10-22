@@ -14,6 +14,8 @@ import { ToastService } from '../../../shared/ui/toast.service';
 import { confirmWith } from '../../../shared/ui/confirm';
 import { AccessPerson, AccessProfile, AccessProfilesService } from './access-profiles.service';
 import { AccessPeopleGrid } from './access-people-grid';
+import { AccessGrants } from './access-grants';
+import { AccessDelegation } from '../../../core/auth/access-delegation';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
 
@@ -29,7 +31,7 @@ interface CardSection { section: string; opens: string[]; withholds: string[]; }
  */
 @Component({
   selector: 'app-access-profiles',
-  imports: [WorkspaceSelect, RefreshButton, PageHeader, Icon, StatTile, CdkMenu, CdkMenuItem, CdkMenuTrigger, AccessPeopleGrid],
+  imports: [WorkspaceSelect, RefreshButton, PageHeader, Icon, StatTile, CdkMenu, CdkMenuItem, CdkMenuTrigger, AccessPeopleGrid, AccessGrants],
   templateUrl: './access-profiles.html',
 })
 export class AccessProfiles implements OnInit {
@@ -39,6 +41,9 @@ export class AccessProfiles implements OnInit {
   readonly auth = inject(AuthService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  readonly delegation = inject(AccessDelegation);
+  /** F3: a member with an access delegation: the people they reach and what they may grant, nothing else of this page. */
+  readonly delegateMode = computed(() => !this.auth.isTenantAdmin() && this.delegation.isDelegate());
 
   /**
    * A platform administrator has no workspace of its own, so it picks one; the screen is empty until it
@@ -106,6 +111,10 @@ export class AccessProfiles implements OnInit {
   private readonly directory = inject(WorkspaceDirectory);
 
   ngOnInit(): void {
+    if (!this.auth.isTenantAdmin()) {
+      this.delegation.load().subscribe(() => this.loadPeople());
+      return;
+    }
     // A link from the Users screen lands on one person's row: the grid view, their name in the
     // filter, and -- for a platform administrator -- their workspace already picked.
     const params = this.route.snapshot.queryParamMap;
@@ -136,6 +145,12 @@ export class AccessProfiles implements OnInit {
     this.profiles.set([]);
     this.people.set([]);
     if (this.tenantId()) this.load();
+  }
+
+  /** "21 Jan 2027": when a delegation ends. */
+  until(value: string): string {
+    const at = new Date(value);
+    return Number.isNaN(at.getTime()) ? value : new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(at);
   }
 
   showProfiles(): void {
@@ -190,6 +205,11 @@ export class AccessProfiles implements OnInit {
       },
     });
     if (this.view() === 'people') this.loadPeople();
+  }
+
+  /** F3: Grant pages and tabs reads the people the first time a person is to be chosen. */
+  needPeople(): void {
+    if (this.people().length === 0 && !this.peopleLoading()) this.loadPeople();
   }
 
   loadPeople(): void {

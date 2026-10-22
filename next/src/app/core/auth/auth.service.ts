@@ -4,7 +4,7 @@ import { Router } from '@angular/router';
 import { Observable, tap } from 'rxjs';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../api/api.config';
 import { AuthUser, ManagementMode, ROLE_RANK, UserRole, isUserRole } from './auth.models';
-import { PageKey } from './page-keys';
+import { PageKey, TabKey } from './page-keys';
 import { ThemeService } from '../theme.service';
 
 const STORAGE_KEY = 'etl_auth_user';
@@ -214,6 +214,19 @@ export class AuthService {
     const keys = this.currentUser()?.pageKeys;
     if (!keys) return !EXPLICIT_PAGES.includes(page);
     return keys.includes(page);
+  }
+
+  /**
+   * F3 (MIG-400): whether a tab of a page opens -- the page, and either none of its tab keys in the list (every tab) or this
+   * one. Identity sends a restricted page's tab keys after the page keys; the gateway refuses a closed tab's own calls.
+   */
+  canOpenTab(page: PageKey, tab: TabKey): boolean {
+    if (!this.canOpen(page)) return false;
+    if (this.hasAtLeast('TENANT_ADMIN')) return true;
+    const keys = (this.currentUser()?.pageKeys ?? null) as string[] | null;
+    if (!keys) return true;
+    const mine = keys.filter(k => k.startsWith(page + ':'));
+    return mine.length === 0 || mine.includes(tab);
   }
 
   /** The same answer as a signal, for templates that want to react to a refresh. */

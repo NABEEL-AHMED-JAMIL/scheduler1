@@ -115,6 +115,18 @@
                           }
                         </span>
                       </label>
+                      @if (isOn(row.key) && tabsOf(row.key).length) {
+                        <div class="ap-row-tabs" role="group" [attr.aria-label]="row.label + ' tabs'" [attr.data-tabs]="row.key">
+                          <span class="text-[11px] text-[color:var(--text-muted)]">{{ tabSummary(row.key) }}</span>
+                          @for (tab of tabsOf(row.key); track tab.key) {
+                            <label class="ap-tab" [title]="tab.apiGated ? 'Closed, its own data is refused too' : 'Hides the tab; its data is the page\'s'">
+                              <input type="checkbox" class="checkbox" [checked]="tabOn(row.key, tab.key)" (change)="toggleTab(row.key, tab.key)"
+                                     [attr.data-tab]="tab.key" [attr.aria-label]="tab.label" />
+                              <span>{{ tab.label }}@if (!tab.apiGated) { <span class="text-[color:var(--text-muted)]"> · hides the tab</span> }</span>
+                            </label>
+                          }
+                        </div>
+                      }
                       @if (row.edit; as edit) {
                         <label class="ap-row-edit" [title]="edit.label + ': saving, pinning and deleting. Brings View with it.'">
                           <input type="checkbox" class="checkbox" [checked]="isOn(edit.key)" (change)="toggleEdit(row)"

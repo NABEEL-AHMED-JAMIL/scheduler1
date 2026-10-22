@@ -79,7 +79,6 @@ describe('Cost & usage: AI model calls', () => {
     expect(text(unnamed.el.querySelector('[data-test="model-source-prompt"]'))).toBe('Prompt 1075');
   });
 
-
   it('opens on the month in four figures and By source, the dearest first, without reading every call', async () => {
     const { fixture, el, api } = mount();
     await fixture.whenStable();

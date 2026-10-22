@@ -38,12 +38,28 @@ export type PageKey =
   // a report version -- certifying its PDF -- and a signature or stamp picture (an action). Identity's PageKey has the same three.
   | 'report-assets' | 'report-asset-custodian' | 'report-approve';
 
+/**
+ * F3 (MIG-400): a tab of a page several menu tabs share, grantable alone -- identity's TabKey, `<page>:<tab>`. A page held with
+ * none of its tab keys opens every tab; with some, only those (AuthService.canOpenTab).
+ */
+export type TabKey =
+  | 'sources:databases' | 'sources:sources' | 'sources:contracts'
+  | 'document-intelligence:in' | 'document-intelligence:types' | 'document-intelligence:approved-data'
+  | 'queue:by-date' | 'queue:failed' | 'jobs:schedules' | 'jobs:backfills'
+  | 'task-inbox:approvals' | 'task-inbox:runs' | 'task-inbox:requests'
+  | 'ai-prompts:prompts' | 'ai-prompts:assistant' | 'ai-prompts:tools';
+
+/** A page's tab in the catalogue: apiGated false means granting it only hides the tab (its data is the page's shared calls). */
+export interface TabCatalogueEntry { key: TabKey; label: string; route: string; apiGated: boolean; }
+
 /** A catalogue row as /pageAccess.json/pages serves it. */
 export interface PageCatalogueEntry {
   key: PageKey;
   label: string;
   section: string;
   route: string;
+  /** F3: the page's own tabs, each grantable alone (absent or empty: the page is one place). */
+  tabs?: TabCatalogueEntry[];
   /** The page this one is the editing half of (a read/edit split), when the catalogue says so; else EDIT_OF does. */
   editOf?: PageKey;
 }

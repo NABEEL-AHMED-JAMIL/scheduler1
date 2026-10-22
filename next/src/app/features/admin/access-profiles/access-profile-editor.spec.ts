@@ -168,3 +168,33 @@ describe('menuPreview', () => {
     expect(admin).not.toContain('Platform');
   });
 });
+
+/** F3 (MIG-400): a page's tabs chosen apart, kept as tab keys after the page keys. */
+describe('AccessProfileEditor: tabs', () => {
+  const WITH_TABS: PageCatalogueEntry[] = [
+    { key: 'jobs', label: 'Schedules', section: 'Pipelines', route: '/pipelines/schedules', tabs: [
+      { key: 'jobs:schedules', label: 'Schedules & triggers', route: '/pipelines/schedules', apiGated: false },
+      { key: 'jobs:backfills', label: 'Backfills', route: '/runs/backfills', apiGated: true }] },
+    { key: 'queue', label: 'Queue', section: 'Pipelines', route: '/pipelines/queue' },
+  ];
+
+  it('opens every tab of a chosen page, restricts it tab by tab, and saves the tab keys', () => {
+    const { page, save } = editor(WITH_TABS);
+    page.form.patchValue({ profileName: 'Schedulers' });
+    page.toggleView({ key: 'jobs', label: 'Schedules', places: [] });
+    expect(page.tabOn('jobs', 'jobs:backfills')).toBe(true);
+    expect(page.tabSummary('jobs')).toBe('Every tab');
+    page.toggleTab('jobs', 'jobs:backfills');
+    expect(page.tabOn('jobs', 'jobs:backfills')).toBe(false);
+    expect(page.tabSummary('jobs')).toBe('1 of 2 tabs');
+    page.save();
+    expect(save.mock.calls[0][0].pageKeys).toEqual(['jobs', 'jobs:schedules']);
+    // Both back on: every tab again, no tab key kept.
+    page.toggleTab('jobs', 'jobs:backfills');
+    expect([...page.selected()]).toEqual(['jobs']);
+    // The last tab off takes the page with it.
+    page.toggleTab('jobs', 'jobs:backfills');
+    page.toggleTab('jobs', 'jobs:schedules');
+    expect(page.isOn('jobs')).toBe(false);
+  });
+});

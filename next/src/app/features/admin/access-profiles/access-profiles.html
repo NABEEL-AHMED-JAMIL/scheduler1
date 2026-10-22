@@ -1,3 +1,23 @@
+@if (delegateMode()) {
+  <div class="page">
+    <app-page-header>
+      <div class="page-head">
+        <div>
+          <h1 class="page-title">Page access</h1>
+          <p class="page-subtitle">Open or withhold pages and tabs for the people you manage. You can grant only what you hold yourself.</p>
+        </div>
+      </div>
+    </app-page-header>
+    @if (delegation.mine(); as d) {
+      <div class="card p-4 text-sm flex items-center gap-2" role="note" data-testid="delegate-banner">
+        <app-icon name="shield" />
+        <span>Delegated by {{ d.grantedByName || 'your workspace administrator' }} until {{ until(d.expiresAt) }}
+          · {{ d.scopePeople === 'ALL_MEMBERS' ? 'every member' : d.people.length + ' people' }}.</span>
+      </div>
+    }
+    <app-access-grants [people]="people()" />
+  </div>
+} @else {
 <div class="page">
   <app-page-header>
     <div class="page-head">
@@ -227,4 +247,9 @@
       </div>
     }
   }
+
+  @if (!needsWorkspace()) {
+    <app-access-grants [people]="people()" [tenantId]="tenantId()" (needPeople)="needPeople()" />
+  }
 </div>
+}

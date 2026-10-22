@@ -4,7 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { routes } from './app.routes';
-import { pageGuard, roleGuard } from './core/auth/auth.guard';
+import { accessManagerGuard, pageGuard, roleGuard } from './core/auth/auth.guard';
 import { HUBS } from './core/nav/nav-tree';
 import { toFirstTab } from './core/nav/nav-access';
 
@@ -134,8 +134,16 @@ describe('tab hubs: every tab is its own guarded route', () => {
       if (keys.length) expect(guards).toContain(pageGuard);
       // The route's floor is the tab's: TENANT_USER is every signed-in member, no floor at all as far as a tab goes.
       const floor = route.data?.minRole === 'TENANT_USER' ? undefined : route.data?.minRole;
+      // F3: an administrator's tab an access delegate opens too is guarded by accessManagerGuard (admin or delegate).
+      if (tab.delegateOk) {
+        expect(floor).toBeUndefined();
+        expect(guards).toContain(accessManagerGuard);
+        return;
+      }
       expect(floor).toBe(role);
       if (role) expect(guards).toContain(roleGuard);
+      // F3: a tab granted apart from its page's other tabs asks for its tab key too.
+      expect(route.data?.tabKey, tab.path).toBe(tab.tabKey);
     });
   }
 

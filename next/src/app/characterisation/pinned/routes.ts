@@ -1383,9 +1383,8 @@ export const PINNED: Record<string, unknown> = {
     {
       "path": "/administration/access-profiles",
       "title": "Page access",
-      "minRole": "TENANT_ADMIN",
       "guards": [
-        "roleGuard"
+        "accessManagerGuard"
       ],
       "lazy": true
     },

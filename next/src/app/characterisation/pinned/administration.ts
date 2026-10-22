@@ -64,12 +64,16 @@ export const PINNED: Record<string, unknown> = {
       "Page access",
       "Who can open what",
       "UI-REVIEW Analysts — Zürich – 東京 ✓ finance analytics and AI prompt authors (long name)",
-      "UI-REVIEW No pages"
+      "UI-REVIEW No pages",
+      "Grant pages and tabs"
     ],
     "buttons": [
+      "A person",
       "Actions for UI-REVIEW Analysts — Zürich – 東京 ✓ finance analytics and AI prompt authors (long name)",
       "Actions for UI-REVIEW No pages",
+      "Changes",
       "Check a person",
+      "Delegates",
       "New profile",
       "People × pages",
       "Profiles",
@@ -83,7 +87,12 @@ export const PINNED: Record<string, unknown> = {
         "Can change"
       ]
     ],
-    "fields": [],
+    "fields": [
+      "Covering month-end close",
+      "ForUntil removed7 days30 days90 days",
+      "PersonNo member to choose",
+      "Reason (kept in the change log)"
+    ],
     "links": [
       "/administration",
       "/administration/access-profiles",
@@ -99,10 +108,14 @@ export const PINNED: Record<string, unknown> = {
     ],
     "headings": [
       "Page access",
-      "Who can open what"
+      "Who can open what",
+      "Grant pages and tabs"
     ],
     "buttons": [
+      "A person",
+      "Changes",
       "Check a person",
+      "Delegates",
       "New profile",
       "People × pages",
       "Profiles",
@@ -125,9 +138,13 @@ export const PINNED: Record<string, unknown> = {
       ]
     ],
     "fields": [
+      "Covering month-end close",
       "Find a person",
       "Find a person…",
+      "ForUntil removed7 days30 days90 days",
+      "PersonChoose a memberCasey Baseline",
       "Profile for Casey Baseline",
+      "Reason (kept in the change log)",
       "Source Jobs for Casey Baseline",
       "Source Tasks for Casey Baseline"
     ],

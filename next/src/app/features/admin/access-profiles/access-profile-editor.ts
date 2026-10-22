@@ -4,7 +4,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { forkJoin } from 'rxjs';
 import { API_SUCCESS } from '../../../core/api/api.config';
 import { AuthService } from '../../../core/auth/auth.service';
-import { PageCatalogueEntry, PageKey } from '../../../core/auth/page-keys';
+import { PageCatalogueEntry, PageKey, TabCatalogueEntry, TabKey } from '../../../core/auth/page-keys';
 import { Field } from '../../../shared/ui/field';
 import { FormRow } from '../../../shared/ui/form-row';
 import { Icon } from '../../../shared/ui/icon';
@@ -46,7 +46,11 @@ export type PageFilter = 'all' | 'on' | 'off';
       border-bottom: 1px solid var(--border-subtle); }
     .ap-hub + .ap-hub { margin-top: 0.5rem; }
     .ap-hub-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin: 0.25rem 0; }
-    .ap-row { display: flex; align-items: flex-start; gap: 0.5rem; padding: 0.3rem 0.375rem; border-radius: var(--radius-md); }
+    .ap-row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0.5rem; padding: 0.3rem 0.375rem; border-radius: var(--radius-md); }
+    /* F3: a chosen page's tabs, on a line of their own under it. */
+    .ap-row-tabs { order: 3; flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 0.375rem; padding-left: 1.5rem; }
+    .ap-tab { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.75rem; border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md); padding: 0.125rem 0.4rem; cursor: pointer; }
     .ap-row:hover { background: var(--surface-sunken); }
     .ap-row-main { display: flex; align-items: flex-start; gap: 0.5rem; flex: 1; min-width: 0; cursor: pointer; overflow-wrap: anywhere; }
     .ap-row-main .checkbox, .ap-row-edit .checkbox { margin-top: 0.125rem; flex: none; }
@@ -74,7 +78,8 @@ export class AccessProfileEditor implements OnInit {
   readonly tenantId = signal<number | null>(null);
   readonly isEdit = computed(() => !!this.profile());
 
-  readonly selected = signal<ReadonlySet<PageKey>>(new Set());
+  /** The page keys chosen, and (F3) the tab keys of a page restricted to some of its tabs. */
+  readonly selected = signal<ReadonlySet<string>>(new Set());
   readonly search = signal('');
   readonly filter = signal<PageFilter>('all');
 
@@ -164,8 +169,44 @@ export class AccessProfileEditor implements OnInit {
 
   // ---- choosing pages ---------------------------------------------------------------------------------------------
 
-  isOn(key: PageKey): boolean {
+  isOn(key: string): boolean {
     return this.selected().has(key);
+  }
+
+  // ---- F3 (MIG-400): a page's tabs ------------------------------------------------------------------------------------
+
+  /** The page's own tabs, from the catalogue (none for a page that is one place). */
+  tabsOf(page: PageKey): TabCatalogueEntry[] {
+    return this.pages().find(p => p.key === page)?.tabs ?? [];
+  }
+
+  /** A tab opens when its page is chosen and either none of the page's tabs is named (every tab) or this one is. */
+  tabOn(page: PageKey, tab: TabKey): boolean {
+    if (!this.isOn(page)) return false;
+    const named = this.tabsOf(page).filter(t => this.isOn(t.key));
+    return named.length === 0 || named.some(t => t.key === tab);
+  }
+
+  /** "Every tab" or "N of M tabs", for the row. */
+  tabSummary(page: PageKey): string {
+    const tabs = this.tabsOf(page);
+    const on = tabs.filter(t => this.tabOn(page, t.key)).length;
+    return on === tabs.length ? 'Every tab' : `${on} of ${tabs.length} tabs`;
+  }
+
+  /** Flips one tab: every tab chosen again means none named; no tab left means the page is not chosen. */
+  toggleTab(page: PageKey, tab: TabKey): void {
+    const tabs = this.tabsOf(page).map(t => t.key);
+    const on = new Set(tabs.filter(t => this.tabOn(page, t)));
+    if (on.has(tab)) on.delete(tab); else on.add(tab);
+    this.change(next => {
+      tabs.forEach(t => next.delete(t));
+      if (on.size === 0) next.delete(page);
+      else {
+        next.add(page);
+        if (on.size < tabs.length) on.forEach(t => next.add(t));
+      }
+    });
   }
 
   /** The View box: off takes the Edit half with it. */
@@ -176,6 +217,7 @@ export class AccessProfileEditor implements OnInit {
       else {
         next.delete(row.key);
         if (row.edit) next.delete(row.edit.key);
+        this.tabsOf(row.key).forEach(t => next.delete(t.key));
       }
     });
   }
@@ -218,7 +260,7 @@ export class AccessProfileEditor implements OnInit {
     this.selected.set(new Set(on ? this.pages().map(p => p.key) : []));
   }
 
-  private change(edit: (next: Set<PageKey>) => void): void {
+  private change(edit: (next: Set<string>) => void): void {
     const next = new Set(this.selected());
     edit(next);
     this.selected.set(next);
@@ -234,7 +276,10 @@ export class AccessProfileEditor implements OnInit {
       return;
     }
     const value = this.form.getRawValue();
-    const pageKeys = this.pages().map(p => p.key).filter(key => this.selected().has(key));
+    const chosen = this.pages().filter(p => this.selected().has(p.key));
+    // F3: the pages, then the tab keys of each chosen page restricted to some of its tabs.
+    const pageKeys: (PageKey | TabKey)[] = [...chosen.map(p => p.key),
+      ...chosen.flatMap(p => (p.tabs ?? []).map(t => t.key).filter(key => this.selected().has(key)))];
     this.saving.set(true);
     this.api.save({
       pageAccessProfileId: this.profile()?.pageAccessProfileId,

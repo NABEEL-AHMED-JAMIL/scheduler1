@@ -209,7 +209,6 @@ describe('JobHistory -- what started a run (ZT-P15)', () => {
   });
 });
 
-
 /**
  * MIG-416 (the browser budget, CLS 0.29 at 1024): the review list above, the facets and the runs answered at different
  * times and each pushed the explorer down. It is drawn once all three have answered, and stays drawn.

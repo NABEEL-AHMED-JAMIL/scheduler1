@@ -54,7 +54,8 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/list?limit=20&page=1",
       "GET /aiPrompt.json/dataPolicy",
       "GET /sourceJob.json/review/policy",
-      "GET /documentReview.json/policy"
+      "GET /documentReview.json/policy",
+      "GET /pageAccess.json/delegates/mine"
     ],
     "headings": [
       "Data policies",
