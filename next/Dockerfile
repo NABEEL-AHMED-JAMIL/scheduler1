@@ -19,6 +19,11 @@ COPY . .
 # stated explicitly here so the image does not silently change behaviour if that default moves.
 RUN npx ng build --configuration production
 
+# MIG-323 S6: the Content-Security-Policy for this very build (its inline scripts by hash). CSP_MODE: enforce, or report
+# to send it as Content-Security-Policy-Report-Only.
+ARG CSP_MODE=enforce
+RUN node scripts/csp.mjs dist/next/browser/index.html "$CSP_MODE" > dist/csp.conf
+
 # ─────────────────────────────────────────────
 # Stage 2: Serve with Nginx
 #
@@ -36,6 +41,7 @@ FROM nginx:1.30-alpine AS production
 RUN rm -rf /usr/share/nginx/html/*
 COPY --from=builder /app/dist/next/browser /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=builder /app/dist/csp.conf /etc/nginx/csp.conf
 
 EXPOSE 80
 
