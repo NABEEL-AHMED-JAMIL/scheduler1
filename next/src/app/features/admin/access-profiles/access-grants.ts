@@ -94,7 +94,7 @@ function stamp(value: string | null | undefined): string {
                   <span class="pill" [class.pill-ok]="page.open" [class.pill-neutral]="!page.open">{{ page.open ? (restricted(page) ? 'Some tabs' : 'Open') : 'Closed' }}</span>
                   @if (mayGrant(page.key)) {
                     <button type="button" class="btn btn-default btn-xs" [disabled]="busy()" (click)="set(page.key, !(page.open && !restricted(page)))"
-                            [attr.data-toggle]="page.key">{{ page.open && !restricted(page) ? 'Withhold' : 'Open every tab' }}</button>
+                            [attr.data-toggle]="page.key">{{ page.open && !restricted(page) ? 'Withhold' : page.tabs.length ? 'Open every tab' : 'Open' }}</button>
                   }
                 </div>
                 @if (page.tabs.length) {
