@@ -195,14 +195,19 @@ export class JobLogs implements OnInit, OnDestroy {
    * analytics names them (the boards' "Made by", B5) -- for a reader who may open Dashboards.
    */
   readonly feeds = signal<{ id: number; name: string }[]>([]);
+  /** ZT §3.11 (CLS 0.16 at 1024): the boards have answered, or are not read -- the link row may be drawn at its height. */
+  readonly feedsKnown = signal(false);
   private readFeeds(): void {
     const job = Number(this.jobId());
     // ZT-A12: a platform administrator's own sign-in (no workspace) reads no workspace's boards; Analytics answers it 403.
-    if (!job || !this.auth.canOpen('analytics-dashboards') || (!!this.auth.isPlatformAdmin?.() && !this.auth.user?.()?.tenantId)) return;
+    if (!job || !this.auth.canOpen('analytics-dashboards') || (!!this.auth.isPlatformAdmin?.() && !this.auth.user?.()?.tenantId)) {
+      this.feedsKnown.set(true);
+      return;
+    }
     this.http.get<ApiResponse<{ analyticsDashboardId?: number | null; dashboardName?: string | null; pipelines?: { jobId: number }[] | null }[]>>(
       `${API_BASE}/analyticsWorkspace.json/fetchAllDashboards`).subscribe({
-        next: r => this.feeds.set(boardsFedBy(r?.status === API_SUCCESS ? r.data ?? [] : [], job)),
-        error: () => this.feeds.set([]),
+        next: r => { this.feeds.set(boardsFedBy(r?.status === API_SUCCESS ? r.data ?? [] : [], job)); this.feedsKnown.set(true); },
+        error: () => { this.feeds.set([]); this.feedsKnown.set(true); },
       });
   }
   /** The pipeline's name when its page is not the reader's to open: said once, in the link row, as text. */
@@ -218,12 +223,16 @@ export class JobLogs implements OnInit, OnDestroy {
     this.review.set(review);
     this.reviewKnown.set(true);
   }
-  /** Latched once the run, its review and its steps (or that it has none) have answered; a missing run or an error shows at once. */
+  /**
+   * Latched once the run, its review and its steps (or that it has none) have answered; a missing run or an error shows at once.
+   * ZT §3.11 (the browser budget on a workspace with longer names, CLS 0.16 at 1024): the boards it feeds and its cost too --
+   * "Feeds: ..." wrapped the header's link row to a second line under a drawn page, and Cost added a second row of facts.
+   */
   private readonly topDrawn = signal(false);
   readonly topReady = computed(() => this.topDrawn() || this.missing() || (!!this.error() && !this.run()));
   protected readonly drawTop = effect(() => {
     const steps = this.store.timeline() !== null || this.store.legacy() || this.store.readError();
-    if (!this.topDrawn() && !!this.run() && this.reviewKnown() && steps) this.topDrawn.set(true);
+    if (!this.topDrawn() && !!this.run() && this.reviewKnown() && steps && this.feedsKnown() && this.costKnown()) this.topDrawn.set(true);
   });
   /** The run's Approval steps: the request it waits at, the reader's task about it, the groups' names. */
   readonly approvals = inject(RunApprovalStore);
@@ -251,18 +260,25 @@ export class JobLogs implements OnInit, OnDestroy {
   });
   /** UX review B9: what the run cost, for an administrator (Billing's runCost); null when unknown or not theirs to read. */
   readonly cost = signal<string | null>(null);
+  /** The cost has answered, or is not this reader's: the summary's facts are all known (ZT §3.11). */
+  readonly costKnown = signal(false);
   private costFor: string | null = null;
   private loadCost(): void {
     const id = this.jobQueueId().trim();
-    if (this.costFor === id || !this.auth.isTenantAdmin?.()) return;
+    if (!this.auth.isTenantAdmin?.()) {
+      this.costKnown.set(true);
+      return;
+    }
+    if (this.costFor === id) return;
     this.costFor = id;
     this.http.get<ApiResponse<{ cost?: number | null; currency?: string | null }>>(`${API_BASE}/billing.json/runCost`, { params: { jobQueueId: id } })
       .subscribe({
         next: r => {
           const cost = r.status === API_SUCCESS ? r.data?.cost : null;
           this.cost.set(typeof cost === 'number' ? formatMoney(cost, r.data?.currency || 'USD', cost > 0 && cost < 1 ? 4 : 2) : null);
+          this.costKnown.set(true);
         },
-        error: () => this.cost.set(null),
+        error: () => { this.cost.set(null); this.costKnown.set(true); },
       });
   }
 

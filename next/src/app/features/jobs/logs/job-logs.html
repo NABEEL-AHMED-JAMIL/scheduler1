@@ -7,7 +7,8 @@
       <span pills class="pill pill-{{ s.tone }} run-status-pill" data-test="run-status"><app-icon [name]="s.icon" size="0.85em" />{{ s.label }}</span>
     }
     <app-refresh-button [loading]="loading() || refreshing()" (refresh)="refresh()" />
-    @if (related().length || pipelineText() || feeds().length) {
+    <!-- ZT §3.11: drawn with the page's body, at its final height (the boards it feeds wrap it at 1024). -->
+    @if (topReady() && (related().length || pipelineText() || feeds().length)) {
       <p meta class="run-related flex flex-wrap items-center gap-x-4 gap-y-1 text-xs" data-test="run-related">
         @for (r of related(); track r.label) {
           <a class="link-inline inline-flex items-center gap-1" [routerLink]="r.link" [queryParams]="r.query ?? null" [attr.data-link]="r.test"><app-icon [name]="r.icon" size="0.95em" />{{ r.label }}</a>

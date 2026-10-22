@@ -585,6 +585,26 @@ describe('Run page: a run waiting at an Approval step', () => {
     expect(el.querySelector('[data-link="dashboards"]')).toBeNull();
   });
 
+  /**
+   * ZT §3.11 (the browser budget on Riverside, CLS 0.16 at 1024): "Feeds: Riverside -- Hospital readmission risk, ..." arrived
+   * after the body and wrapped the link row to a second line, and the Cost fact added a second row of facts.
+   */
+  it('draws the header link row with the body, once the boards it feeds and its cost have answered', () => {
+    const { el, fixture, component } = waiting(null, 'admin');
+    expect(component.topReady()).toBe(false);
+    expect(el.querySelector('[data-test="run-related"]')).toBeNull();
+    expect(el.querySelector('[data-test="run-pending"]')).not.toBeNull();
+    TestBed.inject(HttpTestingController).expectOne(r => r.url.endsWith('/analyticsWorkspace.json/fetchAllDashboards')).flush({ status: API_SUCCESS,
+      data: [{ analyticsDashboardId: 1450, dashboardName: 'Readmissions', pipelines: [{ jobId: 2977 }] }] });
+    fixture.detectChanges();
+    TestBed.tick();
+    fixture.detectChanges();
+    expect(component.topReady()).toBe(true);
+    expect(el.querySelector('[data-test="run-pending"]')).toBeNull();
+    expect(el.querySelector('[data-test="run-related"] [data-link="feeds"]')?.textContent).toContain('Readmissions');
+    expect(el.querySelector('[data-fact="Cost"]')).not.toBeNull();
+  });
+
   it('keeps the plain Dashboards link when no board names the schedule, and reads no boards for a reader without them', () => {
     const { el, fixture } = waiting(null, 'admin');
     TestBed.inject(HttpTestingController).expectOne(r => r.url.endsWith('/analyticsWorkspace.json/fetchAllDashboards'))
@@ -619,6 +639,11 @@ describe('JobLogs drawn once its parts have answered (MIG-416)', () => {
     fixture.detectChanges();
     expect(component.topReady()).toBe(false);
     http.match(r => r.url.endsWith('/sourceJob.json/review')).forEach(r => r.flush({ status: API_SUCCESS, data: { reviewStatus: 'NOT_REQUIRED' } }));
+    fixture.detectChanges();
+    TestBed.tick();
+    // ZT §3.11: and the boards it feeds and its cost, where the reader reads them.
+    http.match(r => r.url.endsWith('/analyticsWorkspace.json/fetchAllDashboards')).forEach(r => r.flush({ status: API_SUCCESS, data: [] }));
+    http.match(r => r.url.endsWith('/billing.json/runCost')).forEach(r => r.flush({ status: API_SUCCESS, data: { cost: 0, currency: 'USD' } }));
     fixture.detectChanges();
     TestBed.tick();
     fixture.detectChanges();
