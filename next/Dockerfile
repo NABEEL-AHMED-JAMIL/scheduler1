@@ -21,7 +21,7 @@ RUN npx ng build --configuration production
 
 # MIG-323 S6: the Content-Security-Policy for this very build (its inline scripts by hash). CSP_MODE: enforce, or report
 # to send it as Content-Security-Policy-Report-Only.
-ARG CSP_MODE=report
+ARG CSP_MODE=enforce
 RUN node scripts/csp.mjs dist/next/browser/index.html "$CSP_MODE" > dist/csp.conf
 
 # ─────────────────────────────────────────────

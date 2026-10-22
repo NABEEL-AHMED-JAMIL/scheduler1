@@ -38,7 +38,8 @@ const policy = [
   // Previews and downloads are blob: URLs; the stylesheet's icons are data: images; avatars come through the API.
   `img-src 'self' data: blob: ${api}`,
   `media-src 'self' blob: ${api}`,
-  `connect-src 'self' ${api} ws://$host:9098 wss://$host:9098`,
+  // blob: the console fetches its own blob: URLs back (a preview read before it is shown).
+  `connect-src 'self' blob: ${api} ws://$host:9098 wss://$host:9098`,
   // pdf.js's worker is the console's own file.
   "worker-src 'self' blob:",
   // An HTML report is shown from a blob: URL in a frame with every sandbox permission off.
