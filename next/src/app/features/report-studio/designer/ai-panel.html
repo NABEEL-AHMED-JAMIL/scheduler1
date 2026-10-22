@@ -47,6 +47,7 @@
     }
   </div>
   @if (error()) { <p class="field-note text-[color:var(--crit-text)]" role="alert">{{ error() }}</p> }
+  @if (note()) { <p class="text-xs text-[color:var(--text-secondary)]" role="status" data-ai-note>{{ note() }}</p> }
 
   @if (proposal(); as p) {
     <article class="rsa-card" [class.is-invalid]="p.state === 'INVALID'" aria-label="Proposal" data-ai-proposal>

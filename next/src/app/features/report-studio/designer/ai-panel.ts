@@ -1,4 +1,5 @@
 import { Component, DestroyRef, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
 import { Icon } from '../../../shared/ui/icon';
@@ -53,6 +54,8 @@ export class AiPanel {
   readonly data = input<AiDataContext | null>(null);
   /** The checks the designer shows now (the canvas checks the data too). */
   readonly problems = input<Problem[]>([]);
+  /** How many data fields the template reads now (the status bar's "N data fields used"); null: not known. */
+  readonly fieldsRead = input<number | null>(null);
   readonly selectedId = input<string | null>(null);
   readonly selectedLabel = input('');
   /** Whether the designer still shows the proposal on the page (an edit there puts the draft back). */
@@ -73,6 +76,8 @@ export class AiPanel {
   readonly busy = signal(false);
   readonly deciding = signal(false);
   readonly error = signal('');
+  /** ZT-R25: the service's "nothing to do" answer (422: nothing to map, no test data, ...), said plainly, not as an error. */
+  readonly note = signal('');
   readonly proposal = signal<Proposal | null>(null);
   readonly previewing = signal(false);
   readonly history = signal<Proposal[]>([]);
@@ -86,13 +91,16 @@ export class AiPanel {
   readonly hasData = computed(() => (this.data()?.fields.length ?? 0) > 0);
   /** ZT-I3: "Explain the checks" with no problem to explain is not asked (the service answers 422, shown as an error). */
   readonly nothingToExplain = computed(() => this.kind() === 'EXPLAIN_VALIDATION' && this.problems().length === 0);
-  readonly canAsk = computed(() => this.editable() && !!this.status()?.available && !this.busy() && !this.nothingToExplain()
+  /** ZT-R25: "Suggest mappings" on a template that reads no field yet is not asked either (the service answers 422). */
+  readonly nothingToMap = computed(() => this.kind() === 'SUGGEST_MAPPINGS' && this.fieldsRead() === 0);
+  readonly canAsk = computed(() => this.editable() && !!this.status()?.available && !this.busy() && !this.nothingToExplain() && !this.nothingToMap()
     && (!this.action().needsWords || this.words().trim().length > 0) && (!this.action().needsData || this.hasData()));
   readonly why = computed(() => {
     if (!this.editable()) return 'The AI helps with a draft you can edit.';
     if (this.status() && !this.status()!.available) return this.status()!.reason ?? 'No model can answer in this workspace now.';
     if (this.action().needsData && !this.hasData()) return 'Pick test data first (Test data, in the toolbar).';
     if (this.nothingToExplain()) return 'The checks find no problem, so there is nothing to explain.';
+    if (this.nothingToMap()) return 'The template reads no data field yet, so there is nothing to map.';
     return '';
   });
   readonly changes = computed(() => {
@@ -121,6 +129,7 @@ export class AiPanel {
   choose(kind: ProposalKind): void {
     this.kind.set(kind);
     this.error.set('');
+    this.note.set('');
   }
 
   ask(): void {
@@ -141,11 +150,18 @@ export class AiPanel {
     this.togglePreview(false);
     this.busy.set(true);
     this.error.set('');
+    this.note.set('');
     this.proposal.set(null);
     this.startTimer();
     this.call = this.api.propose(this.kind(), body).subscribe({
       next: p => { this.busy.set(false); this.stopTimer(); this.proposal.set(p); this.remember(p); },
-      error: e => { this.busy.set(false); this.stopTimer(); this.error.set(studioError(e, 'The AI could not answer; try again.').message); },
+      error: e => {
+        this.busy.set(false);
+        this.stopTimer();
+        const message = studioError(e, 'The AI could not answer; try again.').message;
+        // 422: the request has nothing to work on (nothing to map, no test data, no problem): no model was asked.
+        if (e instanceof HttpErrorResponse && e.status === 422) this.note.set(message); else this.error.set(message);
+      },
     });
   }
 

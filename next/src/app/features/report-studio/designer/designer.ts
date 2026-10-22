@@ -34,6 +34,8 @@ import { TestDataChoice, TestDataData, TestDataPanel } from './test-data-panel';
 import { AssetCard, UsableProfile } from '../assets.model';
 import { AiDataContext, Proposal } from '../ai-designer.api';
 import { AiPanel } from './ai-panel';
+import { StorageService } from '../../objects/storage.service';
+import { API_SUCCESS } from '../../../core/api/api.config';
 import { applyPatch } from './json-patch';
 
 type LeftTab = 'components' | 'layers' | 'data';
@@ -83,6 +85,7 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
   private readonly auth = inject(AuthService);
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);
+  private readonly storage = inject(StorageService);
   private readonly router = inject(Router);
   private readonly destroy = inject(DestroyRef);
   private readonly host: HTMLElement = inject(ElementRef<HTMLElement>).nativeElement;
@@ -526,7 +529,23 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
     // A bucket file's bucket; of several files, the first that is a bucket file's.
     const files = src?.connector === 'BUNDLE' ? Object.values(src.parts) : src ? [src] : [];
     const bucketFile = files.find(f => f.connector === 'BUCKET_OBJECT') as { bucket?: string } | undefined;
-    const bucket = bucketFile?.bucket ?? '';
+    if (bucketFile?.bucket) { this.addImageBlock(path, bucketFile.bucket); return; }
+    // ZT-R29: data that names no bucket (pasted JSON, a run's output, a test sample) reads the pictures from the workspace's
+    // storage -- an empty bucket was refused by every save ("Not saved", a schema error) until one was typed in.
+    this.storage.buckets().subscribe({
+      next: r => {
+        const buckets = r.status === API_SUCCESS ? (r.data ?? []) : [];
+        if (!buckets.length) { this.toast.error('This workspace has no storage to read pictures from: add a storage connection first.'); return; }
+        this.addImageBlock(path, buckets[0].bucket);
+        this.toast.info(buckets.length > 1
+          ? `The pictures are read from ${buckets[0].label || buckets[0].bucket}; change it under Data › Pictures from, in the properties.`
+          : `The pictures are read from ${buckets[0].label || buckets[0].bucket}; set the folder under Data › Pictures from, if they are in one.`);
+      },
+      error: e => this.toast.error(studioError(e, 'The workspace\'s storage could not be read.').message),
+    });
+  }
+
+  private addImageBlock(path: string, bucket: string): void {
     const name = this.names()[0];
     const list = path.includes('[]') ? path.slice(0, path.indexOf('[]')) : null;
     const entry = list
@@ -535,7 +554,6 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
       : { type: 'image', group: 'Media', label: 'Image from data', description: '', defaults: { binding: `${name}.${path}`, width: '60mm', missing: 'placeholder',
         alt: path, imageSource: { kind: 'BUCKET', bucket } } };
     this.add(entry as PaletteEntry);
-    if (!bucket) this.toast.info('Say which bucket the pictures are in: Data › Pictures from, in the properties.');
   }
 
   /** Adds a palette entry: after the selected block (or into it, when it is a container that may hold it), else at the end. */

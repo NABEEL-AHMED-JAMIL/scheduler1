@@ -193,6 +193,39 @@ describe('the AI assistant on a pipeline step\'s data (ZT-I3, ZT-I4)', () => {
   });
 });
 
+describe('the AI assistant with nothing to work on (ZT-R25)', () => {
+  it('does not ask for mappings when the template reads no field yet, and says why', () => {
+    const { http, el, c, fixture } = panel();
+    fixture.componentRef.setInput('fieldsRead', 0);
+    c.choose('SUGGEST_MAPPINGS');
+    fixture.detectChanges();
+    expect((el.querySelector('[data-ai-ask]') as HTMLButtonElement).disabled).toBe(true);
+    expect(el.querySelector('[data-ai-why]')!.textContent).toContain('The template reads no data field yet, so there is nothing to map.');
+    c.ask();
+    http.expectNone(`${API_BASE}/reportDesigner.json/suggestMappings`);
+  });
+
+  it('says the service\'s "nothing to do" answer plainly, not as an error', () => {
+    const { http, el, click, c, fixture } = panel();
+    fixture.componentRef.setInput('fieldsRead', 3);
+    c.choose('SUGGEST_MAPPINGS');
+    fixture.detectChanges();
+    click('[data-ai-ask]');
+    http.expectOne(`${API_BASE}/reportDesigner.json/suggestMappings`).flush(
+      { status: 'ERROR', message: 'Every field the template reads is in this test data: nothing to map.' }, { status: 422, statusText: 'Unprocessable' });
+    fixture.detectChanges();
+    expect(el.querySelector('[role=alert]'), 'not shown as an error').toBeNull();
+    expect(el.querySelector('[data-ai-note]')!.textContent).toContain('nothing to map');
+    c.choose('SUGGEST_CHARTS');
+    fixture.detectChanges();
+    expect(el.querySelector('[data-ai-note]'), 'another action clears it').toBeNull();
+    click('[data-ai-ask]');
+    http.expectOne(`${API_BASE}/reportDesigner.json/suggestCharts`).flush({ status: 'ERROR', message: 'The model could not answer.' }, { status: 502, statusText: 'Bad gateway' });
+    fixture.detectChanges();
+    expect(el.querySelector('[role=alert]')!.textContent, 'a failure is still an error').toContain('The model could not answer.');
+  });
+});
+
 describe('a proposal\'s patch', () => {
   it('adds, replaces, removes and tests on a copy, and refuses what does not fit', () => {
     const doc = { template: { components: [{ id: 'a' }, { id: 'c' }] } };

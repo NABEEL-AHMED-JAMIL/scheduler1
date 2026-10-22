@@ -394,7 +394,7 @@
         }
         @if (canEditTemplates() && t.draft) {
           <app-rs-ai-panel [templateId]="t.templateId" [version]="draftVersion()" [revision]="draftRevision()" [editable]="editable()"
-                           [saveState]="saveState()" [data]="aiData()" [problems]="problems()" [selectedId]="selected()" [selectedLabel]="selectedLabel()"
+                           [saveState]="saveState()" [data]="aiData()" [problems]="problems()" [fieldsRead]="fields()" [selectedId]="selected()" [selectedLabel]="selectedLabel()"
                            [shown]="!!previewDef()" (preview)="aiPreview($event)" (apply)="aiApply($event)" (save)="saveNow()" />
         }
       </aside>
