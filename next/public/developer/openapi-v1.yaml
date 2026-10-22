@@ -1117,7 +1117,7 @@ components:
     pipeline-not-backfillable: { status: 409, title: Conflict, description: "The pipeline has no steps, so it cannot be backfilled.", operations: [startBackfill] }
     backfill-closed: { status: 409, title: Conflict, description: "The backfill has ended already (completed, failed or cancelled).", operations: [cancelBackfill] }
     invalid-parameters: { status: 422, title: Unprocessable Content, description: "A parameter value does not suit its parameter (its type, its choices), a required one has no value, or the pipeline has no parameter of that name.", operations: [startBackfill] }
-    workspace-not-ready: { status: 409, title: Conflict, description: "The workspace has no inbox for API uploads yet; an administrator chooses one under Documents > Inbox.", operations: [uploadFile, startRun] }
+    workspace-not-ready: { status: 409, title: Conflict, description: "The workspace has no inbox for API uploads yet; an administrator chooses one under Documents › Intake › File drop.", operations: [uploadFile, startRun] }
     review-not-open: { status: 409, title: Conflict, description: "The run's review cannot take this decision: not completed, no customer review asked for, or already decided.", operations: [decideReview] }
     file-expired: { status: 410, title: Gone, description: "The file is past its expiry: still listed (expired true), no longer downloadable. Run the pipeline again for a new one.", operations: [downloadFile, readFileContent] }
     link-expired: { status: 410, title: Gone, description: "A signed link (a file link, 5 minutes; a view link, 15 minutes) has expired. Ask for a new one.", operations: [readFileContent, readRunView] }

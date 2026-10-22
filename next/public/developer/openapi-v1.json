@@ -2721,7 +2721,7 @@
       "workspace-not-ready": {
         "status": 409,
         "title": "Conflict",
-        "description": "The workspace has no inbox for API uploads yet; an administrator chooses one under Documents > Inbox.",
+        "description": "The workspace has no inbox for API uploads yet; an administrator chooses one under Documents › Intake › File drop.",
         "operations": [
           "uploadFile",
           "startRun"
