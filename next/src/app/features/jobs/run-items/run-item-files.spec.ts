@@ -59,6 +59,19 @@ describe('Run item files', () => {
     expect(files().request.body).toEqual({ jobQueueId: 9020, ref: '5', stepKey: 'pages', page: 1, size: 15 });
   });
 
+  it('names a page\'s file by what follows its document\'s name, the whole name on hover (ZT-I18)', () => {
+    URL.createObjectURL = () => 'blob:thumb';
+    URL.revokeObjectURL = () => {};
+    const { el, fixture, files } = mount();
+    const named = FILES(0);
+    named.files = named.files.map(f => ({ ...f, name: `referral-0412-${f.name}` }));
+    files().flush({ status: API_SUCCESS, data: named });
+    fixture.detectChanges();
+    const caption = el.querySelector('[data-test="files-grid"] .rf-thumb-name')!;
+    expect(caption.textContent?.trim()).toBe('page-01.png');
+    expect(caption.getAttribute('title')).toBe('referral-0412-page-01.png');
+  });
+
   it('downloads all of them as one zip: the link first, then the zip with its token', () => {
     const saved: string[] = [];
     URL.createObjectURL = () => 'blob:x';

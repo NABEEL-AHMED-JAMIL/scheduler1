@@ -120,7 +120,7 @@ const TEXT_CHARS = 200_000;
                   @if (thumbs().get(f.fileRef); as url) { <img [src]="url" alt="" /> }
                   @else { <span class="pill pill-neutral mono">{{ badge(f) }}</span> }
                 </span>
-                <span class="rf-thumb-name" [title]="f.name">{{ f.name }}</span>
+                <span class="rf-thumb-name" [title]="f.name">{{ short(f.name) }}</span>
                 @if (f.expired) { <span class="text-[11px] text-warn-600">Expired</span> }
               </button>
             }
@@ -161,6 +161,12 @@ export class RunItemFiles implements OnInit {
   private readonly toast = inject(ToastService);
 
   readonly pageSize = FILES_PAGE;
+  /** ZT-I18: a tile names a file by what follows its document's name (page-01.png), which a narrow tile would cut off. */
+  short(name: string): string {
+    const stem = (this.data.label ?? '').replace(/\.[^.]+$/, '');
+    return stem && name.startsWith(stem + '-') && name.length > stem.length + 1 ? name.slice(stem.length + 1) : name;
+  }
+
   readonly views: SegmentOption<'grid' | 'list'>[] = [{ id: 'grid', label: 'Grid', icon: 'image' }, { id: 'list', label: 'List', icon: 'list' }];
   readonly view = signal<'grid' | 'list'>('grid');
   readonly search = signal('');
