@@ -188,6 +188,7 @@ function dayStart(day: string, plusDays = 0): string | null {
                 <p class="text-sm text-[color:var(--text-secondary)] mt-0.5">{{ title(c).sub }}</p>
               </div>
               <div class="px-4 py-3 flex flex-col gap-3 text-sm max-h-[44rem] overflow-auto">
+                @if (c.keyNote) { <p class="text-xs text-[color:var(--text-secondary)]" data-test="compare-key">{{ c.keyNote }}</p> }
                 @if (c.masked.length) {
                   <p class="flex items-center gap-1.5 text-xs text-[color:var(--text-secondary)]" data-test="compare-masked">
                     <app-icon name="lock" size="0.9em" />Masked for you in both runs: <span class="mono">{{ c.masked.join(', ') }}</span></p>
@@ -252,8 +253,9 @@ export class ScheduleItems implements OnInit {
   readonly comparison = signal<Comparison | null>(null);
   readonly compareError = signal('');
 
+  // As the run page's: the schedules, then this schedule's runs; the header adds this page's own title.
   readonly trail = computed(() => [...crumbsFor(`/pipelines/schedules/${this.jobId()}`, 'here').slice(0, -1),
-    { label: this.jobName() ? `${this.jobName()} · items` : 'Schedule items' }]);
+    { label: this.jobName() ? `${this.jobName()} · runs` : 'Schedule runs', link: `/pipelines/schedules/${this.jobId()}/executions` }]);
   readonly headline = computed(() => headline(this.page()));
   readonly keyLabel = computed(() => this.page()?.keys?.find(k => k.key === this.key())?.label ?? this.key().split('/').pop() ?? this.key());
   readonly emptyTitle = computed(() => this.searchApplied() || this.key() ? 'No run processed it' : 'No items yet');

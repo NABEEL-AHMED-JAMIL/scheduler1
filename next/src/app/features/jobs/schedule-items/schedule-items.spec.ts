@@ -73,7 +73,7 @@ describe('Schedule items tab', () => {
       pipeline: { from: 2, to: 3, same: false, changes: ['insight changed its setting promptId'], note: 'Pipeline v2 to v3: insight changed its setting promptId.' },
       steps: [{ key: 'insight', name: 'Insight JSON', same: false, changes: [{ path: 'status.risk', kind: 'changed', before: '"High"', after: '"Moderate"' }] },
         { key: 'transcribe', name: 'Transcribe audio', same: true, changes: [] }],
-      changed: 1, masked: ['patient.name'],
+      changed: 1, masked: ['patient.name'], keyNote: 'The same file from another folder: a/call-a.m4a in #1850, b/call-a.m4a in #1857.',
     };
     ask.flush({ status: API_SUCCESS, data: c });
     fixture.detectChanges();
@@ -85,6 +85,7 @@ describe('Schedule items tab', () => {
     expect(el.querySelector('[data-test="compare-pipeline"]')?.textContent).toContain('Pipeline v2 to v3');
     expect(el.querySelector('[data-test="compare-pipeline"]')?.textContent).toContain('Unchanged in both runs: Transcribe audio.');
     expect(el.querySelector('[data-test="compare-masked"]')?.textContent).toContain('patient.name');
+    expect(el.querySelector('[data-test="compare-key"]')?.textContent).toContain('another folder');
   });
 
   it('searches a value across the runs when no item is named', () => {

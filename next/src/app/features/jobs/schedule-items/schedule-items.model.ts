@@ -83,6 +83,8 @@ export interface Comparison {
   steps: CompareStep[];
   changed: number;
   masked: string[];
+  /** ZT-I22: the same file from another folder -- its two keys, said once. */
+  keyNote?: string | null;
 }
 
 /** The list's question for a search: an exact key when "All runs of this item" asked for one. */
