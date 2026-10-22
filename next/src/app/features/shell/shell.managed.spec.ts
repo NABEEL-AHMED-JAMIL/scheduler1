@@ -37,6 +37,27 @@ describe('MIG-254: the shell and the managed service', () => {
     expect(exited).toBe(true);
   });
 
+  /**
+   * ZT-M18 (live: "Managed session: workspace 1009"): a session held without its workspace's name asks Identity for the
+   * name of the session's own workspace, once, and the bar names it; it never shows the workspace's id.
+   */
+  it('a staff session held without its workspace\'s name asks Identity for it and names it', async () => {
+    localStorage.setItem(PLATFORM_SESSION_KEY, JSON.stringify({ username: 'sam', accessToken: 'p', refreshToken: 'r' }));
+    const answers = { 'GET /managedService.json/thisSession': { status: 'SUCCESS', message: '',
+      data: { tenantId: 2924, tenantName: 'Zanium AI', managementMode: 'SELF' } } };
+    const v = await visit('/dashboard', 'TENANT_ADMIN', null, answers, { msvc: true }, { tenantName: null });
+    await v.settle();
+    expect(v.surface.requests.filter(r => r.startsWith('GET /managedService.json/thisSession'))).toHaveLength(1);
+    expect(said(bar(v))).toContain('Managed session: Zanium AI — every change and every data read is recorded');
+    expect(said(bar(v))).not.toContain('2924');
+    expect(TestBed.inject(AuthService).user()?.tenantName).toBe('Zanium AI');
+  });
+
+  it('a session that has its name asks for none', async () => {
+    const v = await visit('/dashboard', 'TENANT_ADMIN', null, {}, { mgmt: 'MANAGED', msvc: true });
+    expect(v.surface.requests.some(r => r.includes('/managedService.json/thisSession'))).toBe(false);
+  });
+
   it('a staff session\'s account menu offers Exit instead of a profile it cannot read', async () => {
     const v = await visit('/dashboard', 'TENANT_ADMIN', null, {}, { mgmt: 'MANAGED', msvc: true });
     (v.root.querySelector('[data-nav-menu="__user"] > button') as HTMLElement).click();

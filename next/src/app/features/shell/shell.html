@@ -145,7 +145,7 @@
         <div class="mx-auto max-w-[2560px] px-4 sm:px-6 lg:px-8 2xl:px-10 py-1.5 flex items-center gap-2 text-sm">
           <app-icon name="briefcase" class="shrink-0" />
           <p class="flex-1 min-w-0">
-            Managed session: <b>{{ auth.user()?.tenantName || ('workspace ' + auth.user()?.tenantId) }}</b> — every change and every data read is recorded
+            Managed session: <b data-test="managed-workspace">{{ auth.user()?.tenantName || 'this workspace' }}</b> — every change and every data read is recorded
           </p>
           <button type="button" class="btn btn-default btn-sm shrink-0" (click)="auth.exitManagedSession()">
             <app-icon name="logout" />Exit

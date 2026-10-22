@@ -88,6 +88,46 @@ describe('Schedule items tab', () => {
     expect(el.querySelector('[data-test="compare-key"]')?.textContent).toContain('another folder');
   });
 
+  /**
+   * ZT-I23 (live: #1860 with #1857, "3 steps · 14 fields changed"): each change once, under the step that made it, the
+   * JSON column's name beside it; a case-only change stays listed, marked and lighter; a step that only carried the
+   * changes on says so in a line; the title counts the unique changes.
+   */
+  it('says each change once under the step that made it, marks a case-only one and counts only those', () => {
+    const { http, el, fixture } = mount();
+    http.match(r => r.url.endsWith('/sourceJob.json/itemRuns')).forEach(r => r.flush({ status: API_SUCCESS, data: PAGE({ fields: [] }) }));
+    fixture.detectChanges();
+    const boxes = [...el.querySelectorAll('[data-test="across-compare"]')] as HTMLInputElement[];
+    boxes[0].click();
+    boxes[1].click();
+    fixture.detectChanges();
+    const c: Comparison = {
+      jobId: 1037, key: 'voice-intake/call-a.m4a', label: 'call-a.m4a', a: { jobQueueId: 1857, pipelineVersion: 3 }, b: { jobQueueId: 1850, pipelineVersion: 3 },
+      pipeline: { from: 3, to: 3, same: true, changes: [], note: 'Both runs ran pipeline version 3: any change is the data\'s, not the pipeline\'s.' },
+      steps: [
+        { key: 'insight', name: 'Call insight', same: false, carried: 0, changes: [
+          { path: 'followUp', kind: 'changed', before: '"Call on Monday."', after: '"Call on Tuesday."', alsoAt: ['insight_json.followUp'] },
+          { path: 'person.program', kind: 'changed', before: '"Synthetic test patient"', after: '"synthetic test patient"', caseOnly: true,
+            alsoAt: ['insight_json.person.program'] }] },
+        { key: 'fields', name: 'Report fields', same: false, carried: 2, changes: [
+          { path: 'patient.program', kind: 'changed', before: '"Synthetic test patient"', after: '"synthetic test patient"', caseOnly: true }] },
+        { key: 'save', name: 'Insight file per recording', same: false, carried: 3, changes: [] }],
+      changed: 3, masked: [],
+    };
+    http.expectOne(r => r.url.endsWith('/itemRuns/compare')).flush({ status: API_SUCCESS, data: c });
+    fixture.detectChanges();
+    expect(el.querySelector('[data-test="compare"]')?.textContent).toContain('2 steps · 3 fields changed');
+    expect(el.querySelectorAll('[data-change]').length).toBe(3);
+    expect(el.querySelectorAll('[data-change="followUp"]').length).toBe(1);
+    expect(el.querySelector('[data-change="followUp"]')?.textContent).toContain('also insight_json.followUp');
+    expect(el.querySelector('[data-change="followUp"]')?.classList.contains('is-case-only')).toBe(false);
+    const caseOnly = el.querySelector('[data-change="person.program"]')!;
+    expect(caseOnly.classList.contains('is-case-only')).toBe(true);
+    expect(caseOnly.querySelector('[data-test="case-only"]')?.textContent?.trim()).toBe('case only');
+    expect(el.querySelector('[data-compare-step="save"]')).toBeNull();
+    expect(el.querySelector('[data-test="compare-carried"]')?.textContent).toContain('Insight file per recording: carries the 3 changes above on, nothing new.');
+  });
+
   it('searches a value across the runs when no item is named', () => {
     const { http, el, fixture } = mount('');
     http.match(r => r.url.endsWith('/sourceJob.json/itemRuns')).forEach(r => r.flush({ status: API_SUCCESS, data: PAGE({ total: 0, items: [], keys: [], distinctKeys: 0, fields: [] }) }));

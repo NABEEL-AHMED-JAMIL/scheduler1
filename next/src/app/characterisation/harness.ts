@@ -90,14 +90,15 @@ export interface Visit {
 }
 
 /** A stored session like the one sign-in writes: AuthService reads it in its field initialiser. */
-export function signIn(role: Role, pageKeys: string[] | null = null, extraClaims: Record<string, unknown> = {}): void {
+export function signIn(role: Role, pageKeys: string[] | null = null, extraClaims: Record<string, unknown> = {},
+  extraUser: Record<string, unknown> = {}): void {
   const claims = btoa(JSON.stringify({ sub: 'characterisation@example.com', appUserId: 4537, userRole: role,
     tenantId: role === 'PLATFORM_ADMIN' ? null : 2924, exp: 4102444800, ...extraClaims }))
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   localStorage.setItem('etl_auth_user', JSON.stringify({
     username: 'characterisation@example.com', userRole: role, appUserId: 4537, fullName: 'Casey Baseline',
     tenantId: role === 'PLATFORM_ADMIN' ? null : 2924, tenantName: 'Claude Demo',
-    accessToken: `header.${claims}.unsigned`, refreshToken: 'r', pageKeys,
+    accessToken: `header.${claims}.unsigned`, refreshToken: 'r', pageKeys, ...extraUser,
   }));
 }
 
@@ -178,7 +179,7 @@ export function surfaceOf(main: HTMLElement): Omit<Surface, 'url' | 'requests'> 
  * is quiet; then returns what it shows.
  */
 export async function visit(url: string, role: Role, pageKeys: string[] | null,
-  answers: Record<string, unknown> = {}, extraClaims: Record<string, unknown> = {}): Promise<Visit> {
+  answers: Record<string, unknown> = {}, extraClaims: Record<string, unknown> = {}, extraUser: Record<string, unknown> = {}): Promise<Visit> {
   stubBrowser();
   useChicago();
   vi.useFakeTimers({ toFake: ['Date'] });
@@ -188,7 +189,7 @@ export async function visit(url: string, role: Role, pageKeys: string[] | null,
   // platform administrator's workspace choice (WorkspaceDirectory, etl_workspace_choice) above all -- would otherwise
   // open this screen filtered to that workspace.
   clearSession();
-  signIn(role, role === 'TENANT_USER' ? pageKeys : pageKeys ?? null, extraClaims);
+  signIn(role, role === 'TENANT_USER' ? pageKeys : pageKeys ?? null, extraClaims, extraUser);
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
     providers: [

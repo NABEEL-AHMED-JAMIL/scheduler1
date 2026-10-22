@@ -79,11 +79,28 @@ describe('Run item panel (v2)', () => {
     expect(el.querySelector('[data-test="page-check"]')?.textContent?.trim()).toBe('Check by hand · 72 % sure');
     expect(el.querySelector('[data-test="page-text"]')?.textContent).toContain('Non-healing ulcer L heel');
     expect((el.querySelector('[data-test="page-image"]') as HTMLImageElement).getAttribute('src')).toBe('blob:page-3');
+    expect(el.querySelector('[data-test="page-rotation"]')).toBeNull();
+  });
+
+  /** ZT-I25: a page scanned upside down was turned before it was read; the page says so beside its sureness. */
+  it('says a page was turned to be read upright', () => {
+    (URL as unknown as { createObjectURL: (b: Blob) => string }).createObjectURL = () => 'blob:page-3';
+    (URL as unknown as { revokeObjectURL: (u: string) => void }).revokeObjectURL = () => {};
+    const { fixture, http, el } = mount({ ref: '1.3' });
+    http.expectOne(r => r.url.endsWith('/runItems/detail')).flush({ status: API_SUCCESS, data: PAGE3 });
+    fixture.detectChanges();
+    http.match(r => r.url.endsWith('/runItems/data')).find(d => d.request.params.get('stepKey') === 'ocr')!.flush({ status: API_SUCCESS,
+      data: { stepKey: 'ocr', stepName: 'Read text from pages', columns: [], rows: [{ ocr_text: 'Reason for referral', ocr_sureness: 91,
+        ocr_source: 'ocr', ocr_status: 'ok', ocr_note: 'Read: 3 words, 91 % sure. Turned 180° to be read upright.', ocr_rotation: 180 }] } });
+    http.expectOne(r => r.url.endsWith('/runItems/file')).flush(new Blob(['png']));
+    fixture.detectChanges();
+    expect(el.querySelector('[data-test="page-rotation"]')?.textContent?.trim()).toBe('Turned 180° to read');
   });
 
   it('reads an OCR row', () => {
     expect(pageReading({ stepKey: 'o', stepName: 'o', columns: [], rows: [{ ocr_text: 'x', ocr_sureness: '64.5', ocr_source: 'ocr', ocr_status: 'check' }] }))
-      .toEqual({ text: 'x', sureness: 64.5, source: 'ocr', status: 'check', note: null });
+      .toEqual({ text: 'x', sureness: 64.5, source: 'ocr', status: 'check', note: null, rotation: 0 });
+    expect(pageReading({ stepKey: 'o', stepName: 'o', columns: [], rows: [{ ocr_text: 'x', ocr_rotation: 90 }] })?.rotation).toBe(90);
     expect(pageReading({ stepKey: 'o', stepName: 'o', columns: [], rows: [] })).toBeNull();
   });
 });

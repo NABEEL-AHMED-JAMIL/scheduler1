@@ -85,6 +85,10 @@ export class Shell {
       });
     });
     inject(DestroyRef).onDestroy(() => { destroyed = true; host.clear(); });
+    // ZT-M18: the managed-session banner names its workspace; a session held without the name asks Identity for it.
+    effect(() => {
+      if (this.auth.isManagedSession() && !this.auth.user()?.tenantName) untracked(() => this.auth.nameManagedWorkspace());
+    });
     // The avatar into the bar once loaded, and into the menu's header each time the menu opens (its slot comes and goes).
     effect(() => {
       const type = this.avatarType();

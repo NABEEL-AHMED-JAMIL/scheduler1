@@ -684,7 +684,7 @@ export function outputColumns(definition: Definition, index: number, tasks: Step
     // MIG-421: Read text from pages -- each page's row, then what OCR read on it.
     case 'ocr_pages': {
       const columns = input();
-      return columns ? union(columns, ['ocr_text', 'ocr_sureness', 'ocr_source', 'ocr_words', 'ocr_status', 'ocr_note']) : null;
+      return columns ? union(columns, ['ocr_text', 'ocr_sureness', 'ocr_source', 'ocr_words', 'ocr_status', 'ocr_note', 'ocr_rotation']) : null;
     }
     // Owner #16 (2026-10-19): the common tasks added to the registry.
     case 'unpivot': {

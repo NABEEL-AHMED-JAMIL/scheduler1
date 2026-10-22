@@ -377,6 +377,32 @@ export class AuthService {
     void this.router.navigate([WORK_IN_WORKSPACE_PATH]);
   }
 
+  /** ZT-M18: a name asked for this managed session's workspace already (one ask a session). */
+  private namedWorkspace: number | null = null;
+
+  /**
+   * ZT-M18: the banner names the managed session's workspace. A session held without its name -- one restored from
+   * elsewhere, an older sign-in answer -- read "workspace 1009"; Identity knows the name of the session's own workspace
+   * (managedService.json/thisSession), asked once and kept with the session. Nothing to do outside a managed session or
+   * when the name is there.
+   */
+  nameManagedWorkspace(): void {
+    const user = this.currentUser();
+    if (!user || !this.isManagedSession() || (user.tenantName ?? '').trim() || user.tenantId == null
+      || this.namedWorkspace === user.tenantId) return;
+    this.namedWorkspace = user.tenantId;
+    this.http.get<ApiResponse<{ tenantId: number; tenantName: string }>>(`${API_BASE}/managedService.json/thisSession`).subscribe({
+      next: r => {
+        const now = this.currentUser();
+        const name = (r?.data?.tenantName ?? '').trim();
+        if (r?.status === API_SUCCESS && name && now && now.tenantId === r.data!.tenantId && this.isManagedSession()) {
+          this.persist({ ...now, tenantName: name });
+        }
+      },
+      error: () => { /* the banner says "this workspace" */ },
+    });
+  }
+
   private readHeldPlatformSession(): AuthUser | null {
     const raw = readStorage(PLATFORM_SESSION_KEY);
     if (!raw) return null;

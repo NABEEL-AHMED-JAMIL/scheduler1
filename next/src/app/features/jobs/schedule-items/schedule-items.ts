@@ -15,7 +15,7 @@ import { DateRange, DateRangePicker, presetRange } from '../../../shared/ui/date
 import { RunItemsApi, refusalText } from '../run-items/run-items.api';
 import { fieldText } from '../run-items/run-items.model';
 import {
-  AcrossPage, AcrossRow, AcrossStatus, Comparison, acrossQuery, afterText, beforeText, compareTitle, headline, reportText, rowLook,
+  AcrossPage, AcrossRow, AcrossStatus, Comparison, acrossQuery, afterText, beforeText, carriedSteps, compareTitle, headline, reportText, rowLook,
   sameSteps, ticked, versionText,
 } from './schedule-items.model';
 
@@ -56,6 +56,12 @@ function dayStart(day: string, plusDays = 0): string | null {
     .si-path { background: var(--surface-sunken); color: var(--text-secondary); }
     .si-before { background: var(--crit-soft); color: var(--crit-text); }
     .si-after { background: var(--ok-soft); color: var(--ok-text); }
+    /* ZT-I23: a change of letter case only stays listed, lighter: neither red nor green. */
+    .si-diff.is-case-only { border-style: dashed; }
+    .si-diff.is-case-only .si-before, .si-diff.is-case-only .si-after { background: var(--surface-sunken); color: var(--text-muted); }
+    .si-case { margin-left: 0.375rem; padding: 0 0.375rem; border: 1px solid var(--border-subtle); border-radius: 999px;
+      font-family: var(--font-sans, inherit); font-size: 0.6875rem; color: var(--text-muted); }
+    .si-also { margin-left: 0.375rem; font-size: 0.6875rem; color: var(--text-muted); }
   `,
   template: `
     <div class="page">
@@ -197,14 +203,20 @@ function dayStart(day: string, plusDays = 0): string | null {
                   <div class="flex flex-col gap-2" [attr.data-compare-step]="s.key">
                     <h3 class="text-xs font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">{{ s.name }}</h3>
                     @for (ch of s.changes; track ch.path) {
-                      <div class="si-diff">
-                        <div class="si-path mono">{{ ch.path }}</div>
+                      <div class="si-diff" [class.is-case-only]="ch.caseOnly" [attr.data-change]="ch.path">
+                        <div class="si-path mono">{{ ch.path }}
+                          @if (ch.caseOnly) { <span class="si-case" data-test="case-only">case only</span> }
+                          @if (ch.alsoAt?.length) { <span class="si-also" [title]="'Also as ' + ch.alsoAt!.join(', ')">also {{ ch.alsoAt!.join(', ') }}</span> }
+                        </div>
                         <div class="si-before mono">− {{ before(ch) }}</div>
                         <div class="si-after mono">+ {{ after(ch) }}</div>
                       </div>
                     }
                     @if (s.truncated) { <p class="text-xs text-[color:var(--text-muted)]">The first {{ s.changes.length }} changes.</p> }
                   </div>
+                }
+                @for (s of carried(c); track s.name) {
+                  <p class="text-xs text-[color:var(--text-muted)]" data-test="compare-carried">{{ s.name }}: carries {{ s.carried === 1 ? 'the change' : 'the ' + s.carried + ' changes' }} above on, nothing new.</p>
                 }
                 @for (s of oneSided(c); track s.key) {
                   <p class="text-xs text-[color:var(--text-secondary)]">{{ s.name }}: {{ s.note }}</p>
@@ -311,6 +323,7 @@ export class ScheduleItems implements OnInit {
     return names.length ? `Unchanged in both runs: ${names.join(', ')}.` : '';
   }
   changedSteps(c: Comparison) { return c.steps.filter(s => s.changes.length); }
+  carried(c: Comparison) { return carriedSteps(c); }
   oneSided(c: Comparison) { return c.steps.filter(s => !s.changes.length && s.note); }
 
   load(): void {

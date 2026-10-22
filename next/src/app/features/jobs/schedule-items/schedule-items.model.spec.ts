@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { acrossQuery, afterText, beforeText, compareTitle, headline, reportText, rowLook, ticked, versionText, Comparison } from './schedule-items.model';
+import { acrossQuery, afterText, beforeText, carriedSteps, compareTitle, headline, reportText, rowLook, ticked, versionText, Comparison } from './schedule-items.model';
 
 /** MIG-421: the schedule Items tab's readings of Core's across-runs answers. */
 describe('schedule items model', () => {
@@ -27,9 +27,13 @@ describe('schedule items model', () => {
     expect(rowLook({ status: 'done' }).label).toBe('Done');
     expect(versionText(5)).toBe('v5');
     expect(versionText(null)).toBe('—');
-    expect(reportText({ report: { label: 'RPT-0018', version: 1 } })).toBe('RPT-0018');
-    expect(reportText({ report: { label: 'RPT-0018', version: 2 } })).toBe('RPT-0018 v2');
-    expect(reportText({ report: { fileName: 'Call_insight_call-a.m4a_v1.pdf' } })).toBe('Call_insight_call-a.m4a_v1.pdf');
+    // ZT-I24: a Report Studio report is its number and version in every run, its first version too; a plain file its name.
+    expect(reportText({ report: { number: 'RPT-0019', label: 'RPT-0019', version: 1, fileName: 'Call_insight_call-a.m4a_v1.pdf' } }))
+      .toBe('RPT-0019 v1');
+    expect(reportText({ report: { number: 'RPT-0013', label: 'RPT-0013', version: 2, fileName: 'Call_insight_call-a.m4a_v1.pdf' } }))
+      .toBe('RPT-0013 v2');
+    expect(reportText({ report: { number: null, label: 'Call_insight_call-a.m4a_v1.pdf', version: null, fileName: 'Call_insight_call-a.m4a_v1.pdf' } }))
+      .toBe('Call_insight_call-a.m4a_v1.pdf');
     expect(reportText({ report: null })).toBe('—');
   });
 
@@ -52,6 +56,9 @@ describe('schedule items model', () => {
       changed: 3, masked: [],
     };
     expect(compareTitle(c)).toEqual({ title: 'Compare #8814 with #8701', sub: 'Insight JSON · 3 fields changed' });
+    expect(carriedSteps(c)).toEqual([]);
+    expect(carriedSteps({ ...c, steps: [...c.steps, { key: 'save', name: 'Save file', same: false, changes: [], carried: 3 }] }))
+      .toEqual([{ name: 'Save file', carried: 3 }]);
     expect(afterText(c.steps[0].changes[1])).toBe('(removed)');
     expect(beforeText({ path: 'x', kind: 'added', after: '1' })).toBe('(not there)');
   });

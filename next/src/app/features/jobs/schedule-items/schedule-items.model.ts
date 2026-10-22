@@ -42,7 +42,11 @@ export interface AcrossRow {
   children?: { total: number; failed: number } | null;
   durationMs?: number | null;
   fields?: Record<string, unknown> | null;
-  report?: { label?: string | null; version?: number | null; fileName?: string | null; fileRef?: number | null; madeAttempt?: number | null } | null;
+  report?: {
+    /** ZT-I24: a Report Studio report's number ("RPT-0019"); null for a plain file. */
+    number?: string | null;
+    label?: string | null; version?: number | null; fileName?: string | null; fileRef?: number | null; madeAttempt?: number | null;
+  } | null;
 }
 
 export interface AcrossPage {
@@ -60,13 +64,21 @@ export interface AcrossPage {
   note?: string | null;
 }
 
-export interface Change { path: string; kind: 'changed' | 'added' | 'removed'; before?: string | null; after?: string | null; }
+export interface Change {
+  path: string; kind: 'changed' | 'added' | 'removed'; before?: string | null; after?: string | null;
+  /** ZT-I23: the same value under other names (a JSON column's field and its flattened copy): said once, by `path`. */
+  alsoAt?: string[] | null;
+  /** ZT-I23: only the letter case changed ("Synthetic" to "synthetic"). */
+  caseOnly?: boolean | null;
+}
 
 export interface CompareSide { status?: string | null; rows?: number | null; hasData?: boolean | null; reusedFromAttempt?: number | null; }
 
 export interface CompareStep {
   key: string; name: string; task?: string | null; a?: CompareSide | null; b?: CompareSide | null; same: boolean; changes: Change[];
   truncated?: boolean | null; note?: string | null;
+  /** ZT-I23: changes an earlier step made that this one only carried on: said there, counted here. */
+  carried?: number | null;
 }
 
 export interface CompareRun { jobQueueId: number; attempt?: number | null; pipelineVersion?: number | null; startedAt?: string | null; status?: string | null; }
@@ -127,12 +139,15 @@ export function versionText(v: number | null | undefined): string {
   return v === null || v === undefined ? '—' : `v${v}`;
 }
 
-/** The row's report: "RPT-0018" (its version when it has more than one), else its file, else a dash. */
+/**
+ * The row's report (ZT-I24): a Report Studio report is its number and version in every run ("RPT-0019 v1"); only a plain
+ * file is its file's name; nothing, a dash.
+ */
 export function reportText(row: Pick<AcrossRow, 'report'>): string {
   const r = row.report;
   if (!r) return '—';
-  const label = r.label || r.fileName || '';
-  return label ? (r.version && r.version > 1 ? `${label} v${r.version}` : label) : '—';
+  if (r.number) return r.version ? `${r.number} v${r.version}` : r.number;
+  return r.fileName || r.label || '—';
 }
 
 /** The two runs ticked to compare, kept to two: a third tick drops the oldest tick. */
@@ -158,6 +173,11 @@ export function afterText(ch: Change): string {
 
 export function beforeText(ch: Change): string {
   return ch.kind === 'added' ? '(not there)' : ch.before ?? 'null';
+}
+
+/** ZT-I23: the steps that only carried on changes said at an earlier step, with how many ("Save file: 3 carried on"). */
+export function carriedSteps(c: Comparison): { name: string; carried: number }[] {
+  return c.steps.filter(s => !s.changes.length && (s.carried ?? 0) > 0).map(s => ({ name: s.name, carried: s.carried ?? 0 }));
 }
 
 /** The unchanged steps, by name, for the note under the diff ("The transcript is the same word for word"). */

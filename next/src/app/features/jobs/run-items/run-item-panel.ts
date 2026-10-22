@@ -33,7 +33,11 @@ export interface ItemPanelData {
 }
 
 /** MIG-421: an OCR'd page's reading -- the text, how sure, where it came from -- from the OCR step's row. */
-export interface PageReading { text: string; sureness: number | null; source: string | null; status: string | null; note: string | null; }
+export interface PageReading {
+  text: string; sureness: number | null; source: string | null; status: string | null; note: string | null;
+  /** ZT-I25: how far the page was turned, clockwise in degrees, to be read upright (0 when it was read as it came). */
+  rotation: number;
+}
 
 export function pageReading(data: ItemData | null | undefined): PageReading | null {
   const row = data?.rows?.[0];
@@ -45,6 +49,7 @@ export function pageReading(data: ItemData | null | undefined): PageReading | nu
     source: row['ocr_source'] === undefined || row['ocr_source'] === null ? null : String(row['ocr_source']),
     status: row['ocr_status'] === undefined || row['ocr_status'] === null ? null : String(row['ocr_status']),
     note: row['ocr_note'] === undefined || row['ocr_note'] === null ? null : String(row['ocr_note']),
+    rotation: [90, 180, 270].includes(Number(row['ocr_rotation'])) ? Number(row['ocr_rotation']) : 0,
   };
 }
 
@@ -173,6 +178,11 @@ export function notMade(detail: ItemDetail): string[] {
                     <span class="pill pill-neutral">Its own text layer</span>
                   } @else if (r.sureness !== null) {
                     <span class="pill pill-ok">{{ sureText(r) }} sure</span>
+                  }
+                  @if (r.rotation) {
+                    <span class="pill pill-neutral" data-test="page-rotation"
+                      [title]="'The page was scanned turned; it was turned ' + r.rotation + '° clockwise before its text was read.'">
+                      <app-icon name="redo" size="0.9em" />Turned {{ r.rotation }}° to read</span>
                   }
                 }
               </div>
@@ -408,8 +418,8 @@ export class RunItemPanel implements OnInit {
     const step = detail.steps.find(s => s.task === 'ocr_pages' && s.hasData);
     if (!step) return;
     this.api.data(this.data.jobQueueId, detail.item.ref, step.key, this.attempt()).subscribe({
-      next: d => this.reading.set(pageReading(d) ?? { text: '', sureness: null, source: null, status: null, note: d.note ?? null }),
-      error: () => this.reading.set({ text: '', sureness: null, source: null, status: null, note: 'The text read could not be shown.' }),
+      next: d => this.reading.set(pageReading(d) ?? { text: '', sureness: null, source: null, status: null, rotation: 0, note: d.note ?? null }),
+      error: () => this.reading.set({ text: '', sureness: null, source: null, status: null, rotation: 0, note: 'The text read could not be shown.' }),
     });
     const image = detail.files.find(f => /\.(png|jpe?g|tiff?|bmp|webp)$/i.test(f.name) && !f.expired);
     if (!image) { this.pageImageNote.set('This page kept no image.'); return; }
