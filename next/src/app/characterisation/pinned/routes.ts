@@ -1381,6 +1381,12 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
+      "path": "/administration/teams",
+      "title": "Teams",
+      "guards": [],
+      "lazy": true
+    },
+    {
       "path": "/administration/access-profiles",
       "title": "Page access",
       "guards": [

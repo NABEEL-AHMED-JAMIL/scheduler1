@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { StepTimeline } from './run-steps.model';
-import { approvalGroups, approvalRoute, fromNow, liveDuration, reviewersWords, spanWords, waitingApproval } from './run-approval.model';
+import { approvalTeams, approvalRoute, fromNow, liveDuration, reviewersWords, spanWords, waitingApproval } from './run-approval.model';
 
 /**
  * Run page polish 2026-10-12: a run waiting at an Approval step says where it waits, who it waits on by the group's name,
@@ -9,7 +9,7 @@ import { approvalGroups, approvalRoute, fromNow, liveDuration, reviewersWords, s
 const HOUR = 3_600_000;
 const NOW = Date.parse('2026-10-13T10:15:00Z');
 const APPROVAL = { approvalId: 1006, status: 'PENDING', waiting: true, title: 'Approve 3 bulk-review test rows of run 8298',
-  reviewers: { kind: 'group', value: '1063' }, requestedAt: new Date(NOW - 7 * HOUR - 5 * 60_000).toISOString(),
+  reviewers: { kind: 'team', value: '1063' }, requestedAt: new Date(NOW - 7 * HOUR - 5 * 60_000).toISOString(),
   expiresAt: new Date(NOW + 65 * HOUR).toISOString() };
 const TIMELINE = { jobQueueId: 8298, jobId: 2977, runStatus: 'Running', attempt: 1, attempts: [1], legacy: false, waitingForApproval: true,
   steps: [
@@ -28,14 +28,14 @@ describe('A run waiting at an Approval step', () => {
     expect(waitingApproval(null)).toBeNull();
   });
 
-  it('names the group, never its id; a role as its people; an unreadable group plainly', () => {
+  it('names the team, never its id; a role as its people; an unknown team plainly', () => {
     const names = new Map([['1063', 'Reviewer']]);
-    expect(reviewersWords({ kind: 'group', value: '1063' }, names)).toBe('the Reviewer group');
-    expect(reviewersWords({ kind: 'group', value: '1063' }, new Map())).toBe('the pipeline\'s reviewer group');
+    expect(reviewersWords({ kind: 'team', value: '1063' }, names)).toBe('the Reviewer team');
+    expect(reviewersWords({ kind: 'team', value: '1063' }, new Map())).toBe('the pipeline\'s reviewer team');
     expect(reviewersWords({ kind: 'role', value: 'TENANT_USER' }, names)).toBe('the workspace users');
     expect(reviewersWords({ kind: 'role', value: 'TENANT_ADMIN' }, names)).toBe('the workspace administrators');
     expect(reviewersWords(null, names)).toBe('the workspace administrators');
-    expect(approvalGroups(TIMELINE)).toEqual(['1063']);
+    expect(approvalTeams(TIMELINE)).toEqual(['1063']);
   });
 
   it('says a span coarsely, and a moment next to now', () => {

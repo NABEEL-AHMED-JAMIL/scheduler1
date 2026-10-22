@@ -246,7 +246,7 @@ export class AlertRules implements OnInit {
     const who: string[] = [];
     if (rule.roles.includes('TENANT_ADMIN')) who.push('Administrators');
     if (rule.roles.includes('TENANT_USER')) who.push('Members');
-    if (rule.groups.length) who.push(`${rule.groups.length} ${rule.groups.length === 1 ? 'group' : 'groups'}`);
+    if (rule.teams?.length) who.push(`${rule.teams.length} ${rule.teams.length === 1 ? 'team' : 'teams'}`);
     return who.join(', ') || 'Nobody (webhooks only)';
   }
 

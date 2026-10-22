@@ -23,7 +23,7 @@ import { KIND_ICON, KIND_LABEL, linkOf, sendMixed } from './review-home.model';
 import { ReviewItemPanel, ReviewItemPanelData, ReviewItemPanelResult } from './review-item-panel';
 
 type KindFilter = '' | ReviewKind;
-type WaitsFilter = '' | 'me' | 'groups' | 'open';
+type WaitsFilter = '' | 'me' | 'teams' | 'open';
 
 /**
  * Review › All waiting (UX review DR2, owner 2026-10-13, "go for best"): the reviewer's one list. Approvals (and the
@@ -60,7 +60,7 @@ type WaitsFilter = '' | 'me' | 'groups' | 'open';
       </app-page-header>
 
       @if (noWorkspace()) {
-        <!-- A platform administrator's own sign-in has no workspace: the Task inbox's mine, groups and count each answered
+        <!-- A platform administrator's own sign-in has no workspace: the Task inbox's mine, teams and count each answered
              400 "Pick a workspace (tenantId)" and the page showed their errors (2026-10-20). Nothing is read. -->
         <app-needs-workspace what="Review is" todo="decide its approvals, runs and documents" icon="inbox" />
       } @else {
@@ -87,7 +87,7 @@ type WaitsFilter = '' | 'me' | 'groups' | 'open';
           <select class="input w-auto" aria-label="Waits on" [value]="waits()" (change)="waits.set($any($event.target).value)" data-test="review-waits">
             <option value="">Anyone</option>
             <option value="me">You</option>
-            @if (viewer().tasks) { <option value="groups">Your groups</option> }
+            @if (viewer().tasks) { <option value="teams">Your teams</option> }
             <option value="open">Not claimed</option>
           </select>
           @if (filtered()) { <button type="button" class="btn btn-ghost btn-sm" (click)="clear()"><app-icon name="close" />Clear</button> }
@@ -206,7 +206,7 @@ export class ReviewHome implements OnInit {
     const q = this.query().trim().toLowerCase();
     const waits = this.waits();
     return this.items().filter(i => (!kind || i.kind === kind)
-      && (!waits || (waits === 'me' ? i.waitsOn.startsWith('You') : waits === 'groups' ? i.waitsOn === 'Your groups'
+      && (!waits || (waits === 'me' ? i.waitsOn.startsWith('You') : waits === 'teams' ? i.waitsOn === 'Your teams'
         : !i.waitsOn.startsWith('Claimed by')))
       && (!q || [this.nameOf(i), i.title, i.from, i.waitsOn, this.subOf(i)].join(' ').toLowerCase().includes(q)));
   });

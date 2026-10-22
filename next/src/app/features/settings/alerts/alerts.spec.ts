@@ -22,7 +22,7 @@ const ALERTS = `${API_BASE}/reliability.json/alerts/incidents`;
 
 const rule = (extra: Partial<AlertRule> = {}): AlertRule => ({
   id: 1001, kind: 'RUN_FAILED', name: 'A run failed', enabled: true, severity: 'WARNING', jobId: null, threshold: 1, windowMinutes: 60,
-  factor: null, channels: { bell: true, email: true, webhook: false }, roles: ['TENANT_ADMIN'], groups: [77], quietHours: null, ...extra,
+  factor: null, channels: { bell: true, email: true, webhook: false }, roles: ['TENANT_ADMIN'], teams: [77], quietHours: null, ...extra,
 });
 
 const alert = (extra: Partial<Alert> = {}): Alert => ({
@@ -65,7 +65,7 @@ describe('Alerts', () => {
     expect(open.textContent).toContain('What to do');
     expect(s.el.querySelector('[data-alert="6"]')?.textContent).toContain('cleared by itself');
     expect(s.el.querySelector('[data-rule="1001"]')?.textContent).toContain('Mail');
-    expect(s.el.querySelector('[data-rule="1001"]')?.textContent).toContain('Administrators, 1 group');
+    expect(s.el.querySelector('[data-rule="1001"]')?.textContent).toContain('Administrators, 1 team');
     (s.el.querySelector('[data-resolve="5"]') as HTMLButtonElement).click();
     const resolve = s.http.expectOne(`${API_BASE}/reliability.json/alerts/incidents/resolve`);
     expect(resolve.request.body).toEqual({ id: 5 });
@@ -215,15 +215,16 @@ describe('ZT-A12 follow-up: Settings › Alerts on the platform administrator\'s
     return TestBed.inject(HttpTestingController);
   }
 
-  it('the rule panel reads no schedules and no access profiles (the rules are the platform\'s own)', () => {
+  it('the rule panel reads no schedules and no teams (the rules are the platform\'s own)', () => {
     const http = panel({ tenantId: null }, true);
     expect(http.match(r => r.url.includes('/sourceJob.json/listSourceJob'))).toEqual([]);
-    expect(http.match(r => r.url.includes('/pageAccess.json/'))).toEqual([]);
+    expect(http.match(r => r.url.includes('/appUser.json/teams/'))).toEqual([]);
   });
 
-  it('a workspace administrator (and a managed session) still picks a schedule and groups', () => {
+  it('a workspace administrator (and a managed session) still picks a schedule and teams', () => {
     const http = panel({ tenantId: 2924 }, false);
     expect(http.match(r => r.url.includes('/sourceJob.json/listSourceJob')).length).toBe(1);
+    expect(http.match(r => r.url.includes('/appUser.json/teams/list')).length).toBe(1);
   });
 
   it('the page itself asks for the platform\'s rules on the own sign-in', () => {

@@ -138,6 +138,37 @@
                 } @else {
                   <p class="text-sm rounded-md px-3 py-2 bg-sunken">An administrator opens every page of the workspace; Page access does not apply.</p>
                 }
+                @if (p.tenantId != null) {
+                  <!-- F4: the teams they are in: what tasks, approvals, reviews and alerts reach them through. -->
+                  <div class="flex flex-col gap-2" data-test="user-teams">
+                    <span class="label">Teams</span>
+                    @if (theirTeams().length) {
+                      <ul class="flex flex-wrap gap-1.5">
+                        @for (t of theirTeams(); track t.team.teamId) {
+                          <li class="pill pill-neutral inline-flex items-center gap-1" [attr.data-team]="t.team.teamId">
+                            <a class="link-inline" [routerLink]="['/administration/teams']" [queryParams]="{ team: t.team.teamId, tenantId: auth.isPlatformAdmin() ? p.tenantId : null }">{{ t.team.name }}</a>
+                            @if (t.role === 'LEAD') { <span class="text-xs">· Lead</span> }
+                            @if (!readOnly()) {
+                              <button type="button" class="btn btn-ghost btn-xs" (click)="leaveTeam(t.team)" [disabled]="teamBusy()"
+                                      [attr.aria-label]="'Take them out of ' + t.team.name"><app-icon name="close" size="0.8em" /></button>
+                            }
+                          </li>
+                        }
+                      </ul>
+                    } @else {
+                      <p class="text-sm text-[color:var(--text-muted)]">In no team.</p>
+                    }
+                    @if (!readOnly() && joinable().length) {
+                      <div class="flex flex-wrap items-center gap-2">
+                        <select class="input input-sm w-auto" aria-label="Add them to a team" (change)="joinTeamId.set(+$any($event.target).value || null)" data-test="join-team">
+                          <option value="" [selected]="joinTeamId() === null">Add to a team…</option>
+                          @for (t of joinable(); track t.teamId) { <option [value]="t.teamId" [selected]="joinTeamId() === t.teamId">{{ t.name }}</option> }
+                        </select>
+                        <button type="button" class="btn btn-default btn-sm" (click)="joinTeam()" [disabled]="!joinTeamId() || teamBusy()" data-test="join-team-add">Add</button>
+                      </div>
+                    }
+                  </div>
+                }
               </div>
               <div class="rounded-lg border border-[color:var(--border-subtle)] p-4" data-test="user-preview" aria-labelledby="ue-preview-title">
                 <h3 id="ue-preview-title" class="section-title">What they can see</h3>

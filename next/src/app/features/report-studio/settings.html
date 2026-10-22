@@ -29,10 +29,10 @@
           <div>
             <label class="label" for="rss-reviewers">Who approves</label>
             <select id="rss-reviewers" class="input" [ngModel]="reviewers()" (ngModelChange)="reviewers.set($event)" [disabled]="!s.editable">
-              <option value="auto">Automatic: the access profile that may approve</option>
+              <option value="auto">Automatic: the team whose people may approve</option>
               <option value="admins">The workspace administrators</option>
-              @for (p of approverProfiles(); track p.pageAccessProfileId) {
-                <option [value]="'group:' + p.pageAccessProfileId">{{ p.profileName }}{{ p.holds ? '' : ' (does not hold Approve and sign reports)' }}</option>
+              @for (t of teams(); track t.teamId) {
+                <option [value]="'team:' + t.teamId">The {{ t.name }} team</option>
               }
             </select>
             <p class="rss-why mt-1" data-test="reviewers-now">{{ whoWords(s.resolved?.reviewers) }}</p>
@@ -57,10 +57,10 @@
           <div>
             <label class="label" for="rss-publishers">Who publishes</label>
             <select id="rss-publishers" class="input" [ngModel]="publishers()" (ngModelChange)="publishers.set($event)" [disabled]="!s.editable">
-              <option value="auto">Automatic: the access profile that may publish</option>
+              <option value="auto">Automatic: the team whose people may publish</option>
               <option value="admins">The workspace administrators</option>
-              @for (p of publisherProfiles(); track p.pageAccessProfileId) {
-                <option [value]="'group:' + p.pageAccessProfileId">{{ p.profileName }}{{ p.holds ? '' : ' (does not hold Publish report templates)' }}</option>
+              @for (t of teams(); track t.teamId) {
+                <option [value]="'team:' + t.teamId">The {{ t.name }} team</option>
               }
             </select>
             <p class="rss-why mt-1">{{ whoWords(s.resolved?.publishers) }}</p>

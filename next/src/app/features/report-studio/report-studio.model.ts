@@ -336,7 +336,7 @@ export interface TemplateReviewCard extends TemplateRow {
 }
 
 /** Phase 7: whom a review goes to: named in the settings, or worked out from the page gate. */
-export interface Assignee { kind: 'group' | 'role' | 'user'; value: string; }
+export interface Assignee { kind: 'team' | 'role' | 'user'; value: string; }
 
 /** Phase 7: the workspace's Report Studio settings (Report Studio › Settings, administrators). */
 export interface StudioSettings {

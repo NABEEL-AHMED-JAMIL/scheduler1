@@ -14,7 +14,7 @@ import { FlowGraph } from '../../shared/flow-graph/flow-graph';
 import { workflowGraph } from '../../shared/flow-graph/flow-adapters';
 import { ToastService } from '../../shared/ui/toast.service';
 import { confirmWith } from '../../shared/ui/confirm';
-import { AccessProfilesService } from '../admin/access-profiles/access-profiles.service';
+import { TeamsApi } from '../../core/teams/teams.api';
 import { Colleague, RequestRow, WorkflowDetail, WorkflowSummary, WorkflowsApi, CANNOT_ACT } from './workflows.api';
 import { DraftStep, OPERATORS, STEP_TYPES, StepType, Who, WhoKind, canEnd, fromJson, newStep, problemStep, subjectWho, toJson, runSaveAs } from './designer.model';
 import { shortTime } from './history';
@@ -52,7 +52,7 @@ export function isBuiltIn(w: Pick<WorkflowSummary, 'builtIn' | 'createdBy'>): bo
 export class WorkflowDesigner implements OnInit {
   private readonly api = inject(WorkflowsApi);
   private readonly http = inject(HttpClient);
-  private readonly profiles = inject(AccessProfilesService);
+  private readonly teamsApi = inject(TeamsApi);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
@@ -96,7 +96,7 @@ export class WorkflowDesigner implements OnInit {
   /** P2 #36: the workspace has nobody but the reader, so an approval has no one to decide it. */
   readonly soleMember = computed(() => this.colleaguesLoaded()
     && !this.colleagues().some(c => c.userId !== this.auth.user()?.appUserId));
-  readonly groups = signal<{ id: number; name: string }[]>([]);
+  readonly teams = signal<{ id: number; name: string }[]>([]);
   readonly jobs = signal<{ jobId: number; jobName?: string }[]>([]);
   /** Owner #25: the workspace's saved API requests, for a Call API step; read the first time one is shown. */
   readonly apiRequests = signal<ApiRequestChoice[] | null>(null);
@@ -294,8 +294,8 @@ export class WorkflowDesigner implements OnInit {
     if (this.noWorkspace()) { this.loading.set(false); return; }
     this.api.colleagues().subscribe({ next: r => { if (r.status === API_SUCCESS) { this.colleagues.set(r.data ?? []); this.colleaguesLoaded.set(true); } }, error: () => {} });
     if (this.auth.isTenantAdmin()) {
-      this.profiles.list().subscribe({
-        next: r => { if (r.status === API_SUCCESS) this.groups.set((r.data ?? []).map(p => ({ id: p.pageAccessProfileId, name: p.profileName }))); },
+      this.teamsApi.list().subscribe({
+        next: r => { if (r.status === API_SUCCESS) this.teams.set((r.data ?? []).map(t => ({ id: t.teamId, name: t.name }))); },
         error: () => {},
       });
     }
@@ -706,9 +706,9 @@ export class WorkflowDesigner implements OnInit {
         return c ? (c.fullName || c.username) : w.value ? `user ${w.value}` : 'a person (pick one)';
       }
       case 'role': return w.value === 'TENANT_ADMIN' ? 'the administrators' : 'any member';
-      case 'group': {
-        const g = this.groups().find(x => String(x.id) === String(w.value));
-        return g ? `the ${g.name} group` : 'a group';
+      case 'team': {
+        const g = this.teams().find(x => String(x.id) === String(w.value));
+        return g ? `the ${g.name} team` : 'a team';
       }
       case 'manager': return 'the requester\'s manager';
       case 'requester': return 'the requester';

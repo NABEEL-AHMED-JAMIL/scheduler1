@@ -80,6 +80,7 @@ export const PINNED: Record<string, unknown> = {
       "/administration/data-policies",
       "/administration/security",
       "/administration/team-activity",
+      "/administration/teams",
       "/administration/users"
     ]
   },

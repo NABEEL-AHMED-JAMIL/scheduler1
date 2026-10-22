@@ -44,7 +44,7 @@ const REQUESTS: RequestRow[] = [
 function screen(link?: number) {
   const api = {
     mine: vi.fn(() => of({ status: 'SUCCESS', message: '', data: MINE })),
-    groups: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [] })),
+    teams: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [] })),
     done: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [task(90, 'Visit check #1069', { state: 'ChangesRequested', actedAt: '2026-10-06T11:31:00' })] })),
     requests: vi.fn(() => of({ status: 'SUCCESS', message: '', data: REQUESTS })),
     task: vi.fn((id: number) => of({ status: 'SUCCESS', message: '', data: detailOf(MINE.find(t => t.id === id) ?? MINE[0]) })),
@@ -62,7 +62,7 @@ function screen(link?: number) {
       ...(link ? [{ provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({ task: String(link) }), routeConfig: { path: 'workflows/inbox' } } } }] : []),
       { provide: WorkflowsApi, useValue: api },
       { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn() } },
-      { provide: TaskCountService, useValue: { refresh: vi.fn(), count: signal(3), overdue: signal(1), mine: signal(3), groups: signal(0), done: signal(1), requests: signal(1) } },
+      { provide: TaskCountService, useValue: { refresh: vi.fn(), count: signal(3), overdue: signal(1), mine: signal(3), teams: signal(0), done: signal(1), requests: signal(1) } },
       { provide: AuthService, useValue: { canOpen: () => true, user: signal({ appUserId: 4537, tenantId: 2924 }) } },
     ],
   });
@@ -77,7 +77,7 @@ describe('Task inbox, the design', () => {
   it('names its tabs as real tabs with counts, and keeps their test hooks', () => {
     const { el, text } = screen();
     const tabs = [...el.querySelectorAll('[role="tablist"] .tab')];
-    expect(tabs.map(t => t.getAttribute('data-test'))).toEqual(['tab-mine', 'tab-groups', 'tab-done', 'tab-requests']);
+    expect(tabs.map(t => t.getAttribute('data-test'))).toEqual(['tab-mine', 'tab-teams', 'tab-done', 'tab-requests']);
     expect(text('[data-test="tab-mine"]')).toBe('Waiting for me 3');
     expect(text('[data-test="tab-requests"]')).toBe('My requests 1');
     expect(el.querySelector('[data-test="tab-mine"]')!.classList).toContain('tab-active');

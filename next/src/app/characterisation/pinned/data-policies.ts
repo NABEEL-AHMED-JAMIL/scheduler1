@@ -20,6 +20,7 @@ export const PINNED: Record<string, unknown> = {
       "/administration/appearance",
       "/administration/data-policies",
       "/administration/security",
+      "/administration/teams",
       "/administration/users",
       "/platform/workspaces"
     ],
@@ -305,6 +306,7 @@ export const PINNED: Record<string, unknown> = {
       "/administration/appearance",
       "/administration/data-policies",
       "/administration/security",
+      "/administration/teams",
       "/administration/users",
       "/settings/model-connections"
     ],

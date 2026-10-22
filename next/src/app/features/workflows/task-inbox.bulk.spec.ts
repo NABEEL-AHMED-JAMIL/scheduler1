@@ -32,7 +32,7 @@ function screen(pages: Record<string, { data: InboxTask[]; next: string | null }
   });
   const api = {
     mine,
-    groups: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [] })),
+    teams: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [] })),
     done: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [task(600, { state: 'Approved' })] })),
     requests: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [] })),
     task: vi.fn((id: number) => of({ status: 'SUCCESS', message: '', data: { ...FIRST.find(t => t.id === id) ?? task(id), subject: {}, history: [], tasks: [] } })),
@@ -48,7 +48,7 @@ function screen(pages: Record<string, { data: InboxTask[]; next: string | null }
       { provide: WorkflowsApi, useValue: api },
       { provide: BulkReviewApi, useValue: bulk },
       { provide: ToastService, useValue: toast },
-      { provide: TaskCountService, useValue: { refresh: vi.fn(), count: signal(3), overdue: signal(0), mine: signal(240), groups: signal(0), done: signal(1), requests: signal(0) } },
+      { provide: TaskCountService, useValue: { refresh: vi.fn(), count: signal(3), overdue: signal(0), mine: signal(240), teams: signal(0), done: signal(1), requests: signal(0) } },
       { provide: AuthService, useValue: { canOpen: () => true, user: signal({ appUserId: ME, tenantId: 2945 }) } },
     ],
   });

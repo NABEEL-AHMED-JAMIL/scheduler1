@@ -262,7 +262,7 @@ export class RunStepsTable {
     return t?.attemptDetails?.find(detail => detail.attempt === t.attempt) ?? null;
   });
 
-  outcome(approval: StepApproval): string { return approvalOutcome(approval, this.approvals?.groupNames()); }
+  outcome(approval: StepApproval): string { return approvalOutcome(approval, this.approvals?.teamNames()); }
 
   chooseAttempt(value: string): void {
     const attempt = Number(value);

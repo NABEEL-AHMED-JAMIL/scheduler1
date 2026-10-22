@@ -23,6 +23,7 @@ import { ToastService } from '../../../shared/ui/toast.service';
 import { AccountSecurityApi, METHOD_LABEL, OUTCOME_LABEL, PersonSession, PersonStanding, SignInEvent } from '../../account/account-security.api';
 import { pictureProblem } from '../../profile/picture-check';
 import { AccessPerson, AccessProfile, AccessProfilesService } from '../access-profiles/access-profiles.service';
+import { Team, TeamsApi, refusal } from '../../../core/teams/teams.api';
 import { PreviewGroup, menuPreview, previewSize } from '../access-profiles/page-groups';
 import { announceReset } from './reset-password-announce';
 import { ResetPasswordData, ResetPasswordDialog, ResetPasswordResult } from './reset-password-dialog';
@@ -85,6 +86,7 @@ export class UserEdit implements OnInit {
   private readonly toast = inject(ToastService);
   private readonly security = inject(AccountSecurityApi);
   private readonly profilesApi = inject(AccessProfilesService);
+  private readonly teamsApi = inject(TeamsApi);
   private readonly pictures = inject(AvatarCache);
   readonly auth = inject(AuthService);
 
@@ -106,6 +108,21 @@ export class UserEdit implements OnInit {
   readonly catalogue = signal<PageCatalogueEntry[]>([]);
   /** Their effective pages, as the server works them out (a member only). */
   readonly access = signal<AccessPerson | null>(null);
+  /** F4: the workspace's teams; theirs are the ones they are in, with their role. */
+  readonly teams = signal<Team[]>([]);
+  readonly theirTeams = computed(() => {
+    const id = this.person()?.appUserId;
+    return this.teams().flatMap(t => {
+      const m = t.members.find(x => x.appUserId === id);
+      return m ? [{ team: t, role: m.teamRole }] : [];
+    });
+  });
+  readonly joinable = computed(() => {
+    const id = this.person()?.appUserId;
+    return this.teams().filter(t => !t.members.some(m => m.appUserId === id));
+  });
+  readonly joinTeamId = signal<number | null>(null);
+  readonly teamBusy = signal(false);
   readonly standing = signal<PersonStanding | null>(null);
   readonly sessions = signal<PersonSession[] | null>(null);
   readonly sessionsError = signal('');
@@ -253,11 +270,50 @@ export class UserEdit implements OnInit {
     if (this.isSelf() && !this.auth.isPlatformAdmin()) this.form.get('userRole')!.disable();
   }
 
+  private loadTeams(tenant: number | null): void {
+    this.teamsApi.list(tenant).subscribe({ next: r => { if (r.status === API_SUCCESS) this.teams.set(r.data ?? []); }, error: () => {} });
+  }
+
+  /** F4: puts them in a team (as a member; leads are named on Teams), or takes them out of one. */
+  joinTeam(): void {
+    const p = this.person();
+    const team = this.joinTeamId();
+    if (!p || !team) return;
+    this.teamCall(this.teamsApi.addMember(team, p.appUserId), 'They could not be added to the team.', () => this.joinTeamId.set(null));
+  }
+
+  async leaveTeam(team: Team): Promise<void> {
+    const p = this.person();
+    if (!p) return;
+    const ok = await confirmWith(this.dialog, {
+      title: `Take ${this.name()} out of "${team.name}"?`,
+      body: 'Tasks and reviews for the team stop reaching them within a minute. What they decided stays in its history.',
+      confirmLabel: 'Remove from team',
+      danger: true,
+    });
+    if (ok) this.teamCall(this.teamsApi.removeMember(team.teamId, p.appUserId), 'They could not be removed from the team.');
+  }
+
+  private teamCall(call: ReturnType<TeamsApi['addMember']>, fallback: string, done?: () => void): void {
+    this.teamBusy.set(true);
+    call.subscribe({
+      next: r => {
+        this.teamBusy.set(false);
+        if (r.status !== API_SUCCESS) { this.toast.error(r.message || fallback); return; }
+        this.toast.success(r.message || 'Saved.');
+        if (r.data) this.teams.update(list => list.map(t => (t.teamId === r.data!.teamId ? r.data! : t)));
+        done?.();
+      },
+      error: e => { this.teamBusy.set(false); this.toast.error(refusal(e, fallback)); },
+    });
+  }
+
   /** Everything around the person: profiles and pages, their standing, sessions and history. */
   private loadAround(person: AppUser): void {
     const tenant = this.auth.isPlatformAdmin() ? person.tenantId ?? null : null;
     this.profilesApi.pages().subscribe({ next: r => { if (r.status === API_SUCCESS) this.catalogue.set(r.data ?? []); }, error: () => {} });
     if (person.tenantId != null) {
+      this.loadTeams(tenant);
       this.profilesApi.list(tenant).subscribe({ next: r => { if (r.status === API_SUCCESS) this.profiles.set(r.data ?? []); }, error: () => {} });
       if (person.userRole === 'TENANT_USER') {
         this.profilesApi.people(tenant).subscribe({

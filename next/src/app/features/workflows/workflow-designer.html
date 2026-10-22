@@ -567,7 +567,7 @@
   </div>
 </ng-template>
 
-<!-- Who a step is for: a person, a role, a group, the requester's manager, or the requester -->
+<!-- Who a step is for: a person, a role, a team, the requester's manager, or the requester -->
 <ng-template #whoPicker let-field="field" let-who="who" let-label="label" let-noRequester="noRequester">
   <div class="flex flex-col gap-2">
     <div>
@@ -577,7 +577,7 @@
         @if (!noRequester) { <option value="requester">The requester</option> }
         <option value="user">A person</option>
         <option value="role">Everyone with a role</option>
-        <option value="group">Everyone in a group</option>
+        <option value="team">Everyone in a team</option>
         <!-- UX review 2026-10-12: a built-in workflow's approver is named on each request (the pipeline's reviewers). -->
         @if (who?.kind === 'subject') { <option value="subject">{{ subjectWho(who.value) }}</option> }
       </select>
@@ -597,11 +597,14 @@
         <option value="TENANT_USER">Any member</option>
       </select>
     }
-    @if (who?.kind === 'group') {
-      <select class="input" [ngModel]="who.value || ''" (ngModelChange)="setWho(field, 'group', $event)" [disabled]="!canEdit()" [attr.aria-label]="label + ': group'">
-        <option value="" disabled>Pick a group</option>
-        @for (g of groups(); track g.id) { <option [value]="'' + g.id">{{ g.name }}</option> }
+    @if (who?.kind === 'team') {
+      <select class="input" [ngModel]="who.value || ''" (ngModelChange)="setWho(field, 'team', $event)" [disabled]="!canEdit()" [attr.aria-label]="label + ': team'">
+        <option value="" disabled>Pick a team</option>
+        @for (g of teams(); track g.id) { <option [value]="'' + g.id">{{ g.name }}</option> }
       </select>
+      @if (!teams().length) {
+        <p class="field-note text-[color:var(--text-muted)]" data-test="no-teams">No teams yet: make one in Administration › Teams.</p>
+      }
     }
   </div>
 </ng-template>

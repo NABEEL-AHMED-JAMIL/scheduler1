@@ -28,7 +28,7 @@ export interface RunReviewView {
   /** Absent in some answers (a run whose review row is new): read as none. */
   decisions?: ReviewDecision[];
   rerunJobQueueId?: number | null;
-  /** Whose Task inbox the internal review waits in: a role (TENANT_ADMIN, TENANT_USER) or a group (an access profile, by id). */
+  /** Whose Task inbox the internal review waits in: a role (TENANT_ADMIN, TENANT_USER) or a team (by id). */
   reviewers?: { kind?: string | null; value?: string | null } | null;
   you?: { party?: string | null; canDecide?: boolean; refusal?: string | null };
 }

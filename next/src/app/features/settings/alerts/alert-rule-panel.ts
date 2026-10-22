@@ -5,7 +5,7 @@ import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config
 import { Icon } from '../../../shared/ui/icon';
 import { SidePanel } from '../../../shared/ui/side-panel';
 import { refusal } from '../../../shared/ui/bulk/bulk.model';
-import { AccessProfile, AccessProfilesService } from '../../admin/access-profiles/access-profiles.service';
+import { Team, TeamsApi } from '../../../core/teams/teams.api';
 import { AlertKindInfo, AlertRule, AlertScope, AlertsApi, ruleSentence } from './alerts.api';
 import { AuthService } from '../../../core/auth/auth.service';
 import { isOwnPlatformSignIn } from '../../../core/auth/workspace-data';
@@ -20,7 +20,7 @@ interface Schedule { jobId: number; jobName: string; }
 
 /**
  * MIG-355: one alert rule, made or changed, over the right of the rules list -- what it watches and how much is too much,
- * how bad (warning or critical), how it is told (the bell, mail, the workspace's webhooks) and to whom (roles and groups),
+ * how bad (warning or critical), how it is told (the bell, mail, the workspace's webhooks) and to whom (roles and teams),
  * and quiet hours that hold mail. The server checks everything again and answers a refusal in a sentence, shown here.
  */
 @Component({
@@ -119,12 +119,12 @@ interface Schedule { jobId: number; jobName: string; }
               <label class="flex items-center gap-2"><input type="checkbox" class="checkbox" [checked]="draft().roles.includes('TENANT_USER')"
                      (change)="role('TENANT_USER', $any($event.target).checked)" />Every other member</label>
             </div>
-            @if (profiles().length) {
-              <p class="field-note text-[color:var(--text-muted)] mt-2 mb-1">And these groups (access profiles):</p>
-              <div class="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-                @for (p of profiles(); track p.pageAccessProfileId) {
-                  <label class="flex items-center gap-2"><input type="checkbox" class="checkbox" [checked]="draft().groups.includes(p.pageAccessProfileId)"
-                         (change)="group(p.pageAccessProfileId, $any($event.target).checked)" />{{ p.profileName }}</label>
+            @if (teams().length) {
+              <p class="field-note text-[color:var(--text-muted)] mt-2 mb-1">And these teams:</p>
+              <div class="flex flex-wrap gap-x-4 gap-y-1 text-sm" data-testid="alert-teams">
+                @for (t of teams(); track t.teamId) {
+                  <label class="flex items-center gap-2"><input type="checkbox" class="checkbox" [checked]="draft().teams.includes(t.teamId)"
+                         (change)="team(t.teamId, $any($event.target).checked)" />{{ t.name }}</label>
                 }
               </div>
             }
@@ -165,12 +165,12 @@ export class AlertRulePanel implements OnInit {
   readonly data = inject<AlertRulePanelData>(DIALOG_DATA);
   private readonly api = inject(AlertsApi);
   private readonly http = inject(HttpClient);
-  private readonly profilesApi = inject(AccessProfilesService);
+  private readonly teamsApi = inject(TeamsApi);
   private readonly auth = inject(AuthService, { optional: true });
 
   readonly draft = signal<AlertRule>(this.data.rule ? structuredClone(this.data.rule) : this.fresh(this.data.kinds[0]));
   readonly schedules = signal<Schedule[]>([]);
-  readonly profiles = signal<AccessProfile[]>([]);
+  readonly teams = signal<Team[]>([]);
   readonly saving = signal(false);
   readonly error = signal('');
 
@@ -185,21 +185,21 @@ export class AlertRulePanel implements OnInit {
   readonly windowLabel = computed(() => this.draft().kind === 'REVIEW_WAITING' ? 'Waiting longer than (minutes)' : 'Within (minutes)');
 
   ngOnInit(): void {
-    // A workspace's schedules and access profiles; the platform's rules (and the platform administrator's own sign-in,
+    // A workspace's schedules and teams; the platform's rules (and the platform administrator's own sign-in,
     // ZT-A12 follow-up) name neither, and Core answers the own sign-in 403 on the schedules.
     if (this.data.scope !== 'workspace' || isOwnPlatformSignIn(this.auth)) return;
     this.http.get<ApiResponse<Schedule[]>>(`${API_BASE}/sourceJob.json/listSourceJob`).subscribe({
       next: r => this.schedules.set((r?.data ?? []).map(j => ({ jobId: j.jobId, jobName: j.jobName }))),
       error: () => this.schedules.set([]),
     });
-    this.profilesApi.list().subscribe({ next: r => this.profiles.set(r?.data ?? []), error: () => this.profiles.set([]) });
+    this.teamsApi.list().subscribe({ next: r => this.teams.set(r?.data ?? []), error: () => this.teams.set([]) });
   }
 
   private fresh(kind: AlertKindInfo): AlertRule {
     return {
       id: null, kind: kind.kind, name: kind.label, enabled: true, severity: 'WARNING', jobId: null, threshold: kind.threshold,
       windowMinutes: kind.windowMinutes, factor: kind.kind === 'RUN_SLOW' ? 2 : null, channels: { bell: true, email: false, webhook: false },
-      roles: this.data.scope === 'workspace' ? ['TENANT_ADMIN'] : [], groups: [], quietHours: null,
+      roles: this.data.scope === 'workspace' ? ['TENANT_ADMIN'] : [], teams: [], quietHours: null,
     };
   }
 
@@ -209,7 +209,7 @@ export class AlertRulePanel implements OnInit {
 
   setKind(kind: string): void {
     const info = this.data.kinds.find(k => k.kind === kind);
-    if (info) this.draft.set({ ...this.fresh(info), roles: this.draft().roles, groups: this.draft().groups, channels: this.draft().channels });
+    if (info) this.draft.set({ ...this.fresh(info), roles: this.draft().roles, teams: this.draft().teams, channels: this.draft().channels });
   }
 
   setJob(value: string): void {
@@ -224,8 +224,8 @@ export class AlertRulePanel implements OnInit {
     this.draft.update(d => ({ ...d, roles: on ? [...new Set([...d.roles, role])] : d.roles.filter(r => r !== role) }));
   }
 
-  group(id: number, on: boolean): void {
-    this.draft.update(d => ({ ...d, groups: on ? [...new Set([...d.groups, id])] : d.groups.filter(g => g !== id) }));
+  team(id: number, on: boolean): void {
+    this.draft.update(d => ({ ...d, teams: on ? [...new Set([...d.teams, id])] : d.teams.filter(g => g !== id) }));
   }
 
   quiet(on: boolean): void {

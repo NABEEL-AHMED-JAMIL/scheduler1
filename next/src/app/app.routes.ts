@@ -897,6 +897,12 @@ export const routes: Routes = [
         canActivate: [roleGuard],
       },
       {
+        // F4 (MIG-401): every member reads the workspace's teams; an administrator makes them, a team's lead changes its members.
+        path: 'administration/teams',
+        title: 'Teams',
+        loadComponent: () => import('./features/admin/teams/teams').then(m => m.Teams),
+      },
+      {
         path: 'administration/access-profiles',
         title: 'Page access',
         loadComponent: () =>

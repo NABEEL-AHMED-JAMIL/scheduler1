@@ -250,9 +250,12 @@ export const NAV: NavItem[] = [
     children: [
       {
         label: 'Administration', path: '/administration', icon: 'users',
-        hint: 'Users, page access, sign-in security, data policies and appearance',
+        hint: 'Users, teams, page access, sign-in security, data policies and appearance',
         tabs: [
           { label: 'Users', path: '/administration/users', icon: 'users', adminOnly: true },
+          // F4: an administrator makes teams here. The page opens to every member (a team's lead changes its members), who
+          // reaches it from Review › Approvals' My teams.
+          { label: 'Teams', path: '/administration/teams', icon: 'users', adminOnly: true },
           // F3: an access delegate opens it too, for the people their delegation reaches.
           { label: 'Page access', path: '/administration/access-profiles', icon: 'shield', adminOnly: true, delegateOk: true },
           // MIG-353: password rules, lockout, idle sign-out, two-factor, single sign-on and the sign-in history.

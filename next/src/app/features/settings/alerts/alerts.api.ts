@@ -34,7 +34,8 @@ export interface AlertRule {
   factor: number | null;
   channels: { bell: boolean; email: boolean; webhook: boolean };
   roles: string[];
-  groups: number[];
+  /** F4: the teams whose members are told as well, by id. */
+  teams: number[];
   quietHours: { start: string; end: string; zone: string | null } | null;
   whatToDo?: string;
   runbook?: string;
@@ -164,7 +165,7 @@ export class AlertsApi {
 export function recommendedRules(): AlertRule[] {
   const base = (kind: string, name: string, threshold: number, windowMinutes: number, severity: 'WARNING' | 'CRITICAL'): AlertRule => ({
     id: null, kind, name, enabled: true, severity, jobId: null, threshold, windowMinutes, factor: kind === 'RUN_SLOW' ? 2 : null,
-    channels: { bell: true, email: false, webhook: false }, roles: ['TENANT_ADMIN'], groups: [], quietHours: null,
+    channels: { bell: true, email: false, webhook: false }, roles: ['TENANT_ADMIN'], teams: [], quietHours: null,
   });
   return [
     base('RUN_FAILED', 'A run failed', 1, 60, 'WARNING'),

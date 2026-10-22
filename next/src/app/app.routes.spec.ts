@@ -107,6 +107,8 @@ describe('tab hubs: every tab is its own guarded route', () => {
   /** The one tab whose route is deliberately wider than the tab: a member holding Prompts reads Data policies from the
    * AI Assistant (MIG-254); the Administration hub still shows it to administrators only. */
   const WIDER_ROUTE = new Set(['/administration/data-policies']);
+  /** F4: the Teams tab is an administrator's entry, its page every member's (see below). */
+  const MEMBER_ROUTE = new Set(['/administration/teams']);
 
   it('has a lazy page with its own address for every tab, and one tab per address', () => {
     const paths = tabs.map(t => t.tab.path);
@@ -128,6 +130,13 @@ describe('tab hubs: every tab is its own guarded route', () => {
       if (WIDER_ROUTE.has(tab.path)) {
         expect(route.data?.pageKey).toBe('ai-prompts');
         expect(guards).toContain(pageGuard);
+        return;
+      }
+      // F4: the Teams tab is an administrator's menu entry, but its page opens to every member -- they read the teams,
+      // and a team's lead changes its members (from Review › Approvals' My teams). The server decides each change.
+      if (MEMBER_ROUTE.has(tab.path)) {
+        expect(route.data?.minRole).toBeUndefined();
+        expect(guards).toEqual([]);
         return;
       }
       expect(keys.sort()).toEqual(tabKeys.sort());

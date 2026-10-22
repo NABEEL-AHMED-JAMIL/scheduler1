@@ -7,6 +7,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { API_SUCCESS } from '../../core/api/api.config';
+import { TeamsApi } from '../../core/teams/teams.api';
 import { AuthService } from '../../core/auth/auth.service';
 import { Icon } from '../../shared/ui/icon';
 import { StatusPill } from '../../shared/ui/status-pill';
@@ -26,14 +27,14 @@ import { BulkBar } from '../../shared/ui/bulk/bulk-bar';
 import { BulkReviewApi } from '../../shared/ui/bulk/bulk-review.api';
 import { BULK_CAP, BulkAnswer, BulkMatch, BulkSelection } from '../../shared/ui/bulk/bulk.model';
 
-export type InboxTab = 'mine' | 'groups' | 'done' | 'requests';
+export type InboxTab = 'mine' | 'teams' | 'done' | 'requests';
 
 /** A page of a tab's list: the workflow service's Inbox.DEFAULT_LIMIT (it pages by cursor, at most 200 at a time). */
 export const INBOX_PAGE_SIZE = 100;
 
-const TABS: InboxTab[] = ['mine', 'groups', 'done', 'requests'];
+const TABS: InboxTab[] = ['mine', 'teams', 'done', 'requests'];
 type PerTab<T> = Record<InboxTab, T>;
-const perTab = <T>(value: T): PerTab<T> => ({ mine: value, groups: value, done: value, requests: value });
+const perTab = <T>(value: T): PerTab<T> => ({ mine: value, teams: value, done: value, requests: value });
 
 /** A request's field with how its value reads (value-kind.ts). */
 export interface FieldView { label: string; value: string; view: ValueView; }
@@ -62,6 +63,9 @@ export interface FieldView { label: string; value: string; view: ValueView; }
 export class TaskInbox implements OnInit {
   private readonly api = inject(WorkflowsApi);
   readonly auth = inject(AuthService);
+  private readonly teamsApi = inject(TeamsApi);
+  /** F4: the workspace's team names by id, for "With Wound care" on a team's task. */
+  readonly teamNames = signal<Map<string, string>>(new Map());
   /**
    * F3 (MIG-400): My requests is a tab of its own (task-inbox:requests); a person granted the inbox's other tabs only is
    * never shown it, and its list -- refused to them -- is not read.
@@ -80,7 +84,7 @@ export class TaskInbox implements OnInit {
 
   readonly tab = signal<InboxTab>('mine');
   readonly mine = signal<InboxTask[]>([]);
-  readonly groups = signal<InboxTask[]>([]);
+  readonly teams = signal<InboxTask[]>([]);
   readonly done = signal<InboxTask[]>([]);
   readonly requests = signal<RequestRow[]>([]);
   readonly loading = signal(true);
@@ -124,8 +128,8 @@ export class TaskInbox implements OnInit {
 
   // ---- bulk review (2026-10-12) -----------------------------------------------------------------------------------
 
-  /** Waiting for me and My groups pick approval tasks for a bulk decision; Done and My requests have nothing to decide. */
-  readonly canPick = computed(() => this.tab() === 'mine' || this.tab() === 'groups');
+  /** Waiting for me and My teams pick approval tasks for a bulk decision; Done and My requests have nothing to decide. */
+  readonly canPick = computed(() => this.tab() === 'mine' || this.tab() === 'teams');
   readonly taskById = computed(() => new Map(this.rows().map(t => [t.id, t])));
   /** The approval tasks shown that the reader may decide: the page Select all picks. */
   readonly pagePicks = computed<InboxTask[]>(() => {
@@ -145,7 +149,7 @@ export class TaskInbox implements OnInit {
 
   readonly rows = computed<InboxTask[]>(() => {
     switch (this.tab()) {
-      case 'groups': return this.groups();
+      case 'teams': return this.teams();
       case 'done': return this.done();
       default: return this.mine();
     }
@@ -227,7 +231,7 @@ export class TaskInbox implements OnInit {
   /** The open tab's total, as the service counts it (0 until the count is in). */
   private readonly total = computed(() => {
     switch (this.tab()) {
-      case 'groups': return this.badge.groups();
+      case 'teams': return this.badge.teams();
       case 'done': return this.badge.done();
       case 'requests': return this.badge.requests();
       default: return this.badge.mine();
@@ -309,6 +313,10 @@ export class TaskInbox implements OnInit {
     const task = Number(params.get('task'));
     if (task) { this.followLinkedTask = true; this.openTask(task, true); }
     this.api.colleagues().subscribe({ next: r => { if (r.status === API_SUCCESS) { this.colleagues.set(r.data ?? []); this.colleaguesLoaded.set(true); } }, error: () => {} });
+    this.teamsApi.list().subscribe({
+      next: r => { if (r.status === API_SUCCESS) this.teamNames.set(new Map((r.data ?? []).map(t => [String(t.teamId), t.name]))); },
+      error: () => {},
+    });
     this.load();
   }
 
@@ -396,7 +404,7 @@ export class TaskInbox implements OnInit {
 
   private rowsOf(tab: InboxTab): (InboxTask | RequestRow)[] {
     switch (tab) {
-      case 'groups': return this.groups();
+      case 'teams': return this.teams();
       case 'done': return this.done();
       case 'requests': return this.requests();
       default: return this.mine();
@@ -405,7 +413,7 @@ export class TaskInbox implements OnInit {
 
   private setRows(tab: InboxTab, rows: (InboxTask | RequestRow)[]): void {
     switch (tab) {
-      case 'groups': this.groups.set(rows as InboxTask[]); break;
+      case 'teams': this.teams.set(rows as InboxTask[]); break;
       case 'done': this.done.set(rows as InboxTask[]); break;
       case 'requests': this.requests.set(rows as RequestRow[]); break;
       default: this.mine.set(rows as InboxTask[]);
@@ -451,19 +459,19 @@ export class TaskInbox implements OnInit {
   private firstLoad = true;
 
   /**
-   * UX review 2026-10-12 (W1): the inbox opens on the tab with work. A reviewer whose tasks all wait in their group's pool
-   * opened on an empty "Waiting for me" saying "Nothing is waiting for you" while My groups held five. When Mine is empty
-   * and My groups is not, it opens My groups on its first task; a link to a task or to My requests decides for itself.
+   * UX review 2026-10-12 (W1): the inbox opens on the tab with work. A reviewer whose tasks all wait in their team's pool
+   * opened on an empty "Waiting for me" saying "Nothing is waiting for you" while My teams held five. When Mine is empty
+   * and My teams is not, it opens My teams on its first task; a link to a task or to My requests decides for itself.
    */
   private openWhereTheWorkIs(): void {
-    if (this.tab() !== 'mine' || this.mine().length || !this.groups().length) return;
-    this.pick('groups');
+    if (this.tab() !== 'mine' || this.mine().length || !this.teams().length) return;
+    this.pick('teams');
   }
 
   private showLinkedTab(): void {
     const id = this.selectedTask();
     if (this.tab() !== 'mine' || id == null || this.mine().some(t => t.id === id)) return;
-    if (this.groups().some(t => t.id === id)) this.tab.set('groups');
+    if (this.teams().some(t => t.id === id)) this.tab.set('teams');
     else if (this.done().some(t => t.id === id)) this.tab.set('done');
   }
 
@@ -639,9 +647,9 @@ export class TaskInbox implements OnInit {
   /** P2 #36: nobody else in the workspace, so a request of one's own has no one to approve it. */
   readonly aloneInWorkspace = computed(() => this.colleaguesLoaded() && !this.colleagues().some(c => c.userId !== this.me()));
   readonly mineCount = computed(() => this.tabCount(this.mine().length, this.badge.mine(), this.complete('mine')));
-  readonly groupsCount = computed(() => this.tabCount(this.groups().length, this.badge.groups(), this.complete('groups')));
-  /** Whether anything waits for the reader's groups: the empty "Waiting for me" tab then points there (G10, W1). */
-  readonly groupsWaiting = computed(() => this.groups().length > 0 || this.badge.groups() > 0);
+  readonly teamsCount = computed(() => this.tabCount(this.teams().length, this.badge.teams(), this.complete('teams')));
+  /** Whether anything waits for the reader's teams: the empty "Waiting for me" tab then points there (G10, W1). */
+  readonly teamsWaiting = computed(() => this.teams().length > 0 || this.badge.teams() > 0);
   readonly doneCount = computed(() => this.tabCount(this.done().length, this.badge.done(), this.complete('done')));
   readonly requestsCount = computed(() => this.tabCount(this.requests().length, this.badge.requests(), this.complete('requests')));
   readonly mineOverdue = computed(() => this.mine().some(t => t.overdue));
@@ -689,7 +697,7 @@ export class TaskInbox implements OnInit {
    * left (twenty pages at most). The total is known only when the list ran out.
    */
   private matchingTasks(): Observable<BulkMatch<InboxTask>> {
-    const tab = this.tab() === 'groups' ? 'groups' : 'mine';
+    const tab = this.tab() === 'teams' ? 'teams' : 'mine';
     const q = this.query().trim() || null;
     const status = this.statusFilter();
     const workflow = this.workflowFilter();
@@ -727,7 +735,7 @@ export class TaskInbox implements OnInit {
     const open = this.selectedTask();
     const next = open != null && done.has(open) ? this.shownIds().find(id => !done.has(id)) ?? null : open;
     this.mine.update(list => list.filter(t => !done.has(t.id)));
-    this.groups.update(list => list.filter(t => !done.has(t.id)));
+    this.teams.update(list => list.filter(t => !done.has(t.id)));
     this.refreshKeeping(null);
     if (open != null && done.has(open)) {
       if (next != null) this.openTask(next);
@@ -763,9 +771,9 @@ export class TaskInbox implements OnInit {
   holder(t: InboxTask): string {
     if (t.assigneeUserId != null) return this.name(t.assigneeUserId);
     if (t.assigneeKind === 'role') return t.assigneeValue === 'TENANT_ADMIN' ? 'Administrators' : 'Any member';
-    // ZT-R16: a task in My groups is one of the reader's own: their access profile ("With Reviewer"), never a bare "Group".
-    const mine = this.auth.user()?.pageAccessProfileName;
-    return this.tab() === 'groups' && mine ? mine : 'a group';
+    // ZT-R16 / F4: a task in My teams is for one of the reader's own teams, named ("With Wound care"), never a bare "Team".
+    if (t.assigneeKind === 'team') return this.teamNames().get(String(t.assigneeValue)) ?? 'a team';
+    return 'someone';
   }
 
   dueLabel(t: InboxTask): string {
@@ -866,8 +874,8 @@ export class TaskInbox implements OnInit {
     if (!subject) return [];
     return Object.entries(subject)
       .filter(([, v]) => v !== null && v !== undefined && v !== '')
-      // QA 2026-10-20: who a step goes to ({kind, value}: a group, a role, a person) is the workflow's routing, already
-      // shown as the "With ..." chip; as a field it read "Kind group / Value 1063".
+      // QA 2026-10-20: who a step goes to ({kind, value}: a team, a role, a person) is the workflow's routing, already
+      // shown as the "With ..." chip; as a field it read "Kind team / Value 1063".
       .filter(([, v]) => !isAssignee(v))
       .map(([k, v]) => ({ label: labelOf(k), value: this.valueText(v) }));
   }
@@ -884,10 +892,10 @@ export class TaskInbox implements OnInit {
   }
 }
 
-/** A step's assignee as a subject names it: {kind: group | role | user | subject, value} and nothing else. */
+/** A step's assignee as a subject names it: {kind: team | role | user | subject, value} and nothing else. */
 function isAssignee(v: unknown): boolean {
   if (!v || typeof v !== 'object' || Array.isArray(v)) return false;
   const keys = Object.keys(v as object);
   const kind = (v as { kind?: unknown }).kind;
-  return keys.length === 2 && keys.includes('kind') && keys.includes('value') && ['group', 'role', 'user', 'subject'].includes(String(kind));
+  return keys.length === 2 && keys.includes('kind') && keys.includes('value') && ['team', 'role', 'user', 'subject'].includes(String(kind));
 }

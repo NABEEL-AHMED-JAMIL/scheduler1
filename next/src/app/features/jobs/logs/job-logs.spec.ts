@@ -463,18 +463,18 @@ describe('Run page: a run waiting at an Approval step', () => {
       { stepExecutionId: 2, index: 1, key: 'approve', name: 'Approve the test rows', task: 'approval', status: 'Running', recordsIn: 3, tries: 1, datasets: [], log: 'step',
         statusMessage: 'Waiting for approval: Approve 3 bulk-review test rows of run 8298',
         approval: { approvalId: 1006, status: 'PENDING', waiting: true, title: 'Approve 3 bulk-review test rows of run 8298',
-          reviewers: { kind: 'group', value: '1063' }, requestedAt, expiresAt: new Date(Date.now() + 65 * HOUR).toISOString() } },
+          reviewers: { kind: 'team', value: '1063' }, requestedAt, expiresAt: new Date(Date.now() + 65 * HOUR).toISOString() } },
       { stepExecutionId: 3, index: 2, key: 'save', task: 'save_file', status: 'Queue', tries: 0, datasets: [], log: 'step' },
     ] };
   const RUN = {
     auditLogs: [
-      { jobAuditLogId: 1, logsDetail: 'Step 2/3 <approve> (approval) waits for approval by the group 1063 (request 1006): Approve 3 bulk-review test rows of run 8298', dateCreated: '2026-10-12 22:08:36' },
+      { jobAuditLogId: 1, logsDetail: 'Step 2/3 <approve> (approval) waits for approval by the team 1063 (request 1006): Approve 3 bulk-review test rows of run 8298', dateCreated: '2026-10-12 22:08:36' },
     ],
     sourceJob: { jobId: 2977, jobName: 'Bulk approval step test #4', taskDetail: { taskName: 'Bulk approval step test' } },
     sourceJobQueue: { jobQueueId: 8298, jobStatus: 'Running', startTime: '2026-10-12 22:08:35', endTime: null,
       jobStatusMessage: 'Waiting for approval at step 2 <approve>: Approve 3 bulk-review test rows of run 8298' },
   };
-  const TASK = { id: 1136, instanceId: 1130, stepKey: 'approve', stepType: 'approval', state: 'Open', assigneeKind: 'group', assigneeValue: '1063' };
+  const TASK = { id: 1136, instanceId: 1130, stepKey: 'approve', stepType: 'approval', state: 'Open', assigneeKind: 'team', assigneeValue: '1063' };
 
   function waiting(tab: string | null, reader: 'reviewer' | 'admin' = 'reviewer') {
     TestBed.resetTestingModule();
@@ -501,7 +501,7 @@ describe('Run page: a run waiting at an Approval step', () => {
     http.match(r => r.url.endsWith('/sourceJob.json/review')).forEach(r => r.flush({ status: API_SUCCESS, data: { jobQueueId: 8298, jobId: 2977, reviewStatus: 'NOT_REQUIRED', required: [] } }));
     fixture.detectChanges();
     http.match(r => r.url.endsWith('/taskInbox.json/forSubject')).forEach(r => r.flush({ status: API_SUCCESS, data: reader === 'admin' ? [] : [TASK] }));
-    http.match(r => r.url.endsWith('/pageAccess.json/listProfiles')).forEach(r => r.flush({ status: API_SUCCESS, data: [{ pageAccessProfileId: 1063, profileName: 'Reviewer' }] }));
+    http.match(r => r.url.endsWith('/appUser.json/teams/list')).forEach(r => r.flush({ status: API_SUCCESS, data: [{ teamId: 1063, name: 'Reviewer', members: [] }] }));
     http.match(r => r.url.endsWith('/billing.json/runCost')).forEach(r => r.flush({ status: API_SUCCESS, data: { cost: 0, currency: 'USD' } }));
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
@@ -545,19 +545,19 @@ describe('Run page: a run waiting at an Approval step', () => {
     expect(location.path()).toBe('/pipelines/schedules/2977/runs/8298');
   });
 
-  it('names the group in the log and links the request to the reviewer\'s task', () => {
+  it('names the team in the log and links the request to the reviewer\'s task', () => {
     const { el, component, fixture } = waiting(null);
     component.setTab('log');
     fixture.detectChanges();
     const line = el.querySelector('.run-log-msg')!;
-    expect(line.textContent).toContain('waits for approval by the Reviewer group (request 1006)');
-    expect(line.textContent).not.toContain('group 1063');
+    expect(line.textContent).toContain('waits for approval by the Reviewer team (request 1006)');
+    expect(line.textContent).not.toContain('team 1063');
     expect(line.querySelector('a.log-ref')?.getAttribute('href')).toBe('/review/approvals?task=1136');
   });
 
-  it('names the group in the steps table too', () => {
+  it('names the team in the steps table too', () => {
     const { el } = waiting(null, 'admin');
-    expect(el.querySelector('[data-test="step-approval"]')?.textContent).toContain('Waiting for approval by the Reviewer group in Review');
+    expect(el.querySelector('[data-test="step-approval"]')?.textContent).toContain('Waiting for approval by the Reviewer team in Review');
   });
 
   it('walks the reviewer through Runs, and the administrator through Build › Pipelines', () => {

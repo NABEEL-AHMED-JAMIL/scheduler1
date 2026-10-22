@@ -31,7 +31,7 @@ const DETAIL = {
 function screenWith(detail: TaskDetail = DETAIL, tenantId: number | null = 2924, requestsTab = true) {
   const api = {
     mine: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [TASK] })),
-    groups: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [] })),
+    teams: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [] })),
     done: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [] })),
     requests: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [] })),
     task: vi.fn(() => of({ status: 'SUCCESS', message: '', data: detail })),
@@ -48,7 +48,7 @@ function screenWith(detail: TaskDetail = DETAIL, tenantId: number | null = 2924,
       provideRouter([]),
       { provide: WorkflowsApi, useValue: api },
       { provide: ToastService, useValue: toast },
-      { provide: TaskCountService, useValue: { refresh: vi.fn(), count: signal(1), overdue: signal(0), mine: signal(0), groups: signal(0), done: signal(0), requests: signal(0) } },
+      { provide: TaskCountService, useValue: { refresh: vi.fn(), count: signal(1), overdue: signal(0), mine: signal(0), teams: signal(0), done: signal(0), requests: signal(0) } },
       { provide: AuthService, useValue: { canOpen: () => true, canOpenTab: () => requestsTab, user: signal({ appUserId: 4537, tenantId }) } },
     ],
   });

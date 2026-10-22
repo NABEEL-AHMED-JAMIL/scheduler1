@@ -8,18 +8,21 @@ import { LoadError } from '../../shared/ui/load-error';
 import { EmptyState } from '../../shared/ui/empty-state';
 import { AuthService } from '../../core/auth/auth.service';
 import { ToastService } from '../../shared/ui/toast.service';
-import { AccessProfile, AccessProfilesService } from '../admin/access-profiles/access-profiles.service';
+import { Team, TeamsApi } from '../../core/teams/teams.api';
 import { ReportStudioApi, studioError } from './report-studio.api';
 import { Assignee, RetentionPreview, StudioSettings, size } from './report-studio.model';
 import { RsTimePipe } from './rs-time.pipe';
 import { PageLimitCard } from './page-limit-card';
 
-/** The settings' "who": automatic (worked out from the page gate), an access profile, the administrators, or everyone. */
-type WhoChoice = 'auto' | 'admins' | 'members' | `group:${number}`;
+/**
+ * The settings' "who": automatic (worked out from the page gate), a team (F4; its people must also hold the page the
+ * decision needs in Page access), the administrators, or everyone.
+ */
+type WhoChoice = 'auto' | 'admins' | 'members' | `team:${number}`;
 
 export function choiceOf(a: Assignee | null | undefined): WhoChoice {
   if (!a) return 'auto';
-  if (a.kind === 'group') return `group:${Number(a.value)}`;
+  if (a.kind === 'team') return `team:${Number(a.value)}`;
   if (a.kind === 'role') return a.value === 'TENANT_USER' ? 'members' : 'admins';
   return 'auto';
 }
@@ -28,7 +31,7 @@ export function assigneeOf(c: WhoChoice): Assignee | null {
   if (c === 'auto') return null;
   if (c === 'admins') return { kind: 'role', value: 'TENANT_ADMIN' };
   if (c === 'members') return { kind: 'role', value: 'TENANT_USER' };
-  return { kind: 'group', value: c.slice('group:'.length) };
+  return { kind: 'team', value: c.slice('team:'.length) };
 }
 
 /**
@@ -53,7 +56,7 @@ export function assigneeOf(c: WhoChoice): Assignee | null {
 })
 export class ReportSettings implements OnInit {
   private readonly api = inject(ReportStudioApi);
-  private readonly profilesApi = inject(AccessProfilesService);
+  private readonly teamsApi = inject(TeamsApi);
   private readonly toast = inject(ToastService);
   private readonly auth = inject(AuthService);
   /** ZT-R17: the settings are a workspace's own; a platform administrator is told so, not shown a refusal in red. */
@@ -62,7 +65,7 @@ export class ReportSettings implements OnInit {
   readonly loading = signal(true);
   readonly error = signal('');
   readonly settings = signal<StudioSettings | null>(null);
-  readonly profiles = signal<AccessProfile[]>([]);
+  readonly teams = signal<Team[]>([]);
   readonly reviewers = signal<WhoChoice>('auto');
   readonly publishers = signal<WhoChoice>('auto');
   readonly everyVersion = signal(false);
@@ -82,17 +85,8 @@ export class ReportSettings implements OnInit {
       || s.publishing.secondPerson !== this.secondPerson());
   });
 
-  /** The profiles that hold the page the decision needs, first; the others after, marked. */
-  readonly approverProfiles = computed(() => this.sorted('report-approve'));
-  readonly publisherProfiles = computed(() => this.sorted('report-publish'));
-
   ngOnInit(): void {
     this.load();
-  }
-
-  private sorted(key: string): (AccessProfile & { holds: boolean })[] {
-    return this.profiles().map(p => ({ ...p, holds: (p.pageKeys as string[]).includes(key) }))
-      .sort((a, b) => Number(b.holds) - Number(a.holds) || a.profileName.localeCompare(b.profileName));
   }
 
   load(): void {
@@ -106,7 +100,7 @@ export class ReportSettings implements OnInit {
       next: s => { this.apply(s); this.loading.set(false); },
       error: e => { this.loading.set(false); this.error.set(studioError(e, 'The settings could not be read.').message); },
     });
-    this.profilesApi.list().subscribe({ next: r => this.profiles.set(r?.data ?? []), error: () => this.profiles.set([]) });
+    this.teamsApi.list().subscribe({ next: r => this.teams.set(r?.data ?? []), error: () => this.teams.set([]) });
   }
 
   private apply(s: StudioSettings): void {
@@ -122,7 +116,7 @@ export class ReportSettings implements OnInit {
   whoWords(resolved: { assignee: Assignee; automatic: boolean; why: string } | undefined): string {
     if (!resolved) return '';
     const a = resolved.assignee;
-    const who = a.kind === 'group' ? `the access profile ${this.profiles().find(p => String(p.pageAccessProfileId) === a.value)?.profileName ?? '#' + a.value}`
+    const who = a.kind === 'team' ? `the ${this.teams().find(t => String(t.teamId) === a.value)?.name ?? '#' + a.value} team`
       : a.kind === 'role' ? (a.value === 'TENANT_ADMIN' ? 'the workspace administrators' : 'every member') : `user #${a.value}`;
     return `Now: ${who}. ${resolved.why}`;
   }

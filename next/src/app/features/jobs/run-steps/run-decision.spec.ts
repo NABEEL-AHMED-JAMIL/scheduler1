@@ -17,10 +17,11 @@ import { RunDecision } from './run-decision';
 const PENDING = (you: Record<string, unknown>) => ({ status: 'SUCCESS', message: '', data: {
   jobQueueId: 8209, jobId: 2907, reviewStatus: 'PENDING', required: ['internal'], decisions: [], you } });
 const TASK = { id: 1121, instanceId: 1115, stepKey: 'review', stepType: 'approval', name: "Review the run's results", state: 'Open',
-  requestTitle: 'Review run #8209', subjectId: 'pipeline-run:8209', list: 'groups' };
+  requestTitle: 'Review run #8209', subjectId: 'pipeline-run:8209', list: 'teams' };
 
 function box(opts: { review: unknown; tasks?: unknown[]; inbox?: boolean }) {
-  const get = vi.fn(() => of(opts.review));
+  const get = vi.fn((url: string) => url.includes('/appUser.json/teams/list')
+    ? of({ status: 'SUCCESS', message: '', data: [{ teamId: 1063, name: 'Reviewer', members: [] }] }) : of(opts.review));
   const post = vi.fn(() => of({ status: 'SUCCESS', message: 'The internal review is recorded: the run\'s results are APPROVED.' }));
   const api = {
     forSubject: vi.fn(() => of({ status: 'SUCCESS', message: '', data: opts.tasks ?? [] })),
@@ -93,11 +94,11 @@ describe('Run page: Next steps', () => {
     expect(el.querySelector('[data-test="who-decides"]')?.textContent).toContain('Task inbox');
   });
 
-  it('says who it waits on: the reviewer themselves, by their group\'s name', () => {
+  it('says who it waits on: the reviewer themselves, by their team\'s name', () => {
     const review = PENDING({ party: 'internal', canDecide: false, refusal: 'The pipeline\'s reviewers decide it in the Task inbox.' });
-    (review.data as Record<string, unknown>)['reviewers'] = { kind: 'group', value: '1063' };
+    (review.data as Record<string, unknown>)['reviewers'] = { kind: 'team', value: '1063' };
     const { el } = box({ review, tasks: [TASK] });
-    expect(el.querySelector('[data-test="waiting-on"]')?.textContent).toContain('you (the Reviewer group)');
+    expect(el.querySelector('[data-test="waiting-on"]')?.textContent).toContain('you (the Reviewer team)');
   });
 
   it('says the workspace administrators when the pipeline names no reviewers, and that an administrator decides here', () => {

@@ -100,7 +100,7 @@ export class RunApproval {
   readonly route = computed(() => approvalRoute(!!this.approvals.task(), this.approvals.canOpenInbox()));
   /** Who decides, by name; the reader first when they may. */
   readonly who = computed(() => {
-    const words = reviewersWords(this.approvals.waiting()?.approval.reviewers, this.approvals.groupNames());
+    const words = reviewersWords(this.approvals.waiting()?.approval.reviewers, this.approvals.teamNames());
     if (this.route() === 'decide') return `You (${words})`;
     return words.charAt(0).toUpperCase() + words.slice(1);
   });
