@@ -113,7 +113,7 @@ export function orderedColumns(columns: string[], kinds: string[]): string[] {
     .pac-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
     .pac-break { display: flex; flex-wrap: wrap; align-items: center; gap: 0.375rem; font-size: 0.8125rem; }
     .pac-break-label { color: var(--text-muted); margin-right: 0.125rem; }
-    .pac-chip { border: 1px solid var(--border-subtle); border-radius: 999px; padding: 0.125rem 0.625rem; background: var(--surface);
+    .pac-chip { border: 1px solid var(--border-subtle); border-radius: 999px; padding: 0.125rem 0.625rem; background: var(--surface-raised);
                 cursor: pointer; font-size: 0.8125rem; }
     .pac-chip:hover { background: var(--surface-sunken); }
     /* Selected as the console marks a selection (the open inbox row): the soft accent and its mark, never solid ink. */
@@ -126,7 +126,8 @@ export function orderedColumns(columns: string[], kinds: string[]): string[] {
     .pac-photo .pac-ph { display: flex; align-items: center; justify-content: center; font-size: 0.75rem; color: var(--text-muted); }
     .pac-photo figcaption { padding: 0.25rem 0.5rem; font-size: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .pac-table { max-height: 26rem; overflow: auto; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); }
-    .pac-table thead th { position: sticky; top: 0; z-index: 1; background: var(--surface); }
+    /* Solid, with its own rule: a sticky cell in a collapsed table leaves its border behind as rows scroll under it. */
+    .pac-table thead th { position: sticky; top: 0; z-index: 1; background: var(--surface-raised); box-shadow: inset 0 -1px 0 var(--border-subtle); }
     .pac-table td { white-space: nowrap; }
     .pac-photo.pac-odd { border-color: var(--color-warn-500); box-shadow: 0 0 0 1px var(--color-warn-500); }
     .pac-table tr.pac-odd td { background: var(--pill-warn-bg); }
