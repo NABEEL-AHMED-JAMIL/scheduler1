@@ -55,7 +55,7 @@ describe('a step design\'s test data picked from a run (ZT-R39)', () => {
   it('is kept with the design at once and the canvas reads the kept copy', () => {
     const { d, http, opened } = designer('STEP', runPick);
     d.openTestData();
-    expect(opened[0].step).toEqual({ key: 'generate_report', jobIds: [1097] });
+    expect(opened[0].step).toEqual({ key: 'generate_report', jobIds: [1097], keeps: true });
     const keep = http.expectOne(r => r.url === `${API_BASE}/reportTemplate.json/sample/save`);
     expect(keep.request.params.get('templateId')).toBe(ID);
     expect(keep.request.body).toEqual({ name: NAME, source: runPick.source });
@@ -64,6 +64,14 @@ describe('a step design\'s test data picked from a run (ZT-R39)', () => {
       data: { templateId: ID, samples: [frozen], versions: [] } });
     expect(d.testSource()).toEqual({ connector: 'SAMPLE', sampleId: frozen.sampleId });
     expect(d.t()!.samples.map(s => s.name)).toEqual([NAME]);
+  });
+
+  it('is kept too when the design is published with no draft open (a sample is not a change to the design)', () => {
+    const { d, http } = designer('STEP', runPick);
+    d.t.update(t => ({ ...t!, status: 'PUBLISHED', draft: null, currentPublishedVersion: 1 }) as unknown as TemplateDetail);
+    expect(d.editable()).toBe(false);
+    d.openTestData();
+    expect(http.match(r => r.url === `${API_BASE}/reportTemplate.json/sample/save`)).toHaveLength(1);
   });
 
   it('is not kept for a workspace template: the run\'s output stays a pointer, as before', () => {

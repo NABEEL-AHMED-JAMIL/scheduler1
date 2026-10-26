@@ -158,6 +158,11 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
   readonly canEditTemplates = computed(() => this.auth.canOpen('report-templates') && !this.auth.isPlatformAdmin());
   readonly canPublish = computed(() => this.auth.canOpen('report-publish') && !this.auth.isPlatformAdmin());
   readonly editable = computed(() => this.canEditTemplates() && !!this.t()?.draft && this.t()?.status !== 'ARCHIVED');
+  /**
+   * ZT-R39: a step design keeps the data picked from a run whether or not it has a draft open -- a kept sample is the
+   * design's test data, not a change to the design (media's sample/save asks for the template, not a draft).
+   */
+  readonly keepsStepData = computed(() => this.canEditTemplates() && this.t()?.ownerKind === 'STEP' && this.t()?.status !== 'ARCHIVED');
   /** Phase 6: an AI proposal shown on the page (the draft with its patch), or null; editing puts the draft back. */
   readonly previewDef = signal<TemplateDefinition | null>(null);
   readonly previewIds = signal<string[]>([]);
@@ -967,13 +972,13 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
     const stepDesign = t.ownerKind === 'STEP';
     this.dialog.open<TestDataChoice, TestDataData>(TestDataPanel, sidePanelConfig<TestDataData>({
       templateId: t.templateId, samples: t.samples, rootPath: this.testRoot(), canKeep: this.editable(),
-      step: stepDesign ? { key: this.stepParam() || stepKeyOf(t.ownerRef), jobIds: jobIdsOf(this.jobsParam()) } : null,
+      step: stepDesign ? { key: this.stepParam() || stepKeyOf(t.ownerRef), jobIds: jobIdsOf(this.jobsParam()), keeps: this.keepsStepData() } : null,
     }, 'wide', 'right')).closed.subscribe(choice => {
       if (!choice) return;
       if (choice.kept) this.refreshSamples();
       // ZT-R39: a step design's data picked from a run is kept with the design at once -- media freezes a capped, masked copy --
       // so it is still there once the run's data expires (a day for some jobs).
-      if (stepDesign && this.editable() && choice.source?.connector === 'RUN_OUTPUT' && !choice.kept) {
+      if (stepDesign && this.keepsStepData() && choice.source?.connector === 'RUN_OUTPUT' && !choice.kept) {
         this.keepWithDesign(t.templateId, choice.source, choice.rootPath);
         return;
       }

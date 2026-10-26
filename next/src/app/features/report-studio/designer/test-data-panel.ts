@@ -15,7 +15,7 @@ export interface TestDataData {
   /** Whether the reader may keep the data with the template (an editable draft). */
   canKeep: boolean;
   /** ZT-R39: a pipeline step's own design -- its step and its pipeline's schedules: the step's input rows are offered. */
-  step?: { key: string; jobIds: number[] } | null;
+  step?: { key: string; jobIds: number[]; keeps?: boolean } | null;
 }
 
 /** The data the canvas is drawn with, as the panel hands it back. */
@@ -34,7 +34,7 @@ export interface TestDataChoice { source: SourceRef | null; rootPath: string; ke
       <div class="flex flex-col gap-4">
         <app-report-source-picker [samples]="data.samples" [(source)]="source" [(mode)]="mode"
                                   [stepKey]="data.step?.key ?? null" [stepJobs]="data.step?.jobIds ?? []" />
-        @if (data.step && data.canKeep && source()?.connector === 'RUN_OUTPUT') {
+        @if (data.step?.keeps && source()?.connector === 'RUN_OUTPUT') {
           <p class="field-note text-[color:var(--text-muted)]" data-kept-with-design>
             Kept with the step's design when you fill the canvas: a frozen copy (the first 500 rows, sensitive columns masked), so it
             stays when the run's data expires.
