@@ -47,6 +47,8 @@ type DragData = { add: PaletteEntry } | { move: string };
 const UNDO_DEPTH = 100;
 /** A draft saves this long after the last change. */
 const AUTOSAVE_MS = 5000;
+/** The test data's own refusals (media's ErrorCode): it is not there, not the reader's, or not data. Not "unavailable": that passes. */
+const LOST_DATA = ['DATA_SOURCE_NOT_FOUND', 'DATA_SOURCE_ACCESS_DENIED', 'DATA_UNREADABLE'];
 /** The canvas draws again this long after a change. */
 const DRAW_MS = 300;
 
@@ -124,6 +126,12 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
   readonly testRoot = signal('$');
   readonly testLabel = signal('');
   readonly inspect = signal<InspectResult | null>(null);
+  /**
+   * ZT-R37: the test data that can no longer be read -- a kept sample of a run whose output is past its keep date (the
+   * run's retention removes it), a file gone, another's: said once, and the page drawn without it, its fields showing.
+   * The canvas used to wait forever under the error, and the AI was sent nothing.
+   */
+  readonly testDataLost = signal('');
   /** The toolbar's test-data chip: what is chosen and its records, or the offer to add some (ZT-R2: shown whole on hover). */
   readonly testChipText = computed(() => testChipWords(!!this.testSource(), this.testLabel(), this.records()));
   readonly zoom = signal(0.75);
@@ -756,6 +764,7 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
         if (seq !== this.drawSeq) return;
         this.drawing.set(false);
         const err = studioError(e, 'The page could not be drawn.');
+        if (body['source'] && LOST_DATA.includes(err.code)) { this.loseTestData(err.message); return; }
         this.drawError.set(err.message);
         if (err.problems.length) this.problems.set(err.problems);
       },
@@ -958,6 +967,7 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
       if (!choice) return;
       if (choice.kept) this.refreshSamples();
       this.testSource.set(choice.source);
+      this.testDataLost.set('');
       this.testRoot.set(choice.rootPath);
       this.testLabel.set('');
       this.inspectTestData();
@@ -978,8 +988,27 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
     if (!source) { this.inspect.set(null); return; }
     this.api.inspect(source, this.testRoot()).subscribe({
       next: r => { this.inspect.set(r); if (r.label) this.testLabel.set(r.label); },
-      error: e => { this.inspect.set(null); this.drawError.set(studioError(e, 'The test data could not be read.').message); },
+      error: e => {
+        this.inspect.set(null);
+        const err = studioError(e, 'The test data could not be read.');
+        if (LOST_DATA.includes(err.code)) { this.loseTestData(err.message); return; }
+        this.drawError.set(err.message);
+      },
     });
+  }
+
+  /** ZT-R37: test data that cannot be read any more is dropped, said plainly, and the page drawn without it. */
+  private loseTestData(why: string): void {
+    if (!this.testSource()) return;
+    const label = this.testLabel() || 'The test data';
+    this.testDataLost.set(`${label} could not be read: ${why} The page is drawn without it, its fields showing: pick other test data `
+      + '(Test data, in the toolbar).');
+    this.testSource.set(null);
+    this.testLabel.set('');
+    this.inspect.set(null);
+    this.records.set(0);
+    this.drawError.set('');
+    this.draw(true);
   }
 
   /** The Data tab: a field clicked binds the selected block to it, or goes into its text as a placeholder. */

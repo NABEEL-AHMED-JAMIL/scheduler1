@@ -211,6 +211,9 @@
       </aside>
 
       <section class="rsd-canvas" cdkDropListGroup aria-label="Page canvas">
+        @if (testDataLost()) {
+          <div class="rs-banner rs-banner-warn rsd-canvas-note" role="status" data-test-data-lost><app-icon name="alert" class="shrink-0" /><span class="text-sm">{{ testDataLost() }}</span></div>
+        }
         @if (drawError()) {
           <div class="rs-banner rs-banner-crit rsd-canvas-note" role="alert"><app-icon name="alert" class="icon-crit shrink-0" /><span class="text-sm">{{ drawError() }}</span></div>
         }
