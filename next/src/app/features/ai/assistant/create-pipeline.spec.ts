@@ -123,6 +123,35 @@ describe('the Create pipeline dialog', () => {
     return { fixture, el: fixture.nativeElement as HTMLElement, posted };
   }
 
+  it('ZT-AI18: steps Core refuses create nothing -- no empty pipeline is left behind', async () => {
+    const posted: string[] = [];
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [CreatePipeline],
+      providers: [provideZonelessChangeDetection(), provideRouter([]),
+        { provide: DIALOG_DATA, useValue: { flow: flow({ type: 'manual' }), definition: flow({ type: 'manual' }).definition } },
+        { provide: DialogRef, useValue: { close: vi.fn() } },
+        { provide: AuthService, useValue: { user: signal({ appUserId: 1040, tenantId: 1013 }) } },
+        { provide: ConversationApi, useValue: { pipelineCreated: vi.fn(() => of({ status: 'SUCCESS' })) } },
+        { provide: HttpClient, useValue: {
+          get: () => of({ status: 'SUCCESS', data: [{ sourceTaskTypeId: 1, serviceName: 'Pipelines' }] }),
+          post: (url: string) => {
+            posted.push(url.replace(/^.*\/api\/v1/, ''));
+            return of(url.endsWith('/steps/validate')
+              ? { status: 'ERROR', message: 'Not valid.', data: { problems: [{ path: 'steps[0].config.maxRows', message: 'at most 50000' }] } }
+              : { status: 'SUCCESS', message: 'Saved.' });
+          } } }],
+    });
+    const fixture = TestBed.createComponent(CreatePipeline);
+    fixture.detectChanges();
+    await fixture.componentInstance.create();
+    expect(posted).toEqual(['/pipeline.json/steps/validate']);
+    const check = fixture.componentInstance.steps().find(s => s.label === 'Check');
+    expect(check?.state).toBe('failed');
+    expect(check?.note).toContain('steps[0].config.maxRows: at most 50000');
+    expect(fixture.componentInstance.created()).toBeNull();
+  });
+
   it('ZT-AI: a flow a form starts links the form to its schedule, keeping the form as it is', async () => {
     const fields = [{ key: 'consent', label: 'Consent', type: 'yesNo' }];
     const { fixture, el, posted } = created({ type: 'form', formId: 1021 },

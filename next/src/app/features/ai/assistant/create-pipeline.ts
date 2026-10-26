@@ -38,7 +38,7 @@ export interface Topic { sourceTaskTypeId: number; serviceName: string; status?:
 
 type StepState = 'todo' | 'doing' | 'done' | 'failed';
 
-export const CREATE_STEPS = ['Pipeline', 'Steps', 'Pipeline task', 'Schedule', 'Trigger'] as const;
+export const CREATE_STEPS = ['Check', 'Pipeline', 'Steps', 'Pipeline task', 'Schedule', 'Trigger'] as const;
 
 /** The triggers made after the schedule: an inbox, a document type, a form (ZT-AI), an event route (ZT-AI). */
 export const TRIGGERED: readonly string[] = ['inbox', 'document', 'form', 'event'];
@@ -266,6 +266,12 @@ export class CreatePipeline implements OnInit {
     const pid = this.pipelineId();
     const topic = this.topicId()!;
     try {
+      // 0. ZT-AI18: Core checks the steps first (pipeline.json/steps/validate saves nothing). A flow Core refuses creates nothing --
+      // before, the pipeline was saved and its steps then refused, leaving an empty pipeline behind.
+      await this.step('Check', async () => {
+        await this.post('/pipeline.json/steps/validate', { format: 'json', text: JSON.stringify(this.data.definition) });
+        return `Core accepts the ${this.data.definition.steps.length} steps.`;
+      });
       // 1. The pipeline: refused when the id is taken (the person picks another).
       await this.step('Pipeline', async () => {
         const saved = await this.post('/pipeline.json/save', { pipelineId: pid, pipelineName: name, sourceTaskTypeId: topic, status: 'Active',
