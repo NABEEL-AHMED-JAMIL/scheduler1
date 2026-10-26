@@ -118,4 +118,9 @@ describe('Grant pages and tabs', () => {
     expect(actionLabel('DELEGATION_REVOKED')).toBe('Ended a delegation');
     expect(actionLabel('PROFILE_ASSIGNED')).toBe('Moved to a profile');
   });
+
+  it('names the two-factor rule changes in the change log (MIG-424)', () => {
+    expect(actionLabel('PROFILE_TWO_FACTOR')).toBe('Changed a profile\'s two-factor rule');
+    expect(actionLabel('WORKSPACE_TWO_FACTOR')).toBe('Changed the workspace\'s two-factor rule');
+  });
 });

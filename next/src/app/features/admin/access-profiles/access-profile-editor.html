@@ -56,7 +56,7 @@
             People on this profile set up an authenticator app at their next sign-in, and cannot switch it off.
             @if (profile(); as p) {
               @if (p.mfaEnrolledCount != null) {
-                {{ p.mfaEnrolledCount }} of its {{ p.mfaEnrolledCount + (p.mfaNotEnrolledCount ?? 0) }} people have it on@if (p.mfaNotEnrolledCount) {;
+                {{ p.mfaEnrolledCount }} of the {{ p.mfaEnrolledCount + (p.mfaNotEnrolledCount ?? 0) }} {{ p.mfaEnrolledCount + (p.mfaNotEnrolledCount ?? 0) === 1 ? 'person' : 'people' }} on it {{ p.mfaEnrolledCount === 1 ? 'has' : 'have' }} it on@if (p.mfaNotEnrolledCount) {;
                 not yet: {{ (p.mfaNotEnrolledNames ?? []).slice(0, 5).join(', ') }}@if ((p.mfaNotEnrolledNames ?? []).length > 5) { and {{ (p.mfaNotEnrolledNames ?? []).length - 5 }} more }}.
               }
             }

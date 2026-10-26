@@ -19,6 +19,9 @@ export function actionLabel(action: string): string {
     case 'EXCEPTIONS_CLEARED': return 'Back to their profile';
     case 'DELEGATION_GRANTED': return 'Delegated access';
     case 'DELEGATION_REVOKED': return 'Ended a delegation';
+    // MIG-424: two-factor required (or not) of a profile's people, or of the whole workspace.
+    case 'PROFILE_TWO_FACTOR': return 'Changed a profile\'s two-factor rule';
+    case 'WORKSPACE_TWO_FACTOR': return 'Changed the workspace\'s two-factor rule';
     default: return action;
   }
 }
