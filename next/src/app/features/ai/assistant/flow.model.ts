@@ -30,8 +30,13 @@ export interface FlowNodeSpec {
   problems?: FlowProblem[];
 }
 
-/** What starts a designed pipeline's runs; document (ZT-I1): an approved document of the type, as a job's document trigger (MIG-364). */
-export interface FlowTrigger { type: 'manual' | 'schedule' | 'inbox' | 'document' | string; every?: string | null; at?: string | null; documentTypeId?: number | null; }
+/**
+ * What starts a designed pipeline's runs; document (ZT-I1): an approved document of the type, as a job's document trigger
+ * (MIG-364); form (ZT-AI): a form's submission (the form links the job); event (ZT-AI): an event posted to the API, through an
+ * event route to the job.
+ */
+export interface FlowTrigger { type: 'manual' | 'schedule' | 'inbox' | 'document' | 'form' | 'event' | string; every?: string | null; at?: string | null;
+  documentTypeId?: number | null; formId?: number | null; eventType?: string | null; }
 
 export interface FlowDefinitionStep {
   key: string;
@@ -110,6 +115,8 @@ export function triggerWhen(t: FlowTrigger, startDate: string): string {
   }
   if (t.type === 'inbox') return 'It runs when a file lands in its inbox.';
   if (t.type === 'document') return 'It runs when a document of its type is approved, once per document.';
+  if (t.type === 'form') return 'It runs each time its form is submitted, once per submission.';
+  if (t.type === 'event') return 'It runs each time an event of its type is posted to the API, once per event.';
   return 'Nothing runs until you press Run now.';
 }
 

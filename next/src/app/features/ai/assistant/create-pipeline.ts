@@ -40,6 +40,13 @@ type StepState = 'todo' | 'doing' | 'done' | 'failed';
 
 export const CREATE_STEPS = ['Pipeline', 'Steps', 'Pipeline task', 'Schedule', 'Trigger'] as const;
 
+/** The triggers made after the schedule: an inbox, a document type, a form (ZT-AI), an event route (ZT-AI). */
+export const TRIGGERED: readonly string[] = ['inbox', 'document', 'form', 'event'];
+
+/** A form as Core's form.json/fetch answers it to an administrator: what saving it again with the job keeps. */
+interface FormView { formId: number; name: string; description?: string | null; status: string; fields?: unknown[]; workflowKey?: string | null;
+  jobId?: number | null; jobName?: string | null; }
+
 /**
  * Core asks every pipeline for at least one field (what its task form collects): a designed pipeline gets one optional
  * note, which its steps never need -- they read their own source.
@@ -192,6 +199,8 @@ export class CreatePipeline implements OnInit {
     if (t.type === 'schedule') return `On a schedule: every ${t.every ?? 'day'}${t.at ? ' at ' + t.at : ''} (America/Chicago).`;
     if (t.type === 'inbox') return 'When a file lands in the pipeline\'s inbox (an inbox trigger on its schedule).';
     if (t.type === 'document') return `When a document of type ${t.documentTypeId ?? '?'} is approved (a document trigger on its schedule), once per document.`;
+    if (t.type === 'form') return `When form ${t.formId ?? '?'} is submitted (the form is linked to this pipeline's schedule), once per submission.`;
+    if (t.type === 'event') return `When a ${t.eventType || '?'} event is posted to the API (an event route to this pipeline's schedule), once per event.`;
     return 'On demand: Run now, or the API.';
   });
 
@@ -251,7 +260,7 @@ export class CreatePipeline implements OnInit {
     if (!this.canCreate() || this.busy() || this.created() || this.data.update) return;
     this.busy.set(true);
     const trigger = this.trigger();
-    const labels = CREATE_STEPS.filter(l => l !== 'Trigger' || trigger.type === 'inbox' || trigger.type === 'document');
+    const labels = CREATE_STEPS.filter(l => l !== 'Trigger' || TRIGGERED.includes(trigger.type));
     this.steps.set(labels.map(label => ({ label, state: 'todo' as StepState })));
     const name = this.name().trim();
     const pid = this.pipelineId();
@@ -298,6 +307,26 @@ export class CreatePipeline implements OnInit {
           if (!trigger.documentTypeId) throw new Error('The design names no document type; set it on the schedule under When it runs.');
           const r = await this.post('/sourceJob.json/documentTrigger/save', { jobId, documentTypeId: trigger.documentTypeId, enabled: true });
           return r.message || 'An approved document of the type starts a run.';
+        });
+      } else if (trigger.type === 'form') {
+        // ZT-AI: the form names the job it starts. A form that starts another job keeps it: never taken from that job here.
+        await this.step('Trigger', async () => {
+          if (!trigger.formId) throw new Error('The design names no form; link one to this pipeline in Forms.');
+          const form = (await this.get(`/form.json/fetch?formId=${trigger.formId}`)) as FormView;
+          if (form.jobId != null) {
+            throw new Error(`The form "${form.name}" already starts "${form.jobName ?? 'job ' + form.jobId}", so it was left with it: link it to this `
+              + 'pipeline in Forms if this one should start instead.');
+          }
+          await this.post('/form.json/save', { formId: form.formId, name: form.name, description: form.description ?? null, status: form.status,
+            fields: form.fields ?? [], workflowKey: form.workflowKey ?? null, jobId });
+          return `Each submission of "${form.name}" starts a run.`;
+        });
+      } else if (trigger.type === 'event') {
+        // ZT-AI: an event route from the event type to this pipeline (the customer API's POST /v1/events).
+        await this.step('Trigger', async () => {
+          if (!trigger.eventType) throw new Error('The design names no event type; add an event route under Developers.');
+          const r = await this.post('/eventRoute.json/save', { eventType: trigger.eventType, targetKind: 'PIPELINE', jobId, active: true });
+          return r.message ? `${r.message} A ${trigger.eventType} event starts a run.` : `A ${trigger.eventType} event starts a run.`;
         });
       }
       this.created.set({ pipelineId: pid, pipelineKey, taskDetailId, jobId, jobName: name, version });
@@ -349,6 +378,18 @@ export class CreatePipeline implements OnInit {
       throw new Error(problems?.length ? problems.slice(0, 3).map(p => [p.path, p.message].filter(Boolean).join(': ')).join('; ') : r.message || 'Refused.');
     }
     return r;
+  }
+
+  private async get(path: string): Promise<unknown> {
+    let r: ApiResponse;
+    try {
+      r = await firstValueFrom(this.http.get<ApiResponse>(`${API_BASE}${path}`));
+    } catch (err: unknown) {
+      const e = err as { error?: { message?: string }; status?: number };
+      throw new Error(e?.error?.message || `The platform answered HTTP ${e?.status ?? '?'}.`);
+    }
+    if (r.status !== API_SUCCESS) throw new Error(r.message || 'Refused.');
+    return r.data;
   }
 
   private async pipelineKeyOf(pid: string): Promise<number> {
