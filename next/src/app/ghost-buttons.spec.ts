@@ -1,7 +1,7 @@
 /**
  * ZT-U (owner 2026-10-26, "buttons need colour so we can tell a button from a chip"): btn-ghost is for dismissal and
  * dense icons only, as the house rule in styles.css says (btn-ghost: Cancel, Close, Clear, Reset, and icon-only
- * controls in dense rows and toolbars). The rule was not enforced, and 246 real actions -- Void on a report, Try
+ * controls in dense rows and toolbars). The rule was not enforced, and 242 real actions -- Void on a report, Try
  * again, Back to list, Refresh, Download, the pagination -- sat as plain text beside the status pills.
  *
  * A scan of the sources like button-names.spec.ts: every .html template and every inline `template:` under src/app.

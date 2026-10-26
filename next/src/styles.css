@@ -565,7 +565,7 @@
    *
    * An audit found 59.7% of 186 buttons were ghost, including Refresh and Copy in page
    * headers, which is why so little on screen read as pressable. ZT-U (owner 2026-10-26, "buttons
-   * need colour so we can tell a button from a chip"): 246 more ghosts on real actions became
+   * need colour so we can tell a button from a chip"): 242 more ghosts on real actions became
    * btn-default; ghost-buttons.spec.ts now fails a ghost with any other label.
    */
   .btn-primary {

@@ -80,7 +80,7 @@
             </span>
 
             @if (!item.read) {
-              <button type="button" class="btn btn-default btn-icon btn-sm btn-intent-ok max-sm:gap-1"
+              <button type="button" class="btn btn-ghost btn-icon btn-sm btn-intent-ok max-sm:gap-1"
                       title="Mark as read" aria-label="Mark as read"
                       [disabled]="isMarking(item)"
                       (click)="markRead(item)">

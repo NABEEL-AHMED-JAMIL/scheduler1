@@ -107,7 +107,7 @@ let seq = 0;
         <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Fit to view" title="Fit to view (0)" data-act="fit" (click)="fit()">
           <app-icon name="maximize" />
         </button>
-        <button type="button" class="btn btn-default btn-icon btn-sm fg-reset" aria-label="Reset zoom to 100%" title="Reset zoom to 100%" data-act="reset" (click)="resetZoom()">1:1</button>
+        <button type="button" class="btn btn-ghost btn-icon btn-sm fg-reset" aria-label="Reset zoom to 100%" title="Reset zoom to 100%" data-act="reset" (click)="resetZoom()">1:1</button>
         @if (canFullscreen) {
           <button type="button" class="btn btn-ghost btn-icon btn-sm" data-act="fullscreen" (click)="toggleFullscreen()"
                   [attr.aria-label]="fullscreen() ? 'Exit full screen' : 'Full screen'" [attr.title]="fullscreen() ? 'Exit full screen' : 'Full screen'"

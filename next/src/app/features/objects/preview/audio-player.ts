@@ -42,7 +42,7 @@ import { Icon } from '../../../shared/ui/icon';
           {{ clock(duration()) }}
         </span>
 
-        <button type="button" class="btn btn-default btn-icon btn-sm" (click)="cycleRate()"
+        <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="cycleRate()"
                 [title]="'Playback speed — ' + rate() + 'x'" [attr.aria-label]="'Playback speed ' + rate() + 'x'">
           <span class="text-xs tabular font-medium">{{ rate() }}x</span>
         </button>
