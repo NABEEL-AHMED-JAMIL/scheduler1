@@ -373,6 +373,7 @@ export class Docs implements AfterViewInit {
         'Add each person with their name, email and role: Workspace member or Workspace administrator.',
         'Make page-access profiles for the work people do — for example a Reviewer who opens Review and the Runs, and a Viewer who reads Dashboards only — and give each member one.',
         'Set the workspace\'s sign-in rules: password length, lockout, idle sign-out, two-factor and single sign-on.',
+        'To require two-factor sign-in of some people only (clinicians, say), turn on Require two-factor sign-in on their access profile: they set up an authenticator app at their next sign-in. The profile and the people list show who has it on and who not yet.',
       ],
       notes: [
         'Give the workspace at least two administrators, so nobody is locked out when one is away.',
@@ -437,6 +438,10 @@ export class Docs implements AfterViewInit {
           + 'row — one per recording — each its own report in Reports › Library, named from the row, as in Call · {{file_name}}.',
         'In the pipeline\'s Settings, choose whether its results wait for a review, and whether that review may be decided in bulk or only one by one.',
         'For a sign-off in the middle of a run, add an Approval step and say who approves it in Approval workflows.',
+        'To use another pipeline\'s answer, add a Run pipeline step: it calls that pipeline with parameters (once, or once per row) '
+          + 'and takes its answer as rows. A chain of calls is at most three deep, and each call is a run of its own, billed as any run.',
+        'In an approval workflow, a Run pipeline step can pass the request\'s values as the pipeline\'s parameters, wait for the run, '
+          + 'and keep fields of its answer (registration.eligible, careplan.risk) for later conditions and assignees; the request\'s history shows them.',
       ],
       notes: [
         'Data policies (Administration › Data policies) decide which models may see each level of data and how long a run keeps it.',
@@ -629,6 +634,7 @@ export class Docs implements AfterViewInit {
         'API Clients: a workspace administrator makes one client for each system, with only the scopes it needs. Its secret is shown once. Webhooks and event routes are set up on the same page.',
         'Sandbox: once your account team has made one, make test keys under API Clients › Sandbox. They work only in the sandbox, and nothing there is billed.',
         'Developer portal: guides with samples in curl, Python and Node.js, the API reference, the event and problem types, the rate limits, the changelog, and the OpenAPI document and a Postman collection to download.',
+        'A pipeline that answers in seconds can be run and waited for: POST /v1/pipelines/{id}/runs?wait=30s answers its result in the same call (Run and wait in the portal).',
         'Your API clients, in the portal, shows what each client may call; APIs this workspace calls lists the saved requests your pipelines send out, and what each last answered.',
       ],
       notes: [

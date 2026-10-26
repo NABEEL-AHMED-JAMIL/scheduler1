@@ -342,7 +342,8 @@
                             <p class="field-note text-[color:var(--text-muted)]">From the request by name (<span class="mono">{{ '{{' }}subject.mrn{{ '}}' }}</span>)
                               or an earlier step's kept value (<span class="mono">{{ '{{' }}registration.patient_id{{ '}}' }}</span>). Empty: the pipeline's default.</p>
                           } @else {
-                            <p class="field-note text-[color:var(--text-muted)]">{{ selectedPipeline() ? 'This pipeline declares no parameters.' : 'Reading the pipeline…' }}</p>
+                            <p class="field-note text-[color:var(--text-muted)]" data-test="wf-run-parameters-note">{{ selectedPipeline() ? 'This pipeline declares no parameters.'
+                              : pipelineMissing() ? 'This pipeline could not be read: its parameters are checked when you publish.' : 'Reading the pipeline…' }}</p>
                           }
                         </div>
                       }

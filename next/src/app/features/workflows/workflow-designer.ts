@@ -241,14 +241,20 @@ export class WorkflowDesigner implements OnInit {
   readonly resultTakes = RESULT_TAKES;
 
   /** A pipeline's declared parameters and output fields by job (Core's sourceJob.json/outputFields); null while read or unread. */
-  readonly pipelineFields = signal<Record<number, PipelineFields | 'missing'>>({});
+  readonly pipelineFields = signal<Record<number, PipelineFields | 'loading' | 'missing'>>({});
+
+  /** The selected step's pipeline could not be read: not one of this workspace's, or Core did not answer. */
+  readonly pipelineMissing = computed(() => {
+    const s = this.step();
+    return !!s && s.type === 'run_pipeline' && s.jobId != null && this.pipelineFields()[s.jobId] === 'missing';
+  });
 
   /** The selected Run pipeline step's pipeline, once read; null before (or for another step). */
   readonly selectedPipeline = computed<PipelineFields | null>(() => {
     const s = this.step();
     if (!s || s.type !== 'run_pipeline' || s.jobId == null) return null;
     const found = this.pipelineFields()[s.jobId];
-    return found && found !== 'missing' ? found : null;
+    return found && found !== 'missing' && found !== 'loading' ? found : null;
   });
 
   /** The parameters the selected step maps, declared or not: each with what the pipeline says of it. */
@@ -356,13 +362,13 @@ export class WorkflowDesigner implements OnInit {
     this.touch();
   }
 
-  /** Reads a pipeline's parameters and output fields once (a job of another workspace, or none: "missing"). */
+  /** Reads a pipeline's parameters and output fields once ("loading" meanwhile; another workspace's job, or none: "missing"). */
   loadPipelineFields(jobId: number): void {
     if (jobId in this.pipelineFields()) return;
-    this.pipelineFields.update(m => ({ ...m, [jobId]: 'missing' }));
+    this.pipelineFields.update(m => ({ ...m, [jobId]: 'loading' }));
     this.http.get<ApiResponse<PipelineFields>>(`${API_BASE}/sourceJob.json/outputFields`, { params: { jobId } }).subscribe({
-      next: r => { if (r.status === API_SUCCESS && r.data) this.pipelineFields.update(m => ({ ...m, [jobId]: r.data! })); },
-      error: () => {},
+      next: r => this.pipelineFields.update(m => ({ ...m, [jobId]: r.status === API_SUCCESS && r.data ? r.data : 'missing' })),
+      error: () => this.pipelineFields.update(m => ({ ...m, [jobId]: 'missing' })),
     });
   }
 

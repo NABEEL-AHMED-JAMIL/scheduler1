@@ -136,4 +136,15 @@ describe('Workflow designer -- a Run pipeline step\'s parameters and results (MI
     fixture.detectChanges();
     expect(http.match(r => r.url.endsWith('/sourceJob.json/outputFields'))).toHaveLength(0);
   });
+
+  it('says when a pipeline cannot be read -- another workspace\'s, or none -- rather than reading it for ever', () => {
+    const { fixture, http, s, el } = screen();
+    s.pick(0);
+    fixture.detectChanges();
+    http.expectOne(r => r.url.endsWith('/sourceJob.json/outputFields')).flush({ status: 'ERROR', message: 'SourceJob not found with jobId.' },
+      { status: 404, statusText: 'Not Found' });
+    fixture.detectChanges();
+    expect(s.pipelineMissing()).toBe(true);
+    expect(el.querySelector('[data-test="wf-run-parameters-note"]')!.textContent).toContain('could not be read');
+  });
 });
