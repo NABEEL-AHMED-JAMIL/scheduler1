@@ -125,6 +125,11 @@ describe('Report Studio screens (zero-tolerance)', () => {
     expect(await here('library.html')).toContain('<td class="text-xs whitespace-nowrap">@if (j.resultVersion) { v{{ j.resultVersion }}');
   });
 
+  it('ZT-R37: the lost-test-data warning lays out as the designer\'s other banners: the icon beside its text', async () => {
+    const html = await here('designer/designer.html');
+    expect(html).toContain('data-test-data-lost><app-icon name="alert" class="shrink-0" /><span class="min-w-0 flex-1 text-sm">');
+  });
+
   it('ZT-R33: the AI assistant\'s proposal card wraps a long field path in its notes and changes, not past the panel', async () => {
     const css = await here('designer/ai-panel.css');
     const card = css.slice(css.indexOf('.rsa-card {'), css.indexOf('}', css.indexOf('.rsa-card {')));
