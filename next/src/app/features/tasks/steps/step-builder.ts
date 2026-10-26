@@ -413,7 +413,9 @@ export class StepBuilder implements OnInit {
       documentTypes: this.documentTypeChoices() ?? [],
       apiRequests: this.apiRequestChoices() ?? [],
       sampleRows: sampleRowsOf(this.draft()),
-      pipeline: { key: this.view().stored ? this.view().pipelineKey : null, name: this.pipelineName(), jobIds: this.jobIds() },
+      // ZT-R40: the pipeline exists from its first screen (New pipeline makes it), so a report step is designed before its
+      // first save -- a save refuses a report step with no design, and "Save the pipeline first" left no way out.
+      pipeline: { key: this.view().pipelineKey ?? null, name: this.pipelineName(), jobIds: this.jobIds() },
     };
     // Focus goes back to the step's own card, not to whatever opened the panel: from Add step that was the box, whose
     // list then opened over the cards.
@@ -613,9 +615,7 @@ export class StepBuilder implements OnInit {
     this.api.save(pipelineKey, format, text).subscribe({
       next: r => {
         if (r.status !== API_SUCCESS) {
-          this.busy.set('');
-          this.took(r, false);
-          this.toast.error(r.message || 'The steps could not be saved.');
+          this.notSaved(r);
           then(false);
           return;
         }
@@ -638,12 +638,21 @@ export class StepBuilder implements OnInit {
           error: () => { this.busy.set(''); this.say('warn', `${r.message || 'Saved.'} Reading it back failed: open the page again.`); then(true); },
         });
       },
+      // ZT-R40: Core refuses a save that saves nothing with a 4xx in the envelope (422 with the problems at their paths).
       error: err => {
-        this.busy.set('');
-        this.toast.error(err?.error?.message || 'The steps could not be saved.');
+        this.notSaved(err?.error && typeof err.error === 'object' ? err.error as ApiResponse<ValidateResult> : null);
         then(false);
       },
     });
+  }
+
+  /** A refused save: each problem shown on its step, and the answer's own words ("Not saved: step 'report' ..."). */
+  private notSaved(r: ApiResponse<ValidateResult> | null): void {
+    this.busy.set('');
+    this.problems.set(r?.data?.problems ?? []);
+    const message = r?.message || 'The steps could not be saved.';
+    this.say('crit', message);
+    this.toast.error(message);
   }
 
   discard(): void {

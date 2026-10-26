@@ -91,6 +91,9 @@ export interface ReportDesignSettings { design: 'STEP' | 'TEMPLATE'; templateId?
             </select></label>
         }
       }
+      @if (problem() && !(mode() === 'STEP' ? design() : templateId())) {
+        <p class="step-notice step-notice-crit text-sm" role="alert" data-design-problem>{{ problem() }}</p>
+      }
       @if (error()) { <p class="text-sm text-crit-500" role="alert">{{ error() }}</p> }
     </div>
   `,
@@ -112,6 +115,8 @@ export class ReportStepDesign implements OnInit {
   /** The pipeline's schedules: their latest run is the step's data. */
   readonly jobIds = input<number[]>([]);
   readonly disabled = input(false);
+  /** ZT-R40: the server's problem with the design settings (a report step with no design yet), shown here until one is picked. */
+  readonly problem = input('');
   /** The design settings changed (merged into the step's settings by the panel). */
   readonly changed = output<ReportDesignSettings>();
 
@@ -203,7 +208,9 @@ export class ReportStepDesign implements OnInit {
     const d = this.design() ?? (this.templateId() ? { templateId: this.templateId()! } : null);
     if (!d) return;
     const back = typeof location === 'undefined' ? '' : location.pathname + location.search;
-    window.open(`/reports/templates/${encodeURIComponent(d.templateId)}/design?step=${encodeURIComponent(this.stepKey())}`
+    // ZT-R39: the pipeline's schedules go with it, so the designer's Test data offers this step's input rows from recent runs.
+    const jobs = this.jobIds().length ? `&jobs=${this.jobIds().join(',')}` : '';
+    window.open(`/reports/templates/${encodeURIComponent(d.templateId)}/design?step=${encodeURIComponent(this.stepKey())}${jobs}`
       + `&back=${encodeURIComponent(back)}`, '_blank', 'noopener');
   }
 

@@ -95,6 +95,8 @@ export class StepPanel {
     return validKey(this.edit().key) ? '' : 'Lower case letters, digits and _, starting with a letter.';
   });
   readonly configProblems = computed(() => problemsAt(this.data.problems, 'config'));
+  /** ZT-R40: a report step's design settings are its design editor's, not the form's: their problems are shown there. */
+  readonly designProblems = computed(() => REPORT_DESIGN_KEYS.flatMap(k => problemsAt(this.data.problems, `config.${k}`)).join(' · '));
   /** The config's problems re-pathed for the form, which sits at the config itself. */
   readonly formProblems = computed(() => this.data.problems
     .filter(p => p.field.startsWith('config.') || p.field.startsWith('config['))

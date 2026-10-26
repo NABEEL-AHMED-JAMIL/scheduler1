@@ -1,9 +1,12 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import { of } from 'rxjs';
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
-import { ReportSourcePicker, bundleOf, bundleProblem } from './source-picker';
+import { INPUT_ROWS, ReportSourcePicker, bundleOf, bundleProblem, newestRuns, stepRowsOf } from './source-picker';
+import { GeneratedService } from '../documents/generated/generated.service';
+import { StepsApi } from '../tasks/steps/steps.service';
 import { OneFileSource, bundleParts, keepable } from './report-studio.model';
 
 /**
@@ -96,5 +99,80 @@ describe('the source picker\'s "Several files"', () => {
     expect(el.textContent).toContain('8 of 8');
     for (let i = 0; i < 10; i++) p.removePart(0);
     expect(p.parts().length).toBe(1);
+  });
+});
+
+/**
+ * ZT-R39 (AI designer retest, 2026-10-26): the Test data picker offered only the files a Save/Write step kept, so a report
+ * step's own input rows -- what its design was made from -- could not be picked again. A run's step rows are offered beside
+ * them, the report step's input first; a step design opens on "This step's input" from its pipeline's recent runs.
+ */
+describe('a report step\'s own input rows', () => {
+  const later = new Date(Date.now() + 86_400_000).toISOString();
+  const earlier = new Date(Date.now() - 60_000).toISOString();
+  const timeline = {
+    jobQueueId: 1871, jobId: 1097, runStatus: 'Completed', attempt: 1, attempts: [1], legacy: false,
+    steps: [
+      { stepExecutionId: 1, index: 0, key: 'visits', task: 'read_s3', status: 'Completed', datasets: [{ runDatasetId: 9101, name: 'rows', rowCount: 4, columns: [], expiresAt: later }] },
+      { stepExecutionId: 2, index: 1, key: 'clean', task: 'select', status: 'Completed', datasets: [{ runDatasetId: 9102, name: 'rows', rowCount: 4, columns: [], expiresAt: earlier }] },
+      { stepExecutionId: 3, index: 2, key: 'generate_report', task: 'generate_report', status: 'Completed', datasets: [] },
+    ],
+  };
+
+  it('lists each step\'s live rows, the report step\'s input first (the nearest earlier step whose rows are still kept)', () => {
+    const rows = stepRowsOf(timeline as any, 'generate_report');
+    expect(rows.map(r => [r.stepKey, r.runDatasetId])).toEqual([['visits', 9101]]);
+    expect(rows[0].name).toBe(`rows, ${INPUT_ROWS}`);
+    expect(stepRowsOf(timeline as any, null)[0].name).toBe('rows, the step\'s rows');
+    expect(stepRowsOf(null)).toEqual([]);
+  });
+
+  it('takes the newest runs of the pipeline\'s schedules', () => {
+    expect(newestRuns([[{ jobQueueId: 3 }, { jobQueueId: 9 }], [{ jobQueueId: 7 }]], 2).map(r => r.jobQueueId)).toEqual([9, 7]);
+  });
+
+  it('opens on "This step\'s input" for a step design and picks the newest run\'s input rows', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [ReportSourcePicker],
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([]),
+        { provide: GeneratedService, useValue: { runs: vi.fn(() => of([{ jobQueueId: 1870 }, { jobQueueId: 1871 }])), schedules: vi.fn(() => of([])),
+          runOutputs: vi.fn(() => of([])) } },
+        { provide: StepsApi, useValue: { timeline: vi.fn(() => of({ status: 'SUCCESS', message: '', data: timeline })) } }],
+    });
+    const fixture = TestBed.createComponent(ReportSourcePicker);
+    fixture.componentRef.setInput('stepKey', 'generate_report');
+    fixture.componentRef.setInput('stepJobs', [1097]);
+    fixture.componentRef.setInput('mode', 'step');
+    fixture.detectChanges();
+    const p = fixture.componentInstance;
+    expect(p.modes()[0]).toEqual({ id: 'step', label: 'This step\'s input' });
+    expect(p.stepRunId()).toBe(1871);
+    expect(p.source()).toEqual({ connector: 'RUN_OUTPUT', jobQueueId: 1871, runDatasetId: 9101 });
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).querySelector('[data-step-input]')?.textContent).toContain('visits');
+  });
+
+  it('adds the step rows to a picked run\'s outputs, and picks the report step\'s input when no file was kept', () => {
+    const generated = { runs: vi.fn(() => of([])), schedules: vi.fn(() => of([])), runOutputs: vi.fn(() => of([])) };
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [ReportSourcePicker],
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([]),
+        { provide: GeneratedService, useValue: generated },
+        { provide: StepsApi, useValue: { timeline: vi.fn(() => of({ status: 'SUCCESS', message: '', data: timeline })) } }],
+    });
+    const fixture = TestBed.createComponent(ReportSourcePicker);
+    fixture.componentRef.setInput('stepKey', 'generate_report');
+    fixture.componentRef.setInput('mode', 'run');
+    fixture.detectChanges();
+    const p = fixture.componentInstance;
+    p.pickJob(1097);
+    p.pickRun(1871);
+    expect(p.outputs().map(o => o.runDatasetId)).toEqual([9101]);
+    expect(p.source()).toEqual({ connector: 'RUN_OUTPUT', jobQueueId: 1871, runDatasetId: 9101 });
+    // Found on the way: an empty list of schedules was asked for again and again, without end (the effect read what it filled).
+    fixture.detectChanges();
+    expect(generated.schedules).toHaveBeenCalledTimes(1);
   });
 });

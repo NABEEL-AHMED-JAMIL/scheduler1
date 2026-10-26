@@ -22,8 +22,8 @@
   border-radius: var(--radius-md); background: var(--surface-sunken); color: var(--text-secondary); border: 1px solid var(--border-subtle); }
 button.rsd-chip:hover { border-color: var(--border-strong); color: var(--text-primary); }
 .rsd-chip-muted { opacity: 0.75; }
-.rsd-zoom { display: inline-flex; align-items: center; gap: 0.125rem; }
-.rsd-zoom-select { width: 4.75rem; height: 1.75rem; padding-block: 0; padding-inline: 0.5rem; font-size: 0.8125rem; }
+.rsd-zoom { flex-shrink: 0; }
+.rsd-zoom-select { width: 4.25rem; padding-block: 0; }
 
 .rsd-body { display: grid; grid-template-columns: 17rem minmax(0, 1fr) 20rem; min-height: 0; }
 @media (min-width: 1600px) { .rsd-body { grid-template-columns: 19rem minmax(0, 1fr) 23rem; } }

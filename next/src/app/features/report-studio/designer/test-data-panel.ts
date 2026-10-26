@@ -14,6 +14,8 @@ export interface TestDataData {
   rootPath: string;
   /** Whether the reader may keep the data with the template (an editable draft). */
   canKeep: boolean;
+  /** ZT-R39: a pipeline step's own design -- its step and its pipeline's schedules: the step's input rows are offered. */
+  step?: { key: string; jobIds: number[] } | null;
 }
 
 /** The data the canvas is drawn with, as the panel hands it back. */
@@ -30,7 +32,14 @@ export interface TestDataChoice { source: SourceRef | null; rootPath: string; ke
   template: `
     <app-side-panel heading="Test data" subtitle="Fill the canvas with real or pasted data. Nothing is published or stored unless you keep it.">
       <div class="flex flex-col gap-4">
-        <app-report-source-picker [samples]="data.samples" [(source)]="source" [(mode)]="mode" />
+        <app-report-source-picker [samples]="data.samples" [(source)]="source" [(mode)]="mode"
+                                  [stepKey]="data.step?.key ?? null" [stepJobs]="data.step?.jobIds ?? []" />
+        @if (data.step && data.canKeep && source()?.connector === 'RUN_OUTPUT') {
+          <p class="field-note text-[color:var(--text-muted)]" data-kept-with-design>
+            Kept with the step's design when you fill the canvas: a frozen copy (the first 500 rows, sensitive columns masked), so it
+            stays when the run's data expires.
+          </p>
+        }
         <label class="field">
           <span class="label">Report data starts at</span>
           <input class="input mono max-w-80" [ngModel]="rootPath()" (ngModelChange)="rootPath.set($event)" aria-label="Root path" placeholder="$" />
@@ -38,7 +47,7 @@ export interface TestDataChoice { source: SourceRef | null; rootPath: string; ke
         </label>
         @if (data.canKeep && keepable(source())) {
           <section class="flex flex-col gap-2 border-t pt-4 border-subtle" aria-labelledby="rsdKeep">
-            <h3 id="rsdKeep" class="text-sm font-semibold">Keep it with the template</h3>
+            <h3 id="rsdKeep" class="text-sm font-semibold">Keep it with the {{ data.step ? 'design' : 'template' }}</h3>
             @if (source()!.connector === 'BUNDLE') { <p class="text-xs text-[color:var(--text-muted)]">The files are read now, as you, and stored with the template as one document.</p> }
             <div class="flex flex-wrap items-center gap-2">
               <input class="input max-w-64" [ngModel]="name()" (ngModelChange)="name.set($event)" aria-label="Sample name" placeholder="September, all sites" />
@@ -66,7 +75,7 @@ export class TestDataPanel {
 
   readonly source = signal<SourceRef | null>(null);
   readonly keepable = keepable;
-  readonly mode = signal<SourceMode>(this.data.samples.length ? 'sample' : 'paste');
+  readonly mode = signal<SourceMode>(this.data.samples.length ? 'sample' : this.data.step?.jobIds.length ? 'step' : 'paste');
   readonly rootPath = signal(this.data.rootPath || '$');
   readonly name = signal('');
   readonly busy = signal(false);

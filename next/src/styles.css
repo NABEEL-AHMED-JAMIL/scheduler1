@@ -873,6 +873,23 @@
   }
   /* A segmented control with more options than a phone's width holds wraps onto a second row (MIG-253). */
   .seg-wrap .seg { flex-wrap: wrap; }
+  /* ZT-U2: a viewer's toolbar group (pages, zoom, undo/redo) as one bordered segment: icon buttons square, the value
+     between them in the primary text, a select inside without its own border. */
+  .seg-icon { @apply px-1.5 justify-center; }
+  .seg-value {
+    color: var(--text-primary);
+    @apply inline-flex items-center justify-center px-2 text-xs tabular-nums whitespace-nowrap;
+  }
+  .seg-btn.seg-value { color: var(--text-primary); }
+  .seg-btn.seg-value:hover:not(:disabled) { background: var(--surface-raised); }
+  .seg-btn:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 1px; }
+  .seg-btn.seg-icon:hover:not(:disabled) { background: var(--surface-raised); }
+  .seg-select {
+    color: var(--text-primary);
+    background: transparent;
+    @apply h-6 rounded-md border-0 px-1.5 text-xs tabular-nums;
+  }
+  .seg-select:hover { background: var(--surface-raised); }
 
   /* A dot that only pulses while it is actually following the run. */
   .live-dot {

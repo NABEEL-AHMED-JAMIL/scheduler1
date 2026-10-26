@@ -43,7 +43,7 @@
         @if (reportStep) {
           <app-report-step-design class="block mb-3" [config]="s.config ?? {}" [pipelineKey]="data.pipeline?.key ?? null"
                                   [pipelineName]="data.pipeline?.name ?? ''" [stepKey]="s.key" [stepName]="s.name ?? ''" [upstreamKey]="upstreamKey"
-                                  [jobIds]="data.pipeline?.jobIds ?? []" [disabled]="readOnly" (changed)="setDesign($event)" />
+                                  [jobIds]="data.pipeline?.jobIds ?? []" [disabled]="readOnly" [problem]="designProblems()" (changed)="setDesign($event)" />
         }
         @if (configMode() === 'form' && formSchema; as schema) {
           <app-schema-form [schema]="schema" [value]="s.config" [problems]="formProblems()" idPrefix="cfg" [disabled]="readOnly"

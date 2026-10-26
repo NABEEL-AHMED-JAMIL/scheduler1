@@ -73,6 +73,11 @@ export interface SampleRow {
   sourceKind?: string;
   /** A bundle's part names. */
   parts?: string[];
+  /**
+   * ZT-R39: a pipeline step design's frozen copy of a run's output (sourceKind FROZEN): kept with the design, capped and
+   * masked, so it outlives the run's retention.
+   */
+  frozen?: { jobQueueId: number; runDatasetId: number; label?: string | null; records: number; ofRecords: number; capped: boolean; masked: string[] };
   format: string;
   bytes?: number | null;
   jobQueueId?: number;
@@ -122,6 +127,15 @@ export type SourceRef =
   | { connector: 'BUNDLE'; parts: Record<string, OneFileSource> };
 
 /** Whether data may be kept as a template's test sample (media's saveSample: pasted data, a run's output, or several files). */
+/** How a kept sample is named in a list: pasted, several files, a run's output, or a step design's frozen copy of one. */
+export function sampleKindLabel(s: SampleRow): string {
+  if (s.sourceKind === 'FROZEN' && s.frozen) {
+    return `kept from run #${s.frozen.jobQueueId}${s.frozen.capped ? `, first ${s.frozen.records} of ${s.frozen.ofRecords} rows` : ''}`;
+  }
+  if (s.kind === 'RUN_OUTPUT') return `run #${s.jobQueueId}`;
+  return s.sourceKind === 'BUNDLE' ? 'several files' : 'pasted';
+}
+
 export function keepable(s: SourceRef | null | undefined): boolean {
   return !!s && (s.connector === 'INLINE_JSON' || s.connector === 'RUN_OUTPUT' || s.connector === 'BUNDLE');
 }

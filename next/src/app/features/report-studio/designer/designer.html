@@ -71,8 +71,11 @@
     }
 
     <div class="rsd-toolbar" role="toolbar" aria-label="Designer">
-      <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Undo (Ctrl+Z)" title="Undo (Ctrl+Z)" [disabled]="!undoStack().length || !editable()" (click)="undo()"><app-icon name="undo" /></button>
-      <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Redo (Ctrl+Y)" title="Redo (Ctrl+Y)" [disabled]="!redoStack().length || !editable()" (click)="redo()"><app-icon name="redo" /></button>
+      <!-- ZT-U2: the toolbar's groups are bordered segments (.seg): undo/redo, and the zoom with its value and Fit. -->
+      <div class="seg" role="group" aria-label="History">
+        <button type="button" class="seg-btn seg-icon" aria-label="Undo (Ctrl+Z)" title="Undo (Ctrl+Z)" [disabled]="!undoStack().length || !editable()" (click)="undo()"><app-icon name="undo" /></button>
+        <button type="button" class="seg-btn seg-icon" aria-label="Redo (Ctrl+Y)" title="Redo (Ctrl+Y)" [disabled]="!redoStack().length || !editable()" (click)="redo()"><app-icon name="redo" /></button>
+      </div>
       <span class="rsd-sep" aria-hidden="true"></span>
       <span class="rsd-tool">Select</span>
       <button type="button" class="btn btn-default btn-sm" [class.rsd-on]="!selected()" [attr.aria-pressed]="!selected()" (click)="select(null)">Page settings</button>
@@ -93,16 +96,16 @@
         <span class="min-w-0 truncate">{{ testChipText() }}</span>
       </button>
       <span class="text-xs text-[color:var(--text-secondary)] px-1">{{ pageLabel() }}</span>
-      <div class="rsd-zoom" role="group" aria-label="Zoom">
-        <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Zoom out" (click)="zoomBy(-1)"><app-icon name="minus" /></button>
-        <select class="input rsd-zoom-select" [ngModel]="zoom()" (ngModelChange)="zoom.set($event)" aria-label="Zoom level">
+      <div class="seg rsd-zoom" role="group" aria-label="Zoom">
+        <button type="button" class="seg-btn seg-icon" aria-label="Zoom out" title="Zoom out" (click)="zoomBy(-1)"><app-icon name="minus" /></button>
+        <select class="seg-select rsd-zoom-select" [ngModel]="zoom()" (ngModelChange)="zoom.set($event)" aria-label="Zoom level">
           @for (z of zooms; track z) { <option [ngValue]="z">{{ z * 100 }}%</option> }
           @if (!zooms.includes(zoom())) { <option [ngValue]="zoom()">{{ (zoom() * 100).toFixed(0) }}%</option> }
         </select>
-        <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Zoom in" (click)="zoomBy(1)"><app-icon name="plus" /></button>
-        <button type="button" class="btn btn-default btn-sm" (click)="fit()">Fit</button>
+        <button type="button" class="seg-btn seg-icon" aria-label="Zoom in" title="Zoom in" (click)="zoomBy(1)"><app-icon name="plus" /></button>
+        <button type="button" class="seg-btn" title="Fit the page to the canvas" (click)="fit()">Fit</button>
       </div>
-      <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Full screen" title="Full screen" (click)="fullScreen()"><app-icon name="maximize" /></button>
+      <button type="button" class="btn btn-default btn-icon btn-sm" aria-label="Full screen" title="Full screen" (click)="fullScreen()"><app-icon name="maximize" /></button>
     </div>
 
     <div class="rsd-body">

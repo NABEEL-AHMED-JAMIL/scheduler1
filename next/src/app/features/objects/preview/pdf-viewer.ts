@@ -23,26 +23,29 @@ import { Icon } from '../../../shared/ui/icon';
       @if (pageCount()) {
         <div class="flex items-center gap-1 px-3 py-1.5 border-b shrink-0 border-subtle bg-raised"
             >
-          <button type="button" class="btn btn-default btn-icon btn-sm" (click)="go(-1)"
-                  [disabled]="page() <= 1" title="Previous page" aria-label="Previous page">
-            <app-icon name="chevronLeft" />
-          </button>
-          <span class="text-xs tabular px-1">
-            {{ page() }} <span class="text-[color:var(--text-muted)]">of {{ pageCount() }}</span>
-          </span>
-          <button type="button" class="btn btn-default btn-icon btn-sm" (click)="go(1)"
-                  [disabled]="page() >= pageCount()" title="Next page" aria-label="Next page">
-            <app-icon name="chevronRight" />
-          </button>
+          <!-- ZT-U2: pages and zoom are each one bordered group (.seg), the value between its arrows, as every viewer's. -->
+          <div class="seg" role="group" aria-label="Pages">
+            <button type="button" class="seg-btn seg-icon" (click)="go(-1)"
+                    [disabled]="page() <= 1" title="Previous page" aria-label="Previous page">
+              <app-icon name="chevronLeft" />
+            </button>
+            <span class="seg-value" aria-live="polite">
+              {{ page() }}&nbsp;<span class="text-[color:var(--text-muted)]">of {{ pageCount() }}</span>
+            </span>
+            <button type="button" class="seg-btn seg-icon" (click)="go(1)"
+                    [disabled]="page() >= pageCount()" title="Next page" aria-label="Next page">
+              <app-icon name="chevronRight" />
+            </button>
+          </div>
 
-          <span class="w-px h-4 mx-1.5 bg-subtle"></span>
-
-          <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="zoomBy(-0.25)"
-                  [disabled]="scale() <= 0.5" title="Zoom out" aria-label="Zoom out"><app-icon name="minus" /></button>
-          <button type="button" class="btn btn-default btn-sm min-w-14 tabular" (click)="fit()"
-                  title="Fit to width">{{ zoomLabel() }}</button>
-          <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="zoomBy(0.25)"
-                  [disabled]="scale() >= 3" title="Zoom in" aria-label="Zoom in"><app-icon name="plus" /></button>
+          <div class="seg ml-1.5" role="group" aria-label="Zoom">
+            <button type="button" class="seg-btn seg-icon" (click)="zoomBy(-0.25)"
+                    [disabled]="scale() <= 0.5" title="Zoom out" aria-label="Zoom out"><app-icon name="minus" /></button>
+            <button type="button" class="seg-btn seg-value min-w-14" (click)="fit()"
+                    title="Fit to width" [attr.aria-label]="'Zoom ' + zoomLabel() + ': fit to width'">{{ zoomLabel() }}</button>
+            <button type="button" class="seg-btn seg-icon" (click)="zoomBy(0.25)"
+                    [disabled]="scale() >= 3" title="Zoom in" aria-label="Zoom in"><app-icon name="plus" /></button>
+          </div>
 
           @if (rendering()) {
             <app-icon name="refresh" class="spin icon-muted ml-2" size="0.9em" />

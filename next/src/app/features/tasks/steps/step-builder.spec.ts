@@ -3,7 +3,8 @@ import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Dialog } from '@angular/cdk/dialog';
 import { provideRouter } from '@angular/router';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { Confirm } from '../../../shared/ui/confirm';
 import { StepsApi } from './steps.service';
@@ -438,6 +439,33 @@ describe('StepBuilder -- Validate points at the step', () => {
     fixture.detectChanges();
     expect(api.definition).not.toHaveBeenCalled();
     expect(el.querySelector('[data-step="keep"]')!.classList).toContain('has-problems');
+  });
+});
+
+describe('StepBuilder -- a report step with no design (ZT-R40)', () => {
+  const NO_DESIGN = 'This report step has no design yet: open the step and design it or pick a saved template.';
+  const refusal = {
+    status: 'ERROR', message: `Not saved: step 'report' (config.templateId): ${NO_DESIGN}`,
+    data: { valid: false, problems: [{ path: 'steps[1].config.templateId', message: NO_DESIGN }] },
+  };
+
+  it('says a 422 refusal in its own words and keeps the problem on the step it names', () => {
+    const { click, api, el, fixture, toast, builder } = build();
+    api.save.mockReturnValueOnce(throwError(() => new HttpErrorResponse({ status: 422, error: refusal })) as any);
+    click('Move keep up');
+    click('Save');
+    fixture.detectChanges();
+    expect(api.definition).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith(refusal.message);
+    expect(el.textContent).toContain(refusal.message);
+    expect(el.querySelector('[data-step="read"]')!.classList, 'steps[1] after the move').toContain('has-problems');
+    expect(builder.dirty()).toBe(true);
+  });
+
+  it('hands the step\'s panel the pipeline\'s key before its first save, so its report can be designed', () => {
+    const { click, opened } = build({ view: { ...VIEW, stored: false, version: null, versions: [] } });
+    click('Edit step keep');
+    expect(opened.find(o => o.component === StepPanel)!.data.pipeline.key).toBe(100175);
   });
 });
 

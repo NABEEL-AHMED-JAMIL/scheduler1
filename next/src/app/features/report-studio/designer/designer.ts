@@ -17,7 +17,7 @@ import { WorkspaceDirectory } from '../../../core/workspaces/workspace-directory
 import { WorkspaceSelect } from '../../../shared/ui/workspace-select';
 import { RsTimePipe } from '../rs-time.pipe';
 import { ReportStudioApi, studioError } from '../report-studio.api';
-import { InspectResult, Problem, SourceRef, TemplateDefinition, TemplateDetail } from '../report-studio.model';
+import { InspectResult, Problem, SampleRow, SourceRef, TemplateDefinition, TemplateDetail, sampleKindLabel } from '../report-studio.model';
 import { ProblemList } from '../problem-list';
 import { PublishData, PublishPanel } from '../template-panels';
 import { TestPanel, TestPanelData } from '../test-panel';
@@ -79,6 +79,9 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
   readonly backParam = input<string | undefined>(undefined, { alias: 'back' });
   /** Owner 2026-10-21: opened from a report over its page limit -- the table, repeat or image grid to select first. */
   readonly selectParam = input<string | undefined>(undefined, { alias: 'select' });
+  /** ZT-R39: a step design opened from its pipeline: the step's key and the pipeline's schedules ("1097,1098"). */
+  readonly stepParam = input<string | undefined>(undefined, { alias: 'step' });
+  readonly jobsParam = input<string | undefined>(undefined, { alias: 'jobs' });
   readonly back = computed(() => {
     const b = this.backParam();
     return b && b.startsWith('/') && !b.startsWith('//') ? b : null;
@@ -961,17 +964,56 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
   openTestData(): void {
     const t = this.t();
     if (!t) return;
+    const stepDesign = t.ownerKind === 'STEP';
     this.dialog.open<TestDataChoice, TestDataData>(TestDataPanel, sidePanelConfig<TestDataData>({
       templateId: t.templateId, samples: t.samples, rootPath: this.testRoot(), canKeep: this.editable(),
+      step: stepDesign ? { key: this.stepParam() || stepKeyOf(t.ownerRef), jobIds: jobIdsOf(this.jobsParam()) } : null,
     }, 'wide', 'right')).closed.subscribe(choice => {
       if (!choice) return;
       if (choice.kept) this.refreshSamples();
+      // ZT-R39: a step design's data picked from a run is kept with the design at once -- media freezes a capped, masked copy --
+      // so it is still there once the run's data expires (a day for some jobs).
+      if (stepDesign && this.editable() && choice.source?.connector === 'RUN_OUTPUT' && !choice.kept) {
+        this.keepWithDesign(t.templateId, choice.source, choice.rootPath);
+        return;
+      }
       this.testSource.set(choice.source);
       this.testDataLost.set('');
       this.testRoot.set(choice.rootPath);
       this.testLabel.set('');
       this.inspectTestData();
       this.draw(true);
+    });
+  }
+
+  /** Keeps a run's output with the step design (a frozen copy) and draws the canvas with the kept sample; the run's own on failure. */
+  private keepWithDesign(templateId: string, source: Extract<SourceRef, { connector: 'RUN_OUTPUT' }>, rootPath: string): void {
+    const name = `Run #${source.jobQueueId} · the step's data`;
+    const use = (s: SourceRef, label: string) => {
+      this.testSource.set(s);
+      this.testDataLost.set('');
+      this.testRoot.set(rootPath);
+      this.testLabel.set(label);
+      this.inspectTestData();
+      this.draw(true);
+    };
+    const kept = (samples: SampleRow[]) => samples.find(s => s.name === name);
+    this.api.saveSample(templateId, name, source).subscribe({
+      next: () => this.api.template(templateId).subscribe({
+        next: t => {
+          this.t.update(cur => (cur ? { ...cur, samples: t.samples } : cur));
+          const sample = kept(t.samples);
+          use(sample ? { connector: 'SAMPLE', sampleId: sample.sampleId } : source, sample ? `Test sample · ${name}` : '');
+          if (sample) this.toast.success(`Kept with the design: ${sampleKindLabel(sample)}.`);
+        },
+        error: () => use(source, ''),
+      }),
+      error: e => {
+        const already = kept(this.t()?.samples ?? []);
+        if (already) { use({ connector: 'SAMPLE', sampleId: already.sampleId }, `Test sample · ${name}`); return; }
+        this.toast.error(`${studioError(e, 'The data could not be kept with the design.').message} The canvas uses the run's data until it expires.`);
+        use(source, '');
+      },
     });
   }
 
@@ -1238,4 +1280,15 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
 export function testChipWords(chosen: boolean, label: string, records: number): string {
   if (!chosen) return 'No test data · add some';
   return (label || 'Test data') + (records ? ` · ${records} record${records === 1 ? '' : 's'}` : '');
+}
+
+/** ZT-R39: the step key of a step design's owner reference ("pipeline:1161#generate_report"). */
+export function stepKeyOf(ownerRef: string | null | undefined): string {
+  const at = (ownerRef ?? '').indexOf('#');
+  return at < 0 ? '' : (ownerRef ?? '').slice(at + 1);
+}
+
+/** ZT-R39: the pipeline's schedules as the step's link names them ("1097,1098"). */
+export function jobIdsOf(param: string | null | undefined): number[] {
+  return (param ?? '').split(',').map(v => Number(v.trim())).filter(n => Number.isInteger(n) && n > 0).slice(0, 20);
 }

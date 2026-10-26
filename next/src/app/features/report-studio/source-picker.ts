@@ -7,15 +7,18 @@ import { Icon } from '../../shared/ui/icon';
 import { AuthService } from '../../core/auth/auth.service';
 import { GeneratedService, pipelineOf } from '../documents/generated/generated.service';
 import { RunOutput } from '../jobs/run-steps/run-steps.model';
-import { RunRow } from '../tasks/steps/steps.model';
+import { RunRow, Timeline } from '../tasks/steps/steps.model';
+import { StepsApi } from '../tasks/steps/steps.service';
+import { forkJoin, of } from 'rxjs';
+import { catchError, map } from 'rxjs/operators';
 import { ReportStudioApi } from './report-studio.api';
 import {
-  BUNDLE_MAX_PARTS, BUNDLE_PART_NAME, DataSourceRow, OneFileSource, PASTE_MAX_BYTES, SampleRow, SourceRef, jsonProblem,
+  BUNDLE_MAX_PARTS, BUNDLE_PART_NAME, DataSourceRow, OneFileSource, PASTE_MAX_BYTES, SampleRow, SourceRef, jsonProblem, sampleKindLabel,
 } from './report-studio.model';
 import { BucketSummary, StorageService } from '../objects/storage.service';
 import { API_SUCCESS } from '../../core/api/api.config';
 
-export type SourceMode = 'paste' | 'run' | 'bucket' | 'saved' | 'sample' | 'bundle';
+export type SourceMode = 'paste' | 'step' | 'run' | 'bucket' | 'saved' | 'sample' | 'bundle';
 type Mode = SourceMode;
 
 /** One file of a bundle as the picker holds it: its name in the data, how it is picked, and the source picked. */
@@ -51,6 +54,39 @@ export function bundleOf(rows: { name: string; source: SourceRef | null }[]): So
 /** A pipeline output a report can read: a kept file or dataset in JSON, CSV or a table format (a PDF is not data). */
 const DATA_FORMATS = new Set(['json', 'jsonl', 'csv', 'parquet', 'xlsx', 'dataset', '']);
 
+/** How a step's rows that the report step reads are named in the list. */
+export const INPUT_ROWS = 'the rows this report step reads';
+
+/**
+ * ZT-R39: the rows each step of a run kept (its timeline's datasets, kept for the job's retention), as outputs the picker
+ * lists beside the files a Save/Write step kept -- so a report step's own input rows can be picked again. Expired ones are
+ * left out. `reportStep` marks the rows that step reads: the nearest earlier step's that are still there.
+ */
+export function stepRowsOf(t: Timeline | null | undefined, reportStep: string | null = null, now = Date.now()): RunOutput[] {
+  const steps = [...(t?.steps ?? [])].sort((a, b) => a.index - b.index);
+  const reportAt = reportStep ? steps.findIndex(s => s.key === reportStep) : -1;
+  let input: number | null = null;
+  for (let i = (reportAt < 0 ? steps.length : reportAt) - 1; reportAt >= 0 && i >= 0 && input === null; i--) {
+    const live = (steps[i].datasets ?? []).find(d => !d.expiresAt || Date.parse(d.expiresAt) > now);
+    if (live) input = live.runDatasetId;
+  }
+  const out: RunOutput[] = [];
+  for (const step of steps) {
+    for (const d of step.datasets ?? []) {
+      if (d.expiresAt && Date.parse(d.expiresAt) <= now) continue;
+      const mine = d.runDatasetId === input;
+      out.push({ runOutputId: -d.runDatasetId, runDatasetId: d.runDatasetId, kind: 'file', format: 'dataset', stepKey: step.key,
+        name: mine ? `${d.name}, ${INPUT_ROWS}` : `${d.name}, the step's rows`, rowCount: d.rowCount, expiresAt: d.expiresAt });
+    }
+  }
+  return out.sort((a, b) => Number(b.runDatasetId === input) - Number(a.runDatasetId === input));
+}
+
+/** The runs of these schedules, newest first, at most `limit`. */
+export function newestRuns(lists: RunRow[][], limit = 10): RunRow[] {
+  return lists.flat().sort((a, b) => b.jobQueueId - a.jobQueueId).slice(0, limit);
+}
+
 /**
  * Where test or report data comes from (the owner's 2026-10-19 rule): paste JSON (or CSV), pick the output of any
  * pipeline run the reader may open, a file uploaded on the Data tab, or one of the template's saved test samples. The
@@ -78,6 +114,27 @@ const DATA_FORMATS = new Set(['json', 'jsonl', 'csv', 'parquet', 'xlsx', 'datase
           <label class="inline-flex items-center gap-2 text-sm">
             <input type="checkbox" [ngModel]="csv()" (ngModelChange)="csv.set($event)" /> It is CSV (a header row, then rows)
           </label>
+        }
+        @case ('step') {
+          <label class="field">
+            <span class="label">Run of this pipeline</span>
+            <select class="input" [ngModel]="stepRunId()" (ngModelChange)="pickStepRun($event)" aria-label="Run of this pipeline">
+              <option [ngValue]="null">{{ stepRuns().length ? 'Choose a run' : stepRunsLoaded() ? 'No runs yet: run the pipeline, or paste sample JSON' : 'Reading the runs…' }}</option>
+              @for (r of stepRuns(); track r.jobQueueId) {
+                <option [ngValue]="r.jobQueueId">#{{ r.jobQueueId }} · {{ r.jobStatus || '—' }} · {{ r.startTime | rsTime: 'dateTime' }}</option>
+              }
+            </select>
+          </label>
+          @if (stepRunId() !== null) {
+            @if (stepInput(); as rows) {
+              <p class="field-note text-[color:var(--text-muted)]" data-step-input>
+                {{ rows.stepKey }} · {{ rows.name }}@if (rows.rowCount != null) { ({{ rows.rowCount }} rows)}.
+              </p>
+            } @else if (stepInputRead()) {
+              <p class="field-note text-[color:var(--text-muted)]" role="status">This run kept no rows for this step any more (they expire with the job's retention): pick a newer run.</p>
+            }
+          }
+          <p class="field-note text-[color:var(--text-muted)]">The rows the report step read in a recent run, read as you. Kept with the design, a copy is frozen: the first 500 rows, sensitive columns masked.</p>
         }
         @case ('run') {
           @if (runsError()) { <p class="field-note text-[color:var(--crit-text)]" role="alert">{{ runsError() }}</p> }
@@ -144,7 +201,7 @@ const DATA_FORMATS = new Set(['json', 'jsonl', 'csv', 'parquet', 'xlsx', 'datase
             <select class="input" [ngModel]="sampleId()" (ngModelChange)="sampleId.set($event); publish()" aria-label="Test sample">
               <option [ngValue]="null">Choose a sample</option>
               @for (s of samples(); track s.sampleId) {
-                <option [ngValue]="s.sampleId">{{ s.name }} · {{ s.kind === 'RUN_OUTPUT' ? 'run #' + s.jobQueueId : s.sourceKind === 'BUNDLE' ? 'several files' : 'pasted' }}</option>
+                <option [ngValue]="s.sampleId">{{ s.name }} · {{ kindOf(s) }}</option>
               }
             </select>
           </label>
@@ -194,6 +251,7 @@ export class ReportSourcePicker implements OnInit {
   private readonly api = inject(ReportStudioApi);
   private readonly auth = inject(AuthService);
   private readonly storage = inject(StorageService);
+  private readonly stepsApi = inject(StepsApi);
 
   /** The template's saved test samples, when the picker is for a template. */
   readonly samples = input<SampleRow[]>([]);
@@ -205,6 +263,10 @@ export class ReportSourcePicker implements OnInit {
   readonly mode = model<Mode>('paste');
   /** Only these ways (the Data tab picks a run's output only); all by default. */
   readonly only = input<Mode[] | null>(null);
+  /** ZT-R39: a pipeline step's design -- its step's key and its pipeline's schedules -- offers the step's own input rows. */
+  readonly stepKey = input<string | null>(null);
+  readonly stepJobs = input<number[]>([]);
+  readonly kindOf = sampleKindLabel;
   readonly text = signal('');
   readonly csv = signal(false);
   private readonly allJobs = signal<{ jobId: number; label: string; tenantId?: number | null }[]>([]);
@@ -229,6 +291,7 @@ export class ReportSourcePicker implements OnInit {
 
   readonly modes = computed<SegmentOption<Mode>[]>(() => this.allModes().filter(m => !this.only() || this.only()!.includes(m.id)));
   private readonly allModes = computed<SegmentOption<Mode>[]>(() => [
+    ...(this.stepKey() && this.stepJobs().length ? [{ id: 'step' as Mode, label: 'This step\'s input' }] : []),
     { id: 'paste', label: 'Paste JSON' },
     { id: 'run', label: 'Pipeline run' },
     { id: 'bucket', label: 'Bucket file' },
@@ -293,11 +356,18 @@ export class ReportSourcePicker implements OnInit {
       untracked(() => this.publish());
     });
     effect(() => {
-      if (this.mode() === 'run' && !this.allJobs().length) untracked(() => this.loadJobs());
-      if (this.mode() === 'saved' && !this.saved().length) untracked(() => this.loadSaved());
-      if (this.mode() === 'bucket' && !this.buckets().length) untracked(() => this.loadBuckets());
+      // Each list is read once a way is first shown (again after a failure). Found while testing ZT-R39: the effect read the
+      // list it fills, so an empty answer (a workspace with no schedules, uploads or buckets) asked again, without end.
+      const mode = this.mode();
+      if (this.asked.has(mode)) return;
+      const load = { run: () => this.loadJobs(), step: () => this.loadStepRuns(), saved: () => this.loadSaved(), bucket: () => this.loadBuckets() }[
+        mode as 'run' | 'step' | 'saved' | 'bucket'];
+      if (load) { this.asked.add(mode); untracked(load); }
     });
   }
+
+  /** The ways whose list was asked for (once each). */
+  private readonly asked = new Set<Mode>();
 
   ngOnInit(): void {
     this.publish();
@@ -309,6 +379,12 @@ export class ReportSourcePicker implements OnInit {
       case 'paste':
         this.source.set(this.pasteError() ? null : { connector: 'INLINE_JSON', text: this.text(), format: this.csv() ? 'CSV' : 'JSON' });
         break;
+      case 'step': {
+        const rows = this.stepInput();
+        this.source.set(this.stepRunId() !== null && rows?.runDatasetId != null
+          ? { connector: 'RUN_OUTPUT', jobQueueId: this.stepRunId()!, runDatasetId: rows.runDatasetId } : null);
+        break;
+      }
       case 'run':
         this.source.set(this.runId() !== null && this.datasetId() !== null
           ? { connector: 'RUN_OUTPUT', jobQueueId: this.runId()!, runDatasetId: this.datasetId()! } : null);
@@ -335,14 +411,14 @@ export class ReportSourcePicker implements OnInit {
     this.runsError.set('');
     this.generated.schedules().subscribe({
       next: all => this.allJobs.set(all.map(j => ({ jobId: j.jobId, tenantId: (j as { tenantId?: number | null }).tenantId, label: `${j.jobName ?? 'Schedule ' + j.jobId}${pipelineOf(j) ? ' · ' + pipelineOf(j) : ''}` }))),
-      error: () => this.runsError.set('Your schedules could not be read (they need the Schedules or Runs pages).'),
+      error: () => { this.asked.delete('run'); this.runsError.set('Your schedules could not be read (they need the Schedules or Runs pages).'); },
     });
   }
 
   private loadBuckets(): void {
     this.storage.buckets().subscribe({
       next: r => this.buckets.set(r.status === API_SUCCESS ? (r.data ?? []) : []),
-      error: () => this.buckets.set([]),
+      error: () => { this.asked.delete('bucket'); this.buckets.set([]); },
     });
   }
 
@@ -355,7 +431,42 @@ export class ReportSourcePicker implements OnInit {
   }
 
   private loadSaved(): void {
-    this.api.sources().subscribe({ next: list => this.saved.set(list), error: () => this.saved.set([]) });
+    this.api.sources().subscribe({ next: list => this.saved.set(list), error: () => { this.asked.delete('saved'); this.saved.set([]); } });
+  }
+
+  // ---------------------------------------------------------------- this step's input (ZT-R39)
+
+  readonly stepRuns = signal<RunRow[]>([]);
+  readonly stepRunsLoaded = signal(false);
+  readonly stepRunId = signal<number | null>(null);
+  /** The picked run's rows of the step the report step reads; null while none is known. */
+  readonly stepInput = signal<RunOutput | null>(null);
+  readonly stepInputRead = signal(false);
+
+  private loadStepRuns(): void {
+    const jobs = this.stepJobs();
+    if (!jobs.length) { this.stepRunsLoaded.set(true); return; }
+    forkJoin(jobs.map(id => this.generated.runs(id, 10).pipe(catchError(() => of([] as RunRow[]))))).subscribe(lists => {
+      const runs = newestRuns(lists);
+      this.stepRuns.set(runs);
+      this.stepRunsLoaded.set(true);
+      if (runs.length && this.stepRunId() === null) this.pickStepRun(runs[0].jobQueueId);
+    });
+  }
+
+  pickStepRun(runId: number | null): void {
+    this.stepRunId.set(runId);
+    this.stepInput.set(null);
+    this.stepInputRead.set(false);
+    this.publish();
+    if (runId === null) return;
+    this.stepsApi.timeline(runId).pipe(map(r => r.data ?? null), catchError(() => of(null))).subscribe(t => {
+      if (this.stepRunId() !== runId) return;
+      const rows = stepRowsOf(t, this.stepKey());
+      this.stepInput.set(rows.find(o => o.name.endsWith(INPUT_ROWS)) ?? null);
+      this.stepInputRead.set(true);
+      this.publish();
+    });
   }
 
   pickJob(jobId: number | null): void {
@@ -375,12 +486,18 @@ export class ReportSourcePicker implements OnInit {
     this.outputs.set([]);
     this.publish();
     if (runId === null) return;
-    this.generated.runOutputs(runId).subscribe({
-      next: list => {
-        const outputs = (list ?? []).filter(o => o.kind === 'file' && o.runDatasetId != null && !o.expired
+    // ZT-R39: the files a Save/Write step kept, and the rows each step kept (a report step's own input among them).
+    forkJoin([this.generated.runOutputs(runId).pipe(catchError(() => of(null))),
+      this.stepsApi.timeline(runId).pipe(map(r => r.data ?? null), catchError(() => of(null)))]).subscribe({
+      next: ([list, timeline]) => {
+        if (this.runId() !== runId) return;
+        const files = (list ?? []).filter(o => o.kind === 'file' && o.runDatasetId != null && !o.expired
           && DATA_FORMATS.has(String(o.format ?? '').toLowerCase()));
+        const kept = new Set(files.map(o => o.runDatasetId));
+        const outputs = [...files, ...stepRowsOf(timeline, this.stepKey()).filter(o => !kept.has(o.runDatasetId))];
         this.outputs.set(outputs);
-        const same = keepOutput ? outputs.find(o => o.name === keepOutput) : outputs.length === 1 ? outputs[0] : undefined;
+        const input = outputs.find(o => o.name.endsWith(INPUT_ROWS));
+        const same = keepOutput ? outputs.find(o => o.name === keepOutput) : files.length === 1 ? files[0] : !files.length ? input : undefined;
         if (same?.runDatasetId != null) this.pickDataset(same.runDatasetId);
       },
       error: () => this.outputs.set([]),

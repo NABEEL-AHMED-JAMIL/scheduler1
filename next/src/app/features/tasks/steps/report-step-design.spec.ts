@@ -64,8 +64,19 @@ describe('ReportStepDesign', () => {
       source: { connector: 'RUN_OUTPUT', jobQueueId: 905, runDatasetId: 4412 } });
     expect(changed.at(-1)).toEqual({ design: 'STEP', templateId: 'D1', templateVersion: 'latest' });
     expect(open).toHaveBeenCalledTimes(1);
-    expect(String(open.mock.calls[0][0])).toMatch(/^\/reports\/templates\/D1\/design\?step=weekly_report&back=/);
+    // ZT-R39: the pipeline's schedules go with it, so the designer's Test data offers this step's input rows.
+    expect(String(open.mock.calls[0][0])).toMatch(/^\/reports\/templates\/D1\/design\?step=weekly_report&jobs=11,12&back=/);
     expect(open.mock.calls[0][1]).toBe('_blank');
+  });
+
+  it('shows the save\'s problem with the design until the step has one (ZT-R40)', () => {
+    const problem = 'This report step has no design yet: open the step and design it or pick a saved template.';
+    const { el, fixture } = render({ problem });
+    expect(el.querySelector('[data-design-problem]')?.textContent).toContain(problem);
+    expect(el.querySelector('[data-design-report]')).not.toBeNull();
+    fixture.componentRef.setInput('config', { design: 'TEMPLATE', templateId: 'T9', templateVersion: 'latest' });
+    fixture.detectChanges();
+    expect(el.querySelector('[data-design-problem]')).toBeNull();
   });
 
   it('makes a design without data when the pipeline has not run (the designer\'s Test data takes pasted JSON)', async () => {
