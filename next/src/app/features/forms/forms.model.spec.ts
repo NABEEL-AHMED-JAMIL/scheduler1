@@ -76,6 +76,36 @@ describe('Forms -- the definition', () => {
       { key: 'b', label: 'B', type: 'choice', required: true, help: null, options: ['One', 'Two'] },
     ]);
   });
+
+  it('UX2: sends a placeholder trimmed where an empty control shows one, and drops it elsewhere or when blank', () => {
+    const sent = draftForSave(draft({
+      name: 'Visit', fields: [
+        { key: 'a', label: 'A', type: 'text', required: false, placeholder: '  e.g. P-1  ', help: ' Hint ' },
+        { key: 'b', label: 'B', type: 'yesNo', required: false, placeholder: 'never shown' },
+        { key: 'c', label: 'C', type: 'number', required: false, placeholder: '   ' },
+      ],
+    }));
+    expect(sent.fields[0]).toMatchObject({ placeholder: 'e.g. P-1', help: 'Hint' });
+    expect('placeholder' in sent.fields[1]).toBe(false);
+    expect('placeholder' in sent.fields[2]).toBe(false);
+  });
+
+  it('UX2: marks a placeholder over 120 characters or with a line break, and help over 500, as FormFields does', () => {
+    const problems = definitionProblems(draft({
+      name: 'Visit', fields: [
+        { key: 'a', label: 'A', type: 'text', required: false, placeholder: 'x'.repeat(121) },
+        { key: 'b', label: 'B', type: 'email', required: false, placeholder: 'one\ntwo' },
+        { key: 'c', label: 'C', type: 'text', required: false, help: 'h'.repeat(501) },
+        { key: 'd', label: 'D', type: 'text', required: false, placeholder: 'p'.repeat(120), help: 'h'.repeat(500) },
+        { key: 'e', label: 'E', type: 'yesNo', required: false, placeholder: 'x'.repeat(200) },
+      ],
+    }));
+    expect(problems).toEqual({
+      '0': 'Its placeholder is longer than 120 characters.',
+      '1': 'Its placeholder is one line of text, with no line breaks or tabs.',
+      '2': 'Its help text is longer than 500 characters.',
+    });
+  });
 });
 
 describe('Forms -- the answers', () => {

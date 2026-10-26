@@ -19,7 +19,8 @@ export interface UploadWanted {
 
 /**
  * A form's fields as controls (Wave 5 Forms lite; MIG-277): text, long text, number, date, a choice, yes/no, e-mail, a
- * table of rows, files, a signature and a lookup -- each with its label, help text, required mark and problem, in the
+ * table of rows, files, a signature and a lookup -- each with its label, help text (under the control, which names it in
+ * aria-describedby), placeholder (inside an empty one; never instead of the label), required mark and problem, in the
  * form's order, and only those its rules show now. It holds nothing itself: the answers and the problems are the page's,
  * every change is handed back, and chosen files and drawn signatures are handed to the page to upload. The fill-in page
  * and the builder's preview both draw it.
@@ -133,7 +134,7 @@ const IMAGE_MIME: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpe
             @case ('lookup') {
               @if (valuesOf(f.key).length > 30) {
                 <input class="input" [id]="idPrefix() + '-' + f.key" [attr.list]="idPrefix() + '-' + f.key + '-values'" [value]="text(f.key)"
-                       [disabled]="disabled()" [attr.data-field]="f.key" placeholder="Type to find…"
+                       [disabled]="disabled()" [attr.data-field]="f.key" [attr.placeholder]="f.placeholder || 'Type to find…'"
                        (input)="set(f.key, $any($event.target).value)" />
                 <datalist [id]="idPrefix() + '-' + f.key + '-values'">
                   @for (v of valuesOf(f.key); track v) { <option [value]="v"></option> }
@@ -141,19 +142,19 @@ const IMAGE_MIME: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpe
               } @else {
                 <select class="input" [id]="idPrefix() + '-' + f.key" [disabled]="disabled()" [attr.data-field]="f.key"
                         (change)="set(f.key, $any($event.target).value)">
-                  <option value="" [selected]="!text(f.key)">{{ valuesOf(f.key).length ? 'Choose…' : 'Nothing to choose from yet' }}</option>
+                  <option value="" [selected]="!text(f.key)">{{ valuesOf(f.key).length ? (f.placeholder || 'Choose…') : 'Nothing to choose from yet' }}</option>
                   @for (v of valuesOf(f.key); track v) { <option [value]="v" [selected]="text(f.key) === v">{{ v }}</option> }
                 </select>
               }
             }
             @case ('longText') {
               <textarea class="input" rows="4" [id]="idPrefix() + '-' + f.key" [value]="text(f.key)" [disabled]="disabled()"
-                        [attr.data-field]="f.key" (input)="set(f.key, $any($event.target).value)"></textarea>
+                        [attr.data-field]="f.key" [attr.placeholder]="f.placeholder || null" (input)="set(f.key, $any($event.target).value)"></textarea>
             }
             @case ('choice') {
               <select class="input" [id]="idPrefix() + '-' + f.key" [disabled]="disabled()" [attr.data-field]="f.key"
                       (change)="set(f.key, $any($event.target).value)">
-                <option value="" [selected]="!text(f.key)">Choose…</option>
+                <option value="" [selected]="!text(f.key)">{{ f.placeholder || 'Choose…' }}</option>
                 @for (o of f.options ?? []; track o) {
                   <option [value]="o" [selected]="text(f.key) === o">{{ o }}</option>
                 }
@@ -174,19 +175,21 @@ const IMAGE_MIME: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpe
             }
             @case ('date') {
               <app-date-field [inputId]="idPrefix() + '-' + f.key" [label]="f.label" [value]="text(f.key)" [inactive]="disabled()"
+                              [placeholder]="f.placeholder || 'Pick a date'"
                               [clearable]="!f.required" [attr.data-field]="f.key" (valueChange)="set(f.key, $event)" />
             }
             @case ('number') {
               <input class="input" type="text" inputmode="decimal" [id]="idPrefix() + '-' + f.key" [value]="text(f.key)"
-                     [disabled]="disabled()" [attr.data-field]="f.key" (input)="set(f.key, $any($event.target).value)" />
+                     [disabled]="disabled()" [attr.data-field]="f.key" [attr.placeholder]="f.placeholder || null"
+                     (input)="set(f.key, $any($event.target).value)" />
             }
             @case ('email') {
               <input class="input" type="email" autocomplete="off" [id]="idPrefix() + '-' + f.key" [value]="text(f.key)"
-                     [disabled]="disabled()" [attr.data-field]="f.key" (input)="set(f.key, $any($event.target).value)" />
+                     [disabled]="disabled()" [attr.data-field]="f.key" [attr.placeholder]="f.placeholder || null" (input)="set(f.key, $any($event.target).value)" />
             }
             @default {
               <input class="input" type="text" [id]="idPrefix() + '-' + f.key" [value]="text(f.key)" [disabled]="disabled()"
-                     [attr.data-field]="f.key" (input)="set(f.key, $any($event.target).value)" />
+                     [attr.data-field]="f.key" [attr.placeholder]="f.placeholder || null" (input)="set(f.key, $any($event.target).value)" />
             }
           }
         </app-field>

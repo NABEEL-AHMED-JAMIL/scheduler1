@@ -13,7 +13,7 @@ import { AnswerChange, FormRenderer } from './form-renderer';
 import {
   ALLOWED_EXTENSIONS, Answers, COLUMN_TYPES, FIELD_TYPES, FORM_STATUSES, FieldRule, FieldType, FormDraft, FormField, FormStatus, FormSummary,
   LinkableJob, MAX_FIELDS, RULE_OPS, blankField, definitionProblems, draftForSave, formTone, formsOf, lookupSources, optionsFromText,
-  ruleText, typeDefaults, typeLabel, uniqueKey,
+  ruleText, typeDefaults, typeLabel, uniqueKey, MAX_PLACEHOLDER, MAX_HELP, takesPlaceholder,
 } from './forms.model';
 
 type RuleKind = 'showWhen' | 'requiredWhen';
@@ -101,6 +101,20 @@ export class FormBuilder implements OnInit {
   readonly fieldTypes = FIELD_TYPES;
   readonly statuses = FORM_STATUSES;
   readonly maxFields = MAX_FIELDS;
+  readonly maxPlaceholder = MAX_PLACEHOLDER;
+  readonly maxHelp = MAX_HELP;
+  readonly takesPlaceholder = takesPlaceholder;
+
+  /** What the placeholder box itself suggests, by the field's type. */
+  placeholderExample(type: FieldType): string {
+    switch (type) {
+      case 'number': return 'e.g. 2.5';
+      case 'date': return 'e.g. Pick the day';
+      case 'email': return 'e.g. name@example.com';
+      case 'choice': case 'lookup': return 'e.g. Choose one';
+      default: return 'e.g. As written on the card';
+    }
+  }
   readonly typeLabel = typeLabel;
   readonly tone = formTone;
   readonly columnTypes = COLUMN_TYPES;

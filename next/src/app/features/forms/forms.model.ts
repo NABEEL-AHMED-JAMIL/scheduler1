@@ -37,7 +37,13 @@ export interface FormField {
   label: string;
   type: FieldType;
   required: boolean;
+  /** A short hint under the field (at most 500 characters), linked to its control by aria-describedby. */
   help?: string | null;
+  /**
+   * Example text inside the empty control (at most 120, one line; FormFields.PLACEHOLDER_TYPES): text, long text, number,
+   * date, e-mail, choice and lookup. Display text only -- never the field's only label, and shown as text, not markup.
+   */
+  placeholder?: string | null;
   options?: string[] | null;
   /** MIG-277: shown only when this holds; required (as well as when `required`) when that holds. */
   showWhen?: FieldRule | null;
@@ -232,6 +238,15 @@ export const FORM_STATUSES: FormStatus[] = ['Draft', 'Active', 'Archived'];
 export const RESERVED_KEYS = ['submission_id', 'form_id', 'form_name', 'form_version', 'submitted_by', 'submitted_at'];
 
 export const MAX_FIELDS = 50;
+/** FormFields.MAX_PLACEHOLDER and MAX_HELP. */
+export const MAX_PLACEHOLDER = 120;
+export const MAX_HELP = 500;
+/** The types whose empty control shows a placeholder (FormFields.PLACEHOLDER_TYPES). */
+export const PLACEHOLDER_TYPES: FieldType[] = ['text', 'longText', 'number', 'date', 'choice', 'email', 'lookup'];
+
+export function takesPlaceholder(type: FieldType | string): boolean {
+  return (PLACEHOLDER_TYPES as string[]).includes(type);
+}
 const KEY = /^[a-z][a-z0-9_]{0,39}$/;
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -377,7 +392,12 @@ export function definitionProblems(draft: FormDraft): Record<string, string> {
     else if (!KEY.test(key)) problem = 'Its key must start with a lower-case letter and use only a-z, 0-9 and _ (at most 40).';
     else if (RESERVED_KEYS.includes(key)) problem = `The key '${key}' is used by the submission itself.`;
     else if (seen.has(key)) problem = `Another field already has the key '${key}'.`;
-    else if (f.type === 'choice' && !(f.options ?? []).filter(o => o.trim()).length) problem = 'A choice needs at least one option.';
+    else if ((f.help ?? '').trim().length > MAX_HELP) problem = `Its help text is longer than ${MAX_HELP} characters.`;
+    else if (takesPlaceholder(f.type) && (f.placeholder ?? '').trim().length > MAX_PLACEHOLDER) {
+      problem = `Its placeholder is longer than ${MAX_PLACEHOLDER} characters.`;
+    } else if (takesPlaceholder(f.type) && /[\u0000-\u001f\u007f]/.test((f.placeholder ?? '').trim())) {
+      problem = 'Its placeholder is one line of text, with no line breaks or tabs.';
+    } else if (f.type === 'choice' && !(f.options ?? []).filter(o => o.trim()).length) problem = 'A choice needs at least one option.';
     else if (f.type === 'choice' && new Set((f.options ?? []).map(o => o.trim().toLowerCase())).size !== (f.options ?? []).length) {
       problem = 'An option is listed twice.';
     } else problem = extendedProblem(f, draft.fields.slice(0, i));
@@ -434,7 +454,8 @@ function ruleForSave(rule: FieldRule | null | undefined, fields: FormField[]): F
   return { field: rule.field, op: rule.op, value };
 }
 
-/** What POST form.json/save sends: trimmed, a non-choice without options, blank help dropped. */
+/** What POST form.json/save sends: trimmed, a non-choice without options, blank help and placeholder dropped (and a placeholder
+ * where no control shows one). */
 export function draftForSave(draft: FormDraft): FormDraft {
   return {
     ...draft,
@@ -443,7 +464,9 @@ export function draftForSave(draft: FormDraft): FormDraft {
     workflowKey: draft.workflowKey?.trim() || null,
     fields: draft.fields.map(f => ({
       key: f.key.trim(), label: f.label.trim(), type: f.type, required: !!f.required,
-      help: f.help?.trim() || null, options: f.type === 'choice' ? (f.options ?? []).map(o => o.trim()).filter(o => !!o) : null,
+      help: f.help?.trim() || null,
+      ...(takesPlaceholder(f.type) && f.placeholder?.trim() ? { placeholder: f.placeholder.trim() } : {}),
+      options: f.type === 'choice' ? (f.options ?? []).map(o => o.trim()).filter(o => !!o) : null,
       ...(ruleForSave(f.showWhen, draft.fields) ? { showWhen: ruleForSave(f.showWhen, draft.fields) } : {}),
       ...(ruleForSave(f.requiredWhen, draft.fields) ? { requiredWhen: ruleForSave(f.requiredWhen, draft.fields) } : {}),
       ...(f.type === 'table' ? {

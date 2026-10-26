@@ -15,7 +15,8 @@ import { FormField, PublicFormView } from './forms.model';
  */
 const FIELDS: FormField[] = [
   { key: 'visitor', label: 'Your name', type: 'text', required: true },
-  { key: 'host', label: 'Who are you visiting', type: 'text', required: false },
+  { key: 'host', label: 'Who are you visiting', type: 'text', required: false, placeholder: 'e.g. Ward 4 front desk',
+    help: 'The person or the desk you came to see' },
 ];
 const VIEW: PublicFormView = { name: 'Visitor check-in', description: 'Sign in at the front desk', version: 1, fields: FIELDS,
   requireSignIn: false, expiresAt: '2026-10-19T15:00:00Z', ticket: '1001.1700000000000.abc.sig' };
@@ -48,6 +49,17 @@ function render(opts: { open?: unknown; openFails?: { status: number; message?: 
 }
 
 describe('Public form (share link)', () => {
+  it('UX2: shows a field\'s placeholder inside it and its help under it, linked by aria-describedby, with the label kept', () => {
+    const { el } = render();
+    const host = el.querySelector<HTMLInputElement>('[data-field="host"]')!;
+    expect(host.getAttribute('placeholder')).toBe('e.g. Ward 4 front desk');
+    expect(el.querySelector(`label[for="${host.id}"]`)?.textContent).toContain('Who are you visiting');
+    const note = host.closest('.field')!.querySelector('.field-note')!;
+    expect(note.textContent?.trim()).toBe('The person or the desk you came to see');
+    expect(host.getAttribute('aria-describedby')?.split(' ')).toContain(note.id);
+    expect(el.querySelector('[data-field="visitor"]')?.hasAttribute('placeholder')).toBe(false);
+  });
+
   it('opens the link\'s form by its token and draws its fields, with when the link stops working', () => {
     const { api, el } = render();
     expect(api.open).toHaveBeenCalledWith('tok_abc');

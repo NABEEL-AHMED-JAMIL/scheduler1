@@ -274,4 +274,66 @@ describe('Form builder -- the editor', () => {
     screen.previewChange({ key: 'patient_id', value: 'P-1' });
     expect(screen.previewAnswers()).toEqual({ patient_id: 'P-1' });
   });
+
+  it('UX2: sets a field\'s placeholder and help text in its settings, and the canvas shows them as the person will', () => {
+    const { api, screen, fixture, el } = screenWith();
+    screen.edit(FORMS[0]);
+    fixture.detectChanges();
+    const props = el.querySelector('[data-field-props]')!;
+    const placeholder = props.querySelector<HTMLInputElement>('#fieldPlaceholder0')!;
+    const help = props.querySelector<HTMLTextAreaElement>('#fieldHelp0')!;
+    expect(placeholder).not.toBeNull();
+    expect(placeholder.getAttribute('maxlength')).toBe('120');
+    expect(help.getAttribute('maxlength')).toBe('500');
+    expect(props.querySelector('label[for="fieldPlaceholder0"]')?.textContent).toContain('Placeholder');
+
+    placeholder.value = 'e.g. P-00017';
+    placeholder.dispatchEvent(new Event('input'));
+    help.value = 'As on the wristband';
+    help.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(props.textContent).toContain('12/120');
+    expect(props.textContent).toContain('19/500');
+
+    // The live canvas: the placeholder inside the empty box, the help under it, the label kept.
+    const canvas = el.querySelector('[data-field-row="0"]')!;
+    const box = canvas.querySelector<HTMLInputElement>('#canvas-0-patient_id')!;
+    expect(box.getAttribute('placeholder')).toBe('e.g. P-00017');
+    expect(canvas.querySelector('label')?.textContent).toContain('Patient ID');
+    const note = canvas.querySelector('.field-note')!;
+    expect(note.textContent).toContain('As on the wristband');
+    expect(box.getAttribute('aria-describedby')).toContain(note.id);
+
+    screen.select(1);
+    fixture.detectChanges();
+    const choice = el.querySelector<HTMLInputElement>('#fieldPlaceholder1')!;
+    choice.value = 'Choose a site';
+    choice.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(el.querySelector('#canvas-1-wound_location option')?.textContent?.trim()).toBe('Choose a site');
+
+    screen.save();
+    const sent = (api.save.mock.calls[0] as unknown[])[0] as { fields: FormField[] };
+    expect(sent.fields[0]).toMatchObject({ placeholder: 'e.g. P-00017', help: 'As on the wristband' });
+    expect(sent.fields[1].placeholder).toBe('Choose a site');
+  });
+
+  it('UX2: offers no placeholder where no empty box shows one, and refuses one too long before saving', () => {
+    const { api, screen, fixture, el } = screenWith();
+    screen.newForm();
+    screen.patch({ name: 'Visit' });
+    screen.setField(0, { type: 'yesNo', placeholder: 'kept from text' });
+    screen.select(0);
+    fixture.detectChanges();
+    expect(el.querySelector('[data-placeholder-setting]')).toBeNull();
+    expect(el.querySelector('[data-help-setting]')).not.toBeNull();
+    screen.save();
+    const sent = (api.save.mock.calls[0] as unknown[])[0] as { fields: FormField[] };
+    expect('placeholder' in sent.fields[0]).toBe(false);
+
+    screen.setField(0, { type: 'text', placeholder: 'x'.repeat(121) });
+    screen.save();
+    expect(api.save).toHaveBeenCalledTimes(1);
+    expect(screen.problems()['0']).toBe('Its placeholder is longer than 120 characters.');
+  });
 });
