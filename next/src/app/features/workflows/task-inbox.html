@@ -13,6 +13,10 @@
       </div>
       <div class="flex items-center gap-2 flex-wrap">
         <app-refresh-button [loading]="loading()" [disableWhileLoading]="false" (refresh)="load()" />
+        @if (tab() === 'requests' && !noWorkspace()) {
+          <button type="button" class="btn btn-primary btn-sm" (click)="openNew()" [attr.aria-expanded]="newOpen()" data-test="new-request">
+            <app-icon name="plus" />New request</button>
+        }
         @if (auth.canOpen('workflow-designer')) {
           <a routerLink="/workflows/designer" class="btn btn-default btn-sm"><app-icon name="checkCircle" />Approval workflows</a>
         }
@@ -56,6 +60,56 @@
     <!-- Review 2026-10-07 (M14): a list that could not be read offers to read it again where the reader is looking. -->
     <p class="flex items-center gap-2 rounded-md px-3 py-2 text-sm bg-sunken text-warn-500" role="alert"><app-icon name="alert" size="0.95em" />{{ error() }}
       <button type="button" class="btn btn-default btn-sm ml-auto" (click)="load()" data-test="try-again"><app-icon name="refresh" />Try again</button></p>
+  }
+
+  @if (tab() === 'requests' && newOpen()) {
+    <!-- ZT-S2: a new request of a workflow the reader may start, with its title and what it is about. -->
+    <section class="card p-4 flex flex-col gap-3" aria-label="New request" data-test="new-request-form">
+      <div class="flex items-center gap-2">
+        <h2 class="text-sm font-semibold text-[color:var(--text-primary)]">New request</h2>
+        <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="closeNew()" data-test="new-request-cancel"><app-icon name="close" />Cancel</button>
+      </div>
+      @if (startableWorkflows() === null) {
+        <p class="text-sm text-[color:var(--text-secondary)]">Reading the workflows you may start…</p>
+      } @else if (!startableWorkflows()!.length) {
+        <p class="text-sm text-[color:var(--text-secondary)]" data-test="new-request-none">There is no workflow you may start here yet: an
+          administrator publishes one that a person starts, in Approval workflows.</p>
+      } @else {
+        <label class="field">
+          <span class="label">Workflow</span>
+          <select class="input input-sm" [value]="newKey()" (change)="newKey.set($any($event.target).value)" data-test="new-request-workflow">
+            @for (w of startableWorkflows()!; track w.key) {
+              <option [value]="w.key" [selected]="w.key === newKey()">{{ w.name }}</option>
+            }
+          </select>
+        </label>
+        <label class="field">
+          <span class="label">Title</span>
+          <input class="input input-sm" type="text" maxlength="200" placeholder="What the request is, in a few words"
+                 [value]="newTitle()" (input)="newTitle.set($any($event.target).value)" data-test="new-request-title" />
+        </label>
+        <div class="flex flex-col gap-2" role="group" aria-labelledby="new-request-about">
+          <span class="label" id="new-request-about">What it is about</span>
+          @for (f of newFields(); track $index; let i = $index) {
+            <div class="flex items-center gap-2">
+              <input class="input input-sm" type="text" placeholder="Field, e.g. amount" aria-label="Field name" [value]="f.name"
+                     (input)="setNewField(i, 'name', $any($event.target).value)" data-test="new-request-field-name" />
+              <input class="input input-sm" type="text" placeholder="Value" aria-label="Field value" [value]="f.value"
+                     (input)="setNewField(i, 'value', $any($event.target).value)" data-test="new-request-field-value" />
+              <button type="button" class="btn btn-ghost btn-sm" (click)="removeNewField(i)" aria-label="Remove this field"><app-icon name="close" /></button>
+            </div>
+          }
+          <button type="button" class="btn btn-default btn-sm self-start" (click)="addNewField()" data-test="new-request-add-field"><app-icon name="plus" />Add a field</button>
+        </div>
+        <div class="flex items-center gap-2">
+          <button type="button" class="btn btn-primary btn-sm" [disabled]="newBusy()" (click)="submitNew()" data-test="new-request-start">
+            <app-icon name="send" />Start the request</button>
+        </div>
+      }
+      @if (newError()) {
+        <p class="text-sm text-warn-500" role="alert" data-test="new-request-error">{{ newError() }}</p>
+      }
+    </section>
   }
 
   <div class="inbox-split" [attr.data-pane]="pane()">

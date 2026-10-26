@@ -117,6 +117,14 @@ export interface RequestDetail extends RequestRow {
 
 export type Decision = 'approve' | 'reject' | 'changes' | 'done';
 
+/** ZT-S2: a workflow a person may start from My requests > New request. */
+export interface StartableWorkflow {
+  key: string;
+  name: string;
+  description?: string | null;
+  currentVersion?: number | null;
+}
+
 @Injectable({ providedIn: 'root' })
 export class WorkflowsApi {
   private readonly http = inject(HttpClient);
@@ -163,6 +171,19 @@ export class WorkflowsApi {
 
   start(body: { definitionKey: string; subjectId: string; title?: string; subject?: unknown }, key: string): Observable<ApiResponse<RequestRow>> {
     return this.http.post<ApiResponse<RequestRow>>(`${this.workflows}/start`, body, { headers: { 'Idempotency-Key': key } });
+  }
+
+  /**
+   * ZT-S2: My requests > New request -- the workflows the reader may start (published, active, the workspace's own, started
+   * by a person), under the task inbox like My requests, so no designer page is needed.
+   */
+  startable(): Observable<ApiResponse<StartableWorkflow[]>> {
+    return this.http.get<ApiResponse<StartableWorkflow[]>>(`${this.inbox}/requests/startable`);
+  }
+
+  /** ZT-S2: starts a request of a startable workflow as the reader; the same key twice starts one. */
+  newRequest(body: { definitionKey: string; title?: string; subject?: Record<string, unknown> }, key: string): Observable<ApiResponse<RequestRow>> {
+    return this.http.post<ApiResponse<RequestRow>>(`${this.inbox}/requests/start`, body, { headers: { 'Idempotency-Key': key } });
   }
 
   /** My requests: what the reader started. Under the task inbox, so a requester needs no other page to follow them. */

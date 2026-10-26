@@ -16,7 +16,7 @@ import { ToastService } from '../../shared/ui/toast.service';
 import { confirmWith } from '../../shared/ui/confirm';
 import { Dialog } from '@angular/cdk/dialog';
 import { Observable } from 'rxjs';
-import { Colleague, Decision, InboxPage, InboxTask, RequestDetail, RequestRow, TaskDetail, WorkflowsApi, CANNOT_ACT } from './workflows.api';
+import { Colleague, Decision, InboxPage, InboxTask, RequestDetail, RequestRow, StartableWorkflow, TaskDetail, WorkflowsApi, CANNOT_ACT } from './workflows.api';
 import { HistoryLine, compactTime, dropOwnStep, exactTime, historyLines, relativeTime, shortTime } from './history';
 import { TaskCountService } from './task-count.service';
 import { ListItem, RowTone, appendPage, choicesOf, commonOf, dueGroup, groupRows, matchesSearch, mergeHead, nextAfter, pastGroup, splitRef, stepFrom } from './inbox-list';
@@ -540,6 +540,86 @@ export class TaskInbox implements OnInit {
         else { this.detail.set(null); this.detailError.set(r.message || 'This task could not be read.'); }
       },
       error: () => { this.detail.set(null); this.detailError.set('This task could not be read.'); },
+    });
+  }
+
+  /**
+   * ZT-S2: My requests > New request. A person who makes requests starts one of the workflows they may start (published,
+   * active, the workspace's own, started by a person) with a title and what it is about -- the subject's fields, as names and
+   * values. Through the task inbox, so the workflow designer's page is not needed; editing a workflow stays the designer's.
+   */
+  readonly newOpen = signal(false);
+  readonly startableWorkflows = signal<StartableWorkflow[] | null>(null);
+  readonly newKey = signal('');
+  readonly newTitle = signal('');
+  readonly newFields = signal<{ name: string; value: string }[]>([{ name: '', value: '' }]);
+  readonly newBusy = signal(false);
+  readonly newError = signal('');
+  private newIdempotency = '';
+
+  openNew(): void {
+    this.newOpen.set(true);
+    this.newError.set('');
+    this.newIdempotency = `new-request-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    this.api.startable().subscribe({
+      next: r => {
+        const list = r.status === API_SUCCESS ? r.data ?? [] : [];
+        this.startableWorkflows.set(list);
+        if (!list.some(w => w.key === this.newKey())) this.newKey.set(list[0]?.key ?? '');
+        if (r.status !== API_SUCCESS) this.newError.set(r.message || 'The workflows you may start could not be read.');
+      },
+      error: () => { this.startableWorkflows.set([]); this.newError.set('The workflows you may start could not be read. Try again.'); },
+    });
+  }
+
+  closeNew(): void {
+    this.newOpen.set(false);
+  }
+
+  setNewField(index: number, part: 'name' | 'value', value: string): void {
+    this.newFields.update(fields => fields.map((f, i) => i === index ? { ...f, [part]: value } : f));
+  }
+
+  addNewField(): void {
+    this.newFields.update(fields => [...fields, { name: '', value: '' }]);
+  }
+
+  removeNewField(index: number): void {
+    this.newFields.update(fields => fields.length > 1 ? fields.filter((_, i) => i !== index) : [{ name: '', value: '' }]);
+  }
+
+  /** The subject's fields: each named one, a number where its value reads as one. */
+  newSubject(): Record<string, unknown> {
+    const subject: Record<string, unknown> = {};
+    for (const f of this.newFields()) {
+      const name = f.name.trim();
+      if (!name) continue;
+      const value = f.value.trim();
+      subject[name] = value !== '' && /^-?\d+(\.\d+)?$/.test(value) ? Number(value) : value;
+    }
+    return subject;
+  }
+
+  submitNew(): void {
+    const key = this.newKey();
+    if (!key) { this.newError.set('Pick the workflow to start.'); return; }
+    this.newBusy.set(true);
+    this.newError.set('');
+    this.api.newRequest({ definitionKey: key, title: this.newTitle().trim() || undefined, subject: this.newSubject() }, this.newIdempotency).subscribe({
+      next: r => {
+        this.newBusy.set(false);
+        if (r.status !== API_SUCCESS) { this.newError.set(r.message || 'The request could not be started.'); return; }
+        this.toast.success(r.message || 'Request started.');
+        this.newOpen.set(false);
+        this.newTitle.set('');
+        this.newFields.set([{ name: '', value: '' }]);
+        this.load();
+        if (r.data?.id) this.openRequest(r.data.id, true);
+      },
+      error: (e: { error?: { message?: string } }) => {
+        this.newBusy.set(false);
+        this.newError.set(e?.error?.message || 'The request could not be started.');
+      },
     });
   }
 
