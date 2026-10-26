@@ -87,6 +87,8 @@ export class AccessProfileEditor implements OnInit {
     profileName: ['', [Validators.required, Validators.maxLength(100)]],
     description: ['', Validators.maxLength(500)],
     defaultProfile: [false],
+    // MIG-424: two-factor sign-in required of this profile's people.
+    requireMfa: [false],
   });
 
   /** The catalogue as the menu arranges it. */
@@ -162,7 +164,8 @@ export class AccessProfileEditor implements OnInit {
   startFrom(profile: AccessProfile): void {
     this.profile.set(profile);
     this.selected.set(new Set(profile.pageKeys ?? []));
-    this.form.patchValue({ profileName: profile.profileName, description: profile.description ?? '', defaultProfile: profile.defaultProfile });
+    this.form.patchValue({ profileName: profile.profileName, description: profile.description ?? '', defaultProfile: profile.defaultProfile,
+      requireMfa: !!profile.requireMfa });
     // The default stays the default until another is made it (Make default on Page access).
     if (profile.defaultProfile) this.form.get('defaultProfile')!.disable();
   }
@@ -288,6 +291,7 @@ export class AccessProfileEditor implements OnInit {
       description: String(value.description ?? '').trim() || null,
       defaultProfile: !!value.defaultProfile || this.first(),
       pageKeys,
+      requireMfa: !!value.requireMfa,
     }).subscribe({
       next: response => {
         this.saving.set(false);

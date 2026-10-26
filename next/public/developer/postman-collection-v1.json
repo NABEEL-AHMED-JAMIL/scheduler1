@@ -185,6 +185,14 @@
                 ":pipelineId",
                 "runs"
               ],
+              "query": [
+                {
+                  "key": "wait",
+                  "value": "30s",
+                  "disabled": true,
+                  "description": "Seconds to wait for the run to end, 1 to 60 (`30` or `30s`). Absent: answer at once (202)."
+                }
+              ],
               "variable": [
                 {
                   "key": "pipelineId",
@@ -192,10 +200,10 @@
                 }
               ]
             },
-            "description": "Start a run with a record and/or uploaded files (push intake).\n\nThe record is validated against the pipeline's input contract first; nothing is stored when it fails (422, each field's path under \"record\"). Every file id must be one of the workspace's own files (422 at \"files[i]\"). The record and the files are handed to the run as its intake: one JSON object with the record's fields and the start's own under names beginning with \"_\" (_reference, _files, _file_ids, _file_bucket, _file_key, ...). One run of a pipeline is in flight at a time (409 while one is). Sending the same Idempotency-Key again returns the first run.\n\noperationId: startRun",
+            "description": "Start a run with a record and/or uploaded files (push intake).\n\nThe record is validated against the pipeline's input contract first; nothing is stored when it fails (422, each field's path under \"record\"). Every file id must be one of the workspace's own files (422 at \"files[i]\"). The record and the files are handed to the run as its intake: one JSON object with the record's fields and the start's own under names beginning with \"_\" (_reference, _files, _file_ids, _file_bucket, _file_key, ...). One run of a pipeline is in flight at a time (409 while one is). Sending the same Idempotency-Key again returns the first run. `parameters` are the run's parameter values by name, checked as the pipeline declares them (GET /pipelines/{id} lists them): a name it does not declare, a value of the wrong type or a required one with no value and no default is a 422 at \"parameters.<name>\", and nothing starts. Run and wait: with `wait` (1 to 60 seconds), the answer waits for the run to end -- ended in time, 200 with the run and its `result` (a completed run's final output, as GET /runs/{runId}/result gives it); still going, the 202 and its Location, as without `wait`. A replay with the same Idempotency-Key waits again for the same run.\n\noperationId: startRun",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"record\": {},\n  \"files\": [\n    \"string\"\n  ],\n  \"reference\": \"string\"\n}",
+              "raw": "{\n  \"record\": {},\n  \"files\": [\n    \"string\"\n  ],\n  \"reference\": \"string\",\n  \"parameters\": {}\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -373,6 +381,32 @@
               ]
             },
             "description": "The run's manifest: the files it received and made, by file id, and its review.\n\nThe files the run's latest attempt made (role result, or report for a PDF) and, for a run started through the API, the files it was given (role input), each by its file id: GET /v1/files/{fileId} downloads it. A step that makes a PDF lists two files with the same step: the PDF (report), which prints the first rows of a big table, and the full data beside it as a CSV (result), unless the step turns that off. Never a bucket, a storage key or a connection. A made file is kept as long as the pipeline keeps its run's files (expiresAt); after that it is listed as expired and its download is 410.\n\noperationId: getRunOutputs"
+          },
+          "response": []
+        },
+        {
+          "name": "A completed run's answer: its final output's rows, masked, at most 100 rows and 16 KB.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/runs/:runId/result",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "runs",
+                ":runId",
+                "result"
+              ],
+              "variable": [
+                {
+                  "key": "runId",
+                  "value": "123"
+                }
+              ]
+            },
+            "description": "A completed run's answer: its final output's rows, masked, at most 100 rows and 16 KB.\n\nThe rows of the last step of the run's latest attempt that kept an output, as the pipeline's own data -- the answer a run-and-wait gives when the run ends in time. Every column the workspace's data policy marks sensitive (the Data Catalog's sensitive assets, and a person's details in a pipeline marked sensitive) is masked, and named in `masked`; at most 100 rows and 16 KB of JSON (`truncated` says when there were more). An output past the pipeline's retention, or a run that kept none, answers no rows and says why in `problem`. A run that has not completed is a 409 (`run-not-completed`); another workspace's run a 404.\n\noperationId: getRunResult"
           },
           "response": []
         },

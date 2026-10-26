@@ -17,6 +17,12 @@ export interface AccessProfile {
   /** Default profile only: the people who land on it with no profile of their own. */
   defaultUserCount?: number | null;
   defaultUserNames?: string[] | null;
+  /** MIG-424: its people must sign in with two-factor (enrolment at their next sign-in). */
+  requireMfa?: boolean;
+  /** MIG-424: of its people (and, for the default, everyone with no profile), how many have two-factor on, and who has not. */
+  mfaEnrolledCount?: number | null;
+  mfaNotEnrolledCount?: number | null;
+  mfaNotEnrolledNames?: string[] | null;
   dateCreated?: string;
   dateUpdated?: string;
   createdByName?: string | null;
@@ -38,6 +44,10 @@ export interface AccessPerson {
   /** Pages opened for this person beyond their profile, and withheld despite it. */
   allowedExceptions?: PageKey[];
   withheldExceptions?: PageKey[];
+  /** MIG-424: two-factor on for them, and whether -- and by what -- it is required of them. */
+  twoFactorEnabled?: boolean;
+  twoFactorRequired?: boolean;
+  twoFactorRequiredBy?: 'workspace' | 'profile' | null;
 }
 
 /** What the dialog sends: the id only on an edit. */
@@ -74,6 +84,8 @@ export interface AccessProfileDraft {
   description: string | null;
   defaultProfile: boolean;
   pageKeys: (PageKey | TabKey)[];
+  /** MIG-424: its people must sign in with two-factor. */
+  requireMfa?: boolean;
 }
 
 /**

@@ -47,6 +47,22 @@
           </span>
         </span>
       </label>
+      <!-- MIG-424: two-factor sign-in for this profile's people, beside the workspace-wide rule (Administration › Security). -->
+      <label class="flex items-start gap-2 text-sm cursor-pointer select-none mt-3" data-testid="profile-require-mfa">
+        <input type="checkbox" class="checkbox mt-0.5" formControlName="requireMfa" />
+        <span>
+          <span class="font-medium">Require two-factor sign-in</span>
+          <span class="block text-xs text-[color:var(--text-muted)]">
+            People on this profile set up an authenticator app at their next sign-in, and cannot switch it off.
+            @if (profile(); as p) {
+              @if (p.mfaEnrolledCount != null) {
+                {{ p.mfaEnrolledCount }} of its {{ p.mfaEnrolledCount + (p.mfaNotEnrolledCount ?? 0) }} people have it on@if (p.mfaNotEnrolledCount) {;
+                not yet: {{ (p.mfaNotEnrolledNames ?? []).slice(0, 5).join(', ') }}@if ((p.mfaNotEnrolledNames ?? []).length > 5) { and {{ (p.mfaNotEnrolledNames ?? []).length - 5 }} more }}.
+              }
+            }
+          </span>
+        </span>
+      </label>
     </form>
 
     <div class="ap-editor">

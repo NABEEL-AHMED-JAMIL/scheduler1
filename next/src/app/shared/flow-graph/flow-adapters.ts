@@ -104,6 +104,8 @@ const TASK_ICONS: Record<string, string> = {
   split_pages: 'layers',
   // MIG-421: page images read as text (OCR).
   ocr_pages: 'text',
+  // MIG-424: another pipeline of the workspace, called with parameters, its answer as rows.
+  run_pipeline: 'play',
 };
 
 const strings = (v: unknown): string[] => (Array.isArray(v) ? v : [v]).filter((x): x is string => typeof x === 'string' && !!x);

@@ -681,6 +681,19 @@ export function outputColumns(definition: Definition, index: number, tasks: Step
     case 'split_pages':
       return fileRowColumns(definition, index, tasks, ['file_name', 'file_stem', 'page', 'page_count', 'page_text', 'page_chars',
         'page_image', 'page_status', 'page_error']);
+    // MIG-424: Run pipeline -- per row, each row with its call's outcome and the answer's fields; once, the called run's own
+    // columns, which only its run knows (the chosen fields, when named).
+    case 'run_pipeline': {
+      const prefix = typeof config['prefix'] === 'string' && config['prefix'] ? config['prefix'] as string : 'called_';
+      const fields = (Array.isArray(config['fields']) ? config['fields'] as Record<string, unknown>[] : [])
+        .map(f => (typeof f?.['as'] === 'string' && f['as'] ? f['as'] : typeof f?.['path'] === 'string' ? (f['path'] as string).split('.').pop()! : ''))
+        .filter(Boolean) as string[];
+      if (config['mode'] === 'each') {
+        const columns = input();
+        return columns ? union(columns, [`${prefix}run_id`, `${prefix}status`, `${prefix}ok`, `${prefix}error`, ...fields]) : null;
+      }
+      return fields.length ? fields : null;
+    }
     // MIG-421: Read text from pages -- each page's row, then what OCR read on it.
     case 'ocr_pages': {
       const columns = input();
@@ -749,7 +762,11 @@ function fileRowColumns(definition: Definition, index: number, tasks: StepTaskEn
 // ---------------------------------------------------------------------------------------------- a config form
 
 export type FieldKind = 'text' | 'textarea' | 'number' | 'integer' | 'boolean' | 'enum' | 'multi' | 'list' | 'objects' | 'object' | 'json'
-  | 'scalar' | 'column' | 'step' | 'columns' | 'prompt' | 'bucket' | 'webhook' | 'document-type' | 'api-request' | 'api-environment';
+  | 'scalar' | 'column' | 'step' | 'columns' | 'prompt' | 'bucket' | 'webhook' | 'document-type' | 'api-request' | 'api-environment'
+  | 'schedule';
+
+/** MIG-424: one of the workspace's schedules (jobs) a step may call (Run pipeline): its id, and its name as the choice shows it. */
+export interface ScheduleChoice { id: number; label: string; }
 
 /** MIG-245: a saved AI prompt a step may name: its id, and its name as the choice shows it. */
 export interface PromptChoice { id: number; label: string; }
@@ -790,7 +807,7 @@ export interface BucketChoice { alias: string; label: string; }
  * TODO(MIG-249): pickers for api-request, api-environment, data-contract, db-connection, pipeline and user.
  */
 export const FORMATS = ['column', 'step', 'sql', 'template', 'multiline', 'api-request', 'api-environment', 'data-contract',
-  'db-connection', 'bucket', 'pipeline', 'user', 'prompt', 'expression', 'webhook', 'document-type'] as const;
+  'db-connection', 'bucket', 'pipeline', 'user', 'prompt', 'expression', 'webhook', 'document-type', 'schedule'] as const;
 const LONG_TEXT_FORMATS = ['sql', 'template', 'multiline', 'textarea'];
 
 export interface FieldSpec {
@@ -840,7 +857,7 @@ function kindOf(schema: JsonSchema): FieldKind {
     case 'integer':
       return schema.format === 'prompt' ? 'prompt' : schema.format === 'webhook' ? 'webhook'
         : schema.format === 'document-type' ? 'document-type' : schema.format === 'api-request' ? 'api-request'
-        : schema.format === 'api-environment' ? 'api-environment' : 'integer';
+        : schema.format === 'api-environment' ? 'api-environment' : schema.format === 'schedule' ? 'schedule' : 'integer';
     case 'number': return 'number';
     case 'boolean': return 'boolean';
     case 'array': {
@@ -967,6 +984,11 @@ export function usesWebhook(schema: JsonSchema | null | undefined): boolean {
 /** Owner #25: whether a task's settings name a saved API request anywhere (so its panel offers the workspace's requests). */
 export function usesApiRequest(schema: JsonSchema | null | undefined): boolean {
   return usesFormat(schema, 'api-request');
+}
+
+/** MIG-424: whether a task's settings name a schedule anywhere (Run pipeline: its panel offers the workspace's schedules). */
+export function usesSchedule(schema: JsonSchema | null | undefined): boolean {
+  return usesFormat(schema, 'schedule');
 }
 
 /** MIG-364: whether a task's settings name a document type anywhere (so its panel offers the workspace's types). */

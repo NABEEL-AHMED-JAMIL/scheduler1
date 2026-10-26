@@ -156,13 +156,14 @@ const KIND_WORDS: Record<FieldKind, string> = {
   list: 'List', objects: 'Repeatable group', object: 'Group', json: 'JSON', scalar: 'Text, number or yes/no',
   column: 'Column', step: 'Earlier step', columns: 'Columns', prompt: 'AI prompt', bucket: 'Bucket', webhook: 'Webhook',
   'document-type': 'Document type', 'api-request': 'API request', 'api-environment': 'API environment',
+  schedule: 'Pipeline (schedule)',
 };
 
 /** The registry's widget hints that name what a value points at (FORMATS), as words. */
 const FORMAT_WORDS: Record<string, string> = {
   sql: 'SQL', template: 'Text with placeholders', 'api-request': 'API request', 'api-environment': 'API environment',
   'data-contract': 'Data contract', 'db-connection': 'Database connection', bucket: 'Bucket', pipeline: 'Pipeline', user: 'People',
-  prompt: 'AI prompt', expression: 'Formula', webhook: 'Webhook', 'document-type': 'Document type',
+  prompt: 'AI prompt', expression: 'Formula', webhook: 'Webhook', 'document-type': 'Document type', schedule: 'Pipeline (schedule)',
 };
 
 const shown = (value: unknown) => (typeof value === 'string' ? value : JSON.stringify(value));

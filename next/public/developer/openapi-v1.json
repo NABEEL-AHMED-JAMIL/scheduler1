@@ -258,7 +258,7 @@
         ],
         "operationId": "startRun",
         "summary": "Start a run with a record and/or uploaded files (push intake).",
-        "description": "The record is validated against the pipeline's input contract first; nothing is stored when it fails (422, each field's path under \"record\"). Every file id must be one of the workspace's own files (422 at \"files[i]\"). The record and the files are handed to the run as its intake: one JSON object with the record's fields and the start's own under names beginning with \"_\" (_reference, _files, _file_ids, _file_bucket, _file_key, ...). One run of a pipeline is in flight at a time (409 while one is). Sending the same Idempotency-Key again returns the first run.\n",
+        "description": "The record is validated against the pipeline's input contract first; nothing is stored when it fails (422, each field's path under \"record\"). Every file id must be one of the workspace's own files (422 at \"files[i]\"). The record and the files are handed to the run as its intake: one JSON object with the record's fields and the start's own under names beginning with \"_\" (_reference, _files, _file_ids, _file_bucket, _file_key, ...). One run of a pipeline is in flight at a time (409 while one is). Sending the same Idempotency-Key again returns the first run. `parameters` are the run's parameter values by name, checked as the pipeline declares them (GET /pipelines/{id} lists them): a name it does not declare, a value of the wrong type or a required one with no value and no default is a 422 at \"parameters.<name>\", and nothing starts. Run and wait: with `wait` (1 to 60 seconds), the answer waits for the run to end -- ended in time, 200 with the run and its `result` (a completed run's final output, as GET /runs/{runId}/result gives it); still going, the 202 and its Location, as without `wait`. A replay with the same Idempotency-Key waits again for the same run.\n",
         "security": [
           {
             "clientCredentials": [
@@ -272,6 +272,19 @@
           },
           {
             "$ref": "#/components/parameters/IdempotencyKey"
+          },
+          {
+            "name": "wait",
+            "in": "query",
+            "required": false,
+            "description": "Seconds to wait for the run to end, 1 to 60 (`30` or `30s`). Absent: answer at once (202).",
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]{1,2}s?$",
+              "examples": [
+                "30s"
+              ]
+            }
           }
         ],
         "requestBody": {
@@ -285,6 +298,24 @@
           }
         },
         "responses": {
+          "200": {
+            "description": "Run and wait: the run ended within `wait` -- the run, and its result when it completed.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "/v1/runs/{runId}"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunWithResult"
+                }
+              }
+            }
+          },
           "202": {
             "description": "Queued.",
             "headers": {
@@ -823,6 +854,55 @@
           },
           "503": {
             "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/runs/{runId}/result": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "operationId": "getRunResult",
+        "summary": "A completed run's answer: its final output's rows, masked, at most 100 rows and 16 KB.",
+        "description": "The rows of the last step of the run's latest attempt that kept an output, as the pipeline's own data -- the answer a run-and-wait gives when the run ends in time. Every column the workspace's data policy marks sensitive (the Data Catalog's sensitive assets, and a person's details in a pipeline marked sensitive) is masked, and named in `masked`; at most 100 rows and 16 KB of JSON (`truncated` says when there were more). An output past the pipeline's retention, or a run that kept none, answers no rows and says why in `problem`. A run that has not completed is a 409 (`run-not-completed`); another workspace's run a 404.\n",
+        "security": [
+          {
+            "clientCredentials": [
+              "runs:read"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RunId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The run's result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunResultEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
           }
         }
       }
@@ -2760,6 +2840,14 @@
           "retryRun"
         ]
       },
+      "run-not-completed": {
+        "status": 409,
+        "title": "Conflict",
+        "description": "The run has not completed (queued, running, failed, skipped or interrupted), so it has no result.",
+        "operations": [
+          "getRunResult"
+        ]
+      },
       "run-not-failed": {
         "status": 409,
         "title": "Conflict",
@@ -3141,6 +3229,117 @@
             "type": "string",
             "maxLength": 128,
             "description": "The organisation's own id for this work, echoed back."
+          },
+          "parameters": {
+            "type": "object",
+            "additionalProperties": {
+              "type": [
+                "string",
+                "number",
+                "boolean"
+              ]
+            },
+            "description": "The run's parameter values by name, as the pipeline declares them (GET /pipelines/{id}: parameters)."
+          }
+        }
+      },
+      "RunResult": {
+        "type": "object",
+        "required": [
+          "columns",
+          "rowCount",
+          "rows",
+          "truncated",
+          "masked"
+        ],
+        "properties": {
+          "step": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The key of the step whose output this is."
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "rowCount": {
+            "type": "integer",
+            "description": "How many rows the output has; rows holds at most 100 of them."
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "More rows (or more than 16 KB) than given."
+          },
+          "masked": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The columns masked by the workspace's data policy."
+          },
+          "problem": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why there are no rows: past its retention, or the run kept no output."
+          }
+        }
+      },
+      "RunWithResult": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Run"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "result": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/RunResult"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "A completed run's result; null for a run that failed, was skipped or interrupted."
+              }
+            }
+          }
+        ]
+      },
+      "RunResultEnvelope": {
+        "type": "object",
+        "required": [
+          "runId",
+          "pipelineId",
+          "status",
+          "result"
+        ],
+        "properties": {
+          "runId": {
+            "type": "string"
+          },
+          "pipelineId": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RunStatus"
+          },
+          "result": {
+            "$ref": "#/components/schemas/RunResult"
           }
         }
       },

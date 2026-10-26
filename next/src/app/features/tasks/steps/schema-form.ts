@@ -2,7 +2,7 @@ import { Component, computed, input, linkedSignal, output, signal } from '@angul
 import { Field } from '../../../shared/ui/field';
 import { Icon } from '../../../shared/ui/icon';
 import {
-  ApiRequestChoice, BucketChoice, DocumentTypeChoice, FieldKind, FieldSpec, JsonSchema, PromptChoice, StepProblem, WebhookChoice, coerce, fieldsOf, isMapSchema, mapValueKind, parseJson, withValue,
+  ApiRequestChoice, BucketChoice, DocumentTypeChoice, FieldKind, FieldSpec, JsonSchema, PromptChoice, ScheduleChoice, StepProblem, WebhookChoice, coerce, fieldsOf, isMapSchema, mapValueKind, parseJson, withValue,
 } from './steps.model';
 
 interface MapRow { key: string; value: unknown; }
@@ -169,6 +169,20 @@ interface MapRow { key: string; value: unknown; }
                 @for (e of environmentChoices(); track e.id) { <option [value]="'' + e.id" [selected]="textOf(f) === '' + e.id">{{ e.label }}</option> }
                 @if (textOf(f) && !environmentListed(f)) {
                   <option [value]="textOf(f)" selected>Environment {{ textOf(f) }}</option>
+                }
+              </select>
+            </app-field>
+          }
+          @case ('schedule') {
+            <!-- MIG-424: one of the workspace's schedules (a pipeline to call), stored as its id. -->
+            <app-field [label]="f.label" [for]="idOf(f)" [required]="f.required" [error]="errorOf(f)"
+                       [hint]="f.description || scheduleHint">
+              <select [id]="idOf(f)" class="input" [value]="textOf(f)" [disabled]="disabled()" data-test="schedule-select"
+                      (change)="set(f.name, $any($event.target).value === '' ? undefined : +$any($event.target).value)">
+                <option value="">{{ f.required ? 'Choose a pipeline…' : 'None' }}</option>
+                @for (j of schedules(); track j.id) { <option [value]="'' + j.id" [selected]="textOf(f) === '' + j.id">{{ j.label }}</option> }
+                @if (textOf(f) && !scheduleListed(f)) {
+                  <option [value]="textOf(f)" selected>Schedule {{ textOf(f) }} (not one of this workspace's)</option>
                 }
               </select>
             </app-field>
@@ -347,6 +361,9 @@ export class SchemaForm {
   /** The environments of the request this form's requestId names: what an api-environment setting offers. */
   readonly environmentChoices = computed(() =>
     this.apiRequests().find(r => '' + r.id === '' + (this.current()['requestId'] ?? ''))?.environments ?? []);
+  /** MIG-424: the workspace's schedules, what a schedule setting (Run pipeline's pipeline) offers. */
+  readonly schedules = input<ScheduleChoice[]>([]);
+  readonly scheduleHint = 'One of this workspace’s pipelines, by its schedule (Pipelines › Schedules).';
   /** MIG-364: what a document-type setting says when its schema says nothing. */
   readonly documentTypeHint = 'One of this workspace’s document types (Documents › Document types).';
   readonly disabled = input(false);
@@ -399,6 +416,10 @@ export class SchemaForm {
 
   environmentListed(f: FieldSpec): boolean {
     return this.environmentChoices().some(e => '' + e.id === this.textOf(f));
+  }
+
+  scheduleListed(f: FieldSpec): boolean {
+    return this.schedules().some(j => '' + j.id === this.textOf(f));
   }
 
   webhookListed(f: FieldSpec): boolean {

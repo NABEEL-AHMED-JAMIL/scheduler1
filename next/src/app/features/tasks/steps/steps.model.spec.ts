@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   Definition, StepTaskEntry, addStep, canonical, coerce, inputColumns, isMapSchema, mapValueKind, outputColumns, refusalOf, definitionJson, fieldsOf, isLegacyDefinition, moveStep, nextKey, problemsByStep,
   removeStep, replaceStep, runFinished, sampleRowsOf, schemaSupported, seedConfig, taskEntry, taskOptions, toYaml, updateSettings,
-  withSample, parseSampleRows, usesWebhook, usesDocumentType,
+  withSample, parseSampleRows, usesWebhook, usesDocumentType, usesSchedule,
 } from './steps.model';
 
 /**
@@ -429,6 +429,15 @@ describe('fieldsOf -- MIG-364', () => {
     expect(usesDocumentType(schema)).toBe(true);
     expect(usesDocumentType({ type: 'object', properties: { source: schema } })).toBe(true);
     expect(usesDocumentType({ type: 'object', properties: { promptId: { type: 'integer', format: 'prompt' } } })).toBe(false);
+  });
+});
+
+describe('fieldsOf -- MIG-424', () => {
+  it('reads an integer with the schedule hint as a schedule choice, and knows a task that names one', () => {
+    const schema = { type: 'object', properties: { jobId: { type: 'integer', format: 'schedule', title: 'Pipeline' } } };
+    expect(fieldsOf(schema)[0].kind).toBe('schedule');
+    expect(usesSchedule(schema)).toBe(true);
+    expect(usesSchedule({ type: 'object', properties: { promptId: { type: 'integer', format: 'prompt' } } })).toBe(false);
   });
 });
 

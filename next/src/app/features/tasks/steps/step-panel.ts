@@ -10,8 +10,7 @@ import { CallApiPreview } from './call-api-preview';
 import { REPORT_DESIGN_KEYS, ReportDesignSettings, ReportStepDesign } from './report-step-design';
 import {
   LIMITS, ON_ERRORS, ApiRequestChoice, BucketChoice, DocumentTypeChoice, JsonSchema, PromptChoice, WebhookChoice, Step, StepProblem, StepTaskEntry, canonicalStep, fieldsOf, onErrorLabel, parseJson, problemsAt, taskLabel,
-  validKey,
-} from './steps.model';
+  validKey, ScheduleChoice } from './steps.model';
 
 export interface StepPanelData {
   step: Step;
@@ -32,6 +31,8 @@ export interface StepPanelData {
   documentTypes?: DocumentTypeChoice[];
   /** Owner #25: the workspace's saved API requests, for a task whose settings name one. */
   apiRequests?: ApiRequestChoice[];
+  /** MIG-424: the workspace's schedules, for a task whose settings name one (Run pipeline). */
+  schedules?: ScheduleChoice[];
   /** MIG-419: the pipeline's sample rows, for a Call API step's "What the first call sends". */
   sampleRows?: Record<string, unknown>[] | null;
   /** The server's problems with this step, at paths relative to it ("retry.maxAttempts", "config.columns"). */

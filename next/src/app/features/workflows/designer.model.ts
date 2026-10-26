@@ -48,6 +48,10 @@ export interface DraftStep {
   /** 2026-10-21: wait until the run ends (its approvals included), keep its outcome at saveAs, give up after waitHours. */
   waitFor?: boolean;
   waitHours?: number | null;
+  /** MIG-424: the run's parameters by name, each a text filled from the request ({{subject.mrn}}, {{registration.patient_id}}). */
+  parameters?: Record<string, string>;
+  /** MIG-424: what a waiting step keeps of the run's answer, beside its outcome at saveAs (careplan.risk). */
+  results?: RunResults | null;
   // call_api (owner #25): a saved API request, its environment, variables from the request's fields, where the answer goes
   requestId?: number | null;
   environmentId?: number | null;
@@ -57,6 +61,51 @@ export interface DraftStep {
   dataset?: string;
   // wait
   hours?: number | null;
+}
+
+/** MIG-424: a result field -- a column, or a column and a dot path into its JSON -- and the name it is kept under. */
+export interface ResultField { path: string; as?: string; }
+
+/** MIG-424: what a Run pipeline step keeps of the run's answer: from its final output or a step, first row, rows or a figure. */
+export interface RunResults {
+  from?: string;
+  take?: 'first' | 'all' | 'count' | 'sum' | 'min' | 'max' | 'avg';
+  fields?: (string | ResultField)[];
+  maxRows?: number;
+}
+
+export const RESULT_TAKES: { take: NonNullable<RunResults['take']>; label: string }[] = [
+  { take: 'first', label: 'The first row\'s fields' },
+  { take: 'all', label: 'The rows (up to 100)' },
+  { take: 'count', label: 'How many rows' },
+  { take: 'sum', label: 'Each field\'s sum' },
+  { take: 'min', label: 'Each field\'s lowest' },
+  { take: 'max', label: 'Each field\'s highest' },
+  { take: 'avg', label: 'Each field\'s average' },
+];
+
+/** The fields the run's outcome keeps at saveAs itself: a result field may not take one of these names. */
+export const OUTCOME_FIELDS = ['runId', 'jobId', 'status', 'ok', 'ended', 'message', 'giveUpAt', 'rowCount', 'rows', 'count', 'truncated',
+  'masked', 'resultsProblem', 'resultsStep'];
+
+/** A result field's name: its as, else its path's last part, as workflow-service and Core name it. */
+export function resultName(field: string | ResultField): string {
+  const f = typeof field === 'string' ? { path: field } : field;
+  if (f.as && f.as.trim()) return f.as.trim();
+  const last = f.path.slice(f.path.lastIndexOf('.') + 1);
+  let name = last.replace(/[^A-Za-z0-9_]/g, '_');
+  if (!name || !/^[A-Za-z_]/.test(name)) name = 'f_' + name;
+  return name.slice(0, 64);
+}
+
+/** What a later Condition reads for a waiting Run pipeline step: saveAs.ok, .status and each result field's name. */
+export function runFields(s: DraftStep): string[] {
+  const saveAs = s.saveAs || runSaveAs(s.key);
+  const out = ['ok', 'status', 'message'].map(f => `${saveAs}.${f}`);
+  const take = s.results?.take ?? 'first';
+  if (s.results && take === 'count') out.push(`${saveAs}.count`);
+  else if (s.results && take !== 'all') (s.results.fields ?? []).forEach(f => out.push(`${saveAs}.${resultName(f)}`));
+  return out;
 }
 
 /**
@@ -143,15 +192,29 @@ export function toJson(steps: DraftStep[]): { steps: Record<string, unknown>[] }
           out['to'] = who(s.to);
           out['message'] = s.message;
           break;
-        case 'run_pipeline':
+        case 'run_pipeline': {
           out['jobId'] = s.jobId;
           if (s.onError === 'continue') out['onError'] = 'continue';
+          const parameters = Object.entries(s.parameters ?? {}).filter(([name, value]) => name.trim() && `${value ?? ''}`.trim() !== '');
+          if (parameters.length) out['parameters'] = Object.fromEntries(parameters.map(([name, value]) => [name.trim(), `${value}`]));
           if (s.waitFor) {
             out['waitFor'] = true;
             out['saveAs'] = s.saveAs || runSaveAs(s.key);
             out['waitHours'] = s.waitHours ?? 24;
+            // MIG-424: results only on a step that waits (workflow-service refuses them otherwise).
+            if (s.results) {
+              const results: Record<string, unknown> = {};
+              if (s.results.from && s.results.from !== 'final') results['from'] = s.results.from;
+              if (s.results.take && s.results.take !== 'first') results['take'] = s.results.take;
+              const fields = (s.results.fields ?? []).filter(f => (typeof f === 'string' ? f : f.path).trim());
+              if (fields.length) results['fields'] = fields.map(f => typeof f === 'string' || !f.as || f.as === resultName({ path: f.path })
+                ? (typeof f === 'string' ? f : f.path) : { path: f.path, as: f.as });
+              if (s.results.take === 'all' && s.results.maxRows) results['maxRows'] = s.results.maxRows;
+              out['results'] = results;
+            }
           }
           break;
+        }
         case 'call_api':
           out['requestId'] = s.requestId;
           if (s.environmentId) out['environmentId'] = s.environmentId;
@@ -176,7 +239,12 @@ export function fromJson(json: string | null | undefined): DraftStep[] {
   if (!json) return [];
   try {
     const parsed = JSON.parse(json);
-    return Array.isArray(parsed?.steps) ? parsed.steps as DraftStep[] : [];
+    // MIG-424: "wait" is the engine's word for waitFor too; the designer edits one.
+    return Array.isArray(parsed?.steps) ? (parsed.steps as (DraftStep & { wait?: boolean })[]).map(s => {
+      if (s.type !== 'run_pipeline' || s.wait === undefined) return s;
+      const { wait, ...rest } = s;
+      return { ...rest, waitFor: !!wait || !!rest.waitFor };
+    }) : [];
   } catch {
     return [];
   }

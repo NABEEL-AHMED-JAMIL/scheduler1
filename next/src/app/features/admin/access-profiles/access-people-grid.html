@@ -68,6 +68,14 @@
                     <option [value]="profile.pageAccessProfileId" [selected]="profile.pageAccessProfileId === row.person.pageAccessProfileId">{{ profile.profileName }}</option>
                   }
                 </select>
+                @if (row.person.twoFactorRequired || row.person.twoFactorEnabled) {
+                  <!-- MIG-424: two-factor on, or required (by the workspace or the profile) and not set up yet. -->
+                  <span class="mt-1 pill text-[11px]" [class.pill-ok]="row.person.twoFactorEnabled" [class.pill-warn]="!row.person.twoFactorEnabled"
+                        [attr.data-mfa]="row.person.username"
+                        [title]="row.person.twoFactorRequired ? 'Required by ' + (row.person.twoFactorRequiredBy === 'profile' ? 'their profile' : 'the workspace') : 'Their own choice'">
+                    {{ row.person.twoFactorEnabled ? 'Two-factor on' : 'Two-factor not set up' }}
+                  </span>
+                }
                 @if (row.exceptions) {
                   <button type="button" class="mt-1 text-[11px] text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] hover:underline inline-flex items-center gap-1"
                           (click)="reset.emit(row.person)" [disabled]="busy() === row.person.appUserId"

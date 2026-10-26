@@ -80,6 +80,8 @@ const TRIGGER_WORDS: Record<string, string> = {
   retry: 'a retry', api: 'the API',
   // V220: a workflow request's run of the pipeline, beside the job's own runs.
   workflow: 'a workflow',
+  // V235 (MIG-424): a run another pipeline's Run pipeline step called.
+  called: 'another pipeline',
 };
 
 @Component({

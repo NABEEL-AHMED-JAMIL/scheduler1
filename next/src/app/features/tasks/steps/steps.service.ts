@@ -6,7 +6,7 @@ import { LIST_LIMIT } from '../../../core/api/list-limit';
 import { jobActionRequest } from '../../jobs/job-actions';
 import { DocumentsApi } from '../../documents/documents.service';
 import { TaskChange, TaskControlState, TaskUsage, UsageOf, UsagePipeline, UsageRuns, usageParams } from './task-usage.model';
-import { DefinitionView, LinkedJob, BucketChoice, DocumentTypeChoice, PromptChoice, RunRow, StepLog, StepTaskEntry, Timeline, ValidateResult, STEP_WEBHOOK_EVENT, WebhookChoice, ApiRequestChoice } from './steps.model';
+import { DefinitionView, LinkedJob, BucketChoice, DocumentTypeChoice, PromptChoice, RunRow, StepLog, StepTaskEntry, Timeline, ValidateResult, STEP_WEBHOOK_EVENT, WebhookChoice, ApiRequestChoice, ScheduleChoice } from './steps.model';
 
 export type DefinitionFormat = 'json' | 'yaml';
 
@@ -117,6 +117,12 @@ export class StepsApi {
   buckets(): Observable<BucketChoice[]> {
     return this.http.get<ApiResponse<{ bucket: string; label?: string }[]>>(`${API_BASE}/storage.json/buckets`).pipe(
       map(r => (r.data ?? []).filter(b => !!b.bucket).map(b => ({ alias: b.bucket, label: b.label || b.bucket }))));
+  }
+
+  /** MIG-424: the workspace's schedules (jobs), for a Run pipeline step: the pipeline it calls. */
+  schedules(): Observable<ScheduleChoice[]> {
+    return this.http.get<ApiResponse<{ jobId: number; jobName?: string }[]>>(`${API_BASE}/sourceJob.json/listSourceJob`).pipe(
+      map(r => (Array.isArray(r.data) ? r.data : []).map(j => ({ id: j.jobId, label: `${j.jobName || 'Schedule'} (#${j.jobId})` }))));
   }
 
   /** MIG-346: the workspace's webhooks (integration-service), for a Send webhook step: ready ones take run.step.sent and are active. */

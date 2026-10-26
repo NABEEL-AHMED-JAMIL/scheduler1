@@ -16,12 +16,35 @@ import { ToastService } from '../../shared/ui/toast.service';
 import { confirmWith } from '../../shared/ui/confirm';
 import { TeamsApi } from '../../core/teams/teams.api';
 import { Colleague, RequestRow, WorkflowDetail, WorkflowSummary, WorkflowsApi, CANNOT_ACT } from './workflows.api';
-import { DraftStep, OPERATORS, STEP_TYPES, StepType, Who, WhoKind, canEnd, fromJson, newStep, problemStep, subjectWho, toJson, runSaveAs } from './designer.model';
+import { DraftStep, OPERATORS, OUTCOME_FIELDS, RESULT_TAKES, ResultField, RunResults, STEP_TYPES, StepType, Who, WhoKind, canEnd, fromJson, newStep,
+  problemStep, resultName, runFields, subjectWho, toJson, runSaveAs } from './designer.model';
 import { shortTime } from './history';
 import { splitTail } from './inbox-list';
 import { PageHeader } from '../../shared/ui/page-header';
 import { StepsApi } from '../tasks/steps/steps.service';
 import { ApiRequestChoice } from '../tasks/steps/steps.model';
+
+/** MIG-424: a parameter a pipeline declares, as Run with... offers it. */
+export interface PipelineParameter {
+  name: string;
+  type: string;
+  label?: string | null;
+  required?: boolean;
+  default?: unknown;
+  choices?: string[] | null;
+}
+
+/** MIG-424: what a caller of a pipeline needs -- its parameters, its steps and their output columns (sourceJob.json/outputFields). */
+export interface PipelineFields {
+  jobId: number;
+  name?: string;
+  active?: boolean;
+  stepPipeline?: boolean;
+  parameters: PipelineParameter[];
+  steps: { key: string; name?: string | null; task?: string; columns: string[] }[];
+  final: string[];
+  fromRun?: number | null;
+}
 
 /** The platform made it -- a service's built-in workflow (builtIn, or createdBy 0 from a service that predates it). */
 export function isBuiltIn(w: Pick<WorkflowSummary, 'builtIn' | 'createdBy'>): boolean {
@@ -213,10 +236,145 @@ export class WorkflowDesigner implements OnInit {
 
   readonly variablePlaceholder = '{{amount}}';
 
+  // ---- MIG-424: a Run pipeline step's parameters and results ----------------------------------------------------------
+
+  readonly resultTakes = RESULT_TAKES;
+
+  /** A pipeline's declared parameters and output fields by job (Core's sourceJob.json/outputFields); null while read or unread. */
+  readonly pipelineFields = signal<Record<number, PipelineFields | 'missing'>>({});
+
+  /** The selected Run pipeline step's pipeline, once read; null before (or for another step). */
+  readonly selectedPipeline = computed<PipelineFields | null>(() => {
+    const s = this.step();
+    if (!s || s.type !== 'run_pipeline' || s.jobId == null) return null;
+    const found = this.pipelineFields()[s.jobId];
+    return found && found !== 'missing' ? found : null;
+  });
+
+  /** The parameters the selected step maps, declared or not: each with what the pipeline says of it. */
+  parameterRows(s: DraftStep): { name: string; value: string; declared: PipelineParameter | null }[] {
+    const declared = this.selectedPipeline()?.parameters ?? [];
+    const mapped = s.parameters ?? {};
+    const rows: { name: string; value: string; declared: PipelineParameter | null }[] = declared.map(p => ({ name: p.name, value: mapped[p.name] ?? '', declared: p }));
+    Object.entries(mapped).forEach(([name, value]) => {
+      if (!declared.some(p => p.name === name)) rows.push({ name, value, declared: null });
+    });
+    return rows;
+  }
+
+  /** A parameter's hint: its default, or where a value usually comes from ({{subject.<name>}}). */
+  parameterPlaceholder(name: string, declared: PipelineParameter | null): string {
+    return declared?.default != null && declared.default !== '' ? `default: ${declared.default}` : `{{subject.${name}}}`;
+  }
+
+  setParameter(name: string, value: string): void {
+    const s = this.step();
+    if (!s) return;
+    const out = { ...(s.parameters ?? {}) };
+    if (value.trim()) out[name] = value;
+    else delete out[name];
+    this.set('parameters', out);
+  }
+
+  /** The columns a result may be read from: the chosen step's, else the final output's (from the job's latest completed run). */
+  resultColumns(s: DraftStep): string[] {
+    const p = this.selectedPipeline();
+    if (!p) return [];
+    const from = s.results?.from;
+    if (!from || from === 'final') return p.final ?? [];
+    return p.steps.find(x => x.key === from)?.columns ?? [];
+  }
+
+  /** Turns keeping the run's answer on (the first row's fields) or off. */
+  setKeepResults(on: boolean): void {
+    this.set('results', on ? { take: 'first', fields: [] } : null);
+  }
+
+  setResults<K extends keyof RunResults>(field: K, value: RunResults[K]): void {
+    const s = this.step();
+    if (!s) return;
+    this.set('results', { ...(s.results ?? {}), [field]: value });
+  }
+
+  hasResultField(s: DraftStep, path: string): boolean {
+    return (s.results?.fields ?? []).some(f => (typeof f === 'string' ? f : f.path) === path);
+  }
+
+  /** Adds a result field (a column, or a column and a dot path into its JSON), or takes it away when it is there. */
+  toggleResultField(s: DraftStep, path: string): void {
+    const field = path.trim();
+    if (!field) return;
+    const fields = [...(s.results?.fields ?? [])];
+    const at = fields.findIndex(f => (typeof f === 'string' ? f : f.path) === field);
+    if (at >= 0) fields.splice(at, 1);
+    else fields.push(field);
+    this.setResults('fields', fields);
+  }
+
+  resultFieldRows(s: DraftStep): { path: string; name: string; clash: boolean }[] {
+    return (s.results?.fields ?? []).map(f => {
+      const path = typeof f === 'string' ? f : f.path;
+      const name = resultName(f);
+      return { path, name, clash: OUTCOME_FIELDS.includes(name) };
+    });
+  }
+
+  /** Renames a result field (as); its own name back drops the rename. */
+  renameResultField(s: DraftStep, path: string, as: string): void {
+    const fields = (s.results?.fields ?? []).map((f): string | ResultField => {
+      const p = typeof f === 'string' ? f : f.path;
+      if (p !== path) return f;
+      const name = as.trim();
+      return !name || name === resultName(p) ? p : { path: p, as: name };
+    });
+    this.setResults('fields', fields);
+  }
+
+  /** What a Condition after the selected step can read: its outcome and each kept value, by name. */
+  readonly runFieldNames = computed(() => { const s = this.step(); return s && s.type === 'run_pipeline' && s.waitFor ? runFields(s) : []; });
+
+  /** Fields earlier steps keep on the request (a Run pipeline step's outcome and values, a Call API's answer), for a Condition. */
+  readonly knownFields = computed(() => {
+    const i = this.selected() ?? this.steps().length;
+    const out: string[] = [];
+    this.steps().slice(0, i).forEach(s => {
+      if (s.type === 'run_pipeline' && s.waitFor) out.push(...runFields(s));
+      if (s.type === 'call_api') ['status', 'ok', 'error'].forEach(f => out.push(`${s.saveAs || 'api'}.${f}`));
+    });
+    return out;
+  });
+
+  /** Puts a Condition on one kept value right after the selected Run pipeline step (careplan.risk is High, say). */
+  branchOnResult(s: DraftStep, name: string): void {
+    const i = this.selected();
+    if (i === null) return;
+    const step = newStep('condition', this.keys());
+    step.name = `${name}?`;
+    step.condition = { field: `${s.saveAs || runSaveAs(s.key)}.${name}`, op: 'eq', value: true };
+    this.steps.update(list => [...list.slice(0, i + 1), step, ...list.slice(i + 1)]);
+    this.selected.set(i + 1);
+    this.touch();
+  }
+
+  /** Reads a pipeline's parameters and output fields once (a job of another workspace, or none: "missing"). */
+  loadPipelineFields(jobId: number): void {
+    if (jobId in this.pipelineFields()) return;
+    this.pipelineFields.update(m => ({ ...m, [jobId]: 'missing' }));
+    this.http.get<ApiResponse<PipelineFields>>(`${API_BASE}/sourceJob.json/outputFields`, { params: { jobId } }).subscribe({
+      next: r => { if (r.status === API_SUCCESS && r.data) this.pipelineFields.update(m => ({ ...m, [jobId]: r.data! })); },
+      error: () => {},
+    });
+  }
+
   constructor() {
     // The requests are read once a workflow has a Call API step to show them in.
     effect(() => {
       if (this.steps().some(s => s.type === 'call_api')) untracked(() => this.loadApiRequests());
+    });
+    // MIG-424: a Run pipeline step's pipeline is read when the step is opened (its parameters, its output's fields).
+    effect(() => {
+      const s = this.step();
+      if (s?.type === 'run_pipeline' && s.jobId != null) { const id = s.jobId; untracked(() => this.loadPipelineFields(id)); }
     });
   }
 

@@ -270,7 +270,8 @@
                     @if (s.type === 'condition') {
                       <div>
                         <label class="label" for="st-field">Field of the request</label>
-                        <input id="st-field" class="input font-mono" placeholder="amount, or customer.tier" [ngModel]="s.condition?.field" (ngModelChange)="setCondition('field', $event)" />
+                        <input id="st-field" class="input font-mono" placeholder="amount, or customer.tier" list="wf-known-fields" [ngModel]="s.condition?.field" (ngModelChange)="setCondition('field', $event)" />
+                        <datalist id="wf-known-fields">@for (f of knownFields(); track f) { <option [value]="f"></option> }</datalist>
                       </div>
                       <div class="grid grid-cols-2 gap-3">
                         <div>
@@ -318,6 +319,33 @@
                         <app-combobox id="st-job" [numeric]="true" placeholder="Search schedules…" [allowClear]="false" [disabled]="!canEdit()"
                                       [options]="jobOptions()" [ngModel]="s.jobId == null ? null : s.jobId" (ngModelChange)="set('jobId', numberOrNull($event))" />
                       </div>
+                      <!-- MIG-424: the run's parameters, from the request and earlier steps' kept values; checked against what the
+                           pipeline declares when the workflow is published and again when the run starts. -->
+                      @if (s.jobId != null) {
+                        <div data-test="wf-run-parameters">
+                          <span class="label">Parameters</span>
+                          @if (parameterRows(s).length) {
+                            <div class="space-y-2">
+                              @for (p of parameterRows(s); track p.name) {
+                                <div class="flex items-center gap-2">
+                                  <span class="mono text-xs w-32 shrink-0 truncate" [title]="p.declared?.label || p.name">{{ p.name }}@if (p.declared?.required) {<span class="text-[color:var(--crit-text)]" aria-label="required">*</span>}</span>
+                                  <input class="input font-mono text-xs flex-1 min-w-0" [value]="p.value" [disabled]="!canEdit()"
+                                         [placeholder]="parameterPlaceholder(p.name, p.declared)"
+                                         [attr.aria-label]="'Value of ' + p.name" [attr.data-test]="'wf-run-param-' + p.name"
+                                         (change)="setParameter(p.name, $any($event.target).value)" />
+                                  @if (!p.declared) {
+                                    <span class="pill pill-warn text-xs" title="The pipeline does not declare it: publishing refuses it">Not declared</span>
+                                  }
+                                </div>
+                              }
+                            </div>
+                            <p class="field-note text-[color:var(--text-muted)]">From the request by name (<span class="mono">{{ '{{' }}subject.mrn{{ '}}' }}</span>)
+                              or an earlier step's kept value (<span class="mono">{{ '{{' }}registration.patient_id{{ '}}' }}</span>). Empty: the pipeline's default.</p>
+                          } @else {
+                            <p class="field-note text-[color:var(--text-muted)]">{{ selectedPipeline() ? 'This pipeline declares no parameters.' : 'Reading the pipeline…' }}</p>
+                          }
+                        </div>
+                      }
                       <!-- 2026-10-21: wait for the run (its approvals included) and keep how it ended for a Condition. -->
                       <div>
                         <label class="flex items-center gap-2 text-sm">
@@ -335,6 +363,71 @@
                             <button type="button" class="link-inline" (click)="branchOnRun(s)" data-test="wf-run-branch">Add a condition on it</button>
                           </p>
                         </div>
+                        <!-- MIG-424: values from the run's answer, kept beside how it ended, for later conditions and assignees. -->
+                        <div data-test="wf-run-results">
+                          <label class="flex items-center gap-2 text-sm">
+                            <input type="checkbox" [ngModel]="!!s.results" (ngModelChange)="setKeepResults($event)" [disabled]="!canEdit()" data-test="wf-run-keep" />
+                            Keep values from its answer
+                          </label>
+                          @if (s.results) {
+                            <div class="grid grid-cols-2 gap-2 mt-2">
+                              <div>
+                                <label class="label" for="st-run-from">From</label>
+                                <select id="st-run-from" class="input" [ngModel]="s.results.from || 'final'" (ngModelChange)="setResults('from', $event)" [disabled]="!canEdit()" data-test="wf-run-from">
+                                  <option value="final">Its final output</option>
+                                  @for (st of selectedPipeline()?.steps ?? []; track st.key) { <option [value]="st.key">Step: {{ st.name || st.key }}</option> }
+                                </select>
+                              </div>
+                              <div>
+                                <label class="label" for="st-run-take">Keep</label>
+                                <select id="st-run-take" class="input" [ngModel]="s.results.take || 'first'" (ngModelChange)="setResults('take', $event)" [disabled]="!canEdit()" data-test="wf-run-take">
+                                  @for (t of resultTakes; track t.take) { <option [value]="t.take">{{ t.label }}</option> }
+                                </select>
+                              </div>
+                            </div>
+                            @if ((s.results.take || 'first') !== 'count') {
+                              <span class="label mt-2">Fields</span>
+                              @if (resultColumns(s).length) {
+                                <div class="flex flex-wrap gap-1" data-test="wf-run-columns">
+                                  @for (c of resultColumns(s); track c) {
+                                    <button type="button" class="btn btn-sm" [class.btn-primary]="hasResultField(s, c)" [class.btn-default]="!hasResultField(s, c)"
+                                            [attr.aria-pressed]="hasResultField(s, c)" [disabled]="!canEdit()" (click)="toggleResultField(s, c)">{{ c }}</button>
+                                  }
+                                </div>
+                              } @else {
+                                <p class="field-note text-[color:var(--text-muted)]">No completed run shows its columns yet: name them below.</p>
+                              }
+                              <div class="space-y-1 mt-2">
+                                @for (f of resultFieldRows(s); track f.path) {
+                                  <div class="flex items-center gap-2">
+                                    <span class="mono text-xs flex-1 min-w-0 truncate">{{ f.path }}</span>
+                                    <input class="input font-mono text-xs w-32" [value]="f.name" [attr.aria-label]="'Keep ' + f.path + ' as'" [disabled]="!canEdit()"
+                                           (change)="renameResultField(s, f.path, $any($event.target).value)" />
+                                    @if (f.clash) { <span class="pill pill-crit text-xs">Name taken</span> }
+                                    <button type="button" class="btn btn-ghost btn-icon btn-sm" [attr.aria-label]="'Remove ' + f.path" [disabled]="!canEdit()" (click)="toggleResultField(s, f.path)">
+                                      <app-icon name="trash" class="icon-crit" />
+                                    </button>
+                                  </div>
+                                }
+                                <input class="input font-mono text-xs" placeholder="Add a field: risk, or summary.age" [disabled]="!canEdit()" data-test="wf-run-add-field"
+                                       (change)="toggleResultField(s, $any($event.target).value); $any($event.target).value = ''" />
+                              </div>
+                              <p class="field-note text-[color:var(--text-muted)]">Fields of a JSON column by a dot (summary.age). Masked columns stay masked; the values are kept up to 16 KB.</p>
+                            }
+                          }
+                        </div>
+                        @if (runFieldNames().length) {
+                          <p class="field-note text-[color:var(--text-muted)]" data-test="wf-run-fields">Later steps read
+                            @for (f of runFieldNames(); track f; let last = $last) { <span class="mono">{{ f }}</span>{{ last ? '.' : ', ' }} }
+                          </p>
+                          @if (s.results && (s.results.fields ?? []).length && (s.results.take || 'first') !== 'all' && (s.results.take || 'first') !== 'count') {
+                            <p class="field-note">
+                              @for (f of resultFieldRows(s); track f.path) {
+                                <button type="button" class="link-inline mr-2" (click)="branchOnResult(s, f.name)" [attr.data-test]="'wf-run-branch-' + f.name">Branch on {{ f.name }}</button>
+                              }
+                            </p>
+                          }
+                        }
                         <div>
                           <label class="label" for="st-run-hours">Give up after (hours)</label>
                           <input id="st-run-hours" type="number" min="1" max="2160" class="input" [ngModel]="s.waitHours ?? 24"

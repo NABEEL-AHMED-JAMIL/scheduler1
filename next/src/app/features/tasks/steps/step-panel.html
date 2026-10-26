@@ -48,7 +48,7 @@
         @if (configMode() === 'form' && formSchema; as schema) {
           <app-schema-form [schema]="schema" [value]="s.config" [problems]="formProblems()" idPrefix="cfg" [disabled]="readOnly"
                            [columns]="columns" [steps]="data.earlierKeys" [prompts]="data.prompts ?? []" [buckets]="data.buckets ?? []"
-                           [webhooks]="data.webhooks ?? []" [documentTypes]="data.documentTypes ?? []" [apiRequests]="data.apiRequests ?? []" (valueChange)="setConfig($event)" />
+                           [webhooks]="data.webhooks ?? []" [documentTypes]="data.documentTypes ?? []" [apiRequests]="data.apiRequests ?? []" [schedules]="data.schedules ?? []" (valueChange)="setConfig($event)" />
         } @else {
           <app-field label="Settings as JSON" for="stepConfig" [error]="configError() || configProblems().join(' · ')"
                      [hint]="hasForm ? 'The same settings as the form.' : 'This task has no settings form yet: its settings are edited as JSON.'">

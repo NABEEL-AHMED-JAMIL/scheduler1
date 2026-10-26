@@ -172,6 +172,13 @@
               <div class="min-w-0">
                 <div class="flex items-center gap-2 flex-wrap">
                   <h2 class="text-base font-semibold break-words min-w-0">{{ card.profile.profileName }}</h2>
+                  @if (card.profile.requireMfa) {
+                    <!-- MIG-424: its people sign in with two-factor; who has it on, and who not yet. -->
+                    <span class="pill pill-warn" data-testid="profile-mfa-pill"
+                          [title]="(card.profile.mfaNotEnrolledNames ?? []).length ? 'Not set up yet: ' + (card.profile.mfaNotEnrolledNames ?? []).join(', ') : 'Everyone on it has two-factor on'">
+                      Two-factor required{{ card.profile.mfaNotEnrolledCount ? ' · ' + card.profile.mfaNotEnrolledCount + ' not set up' : '' }}
+                    </span>
+                  }
                   @if (card.profile.defaultProfile) {
                     <span class="pill pill-brand" title="Anyone without a profile of their own gets this one">Default</span>
                   }

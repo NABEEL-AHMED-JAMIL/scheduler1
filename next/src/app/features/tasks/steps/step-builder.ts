@@ -17,6 +17,7 @@ import {
   addStep, canonical, definitionJson, inputColumns, isLegacyDefinition, refusalOf, moveStep, onErrorLabel, problemsByStep, removeStep, replaceStep,
   sameDefinition, sampleRowsOf, sourceLabel, taskEntry, taskLabel, taskOptions, toYaml, updateSettings, updateSource, usesBucket, usesPrompt,
   withSample, BucketChoice, PromptChoice, usesWebhook, WebhookChoice, usesApiRequest, ApiRequestChoice, DocumentTypeChoice, usesDocumentType, updateParameters,
+  ScheduleChoice, usesSchedule,
 } from './steps.model';
 import { ParameterEditor } from './parameter-editor';
 import type { RunParameter } from '../../jobs/run-parameters/run-parameters';
@@ -350,6 +351,8 @@ export class StepBuilder implements OnInit {
 
   /** MIG-364: the workspace's document types, read the first time a step that names one is opened. */
   private readonly documentTypeChoices = signal<DocumentTypeChoice[] | null>(null);
+  /** MIG-424: the workspace's schedules, read the first time a step that calls one (Run pipeline) is opened. */
+  private readonly scheduleChoices = signal<ScheduleChoice[] | null>(null);
 
   open(index: number): void {
     const step = this.draft().steps[index];
@@ -388,6 +391,14 @@ export class StepBuilder implements OnInit {
       });
       return;
     }
+    if (this.scheduleChoices() === null && usesSchedule(schema)) {
+      // Likewise: without the list a saved schedule still shows by its id.
+      this.api.schedules().subscribe({
+        next: schedules => { this.scheduleChoices.set(schedules); this.open(index); },
+        error: () => { this.scheduleChoices.set([]); this.open(index); },
+      });
+      return;
+    }
     if (this.documentTypeChoices() === null && usesDocumentType(schema)) {
       // Likewise: without the list a saved type still shows by its id.
       this.api.documentTypes().subscribe({
@@ -412,6 +423,7 @@ export class StepBuilder implements OnInit {
       webhooks: this.webhookChoices() ?? [],
       documentTypes: this.documentTypeChoices() ?? [],
       apiRequests: this.apiRequestChoices() ?? [],
+      schedules: this.scheduleChoices() ?? [],
       sampleRows: sampleRowsOf(this.draft()),
       // ZT-R40: the pipeline exists from its first screen (New pipeline makes it), so a report step is designed before its
       // first save -- a save refuses a report step with no design, and "Save the pipeline first" left no way out.

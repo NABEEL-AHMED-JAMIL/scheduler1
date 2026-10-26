@@ -120,7 +120,7 @@ const RULE_FIELDS: { key: keyof RulesDraft; label: string; hint: string; flag?: 
   { key: 'lockoutMinutes', label: 'Lock for', hint: 'Minutes (1–1440). Administrators are told, and can unlock under Users.',
     group: 'Lockout' },
   { key: 'idleMinutes', label: 'Sign out after', hint: 'Minutes without activity (5–720). Warned a minute before.', group: 'Sessions' },
-  { key: 'requireMfa', label: 'Require two-factor login', hint: 'Everyone signing in with a password sets up an authenticator app.',
+  { key: 'requireMfa', label: 'Require two-factor login', hint: 'Everyone signing in with a password sets up an authenticator app. To require it of some people only, turn it on for their access profile (Administration › Access profiles).',
     flag: true, group: 'Sessions' },
 ];
 

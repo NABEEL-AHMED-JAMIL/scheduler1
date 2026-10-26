@@ -155,6 +155,19 @@ describe('AccessProfileEditor', () => {
       pageKeys: ['queue', 'analytics-dashboards'] }));
   });
 
+  it('requires two-factor of a profile\'s people when asked, and says who of them has it on (MIG-424)', () => {
+    const clinician: AccessProfile = { pageAccessProfileId: 8, profileName: 'Clinician', defaultProfile: false, pageKeys: ['queue'], userCount: 3,
+      requireMfa: true, mfaEnrolledCount: 2, mfaNotEnrolledCount: 1, mfaNotEnrolledNames: ['Sam Synthetic'] };
+    const { page, save } = editor(REAL, [clinician], 8);
+    expect(page.form.get('requireMfa')!.value).toBe(true);
+    page.form.patchValue({ requireMfa: false });
+    page.save();
+    expect(save.mock.calls[0][0]).toEqual(expect.objectContaining({ pageAccessProfileId: 8, requireMfa: false }));
+    page.form.patchValue({ requireMfa: true });
+    page.save();
+    expect(save.mock.calls[1][0]).toEqual(expect.objectContaining({ requireMfa: true }));
+  });
+
   it('says so when the profile is not in the workspace', () => {
     const { page } = editor(REAL, [], 99);
     expect(page.error()).toContain('not in this workspace');

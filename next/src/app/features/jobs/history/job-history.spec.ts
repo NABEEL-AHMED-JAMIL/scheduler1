@@ -205,6 +205,7 @@ describe('JobHistory -- what started a run (ZT-P15)', () => {
     expect(component.triggerWord('form')).toBe('started by a form submitted');
     expect(component.triggerWord('backfill')).toBe('started by a backfill');
     expect(component.triggerWord('workflow')).toBe('started by a workflow');
+    expect(component.triggerWord('called')).toBe('started by another pipeline');
     expect(component.triggerWord('schedule')).toBe('started by its timetable');
   });
 });
