@@ -119,7 +119,7 @@ export function markNumberColumns(table: HTMLTableElement, labels: string[]): vo
                   </label>
                 }
                 @if (hiddenCount()) {
-                  <button type="button" class="btn btn-ghost btn-xs w-full mt-1" (click)="showAllColumns()">Show all</button>
+                  <button type="button" class="btn btn-default btn-xs w-full mt-1" (click)="showAllColumns()">Show all</button>
                 }
               </div>
             }

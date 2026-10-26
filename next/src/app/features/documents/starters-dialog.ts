@@ -49,7 +49,7 @@ export interface StartersDialogResult { changed: boolean; }
                 <h3 class="text-sm font-semibold" [id]="'market-' + m.key">{{ m.label }}</h3>
                 @if (m.description) { <p class="text-xs text-[color:var(--text-muted)] flex-1 min-w-48">{{ m.description }}</p> }
                 @if (addable(m).length) {
-                  <button type="button" class="btn btn-ghost btn-xs" (click)="toggleMarket(m)">{{ allChosen(m) ? 'Clear' : 'Choose all ' + addable(m).length }}</button>
+                  <button type="button" class="btn btn-default btn-xs" (click)="toggleMarket(m)">{{ allChosen(m) ? 'Clear' : 'Choose all ' + addable(m).length }}</button>
                 }
               </div>
               <ul class="mt-1">

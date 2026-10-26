@@ -187,7 +187,7 @@
         <footer class="flex flex-wrap items-center gap-2 px-4 py-3 border-t border-subtle">
           <button type="button" class="btn btn-primary btn-sm" (click)="openInAssistant(c)" data-open><app-icon name="chat" />Open</button>
           <button type="button" class="btn btn-default btn-sm" (click)="togglePin(c)" data-pin>{{ c.pinned ? 'Unpin' : 'Pin' }}</button>
-          <button type="button" class="btn btn-ghost btn-sm ml-auto text-crit-500" (click)="remove(c)" data-delete><app-icon name="trash" class="icon-crit" />Delete</button>
+          <button type="button" class="btn btn-default btn-intent-crit btn-sm ml-auto" (click)="remove(c)" data-delete><app-icon name="trash" class="icon-crit" />Delete</button>
         </footer>
       </aside>
     }

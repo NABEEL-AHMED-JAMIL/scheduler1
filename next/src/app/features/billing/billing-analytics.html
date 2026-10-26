@@ -3,7 +3,7 @@
                    [subtitle]="isPlatform() ? 'What was used and what it cost, by month, service and pipeline — one workspace or every one; with every workspace, the revenue too.' : 'What your workspace used and what it cost, by month, by service and by pipeline.'">
     <app-workspace-select [value]="tenantId()" (valueChange)="pickWorkspace($event)" [allowAll]="true" />
     <app-segmented ariaLabel="Range" [options]="rangeOptions" [value]="'' + months()" (valueChange)="setMonths(+$event)" />
-    <a routerLink="/billing/usage" class="btn btn-ghost btn-sm">Cost &amp; usage</a>
+    <a routerLink="/billing/usage" class="btn btn-default btn-sm">Cost &amp; usage</a>
   </app-page-header>
 
   <!-- Owner #22: the trends, scoped by the server -- a workspace administrator's own workspace, always. -->

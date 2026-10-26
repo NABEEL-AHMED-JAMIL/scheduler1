@@ -68,7 +68,7 @@ type WaitsFilter = '' | 'me' | 'teams' | 'open';
       @for (kind of failedKinds(); track kind) {
         <p class="flex items-center gap-2 rounded-md px-3 py-2 text-sm bg-sunken text-warn-500 mb-3" role="alert" [attr.data-failed]="kind">
           <app-icon name="alert" size="0.95em" />{{ failedText(kind) }}
-          <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="load()"><app-icon name="refresh" />Try again</button></p>
+          <button type="button" class="btn btn-default btn-sm ml-auto" (click)="load()"><app-icon name="refresh" />Try again</button></p>
       }
 
       <section class="card overflow-hidden" data-test="review-list" aria-labelledby="review-list-title">

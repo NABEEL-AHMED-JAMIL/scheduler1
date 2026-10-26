@@ -102,7 +102,7 @@ const STORE_FIELDS: Record<'truststore' | 'keystore', StoreFields> = {
     <div class="form-section">
       <div class="form-section-title flex items-center">
         TLS material
-        <button type="button" class="btn btn-ghost btn-sm ml-auto"
+        <button type="button" class="btn btn-default btn-sm ml-auto"
                 [attr.aria-expanded]="showGuide()" (click)="showGuide.set(!showGuide())">
           <app-icon name="info" class="icon-info" />
           {{ showGuide() ? 'Hide' : 'Where do these files come from?' }}
@@ -426,7 +426,7 @@ const STORE_FIELDS: Record<'truststore' | 'keystore', StoreFields> = {
               <app-icon name="checkCircle" size="0.9em" class="icon-ok shrink-0" />
               <span class="mono truncate">{{ stored.fileName }}</span>
               <span class="text-[color:var(--text-muted)] shrink-0">{{ size(stored.sizeBytes) }}</span>
-              <button type="button" class="btn btn-ghost btn-xs ml-auto shrink-0"
+              <button type="button" class="btn btn-default btn-intent-crit btn-xs ml-auto shrink-0"
                       (click)="remove(need.id, stored)">Remove</button>
             </div>
             @if (stored.subject) {
@@ -461,7 +461,7 @@ const STORE_FIELDS: Record<'truststore' | 'keystore', StoreFields> = {
         }
 
         @if (need.multiple && slot(need.id).files.length) {
-          <button type="button" class="btn btn-ghost btn-xs mt-2" (click)="adder.click()">
+          <button type="button" class="btn btn-default btn-xs mt-2" (click)="adder.click()">
             <app-icon name="plus" size="0.9em" />
             Add another file to the chain
           </button>

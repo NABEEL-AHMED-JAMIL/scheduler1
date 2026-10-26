@@ -92,7 +92,7 @@ function choiceOf(p: PipelineName): PipelineChoice | null {
                     <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="removeTier(i, j)" aria-label="Remove tier"><app-icon name="close" size="0.8em" /></button>
                   </div>
                 }
-                <button type="button" class="btn btn-ghost btn-sm" (click)="addTier(i)"><app-icon name="plus" size="0.8em" />{{ it.tiers.length ? 'Band' : 'Tiers' }}</button>
+                <button type="button" class="btn btn-default btn-sm" (click)="addTier(i)"><app-icon name="plus" size="0.8em" />{{ it.tiers.length ? 'Band' : 'Tiers' }}</button>
               </td>
             </tr>
           }

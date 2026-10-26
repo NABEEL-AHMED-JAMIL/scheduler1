@@ -69,7 +69,7 @@ const hiddenKey = (tenantId: unknown) => `etl_get_started_hidden:${tenantId ?? '
               {{ doneCount() }} of {{ steps().length }} done. Each step opens the screen it happens on; come back here for the next one.
             </p>
           </div>
-          <button type="button" class="btn btn-ghost btn-sm" (click)="hide()"><app-icon name="close" />Hide this guide</button>
+          <button type="button" class="btn btn-default btn-sm" (click)="hide()"><app-icon name="close" />Hide this guide</button>
         </div>
         <ol class="grid gap-2 md:grid-cols-2 2xl:grid-cols-4">
           @for (step of steps(); track step.key; let i = $index) {

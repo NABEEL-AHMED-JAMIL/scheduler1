@@ -18,7 +18,7 @@
           </span>
         }
       }
-      <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Read the limits and queue again" title="Read the limits and queue again" (click)="loadLimits()"><app-icon name="refresh" /></button>
+      <button type="button" class="btn btn-default btn-icon btn-sm" aria-label="Read the limits and queue again" title="Read the limits and queue again" (click)="loadLimits()"><app-icon name="refresh" /></button>
       <button type="button" class="btn btn-default btn-sm" data-test="converter-formats-toggle"
               [attr.aria-expanded]="showFormats()" aria-controls="conv-formats" (click)="showFormats.set(!showFormats())">
         <app-icon name="list" />Supported formats <span class="text-[color:var(--text-muted)]">{{ families().length }}</span>

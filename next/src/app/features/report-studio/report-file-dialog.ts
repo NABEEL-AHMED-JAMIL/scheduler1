@@ -34,7 +34,7 @@ export interface ReportFileView {
           <h2 [id]="titleId" class="text-sm font-medium truncate leading-tight" [title]="data.fileName">{{ data.title }}</h2>
           <div class="text-[11px] text-[color:var(--text-muted)] leading-tight mt-0.5">{{ data.format }} · version {{ data.version }} · {{ data.fileName }}</div>
         </div>
-        <button type="button" class="btn btn-ghost btn-sm" (click)="download()" [disabled]="!blob()"><app-icon name="download" />Download</button>
+        <button type="button" class="btn btn-default btn-sm" (click)="download()" [disabled]="!blob()"><app-icon name="download" />Download</button>
         <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="ref.close()" aria-label="Close"><app-icon name="close" /></button>
       </div>
       <!-- A fixed height, not flex-1: in a column sized by its content, flex-1 collapsed the frame to a thin strip. -->

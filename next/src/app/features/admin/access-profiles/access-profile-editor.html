@@ -69,7 +69,7 @@
             }
           </div>
           <div class="ml-auto flex items-center gap-1">
-            <button type="button" class="btn btn-ghost btn-sm" (click)="everything(true)">Select every page</button>
+            <button type="button" class="btn btn-default btn-sm" (click)="everything(true)">Select every page</button>
             <button type="button" class="btn btn-ghost btn-sm" (click)="everything(false)">Clear</button>
           </div>
         </div>
@@ -97,7 +97,7 @@
                   @if (hub.rows.length > 1 || hub.label !== hub.rows[0].label) {
                     <div class="ap-hub-head">
                       <span class="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">{{ hub.label }}</span>
-                      <button type="button" class="btn btn-ghost btn-xs" (click)="toggleAll(hub.rows)"
+                      <button type="button" class="btn btn-default btn-xs" (click)="toggleAll(hub.rows)"
                               [attr.aria-label]="(stateOf(hub.rows) === 'all' ? 'Clear every page in ' : 'Select every page in ') + hub.label">
                         {{ stateOf(hub.rows) === 'all' ? 'None' : 'All' }}
                       </button>

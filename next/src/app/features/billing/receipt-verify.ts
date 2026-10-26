@@ -92,7 +92,7 @@ export class ReceiptVerdictView {
         <app-receipt-verdict [verdict]="verdict()" />
       </div>
       <div class="flex items-center gap-2 px-4 py-2.5 border-t border-subtle shrink-0">
-        <button type="button" class="btn btn-ghost btn-sm mr-auto" (click)="downloadCertificate()" [disabled]="!signed()" data-test="download-certificate"
+        <button type="button" class="btn btn-default btn-sm mr-auto" (click)="downloadCertificate()" [disabled]="!signed()" data-test="download-certificate"
                 title="The platform's receipt certificate (PEM), to trust by hand in a PDF reader"><app-icon name="download" />Download certificate</button>
         <button type="button" class="btn btn-default btn-sm" (click)="ref.close()">Close</button>
       </div>

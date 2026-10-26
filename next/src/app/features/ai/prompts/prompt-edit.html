@@ -232,7 +232,7 @@
               @if (run.latencyMs != null) { <span>{{ took(run.latencyMs) }}</span> }
               @if (run.tokensIn != null) { <span class="text-[color:var(--text-muted)]">{{ run.tokensIn | number }} in · {{ run.tokensOut | number }} out</span> }
               @if ((run.attempts ?? 1) > 1) { <span class="text-[color:var(--text-muted)]">{{ run.attempts }} attempts</span> }
-              <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="showRendered.set(!showRendered())">{{ showRendered() ? 'Hide input' : 'Show rendered input' }}</button>
+              <button type="button" class="btn btn-default btn-sm ml-auto" (click)="showRendered.set(!showRendered())">{{ showRendered() ? 'Hide input' : 'Show rendered input' }}</button>
             </div>
             @if (showRendered()) {
               <pre class="prompt-out mt-2" [attr.aria-label]="'Rendered input'">{{ run.renderedInput }}</pre>

@@ -48,7 +48,7 @@ export const BOARD_PRESETS: RangePreset[] = ['30d', '90d', '12m', 'ytd', 'all'];
           <button type="button" class="btn btn-ghost btn-xs" data-test="bf-clear-all" (click)="clearAll()"><app-icon name="close" size="0.85em" />Clear all</button>
         }
         @if (canEdit()) {
-          <button type="button" class="btn btn-ghost btn-xs" data-test="bf-edit" (click)="edit.emit()"><app-icon name="settings" size="0.9em" />Edit filters</button>
+          <button type="button" class="btn btn-default btn-xs" data-test="bf-edit" (click)="edit.emit()"><app-icon name="settings" size="0.9em" />Edit filters</button>
         }
       </div>
     </div>

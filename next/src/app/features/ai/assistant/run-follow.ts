@@ -81,7 +81,7 @@ export function runState(t: Pick<Timeline, 'runStatus'> & { reviewStatus?: strin
         @if (jobQueueId() != null) {
           <a class="btn btn-default btn-sm" [routerLink]="['/pipelines/schedules', jobId(), 'runs', jobQueueId()]"><app-icon name="list" />Open the run</a>
         }
-        <a class="btn btn-ghost btn-sm" [routerLink]="['/pipelines/schedules', jobId(), 'executions']"><app-icon name="history" />All runs</a>
+        <a class="btn btn-default btn-sm" [routerLink]="['/pipelines/schedules', jobId(), 'executions']"><app-icon name="history" />All runs</a>
         @if (state().label === 'Failed' && jobQueueId() != null) {
           <button type="button" class="btn btn-default btn-sm" (click)="retry()"><app-icon name="refresh" />Retry</button>
         }

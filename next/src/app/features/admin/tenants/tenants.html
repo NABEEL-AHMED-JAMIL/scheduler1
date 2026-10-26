@@ -254,7 +254,7 @@
 
           <!-- B10 (G8): the card's nine inline actions are its ⋮ menu, as in the table. -->
           <div class="flex items-center gap-1.5 border-t pt-3 border-subtle mt-auto">
-            <button type="button" class="btn btn-ghost btn-sm" (click)="viewUsers(tenant)" [disabled]="!tenant.userCount"
+            <button type="button" class="btn btn-default btn-sm" (click)="viewUsers(tenant)" [disabled]="!tenant.userCount"
                     [title]="tenant.userCount ? 'Show the users in this workspace' : 'This workspace has no users yet'">
               <app-icon name="users" [class.icon-info]="!!tenant.userCount" />Users
             </button>

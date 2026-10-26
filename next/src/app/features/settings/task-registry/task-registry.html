@@ -54,14 +54,14 @@
     <div class="card flex flex-wrap items-center gap-2 px-4 py-2.5 text-sm" role="alert">
       <app-icon name="alert" class="icon-warn" />
       <span class="flex-1 min-w-0 [overflow-wrap:anywhere]">The step tasks could not be read: {{ tasksError() }} The pipelines are listed as usual.</span>
-      <button type="button" class="btn btn-ghost btn-sm" (click)="loadTasks()">Try again</button>
+      <button type="button" class="btn btn-default btn-sm" (click)="loadTasks()">Try again</button>
     </div>
   }
   @if (usageError()) {
     <div class="card flex flex-wrap items-center gap-2 px-4 py-2.5 text-sm" role="alert">
       <app-icon name="alert" class="icon-warn" />
       <span class="flex-1 min-w-0">The pipeline and run counts could not be read: {{ usageError() }}</span>
-      <button type="button" class="btn btn-ghost btn-sm" (click)="loadUsage()">Try again</button>
+      <button type="button" class="btn btn-default btn-sm" (click)="loadUsage()">Try again</button>
     </div>
   }
   @if (truncated()) {

@@ -74,14 +74,14 @@ import { shortHash } from './receipt-verify';
           </div>
           <div class="flex items-center gap-2 flex-wrap">
             <button type="button" class="btn btn-primary btn-sm" (click)="save()" [disabled]="!file() || busy()" data-test="stamp-save"><app-icon name="upload" [busy]="busy()" />Save stamp</button>
-            <button type="button" class="btn btn-ghost btn-sm" (click)="remove()" [disabled]="!current() || busy()" data-test="stamp-remove"><app-icon name="trash" />{{ scope() ? 'Use the platform\\'s stamp' : 'Use the generated stamp' }}</button>
-            <button type="button" class="btn btn-ghost btn-sm" (click)="downloadCertificate()" [disabled]="!info()?.signing?.configured"><app-icon name="download" />Download certificate</button>
+            <button type="button" class="btn btn-default btn-sm" (click)="remove()" [disabled]="!current() || busy()" data-test="stamp-remove"><app-icon name="trash" />{{ scope() ? 'Use the platform\\'s stamp' : 'Use the generated stamp' }}</button>
+            <button type="button" class="btn btn-default btn-sm" (click)="downloadCertificate()" [disabled]="!info()?.signing?.configured"><app-icon name="download" />Download certificate</button>
           </div>
         </div>
         <div class="border-t lg:border-t-0 lg:border-l border-subtle flex flex-col min-w-0">
           <div class="flex items-center gap-2 px-4 py-2 border-b border-subtle">
             <span class="text-xs font-medium mr-auto">Specimen receipt</span>
-            <button type="button" class="btn btn-ghost btn-xs" (click)="loadSpecimen()" [disabled]="specimenLoading()"><app-icon name="refresh" [busy]="specimenLoading()" />Refresh</button>
+            <button type="button" class="btn btn-default btn-xs" (click)="loadSpecimen()" [disabled]="specimenLoading()"><app-icon name="refresh" [busy]="specimenLoading()" />Refresh</button>
           </div>
           <div class="h-[34rem] flex flex-col min-h-0" data-test="stamp-specimen">
             @if (specimenUrl()) { <app-pdf-viewer [src]="specimenUrl()" /> }

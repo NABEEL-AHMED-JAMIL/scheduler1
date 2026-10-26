@@ -75,7 +75,7 @@
       <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Redo (Ctrl+Y)" title="Redo (Ctrl+Y)" [disabled]="!redoStack().length || !editable()" (click)="redo()"><app-icon name="redo" /></button>
       <span class="rsd-sep" aria-hidden="true"></span>
       <span class="rsd-tool">Select</span>
-      <button type="button" class="btn btn-ghost btn-sm" [class.rsd-on]="!selected()" [attr.aria-pressed]="!selected()" (click)="select(null)">Page settings</button>
+      <button type="button" class="btn btn-default btn-sm" [class.rsd-on]="!selected()" [attr.aria-pressed]="!selected()" (click)="select(null)">Page settings</button>
       <label class="rsd-chip rsd-brand" [title]="'The brand this template prints in: ' + brandWord()">
         <span>Brand:</span>
         <select class="rsd-brand-select" aria-label="Brand profile" [disabled]="!editable()" (change)="setBrand($any($event.target).value)">
@@ -100,7 +100,7 @@
           @if (!zooms.includes(zoom())) { <option [ngValue]="zoom()">{{ (zoom() * 100).toFixed(0) }}%</option> }
         </select>
         <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Zoom in" (click)="zoomBy(1)"><app-icon name="plus" /></button>
-        <button type="button" class="btn btn-ghost btn-sm" (click)="fit()">Fit</button>
+        <button type="button" class="btn btn-default btn-sm" (click)="fit()">Fit</button>
       </div>
       <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Full screen" title="Full screen" (click)="fullScreen()"><app-icon name="maximize" /></button>
     </div>
@@ -197,7 +197,7 @@
                           <span class="text-xs text-[color:var(--text-muted)]">{{ f.type }}</span>
                         </button>
                         @if (editable() && looksLikeImage(f.path, f.type)) {
-                          <button type="button" class="btn btn-ghost btn-xs rsd-as-image" (click)="showAsImage(f.path)" [title]="'Show ' + f.path + ' as pictures'">
+                          <button type="button" class="btn btn-default btn-xs rsd-as-image" (click)="showAsImage(f.path)" [title]="'Show ' + f.path + ' as pictures'">
                             <app-icon name="image" />Show as image</button>
                         }
                       </li>

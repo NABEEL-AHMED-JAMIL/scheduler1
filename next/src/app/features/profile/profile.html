@@ -62,7 +62,7 @@
                    [disabled]="uploading()" (change)="onPicture($event)" />
           </label>
           @if (me.avatarVersion) {
-            <button type="button" class="btn btn-ghost btn-sm btn-intent-crit"
+            <button type="button" class="btn btn-default btn-sm btn-intent-crit"
                     [disabled]="uploading()" (click)="removePicture()">
               <app-icon name="trash" />Remove
             </button>

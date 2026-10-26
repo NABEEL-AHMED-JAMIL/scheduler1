@@ -36,6 +36,9 @@ import { ThemeService } from '../../core/theme.service';
     .hero-eyebrow { color: color-mix(in srgb, var(--hero-eyebrow) 95%, transparent); }
     /* A ghost button on the hero takes the hero's text colour, not the theme's. */
     .hero .btn-ghost { color: inherit; }
+    /* A bordered button in the hero's header bar is outlined in the hero's own text colour, not the page's raised surface. */
+    .hero header .btn-default { color: inherit; background: transparent; border-color: color-mix(in srgb, var(--hero-fg) 38%, transparent); }
+    .hero header .btn-default:hover { background: color-mix(in srgb, var(--hero-fg) 10%, transparent); border-color: color-mix(in srgb, var(--hero-fg) 60%, transparent); }
     .rise-late { animation-delay: .12s; }
     .step-marker { background: var(--surface-raised); border: 1px solid var(--border-subtle); color: var(--accent-text); }
 
@@ -72,7 +75,7 @@ import { ThemeService } from '../../core/theme.service';
           <div class="mx-auto w-full max-w-6xl px-5 h-16 flex items-center gap-3">
             <app-brand-mark />
             <div class="ml-auto flex items-center gap-1.5">
-              <a routerLink="/docs" class="btn btn-ghost btn-sm hidden sm:inline-flex">Setup guide</a>
+              <a routerLink="/docs" class="btn btn-default btn-sm hidden sm:inline-flex">Setup guide</a>
               <button type="button" class="btn btn-ghost btn-icon btn-sm"
                       [attr.aria-label]="theme.theme() === 'dark' ? 'Switch to light' : 'Switch to dark'"
                       (click)="theme.toggle()">

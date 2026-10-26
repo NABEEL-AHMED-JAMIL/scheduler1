@@ -45,7 +45,7 @@ const FETCH_ROWS = 20;
   `],
   template: `
     <div class="relative" data-nav-menu="__bell" (focusout)="onFocusOut($event)">
-      <button type="button" class="btn btn-ghost btn-icon relative" (click)="toggle()"
+      <button type="button" class="btn btn-default btn-icon relative" (click)="toggle()"
               [attr.aria-expanded]="open()" aria-controls="notif-panel"
               [attr.aria-label]="unread() ? unread() + ' unread notifications' : 'Notifications'">
         <app-icon name="bell" size="1.05em" />
@@ -61,7 +61,7 @@ const FETCH_ROWS = 20;
               >
             <span class="text-sm font-semibold mr-auto">Notifications</span>
             @if (unread()) {
-              <button type="button" class="btn btn-ghost btn-sm" (click)="markAllRead()">
+              <button type="button" class="btn btn-default btn-sm" (click)="markAllRead()">
                 <app-icon name="check" size="0.85em" />Mark all read
               </button>
             }

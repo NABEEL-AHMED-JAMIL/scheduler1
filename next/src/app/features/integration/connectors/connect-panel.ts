@@ -232,7 +232,7 @@ export function stepText(step: Step, kindWord = 'tables'): string {
       }
 
       <div foot class="flex items-center gap-2 w-full">
-        @if (step() > minStep()) { <button type="button" class="btn btn-ghost btn-sm" (click)="back()" [disabled]="busy()">Back</button> }
+        @if (step() > minStep()) { <button type="button" class="btn btn-default btn-sm" (click)="back()" [disabled]="busy()">Back</button> }
         <span class="flex-1"></span>
         <button type="button" class="btn btn-default btn-sm" (click)="cancel()" [disabled]="busy()" data-cancel>Cancel</button>
         @switch (step()) {

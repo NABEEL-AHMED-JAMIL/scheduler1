@@ -76,12 +76,12 @@ const PAGE = 50;
                   </td>
                   <td class="text-right whitespace-nowrap">
                     @if (d.attempt > 0) {
-                      <button type="button" class="btn btn-ghost btn-sm" [attr.aria-expanded]="open() === d.id" aria-label="Attempts"
+                      <button type="button" class="btn btn-default btn-sm" [attr.aria-expanded]="open() === d.id" aria-label="Attempts"
                               title="Attempts" (click)="toggle(d)">
                         <app-icon name="list" /><span class="hidden xl:inline">Attempts</span>
                       </button>
                     }
-                    <button type="button" class="btn btn-ghost btn-sm" [disabled]="!data.webhook.active || busy() === d.id"
+                    <button type="button" class="btn btn-default btn-sm" [disabled]="!data.webhook.active || busy() === d.id"
                             [title]="data.webhook.active ? 'Send this event again' : 'Resume the webhook to send again'"
                             [attr.aria-label]="'Send ' + d.eventType + ' again'" (click)="resend(d)">
                       <app-icon name="send" [busy]="busy() === d.id" /><span class="hidden xl:inline">Send again</span>

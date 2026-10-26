@@ -258,12 +258,12 @@
           }
         </ul>
         @if (libraryHidden()) {
-          <button type="button" class="btn btn-ghost btn-xs self-start"
+          <button type="button" class="btn btn-default btn-xs self-start"
                   (click)="libraryShowAll.set(true)">
             Show {{ libraryHidden() }} more
           </button>
         } @else if (libraryShowAll() && libraryMatches().length > 8) {
-          <button type="button" class="btn btn-ghost btn-xs self-start"
+          <button type="button" class="btn btn-default btn-xs self-start"
                   (click)="libraryShowAll.set(false)">Show fewer</button>
         }
       }
@@ -338,8 +338,8 @@
                     (click)="openFiles($event.currentTarget)">
               <app-icon name="folder" />Choose a file
             </button>
-            <a routerLink="/data/analytics/dashboards" class="btn btn-ghost btn-sm">Open a dashboard</a>
-            <a routerLink="/data/catalog" class="btn btn-ghost btn-sm">Find it in the Data Catalog</a>
+            <a routerLink="/data/analytics/dashboards" class="btn btn-default btn-sm">Open a dashboard</a>
+            <a routerLink="/data/catalog" class="btn btn-default btn-sm">Find it in the Data Catalog</a>
           </div>
         </div>
       } @else {
@@ -525,7 +525,7 @@
                         [class.pill-neutral]="chip.kind === 'drill'"
                         [title]="cap(chip.label)">{{ chipText(chip.label) }}</span>
                 }
-                <button type="button" class="btn btn-ghost btn-xs ms-auto"
+                <button type="button" class="btn btn-default btn-xs ms-auto"
                         [disabled]="loading()"
                         (click)="toggleCrossFilterData()">Show all rows</button>
               </div>
@@ -534,7 +534,7 @@
                 <p class="field-note text-[color:var(--text-muted)]">
                   The Canvas is narrowed and this tab is not.
                 </p>
-                <button type="button" class="btn btn-ghost btn-xs"
+                <button type="button" class="btn btn-default btn-xs"
                         [disabled]="loading()"
                         (click)="toggleCrossFilterData()">Narrow to match</button>
               </div>
@@ -1552,7 +1552,7 @@
                                            drill dimension at all, rather than offered and then
                                            turned into a drill into the no-value group. -->
                                       @if (!row.isOther && drillValueOf(row) !== undefined) {
-                                        <button type="button" class="btn btn-ghost btn-xs"
+                                        <button type="button" class="btn btn-default btn-xs"
                                                 [disabled]="analysing()"
                                                 [title]="'Narrow to this ' + drillDimension()
                                                   + (drillNext() ? ', then group by ' + drillNext() : '')"
@@ -1974,9 +1974,9 @@
                                 [title]="query.queryText">{{ query.queryName }}</span>
                           <button type="button" class="btn btn-default btn-xs"
                                   (click)="loadSaved(query)">Load</button>
-                          <button type="button" class="btn btn-ghost btn-xs"
+                          <button type="button" class="btn btn-default btn-xs"
                                   (click)="startRename(query)">Rename</button>
-                          <button type="button" class="btn btn-ghost btn-xs"
+                          <button type="button" class="btn btn-default btn-intent-crit btn-xs"
                                   (click)="removeSaved(query)">Delete</button>
                         </div>
                         <p class="mono text-[11px] text-[color:var(--text-muted)] truncate"
@@ -2138,13 +2138,13 @@
                 <!-- The theme and the settings, for whichever chart is drawn. This viewer's own:
                      the Studio has no widget to store them on, so they are kept in the browser. -->
                 <div class="flex items-center gap-1 ms-auto">
-                  <button type="button" class="btn btn-ghost btn-sm" [cdkMenuTriggerFor]="studioThemeMenu" [attr.aria-label]="'Chart theme: ' + chartThemeLabel()"><app-icon name="sun" />{{ chartThemeLabel() }}</button>
+                  <button type="button" class="btn btn-default btn-sm" [cdkMenuTriggerFor]="studioThemeMenu" [attr.aria-label]="'Chart theme: ' + chartThemeLabel()"><app-icon name="sun" />{{ chartThemeLabel() }}</button>
                   <ng-template #studioThemeMenu>
                     <div cdkMenu class="card shadow-xl p-4 w-[34rem] max-w-[92vw] text-sm">
                       <app-theme-picker [value]="chartTheme() ?? 'console'" (changed)="setChartTheme($event)" />
                     </div>
                   </ng-template>
-                  <button type="button" class="btn btn-ghost btn-sm" [disabled]="!studioView()" (click)="openStudioChartSettings()"><app-icon name="settings" />Chart settings</button>
+                  <button type="button" class="btn btn-default btn-sm" [disabled]="!studioView()" (click)="openStudioChartSettings()"><app-icon name="settings" />Chart settings</button>
                 </div>
               </div>
 
@@ -2322,7 +2322,7 @@
                            seconds. Offered on statements only -- a read the screen made by itself
                            has no SQL to open. -->
                       @if (runKind(run) === 'SQL') {
-                        <button type="button" class="btn btn-ghost btn-xs ms-auto"
+                        <button type="button" class="btn btn-default btn-xs ms-auto"
                                 (click)="openRunInConsole(run)">Open in the console</button>
                       }
                     </div>

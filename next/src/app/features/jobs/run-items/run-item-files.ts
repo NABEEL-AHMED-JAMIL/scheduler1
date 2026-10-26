@@ -85,7 +85,7 @@ const TEXT_CHARS = 200_000;
       <div class="side-panel-body flex flex-col gap-3">
         @if (shown(); as f) {
           <div class="flex flex-wrap items-center gap-2" data-test="file-preview">
-            <button type="button" class="btn btn-ghost btn-sm" (click)="closePreview()"><app-icon name="arrowLeft" />All files</button>
+            <button type="button" class="btn btn-default btn-sm" (click)="closePreview()"><app-icon name="arrowLeft" />All files</button>
             <span class="pill pill-neutral mono">{{ badge(f) }}</span>
             <span class="text-sm font-medium truncate min-w-0" [title]="f.name">{{ f.name }}</span>
             <span class="flex-1"></span>
@@ -136,7 +136,7 @@ const TEXT_CHARS = 200_000;
                 @if (previewKind(f)) {
                   <button type="button" class="btn btn-default btn-xs" [disabled]="!!f.expired" [attr.aria-label]="'Look at ' + f.name" (click)="pick(f)"><app-icon name="eye" />View</button>
                 }
-                <button type="button" class="btn btn-ghost btn-xs" [disabled]="!!f.expired" [attr.aria-label]="'Download ' + f.name" (click)="download(f)"><app-icon name="download" />Download</button>
+                <button type="button" class="btn btn-default btn-xs" [disabled]="!!f.expired" [attr.aria-label]="'Download ' + f.name" (click)="download(f)"><app-icon name="download" />Download</button>
               </li>
             }
           </ul>

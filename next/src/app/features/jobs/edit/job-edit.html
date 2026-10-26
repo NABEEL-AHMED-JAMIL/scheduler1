@@ -162,7 +162,7 @@
                 <ul class="mt-1 flex flex-wrap gap-x-4 gap-y-1">
                   @for (example of cronExamples; track example.expression) {
                     <li>
-                      <button type="button" class="btn btn-ghost btn-xs mono" (click)="useCron(example.expression)">{{ example.expression }}</button>
+                      <button type="button" class="btn btn-default btn-xs mono" (click)="useCron(example.expression)">{{ example.expression }}</button>
                       {{ example.means }}
                     </li>
                   }

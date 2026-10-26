@@ -45,7 +45,7 @@
       <div class="flex flex-col gap-2" [class.opacity-60]="!enabled()">
         <div class="flex items-center justify-between">
           <p class="text-sm font-medium">Folders</p>
-          <button type="button" class="btn btn-ghost btn-sm" data-test="index-add-folder" [disabled]="!enabled() || saving() || folders().length >= 20"
+          <button type="button" class="btn btn-default btn-sm" data-test="index-add-folder" [disabled]="!enabled() || saving() || folders().length >= 20"
                   (click)="addFolder()"><app-icon name="plus" />Add folder</button>
         </div>
         @if (!folders().length) {
@@ -75,8 +75,8 @@
       <div class="flex flex-wrap items-center gap-2">
         <button type="button" class="btn btn-primary btn-sm" data-test="index-save" [disabled]="!canSave()" (click)="save()">
           <app-icon [name]="saving() ? 'refresh' : 'save'" [class.spin]="saving()" />Save</button>
-        <button type="button" class="btn btn-ghost btn-sm" [disabled]="!dirty() || saving()" (click)="reset()">Undo changes</button>
-        <button type="button" class="btn btn-ghost btn-sm ml-auto" [disabled]="saving()" (click)="load()"><app-icon name="refresh" />Refresh</button>
+        <button type="button" class="btn btn-default btn-sm" [disabled]="!dirty() || saving()" (click)="reset()">Undo changes</button>
+        <button type="button" class="btn btn-default btn-sm ml-auto" [disabled]="saving()" (click)="load()"><app-icon name="refresh" />Refresh</button>
       </div>
 
       <dl class="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs border-t border-subtle pt-3" data-test="index-counts">

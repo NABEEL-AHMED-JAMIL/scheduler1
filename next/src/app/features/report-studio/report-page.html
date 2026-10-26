@@ -80,9 +80,9 @@
                     </div>
                     @if ((v.pages ?? 0) > 1) {
                       <div class="rsr-thumb-nav" data-test="thumb-nav">
-                        <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Previous page" [disabled]="thumbPage() <= 1 || thumbLoading()" (click)="turn(-1)"><app-icon name="chevronLeft" /></button>
+                        <button type="button" class="btn btn-default btn-icon btn-sm" aria-label="Previous page" [disabled]="thumbPage() <= 1 || thumbLoading()" (click)="turn(-1)"><app-icon name="chevronLeft" /></button>
                         <span class="text-xs tabular" aria-live="polite">Page {{ thumbPage() }} of {{ v.pages }}</span>
-                        <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Next page" [disabled]="thumbPage() >= (v.pages ?? 1) || thumbLoading()" (click)="turn(1)"><app-icon name="chevronRight" /></button>
+                        <button type="button" class="btn btn-default btn-icon btn-sm" aria-label="Next page" [disabled]="thumbPage() >= (v.pages ?? 1) || thumbLoading()" (click)="turn(1)"><app-icon name="chevronRight" /></button>
                       </div>
                     }
                   </div>
@@ -140,8 +140,8 @@
                       <div class="mono text-xs text-[color:var(--text-muted)] truncate" [title]="o.fileName">{{ o.fileName }}</div>
                       <div class="text-xs text-[color:var(--text-muted)]">{{ size(o.format === 'PDF' && v.approval?.signed ? v.approval!.signedBytes : o.bytes) }}@if (o.pages) { · {{ o.pages }} page{{ o.pages === 1 ? '' : 's' }} }@if (o.format === 'HTML') { · self-contained }@if (o.format === 'PDF' && v.approval?.signed) { · signed }</div>
                     </div>
-                    <button type="button" class="btn btn-ghost btn-sm" (click)="view(v, o)" [attr.aria-label]="'View the ' + o.format"><app-icon name="eye" />View</button>
-                    <button type="button" class="btn btn-ghost btn-icon btn-sm" [disabled]="downloading() === v.versionId + o.format" (click)="download(v, o)"
+                    <button type="button" class="btn btn-default btn-sm" (click)="view(v, o)" [attr.aria-label]="'View the ' + o.format"><app-icon name="eye" />View</button>
+                    <button type="button" class="btn btn-default btn-icon btn-sm" [disabled]="downloading() === v.versionId + o.format" (click)="download(v, o)"
                             [attr.aria-label]="'Download the ' + o.format"><app-icon name="download" /></button>
                   </div>
                 }
@@ -256,13 +256,13 @@
                   @if (v.config?.['markAsCopy'] === true) { <span class="pill pill-neutral ml-1" title="Generated marked as COPY: every page of its files says COPY">COPY</span> }
                   @if (v.expired) { <span class="pill pill-neutral ml-1" [title]="'Its files were removed by the workspace\'s retention policy' + (v.expiredAt ? ' on ' + (v.expiredAt | rsTime: 'dateTime') : '') + '; its record stays.'">Removed by retention</span> }
                   @if (v.void) { <span class="pill pill-crit ml-1" [title]="'VOID: ' + v.void.reason + (v.void.by ? ' · ' + v.void.by : '')">VOID</span> }
-                  @else if (canGenerate()) { <button type="button" class="btn btn-ghost btn-xs ml-1" (click)="voidIt(v)" [attr.aria-label]="'Mark version ' + v.version + ' VOID'" title="Mark this version VOID">Void</button> }</td>
+                  @else if (canGenerate()) { <button type="button" class="btn btn-default btn-intent-crit btn-xs ml-1" (click)="voidIt(v)" [attr.aria-label]="'Mark version ' + v.version + ' VOID'" title="Mark this version VOID">Void</button> }</td>
                 <td class="text-xs"><span class="whitespace-nowrap">{{ v.createdAt | rsTime: 'recent' }}</span><div class="text-[color:var(--text-muted)] max-w-36 xl:max-w-60 2xl:max-w-80 truncate" [title]="versionBy(v) + (v.reason ? ' · ' + v.reason : '')">{{ versionBy(v) }}@if (v.reason) { · {{ v.reason }} }</div></td>
                 <td class="text-xs"><span class="whitespace-nowrap">Template v{{ v.templateVersion }}</span>
                   <div class="mono text-[color:var(--text-muted)] max-w-36 xl:max-w-60 2xl:max-w-80 truncate" [title]="v.snapshot?.label || ''">{{ dataOf(v) }}</div></td>
                 <td>@if (v.approval?.signed) { <button type="button" class="pill pill-ok" (click)="verifyVersion(v)" [title]="'Signed by ' + v.approval!.approverName + ', ' + (v.approval!.approvedAt | rsTime: 'dateTime') + '. Click to check the signature.'"><app-icon name="check" />Signed</button> }
                   @else if (v.approval) { <span class="pill pill-neutral" [title]="v.approval.notSignedReason || ''">Approved</span> }
-                  @else if (mayApprove(v) && hasPdf(v)) { <button type="button" class="btn btn-ghost btn-sm" [disabled]="approving()" (click)="approve(v)">Approve</button> }
+                  @else if (mayApprove(v) && hasPdf(v)) { <button type="button" class="btn btn-default btn-sm" [disabled]="approving()" (click)="approve(v)">Approve</button> }
                   @else if (waiting(v)) { <span class="pill pill-warn" [title]="reviewWords(v)">Waiting</span> }
                   @else if (superseded(v)) { <span class="text-xs text-[color:var(--text-muted)]" title="A newer version replaced it; only the current version can be approved.">Superseded</span> }
                   @else { <span class="text-xs text-[color:var(--text-muted)]">—</span> }</td>

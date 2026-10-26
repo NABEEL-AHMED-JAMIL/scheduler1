@@ -84,7 +84,7 @@
         }
 
         <div class="text-sm">
-          <button type="button" class="btn btn-ghost btn-sm -ml-2" [attr.aria-expanded]="showKinds()" aria-controls="inboxKinds"
+          <button type="button" class="btn btn-default btn-sm" [attr.aria-expanded]="showKinds()" aria-controls="inboxKinds"
                   (click)="showKinds.set(!showKinds())">
             <app-icon [name]="showKinds() ? 'chevronDown' : 'chevronRight'" />What the file drop accepts
           </button>

@@ -184,7 +184,7 @@
                   @for (c of columns(); track c.d.sensitivity) {
                     <td [attr.data-level]="c.d.sensitivity" data-row="defaults">
                       @if (!isDefault(c.i)) {
-                        <button type="button" class="btn btn-ghost btn-sm" data-use-defaults (click)="useDefaults(c.i)"><app-icon name="history" />Use the defaults</button>
+                        <button type="button" class="btn btn-default btn-sm" data-use-defaults (click)="useDefaults(c.i)"><app-icon name="history" />Use the defaults</button>
                       }
                     </td>
                   }
@@ -204,7 +204,7 @@
                 {{ changedCount() ? changedCount() + (changedCount() === 1 ? ' level changed' : ' levels changed') : 'No changes' }}
               </p>
             }
-            <button type="button" class="btn btn-ghost btn-sm" data-discard [disabled]="!changedCount() || saving()" (click)="discard()">Discard changes</button>
+            <button type="button" class="btn btn-default btn-intent-crit btn-sm" data-discard [disabled]="!changedCount() || saving()" (click)="discard()">Discard changes</button>
             <button type="button" class="btn btn-primary btn-sm" data-save [disabled]="!changedCount() || saving()" (click)="save()">
               <app-icon name="save" />{{ saving() ? 'Saving…' : 'Save policy' }}
             </button>

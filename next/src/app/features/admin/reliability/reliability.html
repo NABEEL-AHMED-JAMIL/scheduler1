@@ -6,7 +6,7 @@
         <p class="page-subtitle">Each service's status, version, restarts and error rate, the background checks and the platform's alerts; then pipeline execution and billing against their 99.99% targets. Heap, CPU and request history are CloudWatch's.</p>
       </div>
       <div class="flex items-center gap-2 flex-wrap">
-        <button type="button" class="btn btn-ghost btn-sm" data-test="refresh-all" (click)="refreshAll()" [disabled]="health()?.loading()"><app-icon name="refresh" [busy]="!!health()?.loading()" />Refresh</button>
+        <button type="button" class="btn btn-default btn-sm" data-test="refresh-all" (click)="refreshAll()" [disabled]="health()?.loading()"><app-icon name="refresh" [busy]="!!health()?.loading()" />Refresh</button>
       </div>
     </div>
   </app-page-header>
@@ -54,7 +54,7 @@
              aria-labelledby="status-runs-title">
       <div class="flex items-start justify-between gap-3">
         <h2 id="status-runs-title" class="stat-label">Pipeline execution</h2>
-        <button type="button" class="btn btn-ghost btn-sm -mt-1 -mr-2" (click)="scrollTo('slo-runs')">Details</button>
+        <button type="button" class="btn btn-default btn-sm -mt-1" (click)="scrollTo('slo-runs')">Details</button>
       </div>
       @if (runsLoading()) {
         <div class="py-6 text-center text-sm text-[color:var(--text-muted)]"><div class="spinner mx-auto mb-3"></div>Reading…</div>
@@ -111,7 +111,7 @@
              aria-labelledby="status-billing-title">
       <div class="flex items-start justify-between gap-3">
         <h2 id="status-billing-title" class="stat-label">Billing</h2>
-        <button type="button" class="btn btn-ghost btn-sm -mt-1 -mr-2" (click)="scrollTo('slo-billing')">Details</button>
+        <button type="button" class="btn btn-default btn-sm -mt-1" (click)="scrollTo('slo-billing')">Details</button>
       </div>
       @if (billingLoading()) {
         <div class="py-6 text-center text-sm text-[color:var(--text-muted)]"><div class="spinner mx-auto mb-3"></div>Reading…</div>

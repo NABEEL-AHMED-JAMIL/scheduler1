@@ -134,9 +134,9 @@ const LIMIT = 25;
         </div>
         @if (total() > rows().length || page() > 1) {
           <div class="flex items-center gap-2 text-sm">
-            <button type="button" class="btn btn-ghost btn-sm" [disabled]="page() === 1" (click)="go(page() - 1)">Newer</button>
+            <button type="button" class="btn btn-default btn-sm" [disabled]="page() === 1" (click)="go(page() - 1)">Newer</button>
             <span class="text-[color:var(--text-muted)]">Page {{ page() }} of {{ pages() }}</span>
-            <button type="button" class="btn btn-ghost btn-sm" [disabled]="page() >= pages()" (click)="go(page() + 1)">Older</button>
+            <button type="button" class="btn btn-default btn-sm" [disabled]="page() >= pages()" (click)="go(page() + 1)">Older</button>
           </div>
         }
       }

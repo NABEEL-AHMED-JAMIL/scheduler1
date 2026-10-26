@@ -54,7 +54,7 @@ export const STEP_WORDS: Record<PageLimitStep['action'], string> = {
           }
         }
         @if (canRaise()) {
-          <a class="btn btn-ghost" [class.btn-sm]="!compact()" [class.btn-xs]="compact()" routerLink="/reports/settings" data-test="next-raise-limit"><app-icon name="settings" />Raise the limit</a>
+          <a class="btn btn-default" [class.btn-sm]="!compact()" [class.btn-xs]="compact()" routerLink="/reports/settings" data-test="next-raise-limit"><app-icon name="settings" />Raise the limit</a>
         }
       </div>
     }

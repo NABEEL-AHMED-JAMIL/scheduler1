@@ -242,7 +242,7 @@ export const CHILD_PAGE = 15;
                             <button type="button" class="btn btn-default btn-xs" data-test="child-retry" [disabled]="retrying()"
                                     [attr.aria-label]="'Retry ' + child.label + ' of ' + item.label" (click)="retryChild(child)">Retry page</button>
                           } @else {
-                            <button type="button" class="btn btn-ghost btn-xs" [attr.aria-label]="'Open ' + child.label + ' of ' + item.label" (click)="open(child)">Open</button>
+                            <button type="button" class="btn btn-default btn-xs" [attr.aria-label]="'Open ' + child.label + ' of ' + item.label" (click)="open(child)">Open</button>
                           }
                         </td>
                       </tr>

@@ -136,7 +136,7 @@ const PAGE = 50;
               <button type="button" class="link-inline" (click)="clearSearch()">Back to the folder</button>
             </p>
           } @else if (filter().trim()) {
-            <button type="button" class="btn btn-ghost btn-sm self-start" (click)="search()" data-test="picker-search-all">
+            <button type="button" class="btn btn-default btn-sm self-start" (click)="search()" data-test="picker-search-all">
               <app-icon name="search" />Search all of {{ scopeLabel() }} for "{{ filter().trim() }}"
             </button>
           }
@@ -199,7 +199,7 @@ const PAGE = 50;
                               (goTo)="pager.goTo($event, rows().length)" (setSize)="pager.setSize($event)" />
             }
             @if (nextToken() && !searching()) {
-              <button type="button" class="btn btn-ghost btn-sm self-start" (click)="browse(prefix(), true)" data-test="picker-more">
+              <button type="button" class="btn btn-default btn-sm self-start" (click)="browse(prefix(), true)" data-test="picker-more">
                 <app-icon name="chevronDown" />This folder has more — load the next {{ batch }}
               </button>
             }

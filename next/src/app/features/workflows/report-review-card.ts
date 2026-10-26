@@ -65,7 +65,7 @@ export const CARD_PAGES = 4;
           @if (c.approval?.signed) { <span class="pill pill-ok"><app-icon name="check" />Signed</span> }
           @else if (c.review?.state === 'OPEN') { <span class="pill pill-warn">{{ c.stage === 'FIRST' ? 'First of two approvals' : c.review.firstApproval ? 'Second approval' : 'Waiting for approval' }}</span> }
           <span class="flex-1"></span>
-          <a class="btn btn-ghost btn-sm" [routerLink]="['/reports/library', c.reportId]" [queryParams]="{ version: c.version }"><app-icon name="external" />Open the report</a>
+          <a class="btn btn-default btn-sm" [routerLink]="['/reports/library', c.reportId]" [queryParams]="{ version: c.version }"><app-icon name="external" />Open the report</a>
         </div>
         <div class="rvc">
           <div>
@@ -134,7 +134,7 @@ export const CARD_PAGES = 4;
           <span class="pill pill-info">Draft v{{ t.draft?.version ?? subject()?.version }}</span>
           @if (t.changedSinceAsked) { <span class="pill pill-warn" title="Its editor saved it again after asking">Changed since asked</span> }
           <span class="flex-1"></span>
-          <a class="btn btn-ghost btn-sm" [routerLink]="['/reports/templates', t.templateId]"><app-icon name="external" />Open the template</a>
+          <a class="btn btn-default btn-sm" [routerLink]="['/reports/templates', t.templateId]"><app-icon name="external" />Open the template</a>
         </div>
         <div class="rvc">
           <div class="rvc-page" data-test="publish-page">
@@ -173,7 +173,7 @@ export const CARD_PAGES = 4;
           <h3 class="section-title m-0" id="rvc-title">What to approve</h3>
           <span class="pill pill-info">{{ a.kind === 'STAMP' ? 'Stamp' : 'Signature' }} · v{{ subject()?.version }}</span>
           <span class="flex-1"></span>
-          <a class="btn btn-ghost btn-sm" [routerLink]="['/reports/assets', a.assetId]"><app-icon name="external" />Open the asset</a>
+          <a class="btn btn-default btn-sm" [routerLink]="['/reports/assets', a.assetId]"><app-icon name="external" />Open the asset</a>
         </div>
         <div class="rvc">
           <div class="rvc-page">@if (pageUrl(); as src) { <img class="rvc-asset" [src]="src" [alt]="a.name" /> } @else { <span class="text-xs">{{ pageError() || 'Loading the picture…' }}</span> }</div>

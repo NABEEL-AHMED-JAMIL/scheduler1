@@ -33,7 +33,7 @@ export const DOC_VIEW_TITLE_ID = 'doc-view-title';
             @if (data.createdByName) { <span>·</span><span>{{ data.createdByName }}</span> }
           </div>
         </div>
-        <button type="button" class="btn btn-ghost btn-sm" (click)="download()" [disabled]="!blob()"><app-icon name="download" />Download</button>
+        <button type="button" class="btn btn-default btn-sm" (click)="download()" [disabled]="!blob()"><app-icon name="download" />Download</button>
         <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="openTab()" [disabled]="!blob()" title="Open in a new tab" aria-label="Open in a new tab"><app-icon name="external" /></button>
         <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="ref.close()" aria-label="Close"><app-icon name="close" /></button>
       </div>

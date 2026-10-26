@@ -179,7 +179,7 @@ function stamp(value: string | null | undefined): string {
                   <td><span class="pill" [class.pill-ok]="d.status === 'ACTIVE'" [class.pill-neutral]="d.status !== 'ACTIVE'">{{ d.status === 'ACTIVE' ? 'Active' : d.status === 'EXPIRED' ? 'Expired' : 'Ended' }}</span></td>
                   <td class="text-xs">{{ d.reason }}</td>
                   <td class="text-right">
-                    @if (d.status === 'ACTIVE') { <button type="button" class="btn btn-ghost btn-xs" [disabled]="busy()" (click)="revoke(d)" [attr.data-revoke]="d.delegateId">End</button> }
+                    @if (d.status === 'ACTIVE') { <button type="button" class="btn btn-default btn-intent-crit btn-xs" [disabled]="busy()" (click)="revoke(d)" [attr.data-revoke]="d.delegateId">End</button> }
                   </td>
                 </tr>
               } @empty {

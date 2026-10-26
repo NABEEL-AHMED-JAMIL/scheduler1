@@ -104,7 +104,7 @@
         <section class="card">
           <div class="rs-head">
             <div><h2 class="section-title">Generation jobs</h2><p class="text-xs text-[color:var(--text-muted)]">A failed job never replaces an earlier version.</p></div>
-            @if (canLibrary()) { <a class="btn btn-ghost btn-sm" routerLink="/reports/library" [queryParams]="{ view: 'jobs' }">View all</a> }
+            @if (canLibrary()) { <a class="btn btn-default btn-sm" routerLink="/reports/library" [queryParams]="{ view: 'jobs' }">View all</a> }
           </div>
           @if (!d.recentJobs.length) {
             <p class="p-4 text-sm text-[color:var(--text-muted)]">No jobs yet.</p>

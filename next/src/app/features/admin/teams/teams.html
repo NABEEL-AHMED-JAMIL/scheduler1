@@ -135,7 +135,7 @@
                   </td>
                   <td class="text-right">
                     @if (mayRemove(m)) {
-                      <button type="button" class="btn btn-ghost btn-sm" (click)="remove(m)" [attr.data-remove]="m.appUserId"
+                      <button type="button" class="btn btn-default btn-intent-crit btn-sm" (click)="remove(m)" [attr.data-remove]="m.appUserId"
                               [attr.aria-label]="'Remove ' + nameOf(m)"><app-icon name="close" />Remove</button>
                     }
                   </td>

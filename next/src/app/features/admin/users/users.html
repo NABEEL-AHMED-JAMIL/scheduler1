@@ -23,7 +23,7 @@
       <span>
         Showing users in <strong>{{ focusedTenantName() }}</strong> only.
       </span>
-      <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="clearTenantFocus()">
+      <button type="button" class="btn btn-default btn-sm ml-auto" (click)="clearTenantFocus()">
         <app-icon name="close" />Show all workspaces
       </button>
     </div>
@@ -226,32 +226,32 @@
                 </div>
               } @else {
               <div class="flex flex-wrap items-center gap-1 pt-2.5 border-t border-subtle">
-                <button type="button" class="btn btn-ghost btn-sm" (click)="edit(user)"
+                <button type="button" class="btn btn-default btn-sm" (click)="edit(user)"
                         [disabled]="busy() === user.appUserId">
                   <app-icon name="edit" />Edit
                 </button>
-                <button type="button" class="btn btn-ghost btn-sm" (click)="resetPassword(user)"
+                <button type="button" class="btn btn-default btn-sm" (click)="resetPassword(user)"
                         [disabled]="busy() === user.appUserId" title="Set a new password for them">
                   <app-icon name="key" />Reset
                 </button>
                 @if (lockedUntil(user)) {
-                  <button type="button" class="btn btn-ghost btn-sm" (click)="unlock(user)" [disabled]="busy() === user.appUserId">
+                  <button type="button" class="btn btn-default btn-sm" (click)="unlock(user)" [disabled]="busy() === user.appUserId">
                     <app-icon name="lock" />Unlock
                   </button>
                 }
                 @if (mfaOn(user)) {
-                  <button type="button" class="btn btn-ghost btn-sm" (click)="resetMfa(user)" [disabled]="busy() === user.appUserId"
+                  <button type="button" class="btn btn-default btn-sm" (click)="resetMfa(user)" [disabled]="busy() === user.appUserId"
                           title="Reset their two-factor login">
                     <app-icon name="shield" />2FA
                   </button>
                 }
                 @if (avatarVersionOf(user) && !isSelf(user)) {
-                  <button type="button" class="btn btn-ghost btn-sm" (click)="removePicture(user)" [disabled]="busy() === user.appUserId"
+                  <button type="button" class="btn btn-default btn-sm" (click)="removePicture(user)" [disabled]="busy() === user.appUserId"
                           title="Remove their profile picture" data-test="user-remove-picture">
                     <app-icon name="image" />Picture
                   </button>
                 }
-                <button type="button" class="btn btn-ghost btn-sm"
+                <button type="button" class="btn btn-default btn-sm"
                         [class]="isSelf(user) ? '' : (user.status === 'Active' ? 'btn-intent-warn' : 'btn-intent-ok')"
                         [disabled]="isSelf(user) || busy() === user.appUserId"
                         [title]="isSelf(user) ? 'You cannot deactivate your own account' : ''"

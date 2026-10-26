@@ -219,7 +219,7 @@
                     <div class="flex items-center gap-1.5 flex-wrap">
                       @if (p.status === 'submitted' && isPlatformAdmin()) {
                         <button type="button" class="btn btn-primary btn-xs" (click)="verify(p, true)" [disabled]="busy() === 'verify' + p.paymentId">Verify</button>
-                        <button type="button" class="btn btn-ghost btn-xs" (click)="verify(p, false)" [disabled]="busy() === 'verify' + p.paymentId">Reject</button>
+                        <button type="button" class="btn btn-default btn-intent-crit btn-xs" (click)="verify(p, false)" [disabled]="busy() === 'verify' + p.paymentId">Reject</button>
                       } @else {
                         @if (stateChip(p); as c) { <span [class]="c.cls" [title]="c.title || c.label" data-state-chip><app-icon [name]="c.icon" size="0.85em" />{{ c.label }}</span> }
                       }

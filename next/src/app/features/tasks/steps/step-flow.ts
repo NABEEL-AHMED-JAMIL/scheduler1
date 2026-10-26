@@ -94,13 +94,13 @@ export function collapseStages(graph: FlowGraphData, groups: readonly StageGroup
       @if (foldable().length) {
         <div class="flex flex-wrap items-center gap-1" role="group" aria-label="Fold the steps by stage" data-test="flow-stages">
           @for (g of foldable(); track g.id) {
-            <button type="button" class="btn btn-ghost btn-xs" [attr.aria-pressed]="!isFolded(g.id)" [attr.data-stage]="g.id" (click)="toggle(g.id)"
+            <button type="button" class="btn btn-default btn-xs" [attr.aria-pressed]="!isFolded(g.id)" [attr.data-stage]="g.id" (click)="toggle(g.id)"
                     [title]="(isFolded(g.id) ? 'Show ' : 'Fold ') + g.label + ' steps ' + g.range + ' (' + g.count + ')'">
               <app-icon [name]="isFolded(g.id) ? 'chevronRight' : 'chevronDown'" size="0.85em" />{{ g.label }} {{ g.range }}
             </button>
           }
-          <button type="button" class="btn btn-ghost btn-xs" data-test="flow-fold-all" (click)="foldAll()" [disabled]="allFolded()">Collapse all</button>
-          <button type="button" class="btn btn-ghost btn-xs" data-test="flow-open-all" (click)="openAll()" [disabled]="!folded().size">Expand all</button>
+          <button type="button" class="btn btn-default btn-xs" data-test="flow-fold-all" (click)="foldAll()" [disabled]="allFolded()">Collapse all</button>
+          <button type="button" class="btn btn-default btn-xs" data-test="flow-open-all" (click)="openAll()" [disabled]="!folded().size">Expand all</button>
         </div>
       }
       <div class="seg" role="group" aria-label="Layout">

@@ -228,7 +228,7 @@ type Pending = '' | 'sort' | 'search' | 'filter';
                   The last visible column cannot be hidden — a grid with no columns is a blank box.
                 </p>
               }
-              <button type="button" class="btn btn-ghost btn-xs w-full mt-1"
+              <button type="button" class="btn btn-default btn-xs w-full mt-1"
                       [disabled]="!hiddenCount()" (click)="showAllColumns()">
                 Show all {{ allColumns().length }}
               </button>

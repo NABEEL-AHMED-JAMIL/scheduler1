@@ -172,7 +172,7 @@ export function orderedColumns(columns: string[], kinds: string[]): string[] {
           @if (pdf(); as p) {
             <button type="button" class="btn btn-default btn-sm" (click)="openPdf(p)" [disabled]="opening()" data-test="approval-pdf"><app-icon name="file" />{{ p.name || 'Report PDF' }}</button>
           }
-          @if (link()) { <a class="btn btn-ghost btn-sm" [routerLink]="link()!"><app-icon name="external" />Open the run</a> }
+          @if (link()) { <a class="btn btn-default btn-sm" [routerLink]="link()!"><app-icon name="external" />Open the run</a> }
         </div>
 
         @if (loading()) {
@@ -206,7 +206,7 @@ export function orderedColumns(columns: string[], kinds: string[]): string[] {
           @if (allColumns().length > columns().length || allShown()) {
             <div class="flex items-center gap-2 text-xs text-[color:var(--text-muted)]">
               <span>{{ columns().length }} of {{ allColumns().length }} columns</span>
-              <button type="button" class="btn btn-ghost btn-xs" (click)="allShown.set(!allShown())" data-test="approval-columns">{{ allShown() ? 'Fewer columns' : 'All columns' }}</button>
+              <button type="button" class="btn btn-default btn-xs" (click)="allShown.set(!allShown())" data-test="approval-columns">{{ allShown() ? 'Fewer columns' : 'All columns' }}</button>
             </div>
           }
           <div class="pac-table" data-test="approval-rows">

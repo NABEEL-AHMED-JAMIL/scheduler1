@@ -92,7 +92,7 @@ export function viewKind(name: string, format: string | null | undefined): 'pdf'
             @if (columns().length) { <app-segmented [options]="modes" [(value)]="mode" ariaLabel="Show it as" /> }
             <span class="flex-1"></span>
             @if (jsonCut()) { <span class="text-xs text-[color:var(--text-muted)]">The first {{ jsonLimit.toLocaleString() }} characters · download it for the rest</span> }
-            <button type="button" class="btn btn-ghost btn-xs" (click)="copyJson()" data-test="copy-json"><app-icon name="copy" />Copy</button>
+            <button type="button" class="btn btn-default btn-xs" (click)="copyJson()" data-test="copy-json"><app-icon name="copy" />Copy</button>
           </div>
           <pre class="flex-1 min-h-0 overflow-auto mono text-xs leading-relaxed whitespace-pre-wrap break-words rounded p-3 bg-code border border-subtle">{{ jsonShown() }}</pre>
         </div>

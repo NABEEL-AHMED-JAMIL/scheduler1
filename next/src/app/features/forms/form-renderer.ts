@@ -121,7 +121,7 @@ const IMAGE_MIME: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpe
                 @if (signature(f.key); as sig) {
                   <div class="flex items-center gap-2 text-sm" data-signed>
                     <app-icon name="checkCircle" class="icon-ok" />Signed
-                    <button type="button" class="btn btn-ghost btn-xs" [disabled]="disabled()" (click)="set(f.key, null)">Sign again</button>
+                    <button type="button" class="btn btn-default btn-xs" [disabled]="disabled()" (click)="set(f.key, null)">Sign again</button>
                   </div>
                 } @else if (uploading()[f.key]) {
                   <p class="text-sm text-[color:var(--text-muted)]">Keeping your signature…</p>

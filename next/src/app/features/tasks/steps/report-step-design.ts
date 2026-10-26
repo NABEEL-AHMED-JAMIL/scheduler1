@@ -28,11 +28,11 @@ export interface ReportDesignSettings { design: 'STEP' | 'TEMPLATE'; templateId?
   imports: [FormsModule, Icon],
   template: `
     <div class="space-y-3" data-report-step-design>
-      <div class="flex gap-2" role="radiogroup" aria-label="Where the report comes from">
-        <button type="button" class="btn btn-sm" [class.btn-primary]="mode() === 'STEP'" [class.btn-default]="mode() !== 'STEP'"
+      <div class="seg" role="radiogroup" aria-label="Where the report comes from">
+        <button type="button" class="seg-btn" [class.seg-on]="mode() === 'STEP'"
                 [disabled]="disabled()" (click)="setMode('STEP')" role="radio" [attr.aria-checked]="mode() === 'STEP'" data-mode-step>
           <app-icon name="edit" />Design the report here</button>
-        <button type="button" class="btn btn-sm" [class.btn-primary]="mode() === 'TEMPLATE'" [class.btn-default]="mode() !== 'TEMPLATE'"
+        <button type="button" class="seg-btn" [class.seg-on]="mode() === 'TEMPLATE'"
                 [disabled]="disabled()" (click)="setMode('TEMPLATE')" role="radio" [attr.aria-checked]="mode() === 'TEMPLATE'" data-mode-template>
           <app-icon name="file" />Use a saved template</button>
       </div>

@@ -243,7 +243,7 @@
           @if (counts().bytes) { · {{ humanSize(counts().bytes) }} }
         </span>
         @if (hasInsights()) {
-          <button type="button" class="btn btn-ghost btn-sm ml-auto"
+          <button type="button" class="btn btn-default btn-sm ml-auto"
                   [class.text-accent]="showInsights()" [attr.aria-expanded]="showInsights()"
                   (click)="showInsights.set(!showInsights())">
             <app-icon name="chart" />{{ showInsights() ? 'Hide' : 'Insights' }}

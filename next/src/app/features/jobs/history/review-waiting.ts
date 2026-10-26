@@ -79,7 +79,7 @@ interface WaitingAnswer {
           }
         </ul>
         @if (runs().length > FIRST && !all()) {
-          <button type="button" class="btn btn-ghost btn-sm" (click)="expanded.set(!expanded())" [attr.aria-expanded]="expanded()">
+          <button type="button" class="btn btn-default btn-sm" (click)="expanded.set(!expanded())" [attr.aria-expanded]="expanded()">
             {{ expanded() ? 'Show the newest ' + FIRST : 'Show all ' + runs().length }}
           </button>
         }

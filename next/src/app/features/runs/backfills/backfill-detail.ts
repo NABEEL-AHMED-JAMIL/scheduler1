@@ -142,8 +142,8 @@ type PeriodFilter = '' | 'FAILED' | 'QUEUED' | 'PENDING' | 'COMPLETED' | 'SKIPPE
             </table>
             @if ((b.periods?.length ?? 0) === 100) {
               <div class="flex gap-2 mt-2">
-                @if (page() > 1) { <button type="button" class="btn btn-ghost btn-sm" (click)="go(page() - 1)">Earlier</button> }
-                <button type="button" class="btn btn-ghost btn-sm" (click)="go(page() + 1)">Later</button>
+                @if (page() > 1) { <button type="button" class="btn btn-default btn-sm" (click)="go(page() - 1)">Earlier</button> }
+                <button type="button" class="btn btn-default btn-sm" (click)="go(page() + 1)">Later</button>
               </div>
             }
           </section>
@@ -152,7 +152,7 @@ type PeriodFilter = '' | 'FAILED' | 'QUEUED' | 'PENDING' | 'COMPLETED' | 'SKIPPE
         <p class="text-sm text-[color:var(--text-muted)] m-0">Reading the backfill…</p>
       }
       <div foot class="flex items-center gap-2 w-full">
-        <a class="btn btn-ghost btn-sm" [routerLink]="['/pipelines/schedules', backfill()?.jobId ?? 0, 'executions']" (click)="ref.close(changed)"
+        <a class="btn btn-default btn-sm" [routerLink]="['/pipelines/schedules', backfill()?.jobId ?? 0, 'executions']" (click)="ref.close(changed)"
            [class.invisible]="!backfill()" data-test="backfill-runs-link"><app-icon name="history" />The schedule's runs</a>
         <button type="button" class="btn btn-default btn-sm ml-auto" (click)="ref.close(changed)">Close</button>
       </div>

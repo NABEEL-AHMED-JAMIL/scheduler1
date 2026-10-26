@@ -555,14 +555,18 @@
    *   btn-default      a real secondary action the reader should find without hunting:
    *                    Refresh, Copy, Export, Test, Bulk import, Open.
    *   btn-ghost        dismissal (Cancel, Close), filter-clearing (Clear, Reset), and
-   *                    icon-only controls inside dense rows, where a border is noise.
-   *   btn-intent-crit  a destructive *trigger*: the label stays neutral and the icon turns
-   *                    red under the pointer, warning before the click.
+   *                    icon-only controls (btn-icon + aria-label) inside dense rows and
+   *                    toolbars, where a border is noise. Nothing else.
+   *   btn-intent-crit  a destructive *trigger* on a btn-default (Void, Delete, Remove, Discard,
+   *                    End, Revoke): the label stays neutral and the icon turns red under the
+   *                    pointer, warning before the click.
    *   btn-danger       the point of no return -- the confirm button in confirm.ts, and
    *                    nowhere else, so a filled red button always means "this is final".
    *
    * An audit found 59.7% of 186 buttons were ghost, including Refresh and Copy in page
-   * headers, which is why so little on screen read as pressable.
+   * headers, which is why so little on screen read as pressable. ZT-U (owner 2026-10-26, "buttons
+   * need colour so we can tell a button from a chip"): 246 more ghosts on real actions became
+   * btn-default; ghost-buttons.spec.ts now fails a ghost with any other label.
    */
   .btn-primary {
     background: var(--btn-primary-bg);
@@ -576,9 +580,25 @@
     border-color: var(--border-subtle);
     background: var(--surface-raised);
   }
+  .btn-default:hover:not(:disabled) { border-color: var(--border-strong); }
+  /* A toggle button (aria-pressed: Side by side, Charts, Wrap long lines, a step group) shows that it is on. */
+  .btn-default[aria-pressed="true"],
+  .btn-default.is-active {
+    background: var(--accent-soft);
+    color: var(--accent-text);
+    border-color: var(--accent-mark-strong);
+  }
   .btn-ghost {
     @apply text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-sunken)]
            hover:text-[color:var(--text-primary)];
+  }
+  /* What stays ghost (Cancel, Close, an icon in a row) is still findable: the hover surface on keyboard
+     focus too, and a ring that clears the button rather than sitting on its edge. */
+  .btn-ghost:focus-visible {
+    background: var(--surface-sunken);
+    color: var(--text-primary);
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 1px;
   }
   .btn-danger {
     background: var(--btn-danger-bg);
@@ -1108,6 +1128,26 @@
        variant the chip would change size as it toggled. */
     border: 1px solid transparent;
   }
+  /* ZT-U (owner 2026-10-26): a pill is a flat status label -- no hover, no pointer -- and a pill you can press
+     (a filter chip, a suggestion, a "verify" seal) says so: an edge in its own colour, the pointer, a hover, and a
+     pressed state. Buttons have a border or a fill; a resting status pill has neither edge nor hover. */
+  span.pill, div.pill { cursor: default; }
+  :is(button, a).pill {
+    cursor: pointer;
+    border-color: color-mix(in oklab, currentColor 38%, transparent);
+    transition: border-color 0.12s, box-shadow 0.12s, filter 0.12s;
+  }
+  :is(button, a).pill:hover:not(:disabled) {
+    border-color: currentColor;
+    box-shadow: 0 1px 2px color-mix(in oklab, var(--color-ink-950) 12%, transparent);
+  }
+  :is(button, a).pill:active:not(:disabled) { filter: brightness(0.96); }
+  :is(button, a).pill[aria-pressed="true"],
+  :is(button, a).pill[aria-selected="true"] {
+    border-color: currentColor;
+    box-shadow: inset 0 0 0 1px currentColor;
+  }
+  :is(button, a).pill:disabled { cursor: not-allowed; opacity: 0.6; }
   .pill-neutral {
     background: var(--pill-neutral-bg);
     color: var(--pill-neutral-fg);
@@ -2691,7 +2731,7 @@ a.bill-meta-chip:hover { border-color: var(--accent-mark); color: var(--text-pri
 /* The task: its title, the decisions straight under it, then the request and its history; scrolls on its own. */
 .inbox-detail { display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow-y: auto; overscroll-behavior: contain; }
 .inbox-detail-head { display: flex; flex-direction: column; gap: 0.3rem; padding: 1.25rem 1.5rem 1rem; border-bottom: 1px solid var(--border-subtle); }
-.inbox-back { align-self: flex-start; margin: -0.25rem 0 0.25rem -0.5rem; }
+.inbox-back { align-self: flex-start; margin: -0.25rem 0 0.25rem 0; }
 .inbox-detail-title { font-size: 1.25rem; line-height: 1.3; font-weight: 600; letter-spacing: -0.01em; overflow-wrap: anywhere; }
 .inbox-detail-sub { font-size: 0.875rem; color: var(--text-muted); }
 .inbox-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 0.375rem; }

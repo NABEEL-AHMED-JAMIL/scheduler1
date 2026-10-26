@@ -103,11 +103,11 @@
                 </span>
                 @if (v.state !== 'DRAFT') {
                   <div class="flex flex-wrap gap-1">
-                    <button type="button" class="btn btn-ghost btn-sm" (click)="test('' + v.version)"><app-icon name="play" />Test</button>
-                    <button type="button" class="btn btn-ghost btn-sm" (click)="exportJson('' + v.version)"><app-icon name="download" />JSON</button>
+                    <button type="button" class="btn btn-default btn-sm" (click)="test('' + v.version)"><app-icon name="play" />Test</button>
+                    <button type="button" class="btn btn-default btn-sm" (click)="exportJson('' + v.version)"><app-icon name="download" />JSON</button>
                     @if (canEdit()) {
-                      <button type="button" class="btn btn-ghost btn-sm" (click)="copy(v.version)"><app-icon name="copy" />Copy</button>
-                      @if (!t.draft) { <button type="button" class="btn btn-ghost btn-sm" (click)="newDraft(v.version)"><app-icon name="edit" />New draft</button> }
+                      <button type="button" class="btn btn-default btn-sm" (click)="copy(v.version)"><app-icon name="copy" />Copy</button>
+                      @if (!t.draft) { <button type="button" class="btn btn-default btn-sm" (click)="newDraft(v.version)"><app-icon name="edit" />New draft</button> }
                     }
                   </div>
                 }

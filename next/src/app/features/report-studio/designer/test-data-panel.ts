@@ -49,7 +49,7 @@ export interface TestDataChoice { source: SourceRef | null; rootPath: string; ke
         @if (error()) { <p class="field-note text-[color:var(--crit-text)]" role="alert">{{ error() }}</p> }
       </div>
       <div foot class="flex justify-between gap-2">
-        <button type="button" class="btn btn-ghost btn-sm" (click)="clear()">No test data</button>
+        <button type="button" class="btn btn-default btn-sm" (click)="clear()">No test data</button>
         <div class="flex gap-2">
           <button type="button" class="btn btn-default btn-sm" (click)="ref.close()">Cancel</button>
           <button type="button" class="btn btn-primary btn-sm" [disabled]="!source()" (click)="use()"><app-icon name="check" />Fill the canvas</button>

@@ -110,7 +110,7 @@
             @if (comparable(d)) {
               <button type="button" class="btn btn-default btn-sm" [disabled]="comparing()" (click)="compare(d)" data-test="studio-compare"
                       title="The comparison month: does Report Studio's copy say every number, line and total this one says?"><app-icon name="check" />Compare</button>
-              <button type="button" class="btn btn-ghost btn-sm" [class.is-active]="sideBySide()" (click)="toggleSideBySide(d)" data-test="studio-side-by-side"
+              <button type="button" class="btn btn-default btn-sm" [class.is-active]="sideBySide()" (click)="toggleSideBySide(d)" data-test="studio-side-by-side"
                       [attr.aria-pressed]="sideBySide()"><app-icon name="columns" />Side by side</button>
             }
             <button type="button" class="btn btn-primary btn-sm" (click)="download(d)"><app-icon name="download" />Download</button>

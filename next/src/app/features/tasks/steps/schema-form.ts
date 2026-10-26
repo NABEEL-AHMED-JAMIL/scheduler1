@@ -59,7 +59,7 @@ interface MapRow { key: string; value: unknown; }
           <p class="text-xs text-[color:var(--text-muted)]">No entries.</p>
         }
         @if (!disabled()) {
-          <div><button type="button" class="btn btn-ghost btn-sm" [attr.aria-label]="'Add an entry to ' + (label() || 'the map')" (click)="addMapRow()">
+          <div><button type="button" class="btn btn-default btn-sm" [attr.aria-label]="'Add an entry to ' + (label() || 'the map')" (click)="addMapRow()">
             <app-icon name="plus" />Add
           </button></div>
         }
@@ -232,7 +232,7 @@ interface MapRow { key: string; value: unknown; }
               @if (!disabled() && unusedColumns(f).length) {
                 <div class="flex flex-wrap gap-1 mt-1.5">
                   @for (c of unusedColumns(f); track c) {
-                    <button type="button" class="btn btn-ghost btn-sm mono text-xs" [attr.aria-label]="'Add column ' + c + ' to ' + f.label"
+                    <button type="button" class="btn btn-default btn-sm mono text-xs" [attr.aria-label]="'Add column ' + c + ' to ' + f.label"
                             (click)="addColumn(f, c)"><app-icon name="plus" />{{ c }}</button>
                   }
                 </div>
@@ -252,7 +252,7 @@ interface MapRow { key: string; value: unknown; }
               <div class="flex items-center gap-2">
                 <p class="label mb-0">{{ f.label }}@if (f.required) { <span class="text-crit-500 ml-0.5" aria-hidden="true">*</span> }</p>
                 @if (!disabled()) {
-                  <button type="button" class="btn btn-ghost btn-sm ml-auto" [attr.aria-label]="'Add a row to ' + f.label" (click)="addRow(f)">
+                  <button type="button" class="btn btn-default btn-sm ml-auto" [attr.aria-label]="'Add a row to ' + f.label" (click)="addRow(f)">
                     <app-icon name="plus" />Add
                   </button>
                 }

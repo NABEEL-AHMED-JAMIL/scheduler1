@@ -72,7 +72,7 @@ export const READERS_SHOWN = 3;
                        emptyHint="A pipeline built with steps lists here what it reads: a bucket, an API request, a database or documents."
                        emptyIcon="download" (retry)="retry.emit()">
         <div empty-action class="flex justify-center">
-          <a routerLink="/pipelines/list" class="btn btn-ghost btn-sm">See pipelines</a>
+          <a routerLink="/pipelines/list" class="btn btn-default btn-sm">See pipelines</a>
         </div>
         <table class="table-modern">
           <thead>
@@ -105,7 +105,7 @@ export const READERS_SHOWN = 3;
                       </li>
                     }
                     @if (hiddenReaders(r, i) > 0) {
-                      <li><button type="button" class="btn btn-ghost btn-xs" (click)="expand(i)">+{{ hiddenReaders(r, i) }} more</button></li>
+                      <li><button type="button" class="btn btn-default btn-xs" (click)="expand(i)">+{{ hiddenReaders(r, i) }} more</button></li>
                     }
                   </ul>
                 </td>

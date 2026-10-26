@@ -389,7 +389,7 @@ export function filterRows(rows: unknown[], f: RowFilter | null): unknown[] {
                     </div>
                   }
                   @if (!readonly() && seriesList().length < 12) {
-                    <button type="button" class="btn btn-ghost btn-sm self-start" (click)="addSeries()"><app-icon name="plus" />Series</button>
+                    <button type="button" class="btn btn-default btn-sm self-start" (click)="addSeries()"><app-icon name="plus" />Series</button>
                   }
                 </div>
               }
@@ -480,7 +480,7 @@ export function filterRows(rows: unknown[], f: RowFilter | null): unknown[] {
                           </div>
                         }
                         @if (!readonly() && (c.rules?.length ?? 0) < 10) {
-                          <button type="button" class="btn btn-ghost btn-sm self-start" (click)="addRule(i)"><app-icon name="plus" />Style rule</button>
+                          <button type="button" class="btn btn-default btn-sm self-start" (click)="addRule(i)"><app-icon name="plus" />Style rule</button>
                         }
                       }
                       @if (c.type === 'image') {
@@ -490,7 +490,7 @@ export function filterRows(rows: unknown[], f: RowFilter | null): unknown[] {
                     </div>
                   }
                   @if (!readonly()) {
-                    <button type="button" class="btn btn-ghost btn-sm self-start" (click)="addColumn()"><app-icon name="plus" />Column</button>
+                    <button type="button" class="btn btn-default btn-sm self-start" (click)="addColumn()"><app-icon name="plus" />Column</button>
                   }
                 </div>
               }

@@ -59,7 +59,7 @@ import { AlertRulePanel, AlertRulePanelData } from './alert-rule-panel';
         </span>
         <span class="rules-count">· {{ openCount() }} {{ openCount() === 1 ? 'alert' : 'alerts' }} open</span>
         <div class="ml-auto flex gap-2">
-          <button type="button" class="btn btn-ghost btn-sm" (click)="load()" [disabled]="loading()"><app-icon name="refresh" [busy]="loading()" />Refresh</button>
+          <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()"><app-icon name="refresh" [busy]="loading()" />Refresh</button>
           @if (scope() === 'workspace' && !rules().length && !loading()) {
             <button type="button" class="btn btn-default btn-sm" (click)="addRecommended()" [disabled]="busy()" data-test="alerts-recommended">
               <app-icon name="sparkle" />Add the recommended rules</button>
@@ -92,7 +92,7 @@ import { AlertRulePanel, AlertRulePanelData } from './alert-rule-panel';
                 @if (a.state === 'OPEN' && a.whatToDo) { <p class="text-xs m-0 mt-1"><span class="font-medium">What to do:</span> {{ a.whatToDo }}</p> }
               </div>
               <div class="flex flex-col items-end gap-1">
-                @if (a.link) { <button type="button" class="btn btn-ghost btn-sm" (click)="go(a)"><app-icon name="external" />Open</button> }
+                @if (a.link) { <button type="button" class="btn btn-default btn-sm" (click)="go(a)"><app-icon name="external" />Open</button> }
                 @if (a.state === 'OPEN') {
                   <button type="button" class="btn btn-default btn-sm" (click)="resolve(a)" [attr.data-resolve]="a.id"><app-icon name="check" />Resolve</button>
                 }

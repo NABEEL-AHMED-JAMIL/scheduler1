@@ -46,7 +46,7 @@ import { RunFollow } from './run-follow';
             <button type="button" class="seg-btn" [class.seg-on]="direction() === 'LR'" [attr.aria-pressed]="direction() === 'LR'" (click)="direction.set('LR')"
                     title="Left to right" aria-label="Left to right"><app-icon name="arrowRight" size="0.9em" /></button>
           </div>
-          <button type="button" class="btn btn-ghost btn-sm" (click)="copy()" title="Copy Core's definition as JSON"><app-icon name="copy" />JSON</button>
+          <button type="button" class="btn btn-default btn-sm" (click)="copy()" title="Copy Core's definition as JSON"><app-icon name="copy" />JSON</button>
           @if (canCreate() && !created()) {
             <button type="button" class="btn btn-primary btn-sm" data-create [disabled]="opening()" (click)="create()"><app-icon name="save" />Create pipeline</button>
           }
@@ -83,7 +83,7 @@ import { RunFollow } from './run-follow';
             } @else if (c.jobId) {
               <div class="flex flex-wrap gap-2">
                 <button type="button" class="btn btn-primary btn-sm" [disabled]="starting()" (click)="runNow()"><app-icon name="play" [busy]="starting()" />Run now</button>
-                <a class="btn btn-ghost btn-sm" [routerLink]="['/pipelines/schedules', c.jobId, 'edit']"><app-icon name="clock" />Schedule</a>
+                <a class="btn btn-default btn-sm" [routerLink]="['/pipelines/schedules', c.jobId, 'edit']"><app-icon name="clock" />Schedule</a>
               </div>
             }
           </div>

@@ -89,7 +89,7 @@ export const FOLLOW_MS = 1500;
         }
       </div>
       <ng-container foot>
-        <a class="btn btn-ghost btn-sm" [routerLink]="['/pipelines/schedules', data.jobId, 'executions']" (click)="ref.close()">
+        <a class="btn btn-default btn-sm" [routerLink]="['/pipelines/schedules', data.jobId, 'executions']" (click)="ref.close()">
           <app-icon name="history" />Executions
         </a>
         <span class="flex-1"></span>

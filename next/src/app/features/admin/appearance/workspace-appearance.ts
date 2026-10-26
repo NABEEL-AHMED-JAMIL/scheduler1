@@ -54,7 +54,7 @@ export interface AppearanceSettings {
           <div class="form-actions" data-test="appearance-actions">
             @if (changed()) {
               <span class="text-xs text-[color:var(--text-muted)] mr-auto">Not saved yet: {{ draftLabel() }}.</span>
-              <button type="button" class="btn btn-ghost btn-sm" [disabled]="saving()" (click)="draft.set(savedChoice())">Undo</button>
+              <button type="button" class="btn btn-default btn-sm" [disabled]="saving()" (click)="draft.set(savedChoice())">Undo</button>
             }
             <button type="button" class="btn btn-primary btn-sm" [disabled]="!changed() || saving()" (click)="save()">
               <app-icon name="save" [busy]="saving()" />{{ saving() ? 'Saving…' : 'Save default' }}

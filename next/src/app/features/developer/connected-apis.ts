@@ -59,7 +59,7 @@ interface CollectionView { collectionId: number; name: string; description: stri
                   <span class="font-medium">{{ r.name }}</span>
                   <span class="mono text-xs text-[color:var(--text-muted)] min-w-0 truncate">{{ r.urlTemplate }}</span>
                   @if (!r.enabled) { <span class="pill pill-neutral">Disabled</span> }
-                  <button type="button" class="btn btn-ghost btn-sm ml-auto" [attr.aria-expanded]="open() === r.requestId" (click)="toggle(r.requestId)">
+                  <button type="button" class="btn btn-default btn-sm ml-auto" [attr.aria-expanded]="open() === r.requestId" (click)="toggle(r.requestId)">
                     <app-icon [name]="open() === r.requestId ? 'chevronDown' : 'chevronRight'" />Last answer
                   </button>
                 </div>

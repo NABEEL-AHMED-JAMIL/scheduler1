@@ -52,7 +52,7 @@ export interface TestPanelData {
             <button type="button" class="btn btn-default btn-sm" [disabled]="busy() || !source()" (click)="pdf()">
               <app-icon name="file" />Show the PDF
             </button>
-            <button type="button" class="btn btn-ghost btn-sm" [disabled]="busy()" (click)="structure()">
+            <button type="button" class="btn btn-default btn-sm" [disabled]="busy()" (click)="structure()">
               <app-icon name="eye" />Without data
             </button>
             @if (busy()) { <span class="spinner" role="status" aria-label="Working"></span> }

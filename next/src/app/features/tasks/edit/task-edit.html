@@ -320,7 +320,7 @@
         @if (!isEdit()) {
           <a routerLink="/pipelines/list" class="btn btn-ghost"><app-icon name="close" />Cancel</a>
         } @else if (dirty() && !locked()) {
-          <button type="button" class="btn btn-ghost" [disabled]="saving()" (click)="discardAll()"><app-icon name="close" />Discard</button>
+          <button type="button" class="btn btn-default btn-intent-crit" [disabled]="saving()" (click)="discardAll()"><app-icon name="close" />Discard</button>
         }
         @if (builder(); as b) {
           <button type="button" class="btn btn-default" data-test="validate" [disabled]="!!b.busy()" (click)="b.validate()">

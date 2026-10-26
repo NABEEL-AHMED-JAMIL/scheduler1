@@ -67,7 +67,7 @@
             </td>
             <td class="text-right">
               @if (isLive(g)) {
-                <button type="button" class="btn btn-ghost btn-sm btn-intent-crit" [disabled]="busy() === g.grantId"
+                <button type="button" class="btn btn-default btn-sm btn-intent-crit" [disabled]="busy() === g.grantId"
                         [attr.aria-label]="'Revoke ' + name(g) + ' in ' + workspaceName(g)" (click)="revoke(g)">
                   <app-icon name="power" [busy]="busy() === g.grantId" />Revoke
                 </button>

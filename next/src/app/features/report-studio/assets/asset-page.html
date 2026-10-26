@@ -15,7 +15,7 @@
         <div class="flex items-center gap-2">
           <a class="btn btn-default btn-sm" routerLink="/reports/assets" [queryParams]="a.restricted ? { tab: 'restricted' } : {}"><app-icon name="arrowLeft" />Back to assets</a>
           @if (canManage() && a.status === 'ACTIVE') {
-            @if (!a.templates && !a.reports && !a.profiles && !a.usage.length) { <button type="button" class="btn btn-ghost btn-sm" (click)="remove()"><app-icon name="trash" />Delete</button> }
+            @if (!a.templates && !a.reports && !a.profiles && !a.usage.length) { <button type="button" class="btn btn-default btn-intent-crit btn-sm" (click)="remove()"><app-icon name="trash" />Delete</button> }
             <button type="button" class="btn btn-default btn-sm" (click)="retire()"><app-icon name="inbox" />Retire</button>
           }
           <button type="button" class="btn btn-primary btn-sm" [disabled]="!canManage() || a.status !== 'ACTIVE' || !!pending()" (click)="newVersion()"

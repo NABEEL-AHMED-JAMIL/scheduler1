@@ -31,7 +31,7 @@ import { PairRow } from './api-collections.model';
         <p class="text-xs text-[color:var(--text-muted)]">{{ emptyText() }}</p>
       }
       @if (!readonly()) {
-        <div><button type="button" class="btn btn-ghost btn-sm" (click)="add()"><app-icon name="plus" size="0.85em" />{{ addLabel() }}</button></div>
+        <div><button type="button" class="btn btn-default btn-sm" (click)="add()"><app-icon name="plus" size="0.85em" />{{ addLabel() }}</button></div>
       }
     </div>
   `,

@@ -40,7 +40,7 @@ const DAY_CHOICES = [1, 7, 14, 30, 90];
         <p class="text-sm text-[color:var(--text-muted)]" role="status">Loading links…</p>
       } @else if (error()) {
         <p class="text-sm text-crit-500" role="alert">{{ error() }}
-          <button type="button" class="btn btn-ghost btn-xs" (click)="load()">Try again</button></p>
+          <button type="button" class="btn btn-default btn-xs" (click)="load()">Try again</button></p>
       } @else if (state(); as s) {
         @if (!s.enabled) {
           <p class="text-sm text-[color:var(--text-muted)]" role="note">
@@ -114,7 +114,7 @@ const DAY_CHOICES = [1, 7, 14, 30, 90];
                     <td class="hidden lg:table-cell whitespace-nowrap">{{ l.lastUsedAt ? (l.lastUsedAt | serverTime:'dateTime') : '—' }}</td>
                     <td class="text-right">
                       @if (l.status === 'Active') {
-                        <button type="button" class="btn btn-ghost btn-xs" [disabled]="locked() || busy()"
+                        <button type="button" class="btn btn-default btn-intent-crit btn-xs" [disabled]="locked() || busy()"
                                 [attr.aria-label]="'Revoke ' + (l.label || 'link ' + l.linkId)" (click)="revoke(l)">Revoke</button>
                       }
                     </td>

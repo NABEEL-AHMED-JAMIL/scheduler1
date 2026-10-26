@@ -16,7 +16,7 @@ import { StepTaskEntry, TaskState } from './steps.model';
   host: { class: 'inline-flex items-center justify-end gap-1' },
   template: `
     @if (task().overridden && !task().blocked) {
-      <button type="button" class="btn btn-ghost btn-sm" [attr.aria-label]="'Put ' + name() + ' back to its default'"
+      <button type="button" class="btn btn-default btn-sm" [attr.aria-label]="'Put ' + name() + ' back to its default'"
               [disabled]="busy()" (click)="switched.emit(null)">Default</button>
     }
     <!-- Owner #16: a task a platform administrator blocked here cannot be switched by the workspace. -->

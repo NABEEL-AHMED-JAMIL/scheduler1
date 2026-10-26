@@ -81,7 +81,7 @@ export function reviewFields(row: Record<string, unknown>): { first: { label: st
           @if (pdf(); as p) {
             <button type="button" class="btn btn-default btn-sm" (click)="openPdf(p)" [disabled]="opening()" data-test="run-review-pdf"><app-icon name="file" />{{ p.name || 'Report PDF' }}</button>
           }
-          @if (link()) { <a class="btn btn-ghost btn-sm" [routerLink]="link()!"><app-icon name="external" />Open the run</a> }
+          @if (link()) { <a class="btn btn-default btn-sm" [routerLink]="link()!"><app-icon name="external" />Open the run</a> }
         </div>
         <div class="rrc" [class.rrc-noimg]="!imageKey()">
           @if (imageKey()) {

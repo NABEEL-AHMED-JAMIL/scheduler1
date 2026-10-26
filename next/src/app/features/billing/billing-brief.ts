@@ -25,7 +25,7 @@ import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
           } @else {
             <h3 class="text-sm font-semibold">{{ title() }}</h3>
           }
-          <a routerLink="/billing/usage" class="btn btn-ghost btn-sm"><app-icon name="chart" size="0.9em" />Cost &amp; usage</a>
+          <a routerLink="/billing/usage" class="btn btn-default btn-sm"><app-icon name="chart" size="0.9em" />Cost &amp; usage</a>
         </div>
         <dl class="grid grid-cols-[repeat(auto-fit,minmax(9rem,1fr))] gap-x-4 gap-y-3 m-0">
           <div><dt class="stat-label">This month so far</dt><dd class="m-0 text-[1.05rem] font-semibold tabular">{{ money(s.monthToDate, s.currency) }}</dd>

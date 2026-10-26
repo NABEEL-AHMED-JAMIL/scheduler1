@@ -35,7 +35,7 @@
         <div class="flex items-center gap-2">
           <h3 id="stepConfigHeading" class="section-title">Task settings</h3>
           @if (hasForm) {
-            <button type="button" class="btn btn-ghost btn-sm ml-auto" [disabled]="configMode() === 'json' && !!configError()" (click)="toggleMode()">
+            <button type="button" class="btn btn-default btn-sm ml-auto" [disabled]="configMode() === 'json' && !!configError()" (click)="toggleMode()">
               <app-icon [name]="configMode() === 'form' ? 'code' : 'list'" />{{ configMode() === 'form' ? 'Edit as JSON' : 'Edit as form' }}
             </button>
           }

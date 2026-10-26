@@ -12,11 +12,11 @@
             <span class="hidden md:inline text-xs text-[color:var(--text-muted)]" data-test="shortcuts">
               <kbd class="kbd">A</kbd> approve · <kbd class="kbd">R</kbd> reject · <kbd class="kbd">↓</kbd> next field
             </span>
-            <button type="button" class="btn btn-ghost btn-sm" [disabled]="!!busy()" (click)="claim()">
+            <button type="button" class="btn btn-default btn-sm" [disabled]="!!busy()" (click)="claim()">
               <app-icon [name]="claimedByMe() ? 'close' : 'lock'" />{{ claimedByMe() ? 'Let go' : 'Claim' }}
             </button>
             @if (dirty()) {
-              <button type="button" class="btn btn-ghost btn-sm" [disabled]="!!busy()" (click)="discard()">Discard changes</button>
+              <button type="button" class="btn btn-default btn-intent-crit btn-sm" [disabled]="!!busy()" (click)="discard()">Discard changes</button>
               <button type="button" class="btn btn-default btn-sm" [disabled]="!!busy()" (click)="save()">
                 @if (busy() === 'save') { <app-icon name="refresh" class="spin" /> } @else { <app-icon name="save" /> }Save corrections
               </button>
@@ -141,7 +141,7 @@
             <div class="flex items-center gap-2 mb-2">
               <h2 class="text-sm font-semibold mr-auto">{{ t.label }} ({{ t.rows.length }})</h2>
               @if (editable() && newRow()?.tableKey !== t.key) {
-                <button type="button" class="btn btn-ghost btn-xs" (click)="addRow(t)"><app-icon name="plus" />Add row</button>
+                <button type="button" class="btn btn-default btn-xs" (click)="addRow(t)"><app-icon name="plus" />Add row</button>
               }
             </div>
             <div class="overflow-x-auto">

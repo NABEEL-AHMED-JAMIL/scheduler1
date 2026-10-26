@@ -62,7 +62,7 @@ import { openVisualise } from './charts/visualise-open';
       </div>
 
       @if (suggestion() && !datasetName()) {
-        <button type="button" class="btn btn-ghost btn-xs" (click)="datasetName.set(suggestion())">
+        <button type="button" class="btn btn-default btn-xs" (click)="datasetName.set(suggestion())">
           Call it "{{ suggestion() }}"
         </button>
       }

@@ -203,7 +203,7 @@
             }
             <!-- The theme every tile draws in. Stored on the board; choosing one runs nothing. -->
             @if (canEdit()) {
-              <button type="button" class="btn btn-ghost btn-sm dash-theme" [cdkMenuTriggerFor]="themeMenu" [attr.aria-label]="'Chart theme: ' + boardThemeLabel()"><app-icon name="sun" />{{ boardThemeLabel() }}</button>
+              <button type="button" class="btn btn-default btn-sm dash-theme" [cdkMenuTriggerFor]="themeMenu" [attr.aria-label]="'Chart theme: ' + boardThemeLabel()"><app-icon name="sun" />{{ boardThemeLabel() }}</button>
             }
             <ng-template #themeMenu>
               <div cdkMenu class="card shadow-xl p-4 w-[34rem] max-w-[92vw] text-sm">
@@ -257,7 +257,7 @@
                   @for (dataset of boardDatasets(); track dataset.key) { <option [value]="dataset.key" [selected]="dataset.key === boardFilterOn()">{{ dataset.label }}</option> }
                 </select>
               </label>
-              <button type="button" class="btn btn-ghost btn-sm ms-auto" (click)="filterOpen.set(false)">Hide</button>
+              <button type="button" class="btn btn-default btn-sm ms-auto" (click)="filterOpen.set(false)">Hide</button>
             </div>
             @if (boardColumnsLoading()) {
               <p class="field-note text-[color:var(--text-muted)]">Reading that dataset's columns — one of the four queries this server runs at a time, which is why it is only read when you open this.</p>
@@ -501,7 +501,7 @@
                   @if (shown; as view) {
                     @let kind = drawn(widget, view);
                     @if (hiddenRowTotal(view, kind); as total) {
-                      <button type="button" class="btn btn-ghost btn-xs dash-show-all" [attr.aria-expanded]="isExpanded(widget)" (click)="toggleRows(widget)">
+                      <button type="button" class="btn btn-default btn-xs dash-show-all" [attr.aria-expanded]="isExpanded(widget)" (click)="toggleRows(widget)">
                         {{ isExpanded(widget) ? 'Show fewer' : 'Show all ' + total }}
                       </button>
                     }

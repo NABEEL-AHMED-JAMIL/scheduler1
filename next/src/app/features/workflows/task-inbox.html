@@ -55,7 +55,7 @@
   @if (error()) {
     <!-- Review 2026-10-07 (M14): a list that could not be read offers to read it again where the reader is looking. -->
     <p class="flex items-center gap-2 rounded-md px-3 py-2 text-sm bg-sunken text-warn-500" role="alert"><app-icon name="alert" size="0.95em" />{{ error() }}
-      <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="load()" data-test="try-again"><app-icon name="refresh" />Try again</button></p>
+      <button type="button" class="btn btn-default btn-sm ml-auto" (click)="load()" data-test="try-again"><app-icon name="refresh" />Try again</button></p>
   }
 
   <div class="inbox-split" [attr.data-pane]="pane()">
@@ -175,7 +175,7 @@
       <section class="card inbox-detail" aria-label="Task" data-test="task-detail">
         @if (detail(); as d) {
           <div class="inbox-detail-head">
-            <button type="button" class="btn btn-ghost btn-sm inbox-back" (click)="backToList()" data-test="back-to-list"><app-icon name="arrowLeft" />Back to list</button>
+            <button type="button" class="btn btn-default btn-sm inbox-back" (click)="backToList()" data-test="back-to-list"><app-icon name="arrowLeft" />Back to list</button>
             <h2 class="inbox-detail-title"><ng-container *ngTemplateOutlet="titled; context: { $implicit: d.requestTitle || d.name }" /></h2>
             <p class="inbox-detail-sub">{{ d.name }} · {{ d.workflowName }}</p>
             <div class="inbox-chips">
@@ -227,7 +227,7 @@
                   } @else {
                     <button type="button" class="btn btn-primary" [disabled]="busy()" (click)="decide('done')"><app-icon name="check" />Mark done</button>
                   }
-                  <button type="button" class="btn btn-ghost" [disabled]="busy()" (click)="passing.set(true)"><app-icon name="users" />Pass on</button>
+                  <button type="button" class="btn btn-default" [disabled]="busy()" (click)="passing.set(true)"><app-icon name="users" />Pass on</button>
                 </div>
               }
               <p class="inbox-rule" data-test="decision-rule">
@@ -284,7 +284,7 @@
           </div>
         } @else if (detailError()) {
           <div class="p-4">
-            <button type="button" class="btn btn-ghost btn-sm inbox-back mb-2" (click)="backToList()" data-test="back-to-list"><app-icon name="arrowLeft" />Back to list</button>
+            <button type="button" class="btn btn-default btn-sm inbox-back mb-2" (click)="backToList()" data-test="back-to-list"><app-icon name="arrowLeft" />Back to list</button>
             <p class="text-sm text-crit-500">{{ detailError() }}</p>
           </div>
         } @else {
@@ -298,7 +298,7 @@
       <section class="card inbox-detail" aria-label="Request" data-test="request-detail">
         @if (request(); as r) {
           <div class="inbox-detail-head">
-            <button type="button" class="btn btn-ghost btn-sm inbox-back" (click)="backToList()" data-test="back-to-list"><app-icon name="arrowLeft" />Back to list</button>
+            <button type="button" class="btn btn-default btn-sm inbox-back" (click)="backToList()" data-test="back-to-list"><app-icon name="arrowLeft" />Back to list</button>
             <div class="flex items-start gap-3 flex-wrap">
               <div class="min-w-0 flex-1">
                 <h2 class="inbox-detail-title"><ng-container *ngTemplateOutlet="titled; context: { $implicit: r.title }" /></h2>
@@ -328,7 +328,7 @@
           </div>
         } @else if (detailError()) {
           <div class="p-4">
-            <button type="button" class="btn btn-ghost btn-sm inbox-back mb-2" (click)="backToList()" data-test="back-to-list"><app-icon name="arrowLeft" />Back to list</button>
+            <button type="button" class="btn btn-default btn-sm inbox-back mb-2" (click)="backToList()" data-test="back-to-list"><app-icon name="arrowLeft" />Back to list</button>
             <p class="text-sm text-crit-500">{{ detailError() }}</p>
           </div>
         } @else {

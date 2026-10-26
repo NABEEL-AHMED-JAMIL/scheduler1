@@ -67,13 +67,13 @@ export interface ConnectionDialogData {
               <div class="flex items-center gap-2 min-h-9">
                 <span class="secret-mask mono" aria-hidden="true">•••••••</span>
                 <span class="text-xs text-[color:var(--text-secondary)]"><app-icon name="lock" size="0.85em" /> configured</span>
-                <button type="button" class="btn btn-ghost btn-xs ml-auto" aria-label="Replace" (click)="replace()">Replace</button>
+                <button type="button" class="btn btn-default btn-intent-crit btn-xs ml-auto" aria-label="Replace" (click)="replace()">Replace</button>
               </div>
             } @else {
               <div class="flex items-center gap-2">
                 <input id="dbPassword" class="input mono" type="password" autocomplete="new-password" [value]="edit().password"
                        [placeholder]="edit().replacing ? 'the new password' : 'write-only'" (input)="patch({ password: $any($event.target).value })" />
-                @if (edit().replacing) { <button type="button" class="btn btn-ghost btn-xs" aria-label="Keep the stored password" (click)="keep()">Keep</button> }
+                @if (edit().replacing) { <button type="button" class="btn btn-default btn-xs" aria-label="Keep the stored password" (click)="keep()">Keep</button> }
               </div>
               <p class="field-note text-[color:var(--text-muted)]">Sealed as it arrives and never shown again.</p>
             }

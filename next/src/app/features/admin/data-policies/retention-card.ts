@@ -53,14 +53,14 @@ import { RetentionPlatformPanel } from './retention-platform-panel';
         <div section-actions class="flex flex-wrap items-center justify-end gap-2">
           @if (view(); as v) {
             <span class="pill" [class.pill-ok]="v.enabled" [class.pill-neutral]="!v.enabled" data-retention-state>{{ v.enabled ? 'On' : 'Off' }}</span>
-            <button type="button" class="btn btn-ghost btn-sm" (click)="openHistory()" data-retention-history><app-icon name="list" />History</button>
+            <button type="button" class="btn btn-default btn-sm" (click)="openHistory()" data-retention-history><app-icon name="list" />History</button>
             @if (isPlatformAdmin()) {
-              <button type="button" class="btn btn-ghost btn-sm" (click)="openPlatform()" data-retention-platform><app-icon name="settings" />Platform minimums</button>
+              <button type="button" class="btn btn-default btn-sm" (click)="openPlatform()" data-retention-platform><app-icon name="settings" />Platform minimums</button>
             }
-            <button type="button" class="btn btn-ghost btn-sm" [disabled]="previewing()" (click)="runPreview()" data-retention-preview>
+            <button type="button" class="btn btn-default btn-sm" [disabled]="previewing()" (click)="runPreview()" data-retention-preview>
               <app-icon name="eye" [busy]="previewing()" />Preview
             </button>
-            <button type="button" class="btn btn-ghost btn-sm" [disabled]="!v.enabled || v.running || starting()" (click)="runNow()"
+            <button type="button" class="btn btn-default btn-sm" [disabled]="!v.enabled || v.running || starting()" (click)="runNow()"
                     [attr.title]="v.enabled ? null : 'Turn retention on first'" data-retention-run>
               <app-icon name="play" [busy]="starting()" />Run now
             </button>
@@ -120,7 +120,7 @@ import { RetentionPlatformPanel } from './retention-platform-panel';
                         @if (l.deleted) { <span class="block text-xs text-[color:var(--text-muted)] mt-1">Removed {{ l.deleted.toLocaleString('en-US') }}{{ l.bytes ? ', ' + formatSize(l.bytes) : '' }}</span> }
                         @if (l.state === 'PAUSED' || l.state === 'FAILED') { <span class="block text-xs text-[color:var(--text-muted)] mt-1">{{ readable(l.note) }}</span> }
                         @if (l.state === 'PAUSED') {
-                          <button type="button" class="btn btn-ghost btn-sm mt-1" (click)="confirmClass(c)" data-retention-confirm>
+                          <button type="button" class="btn btn-default btn-intent-crit btn-sm mt-1" (click)="confirmClass(c)" data-retention-confirm>
                             <app-icon name="checkCircle" />Confirm {{ l.eligible.toLocaleString('en-US') }} of {{ l.total.toLocaleString('en-US') }}
                           </button>
                         }
@@ -171,7 +171,7 @@ import { RetentionPlatformPanel } from './retention-platform-panel';
                     <span class="min-w-0 flex-1">{{ h.reason }}
                       <span class="block text-xs text-[color:var(--text-muted)]">Placed {{ h.placedAt | serverTime:'recent' }}{{ h.placedBy ? ' by user ' + h.placedBy : '' }}</span>
                     </span>
-                    <button type="button" class="btn btn-ghost btn-sm" (click)="release(h)" data-retention-release>Release</button>
+                    <button type="button" class="btn btn-default btn-sm" (click)="release(h)" data-retention-release>Release</button>
                   </li>
                 }
               </ul>

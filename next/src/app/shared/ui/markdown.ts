@@ -29,7 +29,7 @@ export type Block =
             <div class="md-code">
               <div class="md-code-head">
                 <span>{{ block.lang || 'code' }}</span>
-                <button type="button" class="btn btn-ghost btn-sm" (click)="copyBlock($index, block.code)">
+                <button type="button" class="btn btn-default btn-sm" (click)="copyBlock($index, block.code)">
                   <app-icon [name]="copiedIndex() === $index ? 'check' : 'copy'"
                             [class.icon-ok]="copiedIndex() === $index" size="0.85em" />
                   {{ copiedIndex() === $index ? 'Copied' : 'Copy' }}

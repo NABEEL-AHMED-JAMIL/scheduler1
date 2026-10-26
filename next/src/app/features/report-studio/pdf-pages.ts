@@ -44,9 +44,9 @@ const THUMBS = 12;
       <div class="rsp-main">
         @if (count()) {
           <div class="rsp-nav">
-            <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Previous page" [disabled]="page() <= 1" (click)="go(page() - 1)"><app-icon name="chevronLeft" /></button>
+            <button type="button" class="btn btn-default btn-icon btn-sm" aria-label="Previous page" [disabled]="page() <= 1" (click)="go(page() - 1)"><app-icon name="chevronLeft" /></button>
             <span class="text-xs tabular">Page {{ page() }} of {{ count() }}</span>
-            <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Next page" [disabled]="page() >= count()" (click)="go(page() + 1)"><app-icon name="chevronRight" /></button>
+            <button type="button" class="btn btn-default btn-icon btn-sm" aria-label="Next page" [disabled]="page() >= count()" (click)="go(page() + 1)"><app-icon name="chevronRight" /></button>
           </div>
         }
         <div #scroller class="rsp-scroller">

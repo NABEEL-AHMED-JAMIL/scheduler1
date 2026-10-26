@@ -23,7 +23,7 @@ import { formatSize } from './format-size';
         <app-icon name="file" size="1.75rem" class="icon-info" />
         <p class="mt-2 text-sm font-medium break-all">{{ picked.name }}</p>
         <p class="text-xs text-[color:var(--text-muted)] mt-0.5">{{ formatSize(picked.size) }}</p>
-        <button type="button" class="btn btn-ghost btn-sm mt-3" (click)="file.set(null)">
+        <button type="button" class="btn btn-default btn-intent-crit btn-sm mt-3" (click)="file.set(null)">
           <app-icon name="close" />Remove
         </button>
       } @else {

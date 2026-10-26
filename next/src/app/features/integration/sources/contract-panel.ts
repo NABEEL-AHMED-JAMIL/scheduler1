@@ -57,7 +57,7 @@ export interface ContractPanelData {
                     <td class="text-xs whitespace-nowrap">@if (v.dateCreated) { {{ v.dateCreated | serverTime: 'dateTime' }} } @else { — }</td>
                     <td class="text-right">
                       @if (canChange() && v.status !== 'ACTIVE') {
-                        <button type="button" class="btn btn-ghost btn-xs" [disabled]="busy()" [attr.aria-label]="'Activate v' + v.version" (click)="activate(v.version)">Activate</button>
+                        <button type="button" class="btn btn-default btn-xs" [disabled]="busy()" [attr.aria-label]="'Activate v' + v.version" (click)="activate(v.version)">Activate</button>
                       }
                     </td>
                   </tr>

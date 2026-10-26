@@ -259,7 +259,7 @@
                   }
                   @if (m.toolRunId != null && owners().has(m.messageId)) {
                     <div>
-                      <button type="button" class="btn btn-ghost btn-sm -ml-2" [attr.data-trace-open]="m.toolRunId" (click)="openTrace(m.toolRunId)">
+                      <button type="button" class="btn btn-default btn-sm" [attr.data-trace-open]="m.toolRunId" (click)="openTrace(m.toolRunId)">
                         <app-icon name="plug" />Tool calls
                       </button>
                     </div>
@@ -281,7 +281,7 @@
               <span class="typing"><span></span><span></span><span></span></span>
               <span class="text-[color:var(--text-secondary)]">{{ live()?.run?.phase || (working() === 'decide' ? 'Carrying out your decision…' : 'Starting…') }}</span>
               <span class="text-xs text-[color:var(--text-muted)] tabular-nums">{{ elapsedText() }}</span>
-              <button type="button" class="btn btn-ghost btn-sm ml-auto" [disabled]="stopping()" (click)="stop()" data-stop>
+              <button type="button" class="btn btn-default btn-sm ml-auto" [disabled]="stopping()" (click)="stop()" data-stop>
                 <app-icon name="stop" size="0.85em" [busy]="stopping()" />{{ stopping() ? 'Stopping…' : 'Stop' }}
               </button>
             </div>

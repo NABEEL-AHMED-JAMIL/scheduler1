@@ -176,7 +176,7 @@ export function reconcile(total: number, attributed: number): { total: number; r
                 <td class="text-xs text-[color:var(--text-muted)] whitespace-nowrap" data-test="mostly">{{ mostly(p) }}</td>
                 <td class="text-right">
                   @if (p.taskDetailId) {
-                    <button type="button" class="btn btn-ghost btn-xs" [attr.aria-pressed]="p.taskDetailId === picked()" data-test="pipeline-runs"
+                    <button type="button" class="btn btn-default btn-xs" [attr.aria-pressed]="p.taskDetailId === picked()" data-test="pipeline-runs"
                             [attr.aria-label]="'Show the runs of ' + (p.pipeline || 'pipeline #' + p.taskDetailId)" (click)="$event.stopPropagation(); pick(p)">
                       Runs<app-icon name="chevronDown" size="0.85em" /></button>
                   }

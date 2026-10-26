@@ -159,7 +159,7 @@
 
         <div empty-action class="flex justify-center">
           @if (canManage() && !hasFilters()) { <button type="button" class="btn btn-primary btn-sm" (click)="create()"><app-icon name="plus" />New source</button> }
-          @if (!hasFilters()) { <a routerLink="/connections/api-collections" class="btn btn-ghost btn-sm ml-2">See API Collections</a> }
+          @if (!hasFilters()) { <a routerLink="/connections/api-collections" class="btn btn-default btn-sm ml-2">See API Collections</a> }
         </div>
 
         @if (view() === 'cards') {

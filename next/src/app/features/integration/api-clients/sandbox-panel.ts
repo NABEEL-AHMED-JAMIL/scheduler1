@@ -39,7 +39,7 @@ import { SecretDialog, SecretDialogData } from './secret-dialog';
       } @else if (error()) {
         <div class="card p-4 text-sm flex flex-wrap items-center gap-2" role="alert">
           <span class="text-[color:var(--warn-text)]">{{ error() }}</span>
-          <button type="button" class="btn btn-ghost btn-sm" (click)="load()">Try again</button>
+          <button type="button" class="btn btn-default btn-sm" (click)="load()">Try again</button>
         </div>
       } @else if (sandbox(); as s) {
         <div class="card p-0">

@@ -61,7 +61,7 @@
                              [attr.aria-label]="'Upload a profile picture for ' + name()" />
                     </label>
                     @if (p.avatarVersion) {
-                      <button type="button" class="btn btn-ghost btn-sm" (click)="removePicture()" [disabled]="busy() === 'picture'">
+                      <button type="button" class="btn btn-default btn-intent-crit btn-sm" (click)="removePicture()" [disabled]="busy() === 'picture'">
                         <app-icon name="trash" class="icon-crit" />Remove
                       </button>
                     }
@@ -252,7 +252,7 @@
             <div class="flex flex-wrap items-center gap-2 mb-2">
               <h3 class="text-sm font-semibold">Sessions open now</h3>
               @if (sessions()?.length && !readOnly()) {
-                <button type="button" class="btn btn-ghost btn-sm ml-auto btn-intent-warn" (click)="endAllSessions()" [disabled]="busy() === 'sessions'"
+                <button type="button" class="btn btn-default btn-sm ml-auto btn-intent-warn" (click)="endAllSessions()" [disabled]="busy() === 'sessions'"
                         data-test="end-all-sessions"><app-icon name="logout" />Sign out everywhere</button>
               }
             </div>
@@ -277,7 +277,7 @@
                         <td class="whitespace-nowrap">{{ s.signedInAt | serverTime: 'dateTime' }}</td>
                         <td class="whitespace-nowrap">{{ s.lastActiveAt | serverTime: 'dateTime' }}</td>
                         <td class="text-right">
-                          <button type="button" class="btn btn-ghost btn-sm" (click)="endSession(s)" [disabled]="busy() === 'session:' + s.sessionId"
+                          <button type="button" class="btn btn-default btn-intent-crit btn-sm" (click)="endSession(s)" [disabled]="busy() === 'session:' + s.sessionId"
                                   [attr.aria-label]="'End the session from ' + browserOf(s.userAgent)">End</button>
                         </td>
                       </tr>

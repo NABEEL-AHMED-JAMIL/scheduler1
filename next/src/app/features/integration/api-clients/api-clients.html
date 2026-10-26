@@ -174,10 +174,10 @@
               <td class="text-right"><span [class]="r.active ? 'pill pill-ok' : 'pill pill-neutral'">{{ r.active ? 'Active' : 'Inactive' }}</span></td>
               <td class="text-right whitespace-nowrap">
                 @if (auth.canBuild()) {
-                  <button type="button" class="btn btn-ghost btn-sm" [attr.aria-label]="'Change the route for ' + r.eventType" (click)="openRoute(r)">
+                  <button type="button" class="btn btn-default btn-sm" [attr.aria-label]="'Change the route for ' + r.eventType" (click)="openRoute(r)">
                     <app-icon name="edit" />Change
                   </button>
-                  <button type="button" class="btn btn-ghost btn-sm btn-intent-crit" [disabled]="routeBusy() === r.routeId"
+                  <button type="button" class="btn btn-default btn-sm btn-intent-crit" [disabled]="routeBusy() === r.routeId"
                           [attr.aria-label]="'Remove the route for ' + r.eventType" (click)="removeRoute(r)">
                     <app-icon name="trash" />Remove
                   </button>

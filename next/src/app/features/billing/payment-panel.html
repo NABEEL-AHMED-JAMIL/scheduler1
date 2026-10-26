@@ -25,7 +25,7 @@
                    (input)="setAmount($any($event.target).value)" (blur)="touch('amount')" />
           </div>
           <div class="pay-quick">
-            <button type="button" class="btn btn-ghost btn-xs" (click)="payInFull()" [disabled]="open <= 0" data-pay-full>Pay in full · {{ money(open) }}</button>
+            <button type="button" class="btn btn-default btn-xs" (click)="payInFull()" [disabled]="open <= 0" data-pay-full>Pay in full · {{ money(open) }}</button>
           </div>
         </app-field>
         <app-field class="fr-4" label="Method" for="payMethod">

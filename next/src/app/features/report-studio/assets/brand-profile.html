@@ -18,7 +18,7 @@
         </div>
         <div class="flex items-center gap-2">
           @if (canEdit()) {
-            <button type="button" class="btn btn-ghost btn-sm" (click)="archive()"><app-icon name="inbox" />Archive</button>
+            <button type="button" class="btn btn-default btn-sm" (click)="archive()"><app-icon name="inbox" />Archive</button>
             @if (canPublish() && p.currentPublishedVersion && !p.isDefault) { <button type="button" class="btn btn-default btn-sm" (click)="makeDefault()">Make the workspace default</button> }
             @if (canPublish() && p.draft) { <button type="button" class="btn btn-default btn-sm" [disabled]="dirty() || !passes()" (click)="publish()"><app-icon name="check" />Publish v{{ p.draft.version }}</button> }
             <button type="button" class="btn btn-default btn-sm" [disabled]="!dirty()" (click)="cancel()">Cancel</button>

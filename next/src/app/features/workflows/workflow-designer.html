@@ -87,7 +87,7 @@
       @if (view() === 'new') {
         <div class="designer-scroll">
           <div class="inbox-detail-head">
-            <button type="button" class="btn btn-ghost btn-sm inbox-back" (click)="backToList()" data-test="back-to-list"><app-icon name="arrowLeft" />Back to list</button>
+            <button type="button" class="btn btn-default btn-sm inbox-back" (click)="backToList()" data-test="back-to-list"><app-icon name="arrowLeft" />Back to list</button>
             <h2 class="inbox-detail-title">New workflow</h2>
             <p class="inbox-detail-sub">Name it and say what it approves; you lay out its steps next.</p>
           </div>
@@ -121,7 +121,7 @@
       } @else if (current(); as wf) {
         <!-- The header strip: what it is, its state, its actions, and the tabs along its foot. -->
         <header class="designer-head" data-test="workflow-head">
-          <button type="button" class="btn btn-ghost btn-sm inbox-back" (click)="backToList()" data-test="back-to-list"><app-icon name="arrowLeft" />Back to list</button>
+          <button type="button" class="btn btn-default btn-sm inbox-back" (click)="backToList()" data-test="back-to-list"><app-icon name="arrowLeft" />Back to list</button>
           <div class="designer-head-top">
             <div class="min-w-0 flex-1">
               <h2 class="inbox-detail-title">@let title = nameParts(wf.name);{{ title.ref ? title.name + ' ' : wf.name }}@if (title.ref) {<span class="inbox-title-ref">{{ title.ref }}</span>}</h2>
@@ -193,7 +193,7 @@
                     <p class="text-xs text-[color:var(--text-muted)]">Step {{ selected()! + 1 }} of {{ steps().length }}</p>
                   </div>
                   @if (canEdit()) {
-                    <button type="button" class="btn btn-ghost btn-xs btn-intent-crit" (click)="remove(selected()!)" data-test="remove-step"><app-icon name="trash" />Remove</button>
+                    <button type="button" class="btn btn-default btn-xs btn-intent-crit" (click)="remove(selected()!)" data-test="remove-step"><app-icon name="trash" />Remove</button>
                   }
                   <button type="button" class="btn btn-ghost btn-icon designer-props-close" (click)="closeSheet()" aria-label="Close the step's properties" data-test="close-props"><app-icon name="close" /></button>
                 </div>
@@ -383,7 +383,7 @@
                               </button>
                             </div>
                           }
-                          <button type="button" class="btn btn-ghost btn-sm" (click)="addVariable(s)"><app-icon name="plus" />Add a variable</button>
+                          <button type="button" class="btn btn-default btn-sm" (click)="addVariable(s)"><app-icon name="plus" />Add a variable</button>
                         </div>
                         <p class="field-note text-[color:var(--text-muted)]" data-test="wf-api-variables-note">From the request's fields by name (patient.id), and subject_id, instance and call_key.
                           A variable that is only <span class="mono">{{ '{{' }}subject{{ '}}' }}</span>, or only an object or list of it (<span class="mono">{{ '{{' }}patient{{ '}}' }}</span>), is sent as JSON.</p>
@@ -521,7 +521,7 @@
                 <label class="sr-only" for="wf-note">What changed</label>
                 <input id="wf-note" class="input input-sm" maxlength="500" placeholder="What changed (optional, for the version history)" [ngModel]="note()" (ngModelChange)="note.set($event)" data-test="publish-note" />
               </div>
-              <button type="button" class="btn btn-ghost btn-sm" (click)="discard()" data-test="discard">Discard changes</button>
+              <button type="button" class="btn btn-default btn-intent-crit btn-sm" (click)="discard()" data-test="discard">Discard changes</button>
             } @else {
               <p class="designer-foot-quiet" data-test="publish-clean">
                 @if (wf.currentVersion) { Version {{ wf.currentVersion }} is live. A change here stays a draft until you publish it. }

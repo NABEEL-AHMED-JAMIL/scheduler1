@@ -263,12 +263,12 @@ interface BuilderRow {
         </span>
 
         <div class="ml-auto flex items-center gap-1 shrink-0">
-          <button type="button" class="btn btn-ghost btn-xs" [disabled]="!columns().length"
+          <button type="button" class="btn btn-default btn-xs" [disabled]="!columns().length"
                   (click)="addClause()">
             <app-icon name="plus" />Condition
           </button>
           @if (depth() < maxDepth) {
-            <button type="button" class="btn btn-ghost btn-xs" (click)="addGroup()"
+            <button type="button" class="btn btn-default btn-xs" (click)="addGroup()"
                     title="A group nests: the conditions inside it are joined by their own AND or OR.">
               <app-icon name="plus" />Group
             </button>
