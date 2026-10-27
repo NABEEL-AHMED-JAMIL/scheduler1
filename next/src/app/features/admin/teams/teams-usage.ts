@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { Observable, catchError, forkJoin, from, map, mergeMap, of, toArray } from 'rxjs';
+import { Observable, catchError, forkJoin, from, map, mergeMap, of, shareReplay, toArray } from 'rxjs';
 import { API_SUCCESS } from '../../../core/api/api.config';
 import { AuthService } from '../../../core/auth/auth.service';
 import { AlertRule, AlertsApi } from '../../settings/alerts/alerts.api';
@@ -26,6 +26,8 @@ export interface TeamUse {
 export interface TeamUsage {
   byTeam: Map<number, TeamUse[]>;
   known: TeamUseKind[];
+  /** More workflow definitions than MAX_WORKFLOWS: the newest were read, so a workflow count may be short. */
+  capped?: boolean;
 }
 
 export const USE_LABELS: Record<TeamUseKind, { one: string; many: string; title: string; icon: string }> = {
@@ -35,8 +37,13 @@ export const USE_LABELS: Record<TeamUseKind, { one: string; many: string; title:
   reports: { one: 'Report Studio', many: 'Report Studio', title: 'Report Studio', icon: 'file' },
 };
 
-/** The most workflow definitions read for the usage, so a large workspace never makes the page slow. */
+/**
+ * The most workflow definitions read for the usage (four at a time), so a large workspace never makes the page slow: the
+ * designer's list carries no steps, so each definition is one more call. Past it the panel says the count may be short.
+ */
 export const MAX_WORKFLOWS = 60;
+/** How long one reading is reused when the page is opened again (Refresh reads again). */
+export const USAGE_TTL_MS = 60_000;
 
 function add(into: Map<number, TeamUse[]>, teamId: number, use: TeamUse): void {
   if (!Number.isFinite(teamId)) return;
@@ -116,14 +123,27 @@ export class TeamUsageReader {
   private readonly alerts = inject(AlertsApi);
   private readonly reports = inject(ReportStudioApi);
 
-  read(): Observable<TeamUsage> {
+  private cached: { at: number; usage$: Observable<TeamUsage> } | null = null;
+
+  /** Reused for a minute (the page opened again, a tab switched back); `fresh` reads again (Refresh). */
+  read(fresh = false): Observable<TeamUsage> {
+    if (!fresh && this.cached && Date.now() - this.cached.at < USAGE_TTL_MS) return this.cached.usage$;
+    const usage$ = this.readNow().pipe(shareReplay({ bufferSize: 1, refCount: false }));
+    this.cached = { at: Date.now(), usage$ };
+    return usage$;
+  }
+
+  private readNow(): Observable<TeamUsage> {
     const admin = this.auth.isTenantAdmin();
     const canDesign = admin || this.auth.canOpen('workflow-designer');
     const none = of(null);
+    let capped = false;
     const workflows$: Observable<WorkflowDetail[] | null> = canDesign ? this.workflows.list().pipe(
       mergeMap(r => {
         if (r.status !== API_SUCCESS) return of(null);
-        const list = (r.data ?? []).filter((w: WorkflowSummary) => w.status !== 'Archived').slice(0, MAX_WORKFLOWS);
+        const live = (r.data ?? []).filter((w: WorkflowSummary) => w.status !== 'Archived');
+        capped = live.length > MAX_WORKFLOWS;
+        const list = live.slice(0, MAX_WORKFLOWS);
         if (!list.length) return of([] as WorkflowDetail[]);
         return from(list).pipe(
           mergeMap(w => this.workflows.fetch(w.key).pipe(map(d => (d.status === API_SUCCESS ? d.data ?? null : null)), catchError(() => of(null))), 4),
@@ -152,7 +172,7 @@ export class TeamUsageReader {
         reportUses(reports, byTeam);
         known.push('reports');
       }
-      return { byTeam, known };
+      return { byTeam, known, capped };
     }));
   }
 }

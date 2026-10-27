@@ -17,7 +17,7 @@ import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { SidePanel, sidePanelConfig } from '../../../shared/ui/side-panel';
 import { StatStrip, StatStripItem } from '../../../shared/ui/stat-strip';
 import { ToastService } from '../../../shared/ui/toast.service';
-import { TeamUsage, TeamUsageReader, TeamUse, USE_LABELS, usageSummary } from './teams-usage';
+import { MAX_WORKFLOWS, TeamUsage, TeamUsageReader, TeamUse, USE_LABELS, usageSummary } from './teams-usage';
 
 /** The members drawn in a row's avatar stack; the rest are "+N". */
 const STACK = 4;
@@ -94,6 +94,7 @@ export class Teams implements OnInit {
   readonly pager = createPager<Team>();
   readonly usage = signal<TeamUsage | null>(null);
   readonly useLabels = USE_LABELS;
+  readonly maxWorkflows = MAX_WORKFLOWS;
   readonly stack = STACK;
 
   /** Everyone who leads or is in a team now, for the filters: by name. */
@@ -163,10 +164,14 @@ export class Teams implements OnInit {
   });
 
   ngOnInit(): void {
-    this.load();
+    this.load('cached');
   }
 
-  load(): void {
+  /**
+   * The teams, and where they are used: on opening a reading from the last minute is reused, Refresh reads again, and
+   * listing archived teams leaves it alone (it does not depend on them).
+   */
+  load(usage: 'cached' | 'fresh' | 'skip' = 'fresh'): void {
     this.loading.set(true);
     this.error.set('');
     this.api.list(null, this.admin() && this.withArchived()).subscribe({
@@ -194,7 +199,7 @@ export class Teams implements OnInit {
         this.toast.error(refusal(e, 'The teams could not be read.'));
       },
     });
-    this.usageReader.read().subscribe({ next: u => this.usage.set(u), error: () => this.usage.set(null) });
+    if (usage !== 'skip') this.usageReader.read(usage === 'fresh').subscribe({ next: u => this.usage.set(u), error: () => this.usage.set(null) });
     this.workflows.colleagues().subscribe({
       next: r => this.people.set(r.status === API_SUCCESS ? r.data ?? [] : []),
       error: () => this.people.set([]),
@@ -205,7 +210,7 @@ export class Teams implements OnInit {
 
   toggleArchived(): void {
     this.withArchived.set(!this.withArchived());
-    this.load();
+    this.load('skip');
   }
 
   /** Archived teams are listed only when asked for (an administrator's). */
@@ -321,7 +326,7 @@ export class Teams implements OnInit {
         this.toast.success(r.message || 'Team made.');
         this.creating.set(false);
         this.selectedId.set(r.data?.teamId ?? null);
-        this.load();
+        this.load('skip');
       },
       error: e => {
         this.busy.set(false);
@@ -404,7 +409,7 @@ export class Teams implements OnInit {
         this.toast.success(r.message || 'Saved.');
         if (r.data) this.teams.update(list => list.map(t => (t.teamId === r.data!.teamId ? r.data! : t)));
         done?.();
-        if (r.data?.status === 'ARCHIVED' && !this.withArchived()) this.load();
+        if (r.data?.status === 'ARCHIVED' && !this.withArchived()) this.load('skip');
       },
       error: e => {
         this.busy.set(false);

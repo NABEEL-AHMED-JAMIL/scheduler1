@@ -272,6 +272,9 @@
         <!-- Where it is used, from what the caller may open. -->
         <section class="flex flex-col gap-2" aria-labelledby="team-used-title" data-testid="team-used">
           <h3 id="team-used-title" class="section-title">Where it is used</h3>
+          @if (usage()?.capped) {
+            <p class="text-xs text-[color:var(--text-muted)]">The first {{ maxWorkflows }} workflows were read; one further down may also use it.</p>
+          }
           @if (usesOf(team); as uses) {
             @if (uses.length) {
               <ul class="flex flex-col gap-1 text-sm">

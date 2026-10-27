@@ -1,6 +1,12 @@
-import { describe, it, expect } from 'vitest';
-import { WorkflowDetail } from '../../workflows/workflows.api';
-import { alertUses, reportUses, usageSummary, workflowUses } from './teams-usage';
+import { describe, it, expect, vi } from 'vitest';
+import { provideZonelessChangeDetection, signal } from '@angular/core';
+import { TestBed } from '@angular/core/testing';
+import { firstValueFrom, from, of } from 'rxjs';
+import { AuthService } from '../../../core/auth/auth.service';
+import { AlertsApi } from '../../settings/alerts/alerts.api';
+import { ReportStudioApi } from '../../report-studio/report-studio.api';
+import { WorkflowDetail, WorkflowsApi } from '../../workflows/workflows.api';
+import { MAX_WORKFLOWS, TeamUsageReader, alertUses, reportUses, usageSummary, workflowUses } from './teams-usage';
 
 /** UX2: where a team is used, read from the definitions and settings that name it ({ kind: 'team', value }). */
 const detail = (steps: unknown, currentVersion = 2): WorkflowDetail => ({
@@ -45,4 +51,48 @@ describe('UX2: where a team is used', () => {
     expect(usageSummary(into.get(1)).map(s => s.text)).toEqual(['1 approval', '2 alerts', 'Report Studio']);
     expect(usageSummary(undefined)).toEqual([]);
   });
+
+  it('reads a bounded number of calls: the list, at most MAX_WORKFLOWS definitions four at a time, and reuses a reading for a minute', async () => {
+    const many = Array.from({ length: 80 }, (_, i) => ({ key: `w${i}`, name: `W${i}`, status: i === 0 ? 'Archived' : 'Active' }));
+    let inFlight = 0; let most = 0;
+    const fetch = vi.fn((_key: string) => {
+      inFlight++; most = Math.max(most, inFlight);
+      return new Promise(r => setTimeout(r, 1)).then(() => { inFlight--; return { status: 'SUCCESS', data: detail({ steps: [] }) }; });
+    });
+    const workflows = { list: vi.fn(() => of({ status: 'SUCCESS', data: many })), fetch: (k: string) => from(fetch(k)) };
+    const alerts = { rules: vi.fn(() => of({ status: 'SUCCESS', data: { rules: [] } })) };
+    const reports = { settings: vi.fn(() => of(null)) };
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [provideZonelessChangeDetection(),
+      { provide: WorkflowsApi, useValue: workflows }, { provide: AlertsApi, useValue: alerts }, { provide: ReportStudioApi, useValue: reports },
+      { provide: AuthService, useValue: { isTenantAdmin: signal(true), canOpen: () => true } }] });
+    const reader = TestBed.inject(TeamUsageReader);
+    const usage = await firstValueFrom(reader.read());
+    expect(workflows.list).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledTimes(MAX_WORKFLOWS);
+    expect(fetch).not.toHaveBeenCalledWith('w0');
+    expect(most).toBeLessThanOrEqual(4);
+    expect(usage.known).toEqual(['workflow', 'approval', 'alert']);
+    expect(usage.capped).toBe(true);
+    await firstValueFrom(reader.read());
+    expect(workflows.list, 'reused within a minute').toHaveBeenCalledTimes(1);
+    await firstValueFrom(reader.read(true));
+    expect(workflows.list, 'Refresh reads again').toHaveBeenCalledTimes(2);
+  });
+
+  it('asks nothing a member may not read: no alerts or Report Studio, no designer without its page', async () => {
+    const workflows = { list: vi.fn(() => of({ status: 'SUCCESS', data: [] })), fetch: vi.fn() };
+    const alerts = { rules: vi.fn() };
+    const reports = { settings: vi.fn() };
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [provideZonelessChangeDetection(),
+      { provide: WorkflowsApi, useValue: workflows }, { provide: AlertsApi, useValue: alerts }, { provide: ReportStudioApi, useValue: reports },
+      { provide: AuthService, useValue: { isTenantAdmin: signal(false), canOpen: () => false } }] });
+    const usage = await firstValueFrom(TestBed.inject(TeamUsageReader).read());
+    expect(workflows.list).not.toHaveBeenCalled();
+    expect(alerts.rules).not.toHaveBeenCalled();
+    expect(reports.settings).not.toHaveBeenCalled();
+    expect(usage.known).toEqual([]);
+  });
 });
+
