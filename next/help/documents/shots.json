@@ -1,0 +1,183 @@
+[
+ {
+  "name": "doc-documents-in",
+  "route": "/documents/in",
+  "as": "summit.admin"
+ },
+ {
+  "name": "doc-intake-upload",
+  "route": "/documents/intake/upload",
+  "as": "summit.admin"
+ },
+ {
+  "name": "doc-upload-dialog",
+  "route": "/documents/intake/upload",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "click": "main button:has-text(\"Upload documents\") >> nth=-1"
+   },
+   {
+    "wait": 800
+   }
+  ],
+  "clip": ".cdk-overlay-pane"
+ },
+ {
+  "name": "doc-email-in",
+  "route": "/documents/intake/email-in",
+  "as": "summit.admin",
+  "thumb": true
+ },
+ {
+  "name": "doc-file-drop",
+  "route": "/documents/intake/file-drop",
+  "as": "summit.admin"
+ },
+ {
+  "name": "doc-file-drop-settings",
+  "route": "/documents/intake/file-drop",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "click": "[data-test=inbox-settings]"
+   },
+   {
+    "waitFor": "#inboxAlias"
+   },
+   {
+    "wait": 800
+   }
+  ],
+  "clip": ".cdk-overlay-pane"
+ },
+ {
+  "name": "doc-types",
+  "route": "/documents/types",
+  "as": "summit.admin",
+  "thumb": true
+ },
+ {
+  "name": "doc-starters",
+  "route": "/documents/types",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "click": "main button:has-text(\"Add from starters\")"
+   },
+   {
+    "waitFor": ".cdk-overlay-pane h3"
+   },
+   {
+    "wait": 800
+   }
+  ],
+  "clip": ".cdk-overlay-pane",
+  "thumb": true
+ },
+ {
+  "name": "doc-type-editor",
+  "route": "/documents/types",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "click": "button:text-is(\"Invoice\")"
+   },
+   {
+    "waitFor": "#typeName"
+   },
+   {
+    "wait": 1200
+   }
+  ]
+ },
+ {
+  "name": "doc-checks",
+  "route": "/documents/types",
+  "as": "summit.admin",
+  "viewport": [
+   1920,
+   5200
+  ],
+  "steps": [
+   {
+    "click": "button:text-is(\"Invoice\")"
+   },
+   {
+    "waitFor": "section[aria-label=\"Rules\"]"
+   },
+   {
+    "wait": 1200
+   }
+  ],
+  "clip": "section[aria-label=\"Rules\"]"
+ },
+ {
+  "name": "doc-review",
+  "route": "/review/documents/1013",
+  "as": "summit.admin",
+  "thumb": true
+ },
+ {
+  "name": "doc-reject",
+  "route": "/review/documents/1013",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "click": "button:has-text(\"Reject\")"
+   },
+   {
+    "waitFor": "#rejectReason"
+   },
+   {
+    "wait": 500
+   }
+  ],
+  "clip": ".cdk-overlay-pane"
+ },
+ {
+  "name": "doc-review-queue",
+  "route": "/review/documents",
+  "as": "summit.admin"
+ },
+ {
+  "name": "doc-bulk",
+  "route": "/review/documents",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "click": "[data-bulk-page]"
+   },
+   {
+    "waitFor": "[data-bulk-bar]"
+   },
+   {
+    "wait": 800
+   }
+  ]
+ },
+ {
+  "name": "doc-review-policy",
+  "route": "/administration/data-policies",
+  "as": "summit.admin",
+  "viewport": [
+   1920,
+   2400
+  ],
+  "steps": [
+   {
+    "waitFor": "[data-review-policy]"
+   },
+   {
+    "wait": 800
+   }
+  ],
+  "clip": "[data-review-policy]"
+ },
+ {
+  "name": "doc-approved-data",
+  "route": "/documents/approved-data",
+  "as": "summit.admin",
+  "thumb": true
+ }
+]
