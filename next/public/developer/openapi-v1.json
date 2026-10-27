@@ -4528,9 +4528,26 @@
                   "type": "array",
                   "items": {
                     "type": "string"
-                  }
+                  },
+                  "description": "A choice's options, or a checkboxes field's (each one the person may tick)."
+                },
+                "section": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "description": "The title of the group the field belongs to: consecutive fields with the same section are shown together under its heading. One line of display text; absent when the field is not grouped."
+                },
+                "minSelected": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "checkboxes: the fewest options to tick once any is ticked; absent when there is no least."
+                },
+                "maxSelected": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "checkboxes: the most options that may be ticked; absent when there is no most."
                 }
-              }
+              },
+              "description": "type is one of text, longText, number, date, choice, checkboxes, yesNo, email, table, file, signature or lookup. A checkboxes answer is the list of the options ticked, in the options' order (in a form's CSV export they are joined with \"; \")."
             }
           }
         }
