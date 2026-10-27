@@ -67,7 +67,7 @@ Tested by ______ on ______
 | QA-19.26 | Not high: one approval | Send a low-priority case (P01 Lena Halvorsen); as R approve | No senior step; the report is made after R alone | ☐ Pass ☐ Fail |
 | QA-19.27 | A rejection needs a reason | Send another intake; as R choose **Reject** with no reason, then with "Wrong patient" | Refused without a reason; with it, the request ends rejected | ☐ Pass ☐ Fail |
 | QA-19.28 | A rejection makes no summary | After QA-19.27, look in **Reports › Library** and F's **My requests** | No report for that intake; F's request reads rejected with R's reason | ☐ Pass ☐ Fail |
-| QA-19.29 | The kept decision | Open Ingrid's request **History**; open her PDF | The history shows what was kept of R's decision; the PDF's *Nurse's review* and the line under the summary name R and the time, with R's note | ☐ Pass ☐ Fail |
+| QA-19.29 | The kept decision | Open Ingrid's request **History**; open her PDF | The history shows what was kept of R's decision; the PDF's *Intake review* and the line under the summary name R and the time, with R's note | ☐ Pass ☐ Fail |
 | QA-19.30 | Masking in the PDF | Read the PDF's patient and insurance parts | The phone, the emergency and guardian phones and both member IDs show only their last 4 characters | ☐ Pass ☐ Fail |
 | QA-19.31 | The PDF's parts | Page through it | Each part is whole on a page; the DRAFT line *Drafted with AI … (a DRAFT, not a diagnosis)*; allergies as red chips; symptoms ticked only; *Missing information to ask*; a QR code | ☐ Pass ☐ Fail |
 | QA-19.32 | Approve and sign, Verify | As R (who did not generate it) choose **Approve and sign**; then **Verify signature**; scan the QR code | The version reads **Signed**; the signature holds; the QR code opens the report's verification | ☐ Pass ☐ Fail |
@@ -102,10 +102,10 @@ Tested by ______ on ______
 ## The approving nurse's signature
 | # | Check | Steps | Expected | Pass / Fail |
 |---|---|---|---|---|
-| QA-19.46 | The approving nurse's own signature | Approve one summary as R and another as a second nurse who can approve | Each signed PDF's *Nurse's review* shows the signature, name and title of the nurse who approved it, never the other's (a nurse with no signature of her own: her typed name and **SIGNED DIGITALLY**) | ☐ Pass ☐ Fail |
+| QA-19.46 | The approving nurse's own signature | Approve one summary as R and another as a second nurse who can approve | Each signed PDF's *Report approved and signed by* shows the signature, name and title of the nurse who approved it, never the other's (a nurse with no signature of her own: her typed name and **SIGNED DIGITALLY**) | ☐ Pass ☐ Fail |
 
 ## Example
 At Riverside Health the front desk sends Ingrid Castellanos's intake; the reviewer, as the nurse, approves it with a note,
 and the administrator approves it again as the senior nurse because the DRAFT priority is high. The signed summary names
-the reviewer under *Nurse's review*, masks her phone, and verifies. A second intake rejected for a wrong phone makes no
+the reviewer under *Intake review* and her signature under *Report approved and signed by*, masks her phone, and verifies. A second intake rejected for a wrong phone makes no
 summary, and the Meridian administrator cannot open any of it.

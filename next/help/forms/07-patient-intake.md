@@ -62,7 +62,7 @@ A check that fails does not stop the intake: it goes on, flagged, and the summar
 1. Open **Run & review › Review › Approvals**. The intake's approval is under your team.
 2. Open it. Read the DRAFT summary, the suggested priority and why, and the flags against the patient's own answers.
 3. **Approve** with a short note, or **Reject** with the reason (a reason is required). Your name, the time and your note
-   are what the summary prints under *Nurse's review*.
+   are what the summary prints under *Intake review*.
 
 > **Warning:** The AI's summary, flags and priority are a DRAFT to help you read the intake quickly. They are never a
 > diagnosis or a triage decision: you decide, from the patient's answers.
@@ -80,8 +80,9 @@ The report opens in **See results › Reports › Library** as **Patient intake 
 - tables of the medicines, the allergies and reactions, conditions, operations, family history and vaccines; social
   history; the symptoms ticked (positives only); women's health for a female patient;
 - insurance, with the member IDs **masked**; the consents and who signed;
-- **Missing information to ask**; the **Nurse's review** with the signature and the approval stamp, the senior nurse when
-  there was one, and a QR code to verify the report.
+- **Missing information to ask**; the **Intake review** (who reviewed it, when, the note, the senior nurse when there
+  was one) and, beside it, **Report approved and signed by**: the approving person's own signature (or typed name),
+  name and time, the approval stamp, and a QR code to verify the report.
 
 The PDF is signed when it is approved with **Approve and sign**: by someone other than the person who generated it.
 **Verify signature** on its page, or the QR code, says whether it holds ([Approve and sign](#rs-approve)).

@@ -175,7 +175,7 @@ together, so no part is split across two pages.
 | Insurance | Payer, **member IDs masked to their last 4**, group, policy holder, secondary insurance |
 | Missing information to ask | The AI's list, what the rules found missing, and the checks that failed |
 | Consents | The three consents, who signed and when |
-| Nurse's review | Reviewed by, when, the nurse's note, the senior nurse (or *Not needed*); an **Approver's signature** (the approving nurse's own, placed at approval) with the stamp; a QR code *Scan to verify this report* |
+| Intake review, and Report approved and signed by | Side by side in one box: the intake review (Reviewed by, Reviewed at, Review note, the senior nurse or *Not needed*), and the report's approval -- an **Approver's signature** (the approving nurse's own, placed at approval) captioned *Approval and digital signature of this report*, with the stamp and a QR code *Scan to verify this report* |
 
 Test it with `intake-summary-sample.json`, keep it as a test sample, and **Publish**.
 
