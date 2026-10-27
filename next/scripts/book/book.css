@@ -7,7 +7,7 @@
   @bottom-right { content: counter(page); font: 600 8.5pt -apple-system, "Helvetica Neue", Arial, sans-serif; color: #1E2939; }
 }
 @page :left { margin: 20mm 22mm 22mm 18mm; }
-@page cover { margin: 0; @top-left { content: none; } @bottom-left { content: none; } @bottom-right { content: none; } }
+@page cover { margin: 0; background: #101828; @top-left { content: none; } @bottom-left { content: none; } @bottom-right { content: none; } }
 @page front { @top-left { content: none; } @top-right { content: none; } }
 @page { @top-right { font: 7.5pt -apple-system, "Helvetica Neue", Arial, sans-serif; color: #0F766E; } }
 
@@ -35,12 +35,14 @@ hr { border: 0; border-top: 0.5pt solid var(--rule); margin: 4mm 0; }
 .mark { position: absolute; font-size: 1pt; color: #fff; line-height: 0; margin: 0; }
 
 /* Cover */
-.cover { page: cover; position: relative; height: 299mm; width: 212mm; margin: -1mm 0 0 -1mm; background: #101828; color: #fff; padding: 34mm 22mm 0; overflow: hidden; break-after: page; }
+.cover { page: cover; position: relative; height: 297mm; width: 210mm; margin: 0; background: #101828; contain: paint; color: #fff; padding: 34mm 22mm 0; overflow: hidden; break-after: page; }
 .cover .band { position: absolute; left: 0; right: 0; top: 0; height: 14mm; background: var(--teal); }
 .cover .brand { font-size: 13pt; font-weight: 600; letter-spacing: 0.04em; color: #8FE3D6; margin: 0; }
-.cover h1 { color: #fff; font-size: 44pt; margin: 4mm 0 3mm; letter-spacing: -0.01em; }
+.cover h1 { color: #fff; font-size: 40pt; max-width: 165mm; margin: 4mm 0 3mm; letter-spacing: -0.01em; }
 .cover .sub { font-size: 13pt; color: #D0D5DD; max-width: 140mm; }
-.cover-fig { position: absolute; left: 22mm; right: -30mm; top: 118mm; width: 210mm; border-radius: 2mm; box-shadow: 0 6mm 18mm rgba(0,0,0,.45); }
+/* The picture runs off the right edge on purpose: rounded only where it starts, so the edge reads as a bleed, not a cut. */
+.cover-fig { display: block; margin: 16mm 0 0; width: 236mm; max-width: none; max-height: 130mm; object-fit: cover; object-position: left top;
+             border-radius: 2mm 0 0 2mm; outline: 0.4mm solid rgba(255,255,255,.12); }
 .cover .edition { position: absolute; left: 22mm; bottom: 18mm; margin: 0; font-size: 10pt; color: #D0D5DD; }
 
 /* Copyright and contents */
@@ -105,7 +107,7 @@ td.box { white-space: nowrap; width: 18mm; line-height: 1.9; }
 .tick { display: inline-block; width: 3.2mm; height: 3.2mm; border: 0.9pt solid var(--ink); border-radius: 0.5mm; vertical-align: -0.6mm; }
 
 figure.fig { margin: 4mm 0 5mm; break-inside: avoid; }
-figure.fig img { display: block; max-width: 150mm; border: 0.5pt solid #D0D5DD; border-radius: 1mm; }
+figure.fig img { display: block; max-width: 168mm; border: 0.5pt solid #D0D5DD; border-radius: 1mm; }
 figure.fig figcaption { font-size: 8pt; color: var(--muted); margin-top: 1.5mm; }
 .todo-box { height: 38mm; border: 0.75pt dashed #98A2B3; border-radius: 1.5mm; background: var(--surface); display: flex; flex-direction: column;
             align-items: center; justify-content: center; gap: 1mm; color: var(--muted); text-align: center; padding: 0 10mm; }
