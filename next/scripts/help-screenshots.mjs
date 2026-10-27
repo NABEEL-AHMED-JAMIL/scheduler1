@@ -140,6 +140,12 @@ try {
       await page.waitForTimeout(s.settle ?? 900);
       for (const step of s.steps ?? []) await act(page, step);
       await page.waitForTimeout(400);
+      if (s.fullPage) {
+        // Lazy pictures load only when they come into view: scroll the page through once.
+        await page.evaluate(async () => { for (let y = 0; y < document.body.scrollHeight; y += 600) { window.scrollTo(0, y); await new Promise(r => setTimeout(r, 120)); } window.scrollTo(0, 0); });
+        await page.waitForLoadState('networkidle', { timeout: 8_000 }).catch(() => {});
+        await page.waitForTimeout(500);
+      }
       // No caret blinking, no toasts half-faded, no focus ring from the last click.
       await page.addStyleTag({ content: '*{caret-color:transparent!important} .toast-host,.toasts{display:none!important}' });
       if (!s.keepFocus) await page.evaluate(() => (document.activeElement instanceof HTMLElement) && document.activeElement.blur());

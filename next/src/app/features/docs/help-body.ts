@@ -60,7 +60,7 @@ export interface MenuRow { group: string; entry: string; path: string; tabs: str
     .tbl td:first-child { min-width: 9rem; }
     figure.fig { margin: 1.5rem 0; }
     figure.fig button { display: block; padding: 0; border: 0; background: none; cursor: zoom-in; max-width: 100%; }
-    figure.fig img { display: block; max-width: 100%; height: auto; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);
+    figure.fig img { display: block; max-width: 100%; max-height: 40rem; width: auto; height: auto; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);
                      box-shadow: 0 8px 24px -16px var(--scrim); background: var(--surface-raised); }
     figure.fig figcaption { margin-top: .55rem; font-size: .8rem; color: var(--text-muted); line-height: 1.5; }
     .wide { width: 100%; }

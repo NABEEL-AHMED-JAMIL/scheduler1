@@ -231,7 +231,7 @@ export function gateOf(path: string): (NavGate & { tabs?: NavTab[] }) | null {
                         </a>
                         <ul class="flex flex-col gap-1.5 text-sm pl-12">
                           @for (a of articlesOf(t).slice(0, 3); track a.id) {
-                            <li class="truncate"><a class="link-inline" [href]="'/docs#' + a.id" (click)="open($event, a.id)">{{ a.title }}</a></li>
+                            <li><a class="link-inline" [href]="'/docs#' + a.id" (click)="open($event, a.id)">{{ a.title }}</a></li>
                           }
                         </ul>
                         <a class="text-sm text-[color:var(--accent-text)] font-medium pl-12 mt-auto" [href]="'/docs#topic-' + t.id" (click)="go($event, 'topic-' + t.id)" data-test="topic-count">
@@ -281,7 +281,7 @@ export function gateOf(path: string): (NavGate & { tabs?: NavTab[] }) | null {
                       <h2 id="newTitle" class="text-base font-semibold">What's new</h2>
                       @if (apiChangelog()) { <a routerLink="/developers/portal/changelog" class="link-inline text-sm ml-auto">API changelog</a> }
                     </div>
-                    @for (n of whatsNew(); track n.title) {
+                    @for (n of whatsNew().slice(0, 8); track n.title) {
                       <a class="row-link flex items-start gap-3 px-4 py-3" [href]="'/docs#' + n.article" (click)="open($event, n.article)" data-test="doc-new">
                         <span class="text-xs mono text-[color:var(--text-muted)] whitespace-nowrap w-24 shrink-0 mt-0.5">{{ day(n.date) }}</span>
                         <span class="min-w-0"><span class="block text-sm font-semibold">{{ n.title }}</span><span class="block text-sm text-[color:var(--text-secondary)]">{{ n.text }}</span></span>
