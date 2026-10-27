@@ -43,4 +43,28 @@ describe('RequestWorkspace', () => {
     expect(el.querySelector('#contactName')!.getAttribute('maxlength')).toBe('255');
     expect(el.querySelector('#contactEmail')!.getAttribute('maxlength')).toBe('255');
   });
+
+  it('UX2: sits on the front door\'s hero, the form raised on a card beside a short value line, with a proper footer', () => {
+    const { el } = mount();
+    const hero = el.querySelector('.hero.request-hero')!;
+    expect(hero).not.toBeNull();
+    expect(hero.querySelector('app-brand-mark')).not.toBeNull();
+    expect(hero.querySelector('h1')!.textContent!.trim()).toBe('Request a workspace');
+    const card = hero.querySelector('.card.request-card')!;
+    expect([...card.querySelectorAll('input, textarea')].map(c => c.id)).toEqual(['organisationName', 'contactName', 'contactEmail', 'purpose']);
+    expect(card.querySelector('button[type="submit"]')!.textContent).toContain('Send request');
+    expect(hero.querySelectorAll('ul li').length).toBe(3);
+    const footer = [...el.querySelectorAll('footer a')].map(a => a.getAttribute('href'));
+    expect(footer).toEqual(['/', '/docs', '/login']);
+  });
+
+  it('UX2: keeps the rules as they were -- required fields marked and nothing sent while one is empty', () => {
+    const { fixture, component, el, post } = mount();
+    component.submit();
+    fixture.detectChanges();
+    expect(post).not.toHaveBeenCalled();
+    expect(el.textContent).toContain('Check the highlighted fields.');
+    expect(el.textContent).toContain('Organisation is required');
+    expect(el.textContent).toContain('Your email is required');
+  });
 });
