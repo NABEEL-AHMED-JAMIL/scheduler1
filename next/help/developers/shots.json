@@ -1,0 +1,134 @@
+[
+ {
+  "name": "dev-clients",
+  "route": "/developers/api-clients",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "[data-api-clients]"
+   },
+   {
+    "wait": 1200
+   }
+  ],
+  "thumb": true
+ },
+ {
+  "name": "dev-client-change",
+  "route": "/developers/api-clients",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "[data-api-clients]"
+   },
+   {
+    "wait": 800
+   },
+   {
+    "click": "[aria-label='Actions for Partner portal']"
+   },
+   {
+    "click": "button.menu-item:text-is('Change')"
+   },
+   {
+    "waitFor": "#clientName"
+   },
+   {
+    "wait": 800
+   }
+  ],
+  "clip": "app-form-dialog",
+  "pad": 0,
+  "thumb": true
+ },
+ {
+  "name": "dev-sandbox",
+  "route": "/developers/api-clients",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "[data-sandbox-clients]"
+   },
+   {
+    "wait": 800
+   }
+  ],
+  "clip": "#sandbox",
+  "thumb": true
+ },
+ {
+  "name": "dev-routes",
+  "route": "/developers/api-clients",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "[data-event-routes]"
+   },
+   {
+    "wait": 800
+   }
+  ],
+  "clip": "app-table-shell:has([data-event-routes])",
+  "retake": "Summit Valley: routes active with their data contracts (lab_result, device_reading); four are Inactive with no contract today"
+ },
+ {
+  "name": "dev-webhooks",
+  "route": "/developers/api-clients",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "[data-webhooks]"
+   },
+   {
+    "wait": 800
+   }
+  ],
+  "clip": "app-table-shell:has([data-webhooks])",
+  "retake": "Summit Valley: receivers on an https address (the demo receiver is a local http host)",
+  "thumb": true
+ },
+ {
+  "name": "dev-deliveries",
+  "route": "/developers/api-clients",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "[data-webhooks]"
+   },
+   {
+    "scroll": "[data-webhooks]"
+   },
+   {
+    "wait": 600
+   },
+   {
+    "click": "[aria-label='Actions for the webhook to http://showcase-echo:8080/hooks/partner']"
+   },
+   {
+    "click": "button.menu-item:text-is('Deliveries')"
+   },
+   {
+    "waitFor": "app-form-dialog"
+   },
+   {
+    "wait": 2000
+   }
+  ],
+  "clip": "app-form-dialog",
+  "pad": 0
+ },
+ {
+  "name": "dev-portal",
+  "route": "/developers/portal",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "[data-developer-overview]"
+   },
+   {
+    "wait": 1200
+   }
+  ],
+  "thumb": true
+ }
+]
