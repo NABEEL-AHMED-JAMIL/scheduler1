@@ -1,0 +1,148 @@
+[
+ {
+  "name": "apr-review-all",
+  "route": "/review/all",
+  "as": "summit.admin",
+  "thumb": true
+ },
+ {
+  "name": "apr-review-selected",
+  "route": "/review/all",
+  "as": "summit.dr.patel",
+  "steps": [
+   {
+    "click": "tbody tr:nth-child(1) input[type=checkbox]"
+   },
+   {
+    "click": "tbody tr:nth-child(2) input[type=checkbox]"
+   },
+   {
+    "wait": 800
+   }
+  ]
+ },
+ {
+  "name": "apr-approvals",
+  "route": "/review/approvals",
+  "as": "summit.admin"
+ },
+ {
+  "name": "apr-run-review-done",
+  "route": "/review/approvals",
+  "as": "summit.rad.schmidt",
+  "steps": [
+   {
+    "click": "text=/^Done/"
+   },
+   {
+    "wait": 1500
+   },
+   {
+    "click": ".inbox-list button, [role=option], li button >> nth=0"
+   },
+   {
+    "wait": 2500
+   }
+  ],
+  "retake": "Summit Valley: a chest X-ray run review still pending, its image and DRAFT finding shown (job 8)",
+  "thumb": true
+ },
+ {
+  "name": "apr-step-approval-done",
+  "route": "/review/approvals",
+  "as": "summit.wound.harper",
+  "steps": [
+   {
+    "click": "text=/^Done/"
+   },
+   {
+    "wait": 1500
+   },
+   {
+    "click": ".inbox-list button, [role=option], li button >> nth=0"
+   },
+   {
+    "wait": 2500
+   }
+  ]
+ },
+ {
+  "name": "apr-step-in-run",
+  "route": "/pipelines/schedules/1104/runs/2042",
+  "as": "summit.admin",
+  "clip": "app-run-steps-table"
+ },
+ {
+  "name": "apr-review-settings",
+  "route": "/pipelines/1352/edit?tab=settings",
+  "as": "summit.admin",
+  "clip": "#pipeline-review"
+ },
+ {
+  "name": "apr-designer",
+  "route": "/workflows/designer?key=patient-journey",
+  "as": "summit.admin",
+  "thumb": true
+ },
+ {
+  "name": "apr-approval-settings",
+  "route": "/workflows/designer?key=data-access",
+  "as": "summit.admin"
+ },
+ {
+  "name": "apr-versions",
+  "route": "/workflows/designer?key=patient-journey",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "click": "role=tab[name=/Versions/]"
+   },
+   {
+    "wait": 1500
+   }
+  ],
+  "retake": "Summit Valley: version notes without build ticket numbers (version 2 names MIG-424)"
+ },
+ {
+  "name": "apr-teams",
+  "route": "/administration/teams",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "click": "text=Physicians >> nth=0"
+   },
+   {
+    "wait": 1500
+   }
+  ],
+  "retake": "Summit Valley: teams with their leads named (the build left every team without a lead)",
+  "thumb": true
+ },
+ {
+  "name": "apr-my-requests",
+  "route": "/review/requests",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "click": "text=Hospice eligibility SV-000310"
+   },
+   {
+    "wait": 2000
+   }
+  ],
+  "thumb": true
+ },
+ {
+  "name": "apr-new-request",
+  "route": "/review/requests",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "click": "button:has-text('New request')"
+   },
+   {
+    "wait": 2000
+   }
+  ]
+ }
+]
