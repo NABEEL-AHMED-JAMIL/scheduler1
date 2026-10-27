@@ -65,6 +65,12 @@ Tested by ______ on ______
 | QA-05.26 | A rejected document is not there | Look for the rejected referral | It has no row in approved data | ☐ Pass ☐ Fail |
 | QA-05.27 | What a type's approval starts | **Document types**, the column **When approved, starts…** | **Nothing yet** for a type no schedule starts on; after [QA-08.16](#qa-triggers), the schedule's name, linked | ☐ Pass ☐ Fail |
 
+## Choice words a page writes
+| # | Check | Steps | Expected | Pass / Fail |
+|---|---|---|---|---|
+| QA-05.31 | A lab printout's H, L and N | **Document types**, the lab result type › **Edit**: on the **Flag** column, **Options written as** `High = H; Low = L; Normal = N`; **Save as the next version**; add a lab PDF whose flags are printed `H`, `L` and `N` | The flags read **High**, **Low** and **Normal**, each pointing at its letter on the page, with no "Not one of" problem | ☐ Pass ☐ Fail |
+| QA-05.32 | A word for two options is refused | **Options written as** `High = H; Low = H`; **Save** | Refused: the word `H` is given to both High and Low | ☐ Pass ☐ Fail |
+
 ## Access and isolation
 | # | Check | Steps | Expected | Pass / Fail |
 |---|---|---|---|---|

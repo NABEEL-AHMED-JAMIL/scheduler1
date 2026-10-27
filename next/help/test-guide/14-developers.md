@@ -1,7 +1,7 @@
 ---
 id: qa-developers
 title: "Test area 14: developers and the API"
-summary: API clients and their scopes, the sandbox and test keys, starting a run through the API, event routes, webhooks with their signature and redelivery, embedded run views and the Developer portal.
+summary: API clients and their scopes, the sandbox and test keys, starting a run through the API, event routes, webhooks with their signature and redelivery, embedded run views, the result as JSON, PDF, HTML or Markdown, and the Developer portal.
 section: Administer
 who: Testers with a developer's tool for sending API calls (curl, Postman or similar); A sets up, with R and X for access and isolation
 where: Developers › API Clients (/developers/api-clients); Developers › Developer portal (/developers/portal)
@@ -68,6 +68,17 @@ Tested by ______ on ______
 | QA-14.27 | API Clients are the administrators' | As R, go to `/developers/api-clients` | Refused | ☐ Pass ☐ Fail |
 | QA-14.28 | Revoke ends everything | ⋯ › **Revoke** on `QA client`; call with it | The client and its tokens stop working for good; **Show revoked** lists it | ☐ Pass ☐ Fail |
 | QA-14.29 | Another workspace's client cannot reach this one | With a client of X's workspace, ask for `QA occupancy` by its id, and for one of its runs | *Not found* for both | ☐ Pass ☐ Fail |
+
+## Result formats
+| # | Check | Steps | Expected | Pass / Fail |
+|---|---|---|---|---|
+| QA-14.30 | The result as JSON, the default | With `QA client`, read a completed run's result with no `format` | The rows of its final output, masked, as in QA-14.13 | ☐ Pass ☐ Fail |
+| QA-14.31 | A run with a report, as PDF, HTML and Markdown | Read the result of a run whose pipeline has a **Generate report** step with `format=pdf`, `format=html`, then `format=md` | A PDF (the signed one if the report was approved), the report's page, and Markdown whose first line reads **From signed report RPT-… version N** (or **(not signed)**), with its tables and lists, and its pictures and signature as links | ☐ Pass ☐ Fail |
+| QA-14.32 | A run without a report | Read a `QA occupancy` run's result with `format=md`, `format=html`, then `format=pdf` | Markdown and HTML hold the result rows as a table, first line **From the result of run …**; the PDF is refused: **no report** | ☐ Pass ☐ Fail |
+| QA-14.33 | The format by Accept, and one that is not offered | Read a result with the header `Accept: text/markdown`; then with `format=xlsx` | Markdown; then refused (400) with the allowed formats named: json, pdf, html, md | ☐ Pass ☐ Fail |
+| QA-14.34 | Run and wait in a format | Start a short pipeline with `wait=30s&format=md` | Once it ends, the answer is its Markdown, with the run's address in `Location` | ☐ Pass ☐ Fail |
+| QA-14.35 | A sensitive pipeline's report stays in the console | Mark a pipeline with a report **sensitive**; run it; read its result as `pdf`, `html` and `md`, then as JSON | Each document is refused (**sensitive files**); the JSON answers with the person's details masked | ☐ Pass ☐ Fail |
+| QA-14.36 | A webhook carries the chosen formats | **Change** the webhook of QA-14.19: under **The run's result**, tick **JSON** and **Markdown**; **Save**; run a pipeline | The list shows **run.completed carries the result as JSON, Markdown**; the receiver's `run.completed` has `data.results` with `json` and `md` (its text), and the signature matches | ☐ Pass ☐ Fail |
 
 ## Example
 At Summit Valley the *Locked-down client* is allowed only from `10.0.0.0/8` and is refused from anywhere else, and

@@ -46,7 +46,9 @@ Each one added is this workspace's own type, to change as you like.
 6. **Instructions**: anything the model should know when it reads this type, such as your own conventions.
 7. Under **Fields**, add each value to read: a key, a **Label**, a type (`text`, `number`, `integer`, `money`, `date`,
    `boolean` or `choice`, with its options), **Required**, and the other words it goes by on a page (**Also written
-   as**: Invoice No., Invoice #).
+   as**: Invoice No., Invoice #). A choice may also say how a page writes each option (**Options written as**:
+   `High = H; Low = L; Normal = N`): a lab printout's `H` is then read as High, and the `H` is where High came from. Each
+   word belongs to one option, and is never another option itself.
 8. Under **Line-item tables**, choose **Add table** for rows such as invoice lines or lab tests: a key, a label, its
    columns, and **At least one row** if a document must have one.
 9. Under **Rules**, add the checks a document must pass. See [Checks on a document](#doc-checks).

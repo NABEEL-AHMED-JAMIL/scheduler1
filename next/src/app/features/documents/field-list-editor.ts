@@ -1,10 +1,11 @@
 import { Component, input, output } from '@angular/core';
 import { Icon } from '../../shared/ui/icon';
-import { FIELD_TYPES, TypeField, blankField, listText, textList } from './documents.model';
+import { FIELD_TYPES, TypeField, aliasText, blankField, listText, textAliases, textList } from './documents.model';
 
 /**
  * A document type's fields -- or one table's columns -- in the type editor (MIG-272): a key, a label, a type, whether
- * it is required, the other words it goes by on a page, and a choice's options. Every edit emits a new list; the
+ * it is required, the other words it goes by on a page, and a choice's options (MIG-426: and the words a page writes each
+ * option as, "High = H; Low = L"). Every edit emits a new list; the
  * editor never writes into the one it was given. Read-only, it is the same rows without the controls.
  */
 @Component({
@@ -36,6 +37,11 @@ import { FIELD_TYPES, TypeField, blankField, listText, textList } from './docume
           @if (f.type === 'choice') {
             <input class="input text-xs field-row-wide" [value]="options(f)" placeholder="Options (comma-separated)" [readOnly]="readonly()"
                    [attr.aria-label]="noun() + ' ' + (i + 1) + ' options'" (change)="patch(i, { options: split($any($event.target).value) })" />
+            <input class="input text-xs field-row-wide" [value]="optionAliases(f)"
+                   placeholder="Options written as (option = words; ...): High = H; Low = L; Normal = N" [readOnly]="readonly()"
+                   [attr.aria-label]="noun() + ' ' + (i + 1) + ' options written as'"
+                   title="The words a page writes an option as: a printout's H is read as High."
+                   (change)="patch(i, { optionAliases: aliasesOf($any($event.target).value) })" />
           }
         </div>
       } @empty {
@@ -64,6 +70,9 @@ export class FieldListEditor {
   aliases(f: TypeField): string { return listText(f.aliases); }
   options(f: TypeField): string { return listText(f.options); }
   split(text: string): string[] { return textList(text); }
+  /** MIG-426: "High = H; Low = L" -- the words a page writes each option as. */
+  optionAliases(f: TypeField): string { return aliasText(f.optionAliases); }
+  aliasesOf(text: string): Record<string, string[]> { return textAliases(text); }
 
   patch(index: number, patch: Partial<TypeField>): void {
     this.changed.emit(this.fields().map((f, i) => i === index ? { ...f, ...patch } : f));

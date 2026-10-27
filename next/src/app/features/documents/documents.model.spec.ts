@@ -3,7 +3,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import {
   TypeDefinition, blankDefinition, boxPercent, correctionsOf, definitionProblems, definitionToSave, documentFields,
   editableDefinition, fieldName, fileName, isLow, isNumberColumn, linesMinWidthRem, listName, lowLine, nextInQueue, nextRowIndex, percent, recentRows, refusalText, ruleText,
-  shortcutOf, skippedWhy, statusLabel, stepIndex, tableViews, textList, totalsOf, typeLabel,
+  shortcutOf, skippedWhy, statusLabel, stepIndex, tableViews, textList, totalsOf, typeLabel, aliasText, textAliases,
 } from './documents.model';
 import { PO_DEFINITION, PO_FIELDS } from './documents.fixtures';
 
@@ -211,6 +211,30 @@ describe('the type editor', () => {
     expect(saved.fields[0]).toEqual({ key: 'po_number', label: 'PO number', type: 'text', required: true, aliases: ['PO #', 'Purchase Order No.'] });
     expect(saved.fields[1]).toEqual({ key: 'order_date', label: 'Order date', type: 'date', required: true });
     expect(saved.autoApproveThreshold).toBe(0.9);
+  });
+});
+
+/** MIG-426: a choice's option aliases -- the words a page writes each option as (a lab printout's H for High). */
+describe('option aliases', () => {
+  it('reads "High = H, HI; Low = L" as each option\'s words, and writes them back the same way', () => {
+    const map = textAliases(' High = H, HI ; Low = L;Normal=N; = X; Critical = ; High = H, HH');
+    expect(map).toEqual({ High: ['H', 'HI', 'HH'], Low: ['L'], Normal: ['N'] });
+    expect(aliasText(map)).toBe('High = H, HI, HH; Low = L; Normal = N');
+    expect(aliasText(null)).toBe('');
+    expect(textAliases('no equals sign')).toEqual({});
+  });
+
+  it('are saved with a choice, never with another type, and must name its options', () => {
+    const d = editableDefinition({ ...blankDefinition(), fields: [
+      { key: 'flag', label: 'Flag', type: 'choice', options: ['Normal', 'High', 'Low'], optionAliases: { High: ['H'], Hgh: ['X'] } },
+      { key: 'note', label: 'Note', type: 'text', optionAliases: { High: ['H'] } },
+    ] });
+    expect(definitionProblems('Lab', 'lab', d)).toContain('Field 1: "Hgh" in "Options written as" is not one of its options.');
+    d.fields[0].optionAliases = { high: ['H'], Low: ['L'] };
+    expect(definitionProblems('Lab', 'lab', d).filter(p => p.includes('Options written as'))).toEqual([]);
+    const saved = definitionToSave(d);
+    expect(saved.fields[0].optionAliases).toEqual({ high: ['H'], Low: ['L'] });
+    expect(saved.fields[1]).not.toHaveProperty('optionAliases');
   });
 });
 

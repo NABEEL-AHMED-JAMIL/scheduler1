@@ -171,6 +171,12 @@
                 "value": "{{$guid}}"
               },
               {
+                "key": "Accept",
+                "value": "text/markdown",
+                "disabled": true,
+                "description": "Without format: application/json, application/pdf, text/html or text/markdown (by q, then order; */* is json). An Accept naming none of them is a 400 (unsupported-format). For POST /pipelines/{pipelineId}/runs only with wait."
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json"
               }
@@ -191,6 +197,18 @@
                   "value": "30s",
                   "disabled": true,
                   "description": "Seconds to wait for the run to end, 1 to 60 (`30` or `30s`). Absent: answer at once (202)."
+                },
+                {
+                  "key": "format",
+                  "value": "json",
+                  "disabled": true,
+                  "description": "json (the default), pdf, html or md. Wins over Accept. Anything else is a 400 (unsupported-format)."
+                },
+                {
+                  "key": "report",
+                  "value": "RPT-0093",
+                  "disabled": true,
+                  "description": "pdf, html and md of a run that made several reports: which one, by its number (RPT-0093)."
                 }
               ],
               "variable": [
@@ -200,7 +218,7 @@
                 }
               ]
             },
-            "description": "Start a run with a record and/or uploaded files (push intake).\n\nThe record is validated against the pipeline's input contract first; nothing is stored when it fails (422, each field's path under \"record\"). Every file id must be one of the workspace's own files (422 at \"files[i]\"). The record and the files are handed to the run as its intake: one JSON object with the record's fields and the start's own under names beginning with \"_\" (_reference, _files, _file_ids, _file_bucket, _file_key, ...). One run of a pipeline is in flight at a time (409 while one is). Sending the same Idempotency-Key again returns the first run. `parameters` are the run's parameter values by name, checked as the pipeline declares them (GET /pipelines/{id} lists them): a name it does not declare, a value of the wrong type or a required one with no value and no default is a 422 at \"parameters.<name>\", and nothing starts. Run and wait: with `wait` (1 to 60 seconds), the answer waits for the run to end -- ended in time, 200 with the run and its `result` (a completed run's final output, as GET /runs/{runId}/result gives it); still going, the 202 and its Location, as without `wait`. A replay with the same Idempotency-Key waits again for the same run.\n\noperationId: startRun",
+            "description": "Start a run with a record and/or uploaded files (push intake).\n\nThe record is validated against the pipeline's input contract first; nothing is stored when it fails (422, each field's path under \"record\"). Every file id must be one of the workspace's own files (422 at \"files[i]\"). The record and the files are handed to the run as its intake: one JSON object with the record's fields and the start's own under names beginning with \"_\" (_reference, _files, _file_ids, _file_bucket, _file_key, ...). One run of a pipeline is in flight at a time (409 while one is). Sending the same Idempotency-Key again returns the first run. `parameters` are the run's parameter values by name, checked as the pipeline declares them (GET /pipelines/{id} lists them): a name it does not declare, a value of the wrong type or a required one with no value and no default is a 422 at \"parameters.<name>\", and nothing starts. Run and wait: with `wait` (1 to 60 seconds), the answer waits for the run to end -- ended in time, 200 with the run and its `result` (a completed run's final output, as GET /runs/{runId}/result gives it); still going, the 202 and its Location, as without `wait`. A replay with the same Idempotency-Key waits again for the same run. With `wait`, `format` (or the Accept header) chooses the waited answer's format, as GET /runs/{runId}/result's: json (the default, the Run and its result); pdf, html or md -- once the run ends, exactly what GET /runs/{runId}/result answers in that format (the document, or its problem: a run that did not complete is a 409 run-not-completed), always with the run's Location. An unsupported format is a 400 and nothing starts.\n\noperationId: startRun",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"record\": {},\n  \"files\": [\n    \"string\"\n  ],\n  \"reference\": \"string\",\n  \"parameters\": {}\n}",
@@ -385,10 +403,17 @@
           "response": []
         },
         {
-          "name": "A completed run's answer: its final output's rows, masked, at most 100 rows and 16 KB.",
+          "name": "A completed run's answer: its final output's rows, masked, at most 100 rows and 16 KB -- or the run's report as PDF, HTML or Markdown.",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "Accept",
+                "value": "text/markdown",
+                "disabled": true,
+                "description": "Without format: application/json, application/pdf, text/html or text/markdown (by q, then order; */* is json). An Accept naming none of them is a 400 (unsupported-format). For POST /pipelines/{pipelineId}/runs only with wait."
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/runs/:runId/result",
               "host": [
@@ -399,6 +424,20 @@
                 ":runId",
                 "result"
               ],
+              "query": [
+                {
+                  "key": "format",
+                  "value": "json",
+                  "disabled": true,
+                  "description": "json (the default), pdf, html or md. Wins over Accept. Anything else is a 400 (unsupported-format)."
+                },
+                {
+                  "key": "report",
+                  "value": "RPT-0093",
+                  "disabled": true,
+                  "description": "pdf, html and md of a run that made several reports: which one, by its number (RPT-0093)."
+                }
+              ],
               "variable": [
                 {
                   "key": "runId",
@@ -406,7 +445,7 @@
                 }
               ]
             },
-            "description": "A completed run's answer: its final output's rows, masked, at most 100 rows and 16 KB.\n\nThe rows of the last step of the run's latest attempt that kept an output, as the pipeline's own data -- the answer a run-and-wait gives when the run ends in time. Every column the workspace's data policy marks sensitive (the Data Catalog's sensitive assets, and a person's details in a pipeline marked sensitive) is masked, and named in `masked`; at most 100 rows and 16 KB of JSON (`truncated` says when there were more). An output past the pipeline's retention, or a run that kept none, answers no rows and says why in `problem`. A run that has not completed is a 409 (`run-not-completed`); another workspace's run a 404.\n\noperationId: getRunResult"
+            "description": "A completed run's answer: its final output's rows, masked, at most 100 rows and 16 KB -- or the run's report as PDF, HTML or Markdown.\n\nThe rows of the last step of the run's latest attempt that kept an output, as the pipeline's own data -- the answer a run-and-wait gives when the run ends in time. Every column the workspace's data policy marks sensitive (the Data Catalog's sensitive assets, and a person's details in a pipeline marked sensitive) is masked, and named in `masked`; at most 100 rows and 16 KB of JSON (`truncated` says when there were more). An output past the pipeline's retention, or a run that kept none, answers no rows and says why in `problem`. A run that has not completed is a 409 (`run-not-completed`); another workspace's run a 404. The format is the client's choice -- `format` (json, pdf, html, md), or the Accept header (application/json, application/pdf, text/html, text/markdown; a wildcard is json); json when neither says, and any other format is a 400 (`unsupported-format`) naming the allowed ones. pdf, html and md are the run's report (its Generate report step): its PDF -- the signed one once approved and signed --, its HTML, or Markdown made from that HTML (headings, tables and lists; pictures, signatures, charts and the QR code as links to the PDF), whose first line names it (\"From signed report RPT-0093 version 1\") -- Markdown is never signed: the PDF is the record. A run that made several reports (one per row) names one with `report` (else 409 `several-reports`, listing them in `reports`). Without a report, html and md are the result rows above as a table (masked the same way), and pdf is a 404 (`no-report`). A pipeline marked sensitive keeps its report from API clients in every format (403 `sensitive-files`), as its files; a report made without the format's source (a PDF-only report has no HTML, so no Markdown) is a 404 (`format-not-kept`); one whose files the workspace's retention removed is a 410 (`report-expired`). A document's answer says what it is made from in X-Result-Source (report or rows) and, for a report, X-Report, X-Report-Version and X-Report-Signed; it is never cached (Cache-Control: no-store) and comes as an attachment.\n\noperationId: getRunResult"
           },
           "response": []
         },
@@ -1145,7 +1184,7 @@
             "description": "Subscribe a URL to event types; the signing secret is shown once.\n\nThe URL must be https and every address its host resolves to public: a private, loopback, link-local or metadata address is refused here (422 at url), and again at every delivery. A workspace has at most 20 webhooks (409). Only events that happen after the webhook is made are sent to it. In a workspace our team manages, webhooks are set up by our team: making, changing, removing and rotating are 403 there.\n\noperationId: createWebhook",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"url\": \"https://portal.example.com/hook\",\n  \"eventTypes\": [\n    \"string\"\n  ]\n}",
+              "raw": "{\n  \"url\": \"https://portal.example.com/hook\",\n  \"eventTypes\": [\n    \"string\"\n  ],\n  \"resultFormats\": [\n    \"json\",\n    \"pdf\"\n  ]\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1209,7 +1248,7 @@
             "description": "Change the URL, the event types, or pause it.\n\nactive false pauses the webhook: nothing more is sent to it, and what was still waiting is marked failed. active true resumes it (and clears a pause the platform made after repeated failures); only events after that are sent.\n\noperationId: updateWebhook",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"url\": \"https://portal.example.com/hook\",\n  \"eventTypes\": [\n    \"string\"\n  ],\n  \"active\": true\n}",
+              "raw": "{\n  \"url\": \"https://portal.example.com/hook\",\n  \"eventTypes\": [\n    \"string\"\n  ],\n  \"active\": true,\n  \"resultFormats\": [\n    \"json\",\n    \"pdf\"\n  ]\n}",
               "options": {
                 "raw": {
                   "language": "json"

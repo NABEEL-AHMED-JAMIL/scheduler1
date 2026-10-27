@@ -1,7 +1,7 @@
 ---
 id: dev-runs
 title: Start a run and read it back
-summary: Tokens, starting a run with a record and files, idempotency, following it, its steps, outputs, items and review, retrying, and run-and-wait.
+summary: Tokens, starting a run with a record and files, idempotency, following it, its steps, outputs, items and review, retrying, run-and-wait, and the result as JSON, PDF, HTML or Markdown.
 section: Use the API
 who: Your systems, with an API client that has runs:write (start) and runs:read (read)
 where: Administration & billing › Developers › Developer portal (/developers/portal)
@@ -56,13 +56,29 @@ A pipeline that answers in seconds (an eligibility check, a lookup) can be start
 for 1 to 60 seconds. If it finishes in time, the answer carries its result; if not, it is followed as usual.
 Columns your data policy marks sensitive are masked in the result.
 
+## The result as JSON, PDF, HTML or Markdown
+The system that starts a run chooses the format it gets the result in -- on the run's result, on run and wait, and for
+a webhook's `run.completed`:
+
+| Format | What it is |
+|---|---|
+| JSON (the default) | The rows of the run's final output, masked by your data policy |
+| PDF | The run's report (its Generate report step): the signed PDF once it is approved and signed |
+| HTML | The report's page; with no report, the rows as a table |
+| Markdown | Made from the report's page: headings, tables, lists; pictures and signatures as links to the PDF. Its first line says which report it is from and whether it is signed. Markdown is never signed itself: the PDF is the record. With no report, the rows as a table |
+
+A run with no report has no PDF. A run that made one report per row names the one it wants. Anything else -- Word,
+Excel -- is refused, naming the four formats. A pipeline marked sensitive keeps its report from the API in every
+format, as it keeps its files; the JSON stays masked. Choosing a format costs nothing more than the call.
+
 ## Limits
 | What | Limit |
 |---|---|
 | A token | 15 minutes |
 | An Idempotency-Key | Kept 24 hours; 8 to 128 characters |
 | Waiting for a run | 1 to 60 seconds |
-| A run's result through the API | The first 100 rows, up to 16 KB |
+| A run's result through the API | The first 100 rows, up to 16 KB (a report as PDF, HTML or Markdown: the whole report) |
+| A webhook's result formats | Up to 5 MB of documents a delivery; past it, the system reads that format through the API |
 | Runs of one pipeline at a time | One in flight; a second start while one runs is refused |
 
 ## Example

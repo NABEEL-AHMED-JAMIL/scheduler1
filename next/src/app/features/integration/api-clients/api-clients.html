@@ -232,6 +232,11 @@
                 <div class="flex flex-wrap gap-1">
                   @for (t of w.eventTypes; track t) { <span class="pill pill-neutral mono">{{ t }}</span> }
                 </div>
+                @if (w.resultFormats?.length) {
+                  <div class="text-xs text-[color:var(--text-muted)] mt-1" data-webhook-result-formats>
+                    run.completed carries the result as {{ formatLabels(w.resultFormats!) }}
+                  </div>
+                }
               </td>
               <td class="whitespace-nowrap text-[color:var(--text-secondary)]">
                 {{ w.lastSuccessAt ? (w.lastSuccessAt | serverTime: 'dateTime') : 'Never' }}

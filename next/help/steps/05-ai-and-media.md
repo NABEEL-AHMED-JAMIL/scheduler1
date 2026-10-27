@@ -15,6 +15,11 @@ Several of them read files in the same way. **Bucket** names the storage connect
 column** names the column that holds each row's file key. Leave both empty to work on the list a **Read S3** step made
 before it, or on the files the run was started for (a file that arrived in the inbox).
 
+A form's file field works as it is in any of these key columns -- **Image key column**, **Mask key column** or **File key
+column**: name the field itself (`photo`, `signature`, `recording`), not a hidden `photo_key`. The step reads the file
+from where the form stored it, under the name it was uploaded with. A field holding several files is read by its first
+(the run is warned how many rows held more), and a field with no file says so for that row.
+
 > **Warning:** A model's answer is a DRAFT for a person to check. Put an [Approval](#step-people) step, or the
 > pipeline's review, after an AI step whose answer matters.
 

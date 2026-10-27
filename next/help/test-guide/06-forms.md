@@ -44,6 +44,7 @@ Tested by ______ on ______
 | QA-06.14 | An old submission keeps its version | Change the form (add a field), save; **View** the first submission again | It is still shown with the fields of the version it answered | ☐ Pass ☐ Fail |
 | QA-06.15 | Export | **Export CSV** | Every submission of the form, one row each | ☐ Pass ☐ Fail |
 | QA-06.16 | A submission starts a pipeline | In **Settings**, **When submitted, start**: a schedule **Only when started** (see [QA-08](#qa-triggers)); **Save**; as F, submit again | The forms list shows the schedule under **Starts**; the new submission's **Status** reads **Run started** #N, linked to its run | ☐ Pass ☐ Fail |
+| QA-06.29 | A photo field feeds an image step as it is | A form with a **File** field `photo`; a pipeline it starts with **Measure image** (or **AI prompt** with an image) whose **Image key column** is `photo` -- the field itself, not `photo_key`; submit with a photo | The run measures (or describes) the photo; no "is not a png or jpg image" with the field's text | ☐ Pass ☐ Fail |
 | QA-06.17 | A submission starts a workflow | In **Settings**, **Approval**: a published workflow (see [QA-11](#qa-approvals)); **Save**; submit again | The submission shows its **Stage** and **Approval** (**Pending**) with **Open request** | ☐ Pass ☐ Fail |
 
 ## Share links

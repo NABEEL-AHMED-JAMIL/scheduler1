@@ -18,8 +18,11 @@ logged.
 3. **URL**: an `https` address on the public internet, such as `https://portal.example.com/hooks/etl`. A private or
    local address is refused.
 4. Tick the **Events** to send (see the table below).
-5. Choose **Add webhook**. The console shows **Webhook added** with its **Signing secret**.
-6. **Copy** the signing secret into your receiver's settings now: it is not shown again.
+5. With `run.completed` ticked, you may also tick **The run's result** formats it carries: **JSON** (the result rows,
+   masked), **PDF** (the run's report, signed once approved), **HTML** and **Markdown** (made from the report's page;
+   with no report, the rows as a table). None ticked sends the run alone.
+6. Choose **Add webhook**. The console shows **Webhook added** with its **Signing secret**.
+7. **Copy** the signing secret into your receiver's settings now: it is not shown again.
 
 Only events after the webhook is added are sent.
 
@@ -37,6 +40,13 @@ Only events after the webhook is added are sent.
 | `run.step.sent` | A pipeline's **Send webhook** step sent its rows to this webhook (only the webhook the step names) |
 
 ![Webhooks](dev-webhooks "Webhooks: each URL, its events, when it last delivered, and its state")
+
+## The run's result with run.completed
+A webhook with result formats gets `run.completed` with the run's result inside it (`data.results`), in each format
+ticked: JSON as data, HTML and Markdown as text, the PDF as base64. The list of webhooks shows the formats under the
+events. The result is read when each delivery is sent, so a retry or a **Send again** carries it as it is then, and the
+signature covers it. A format the run cannot be given in is named with the reason instead -- a sensitive pipeline's
+report, a PDF of a run with no report, more than 5 MB of documents -- and your system reads that one through the API.
 
 ## How your receiver checks a delivery
 Every delivery carries a `Webhook-Signature` header with a time (`t`) and a signature (`v1`): an HMAC-SHA256 of the

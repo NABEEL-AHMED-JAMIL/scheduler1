@@ -33,7 +33,7 @@ const EVENT_TYPES = [{ type: 'run.completed', description: 'A run finished.' }, 
 const WEBHOOKS = [
   { id: '1000', url: 'https://portal.example.com/hooks', eventTypes: ['run.completed', 'run.failed'], active: true, pausedReason: null,
     createdAt: '2026-10-06T14:00:00Z', updatedAt: null, failingSince: '2026-10-06T15:00:00Z', lastSuccessAt: '2026-10-06T14:30:00Z',
-    secretRotatedAt: null, previousSecretValidUntil: null, tenantId: 2946, createdBy: 'alice@northwind.example' },
+    secretRotatedAt: null, previousSecretValidUntil: null, tenantId: 2946, createdBy: 'alice@northwind.example', resultFormats: ['pdf', 'json'] },
   { id: '1001', url: 'https://old.example.com/hooks', eventTypes: ['run.failed'], active: false, pausedReason: 'Paused by its owner.',
     createdAt: '2026-10-05T14:00:00Z', updatedAt: null, failingSince: null, lastSuccessAt: null, secretRotatedAt: null,
     previousSecretValidUntil: null, tenantId: 2946, createdBy: 'API client cl_portal' },
@@ -321,6 +321,8 @@ describe('MIG-333: webhooks on Integration › API Clients', () => {
     expect(table).toContain('Paused');
     expect(table).toContain('Paused by its owner.');
     expect(table).toContain('Added by alice@northwind.example');
+    // MIG-426: the formats run.completed carries the result in, in the API's order.
+    expect(table).toContain('run.completed carries the result as JSON, PDF');
     expect(table).not.toContain('whsec_');
   });
 
@@ -399,8 +401,8 @@ describe('MIG-333: the webhook dialog', () => {
     d.toggle('run.completed', true);
     expect(d.ready()).toBe(true);
     d.save();
-    expect(api.createWebhook).toHaveBeenCalledWith({ url: 'https://portal.example.com/hooks', eventTypes: ['run.completed', 'run.failed'] },
-      undefined);
+    expect(api.createWebhook).toHaveBeenCalledWith({ url: 'https://portal.example.com/hooks', eventTypes: ['run.completed', 'run.failed'],
+      resultFormats: [] }, undefined);
     expect(ref.close).toHaveBeenCalledWith({ made: MADE_HOOK });
   });
 
@@ -413,9 +415,57 @@ describe('MIG-333: the webhook dialog', () => {
     d.save();
     fixture.detectChanges();
     expect(api.updateWebhook).toHaveBeenCalledWith(
-      { webhookId: '1000', url: 'https://10.0.0.5/hooks', eventTypes: ['run.completed', 'run.failed'] }, undefined);
+      { webhookId: '1000', url: 'https://10.0.0.5/hooks', eventTypes: ['run.completed', 'run.failed'], resultFormats: ['json', 'pdf'] },
+      undefined);
     expect(ref.close).not.toHaveBeenCalled();
     expect((fixture.nativeElement as HTMLElement).textContent).toContain('a webhook must be a public address');
+  });
+});
+
+describe('MIG-426: a webhook\'s result formats', () => {
+  function dialog(webhook: unknown = null) {
+    const api = {
+      createWebhook: vi.fn(() => of({ status: 'SUCCESS', message: '', data: MADE_HOOK })),
+      updateWebhook: vi.fn(() => of({ status: 'SUCCESS', message: 'Webhook saved.', data: WEBHOOKS[0] })),
+    };
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [
+      provideZonelessChangeDetection(),
+      { provide: DIALOG_DATA, useValue: { eventTypes: EVENT_TYPES, webhook } },
+      { provide: DialogRef, useValue: { close: vi.fn() } },
+      { provide: ApiClientsApi, useValue: api },
+      { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn() } },
+    ] });
+    const fixture = TestBed.createComponent(WebhookDialog);
+    fixture.detectChanges();
+    return { fixture, d: fixture.componentInstance, api };
+  }
+
+  it('offers JSON, PDF, HTML and Markdown with run.completed and sends them in the API\'s order', () => {
+    const { fixture, d, api } = dialog();
+    const group = () => (fixture.nativeElement as HTMLElement).querySelector('[data-webhook-formats]')!;
+    const boxes = () => Array.from(group().querySelectorAll('input[type=checkbox]')) as HTMLInputElement[];
+    expect(group().textContent).toContain('JSON');
+    expect(group().textContent).toContain('Markdown');
+    expect(boxes().every(b => b.disabled)).toBe(true);
+    expect(group().textContent).toContain('Tick run.completed above');
+    d.url.set('https://portal.example.com/hooks');
+    d.toggle('run.completed', true);
+    fixture.detectChanges();
+    expect(boxes().some(b => b.disabled)).toBe(false);
+    d.toggleFormat('md', true);
+    d.toggleFormat('json', true);
+    d.save();
+    expect(api.createWebhook).toHaveBeenCalledWith({ url: 'https://portal.example.com/hooks', eventTypes: ['run.completed'],
+      resultFormats: ['json', 'md'] }, undefined);
+  });
+
+  it('a webhook keeps its formats, and without run.completed sends none', () => {
+    const { d, api } = dialog({ ...WEBHOOKS[0], resultFormats: ['pdf'] });
+    expect(d.formats()).toEqual(['pdf']);
+    d.toggle('run.completed', false);
+    d.save();
+    expect(api.updateWebhook).toHaveBeenCalledWith(expect.objectContaining({ webhookId: '1000', resultFormats: [] }), undefined);
   });
 });
 

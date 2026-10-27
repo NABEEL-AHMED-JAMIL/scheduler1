@@ -230,6 +230,8 @@ export interface TypeField {
   description?: string | null;
   aliases?: string[] | null;
   options?: string[] | null;
+  /** MIG-426, choice only: the words a page writes each option as -- {"High": ["H"], "Low": ["L"]}; a printout's H reads as High. */
+  optionAliases?: Record<string, string[]> | null;
 }
 
 export interface TypeTable {
@@ -722,6 +724,27 @@ export function listText(list: string[] | null | undefined): string { return (li
 export function textList(text: string): string[] { return text.split(',').map(s => s.trim()).filter(Boolean); }
 
 /**
+ * MIG-426: a choice's option aliases as the editor's box holds them -- "High = H, HI; Low = L" -- and back. An entry without
+ * "=" or without a word after it is dropped; an option named twice keeps both lists' words, once each.
+ */
+export function aliasText(map: Record<string, string[]> | null | undefined): string {
+  return Object.entries(map ?? {}).filter(([, words]) => (words ?? []).length).map(([option, words]) => `${option} = ${words.join(', ')}`)
+    .join('; ');
+}
+export function textAliases(text: string): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  for (const entry of text.split(';')) {
+    const at = entry.indexOf('=');
+    if (at < 0) continue;
+    const option = entry.slice(0, at).trim();
+    const words = textList(entry.slice(at + 1));
+    if (!option || !words.length) continue;
+    out[option] = [...new Set([...(out[option] ?? []), ...words])];
+  }
+  return out;
+}
+
+/**
  * What the service would refuse in a definition, found before it is asked: keys in lower_snake_case and unique, a
  * label on each, a choice's options, a threshold from 0 (exclusive) to 1, and every rule naming what exists.
  */
@@ -742,6 +765,13 @@ export function definitionProblems(name: string, typeKey: string, d: TypeDefinit
       if (!f.label?.trim()) out.push(`${at}: add a label.`);
       if (!(FIELD_TYPES as readonly string[]).includes(f.type)) out.push(`${at}: pick a type.`);
       if (f.type === 'choice' && !(f.options ?? []).length) out.push(`${at}: a choice needs its options.`);
+      // MIG-426: an alias list names one of the choice's own options.
+      if (f.type === 'choice') {
+        const options = (f.options ?? []).map(o => o.trim().toLowerCase());
+        for (const option of Object.keys(f.optionAliases ?? {})) {
+          if (!options.includes(option.trim().toLowerCase())) out.push(`${at}: "${option}" in "Options written as" is not one of its options.`);
+        }
+      }
     });
   };
   checkFields(d.fields, 'Field');
@@ -822,6 +852,7 @@ export function definitionToSave(d: TypeDefinition): TypeDefinition {
     ...(f.description?.trim() ? { description: f.description.trim() } : {}),
     ...((f.aliases ?? []).length ? { aliases: f.aliases } : {}),
     ...(f.type === 'choice' ? { options: f.options ?? [] } : {}),
+    ...(f.type === 'choice' && Object.keys(f.optionAliases ?? {}).length ? { optionAliases: f.optionAliases } : {}),
   });
   const USES: Record<string, (keyof TypeRule)[]> = {
     sumEquals: ['table', 'column', 'field', 'tolerance'], sumOf: ['fields', 'field', 'tolerance'],

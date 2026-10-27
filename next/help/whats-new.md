@@ -2,6 +2,9 @@
 
 Newest first. Each line: `- date · [Title](#article) · one sentence`.
 
+- 2026-10-27 · [Result formats](#dev-runs--the-result-as-json-pdf-html-or-markdown) · Your systems choose the run's result as JSON, PDF, HTML or Markdown: on the API, run and wait, webhooks and Call API.
+- 2026-10-27 · [Options written as](#doc-types) · A choice field can say how a page writes each option, so a lab printout's H reads as High.
+- 2026-10-27 · [Form file fields in image and audio steps](#step-ai) · Name a form's photo or recording field in the step itself; no hidden _key column needed.
 - 2026-10-26 · [Patient intake](#form-patient-intake) · A new patient's intake, typed in or scanned, checked in code, summarised by AI as a DRAFT, approved by a nurse and kept as a signed summary.
 - 2026-10-26 · [Form sections](#form-build--sections) · Give fields a section and the form shows them together under its heading.
 - 2026-10-26 · [Checkboxes field](#form-build--checkboxes) · A tick-all-that-apply question, with an optional least and most to tick.

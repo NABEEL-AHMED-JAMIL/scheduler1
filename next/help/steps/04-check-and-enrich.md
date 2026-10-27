@@ -84,6 +84,16 @@ file** step of this run), the **File name** when it made several, and where to *
 storage connection; empty for the workspace's file drop). The request's file or multipart body then gets
 `{{file_bucket}}`, `{{file_key}}`, `{{file_name}}` and `{{file_format}}`.
 
+### Send a report in PDF, HTML or Markdown
+
+Under **A report from an earlier step**, name the **Generate report** step (**From step**) and the **Formats sent**:
+`pdf` (the report's PDF, the signed one once it is approved and signed, as base64 in `{{report_pdf}}`), `html` (its page
+in `{{report_html}}`) and `md` (Markdown made from that page in `{{report_md}}`; never signed). The request also gets
+`{{report_label}}` (RPT-0093), `{{report_version}}` and `{{report_signed}}`. With **Send** `each` and a report step that
+made one report per row, each row sends its own report; sent `once` or in batches, the report step must have made one
+report of all the rows. A report made without the format asked for (a PDF-only report has no HTML, so no Markdown) fails
+the step before any call, saying so. The rows still go as JSON (`{{row}}`, `{{rows_json}}`) as always.
+
 **Before you run.** With sample rows first ([Test with sample](#pl-try)), the panel shows **What the first call sends**.
 
 **Examples.** **Eligibility checks before tomorrow's visits** calls the payer once per appointment, four at a time, and

@@ -10,8 +10,8 @@ import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { confirmWith } from '../../../shared/ui/confirm';
 import {
-  ApiClientRow, ApiClientWithSecret, ApiClientsApi, ApiLimitsRow, EventRouteRow, EventTypeRow, RouteTarget, ScopeRow, WebhookRow,
-  WebhookWithSecret,
+  ApiClientRow, ApiClientWithSecret, ApiClientsApi, ApiLimitsRow, EventRouteRow, EventTypeRow, RESULT_FORMATS, RouteTarget, ScopeRow,
+  WebhookRow, WebhookWithSecret,
 } from './api-clients.api';
 import { ClientDialog, ClientDialogData, ClientDialogResult } from './client-dialog';
 import { DeliveriesDialog, DeliveriesDialogData } from './deliveries-dialog';
@@ -312,6 +312,11 @@ export class ApiClients implements OnInit {
       next: r => this.eventTypes.set(r.status === API_SUCCESS ? r.data ?? [] : []),
       error: () => this.eventTypes.set([]),
     });
+  }
+
+  /** MIG-426: "JSON, PDF": a webhook's result formats as the dialog names them. */
+  formatLabels(formats: string[]): string {
+    return RESULT_FORMATS.filter(f => formats.includes(f.format)).map(f => f.label).join(', ');
   }
 
   webhookState(w: WebhookRow): string {

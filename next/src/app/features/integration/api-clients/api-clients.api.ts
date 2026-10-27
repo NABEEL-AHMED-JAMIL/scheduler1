@@ -151,6 +151,8 @@ export interface WebhookRow {
   lastSuccessAt: string | null;
   secretRotatedAt: string | null;
   previousSecretValidUntil: string | null;
+  /** MIG-426: the formats run.completed carries the run's result in (json, pdf, html, md); [] for none (the run alone). */
+  resultFormats?: string[];
   tenantId: number;
   createdBy: string | null;
 }
@@ -163,7 +165,17 @@ export interface WebhookInput {
   url?: string;
   eventTypes?: string[];
   active?: boolean;
+  /** MIG-426: [] for none. */
+  resultFormats?: string[];
 }
+
+/** MIG-426: the formats a webhook may carry a run's result in with run.completed, in the API's order, and what each is. */
+export const RESULT_FORMATS: { format: string; label: string; detail: string }[] = [
+  { format: 'json', label: 'JSON', detail: 'the result rows, masked as the API gives them' },
+  { format: 'pdf', label: 'PDF', detail: "the run's report: the signed PDF once it is approved and signed" },
+  { format: 'html', label: 'HTML', detail: "the report's page, or with no report the rows as a table" },
+  { format: 'md', label: 'Markdown', detail: "made from the report's HTML (never signed), or with no report the rows as a table" },
+];
 
 /** One event sent (or being sent) to one webhook. */
 export interface DeliveryRow {

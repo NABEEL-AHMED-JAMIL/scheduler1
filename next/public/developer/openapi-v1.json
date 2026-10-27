@@ -258,7 +258,7 @@
         ],
         "operationId": "startRun",
         "summary": "Start a run with a record and/or uploaded files (push intake).",
-        "description": "The record is validated against the pipeline's input contract first; nothing is stored when it fails (422, each field's path under \"record\"). Every file id must be one of the workspace's own files (422 at \"files[i]\"). The record and the files are handed to the run as its intake: one JSON object with the record's fields and the start's own under names beginning with \"_\" (_reference, _files, _file_ids, _file_bucket, _file_key, ...). One run of a pipeline is in flight at a time (409 while one is). Sending the same Idempotency-Key again returns the first run. `parameters` are the run's parameter values by name, checked as the pipeline declares them (GET /pipelines/{id} lists them): a name it does not declare, a value of the wrong type or a required one with no value and no default is a 422 at \"parameters.<name>\", and nothing starts. Run and wait: with `wait` (1 to 60 seconds), the answer waits for the run to end -- ended in time, 200 with the run and its `result` (a completed run's final output, as GET /runs/{runId}/result gives it); still going, the 202 and its Location, as without `wait`. A replay with the same Idempotency-Key waits again for the same run.\n",
+        "description": "The record is validated against the pipeline's input contract first; nothing is stored when it fails (422, each field's path under \"record\"). Every file id must be one of the workspace's own files (422 at \"files[i]\"). The record and the files are handed to the run as its intake: one JSON object with the record's fields and the start's own under names beginning with \"_\" (_reference, _files, _file_ids, _file_bucket, _file_key, ...). One run of a pipeline is in flight at a time (409 while one is). Sending the same Idempotency-Key again returns the first run. `parameters` are the run's parameter values by name, checked as the pipeline declares them (GET /pipelines/{id} lists them): a name it does not declare, a value of the wrong type or a required one with no value and no default is a 422 at \"parameters.<name>\", and nothing starts. Run and wait: with `wait` (1 to 60 seconds), the answer waits for the run to end -- ended in time, 200 with the run and its `result` (a completed run's final output, as GET /runs/{runId}/result gives it); still going, the 202 and its Location, as without `wait`. A replay with the same Idempotency-Key waits again for the same run. With `wait`, `format` (or the Accept header) chooses the waited answer's format, as GET /runs/{runId}/result's: json (the default, the Run and its result); pdf, html or md -- once the run ends, exactly what GET /runs/{runId}/result answers in that format (the document, or its problem: a run that did not complete is a 409 run-not-completed), always with the run's Location. An unsupported format is a 400 and nothing starts.\n",
         "security": [
           {
             "clientCredentials": [
@@ -285,6 +285,15 @@
                 "30s"
               ]
             }
+          },
+          {
+            "$ref": "#/components/parameters/ResultFormat"
+          },
+          {
+            "$ref": "#/components/parameters/ResultReport"
+          },
+          {
+            "$ref": "#/components/parameters/ResultAccept"
           }
         ],
         "requestBody": {
@@ -299,13 +308,25 @@
         },
         "responses": {
           "200": {
-            "description": "Run and wait: the run ended within `wait` -- the run, and its result when it completed.",
+            "description": "Run and wait: the run ended within `wait` -- the run, and its result when it completed (json); or, with `format` pdf, html or md, the run's result as that document.",
             "headers": {
               "Location": {
                 "schema": {
                   "type": "string"
                 },
                 "description": "/v1/runs/{runId}"
+              },
+              "X-Result-Source": {
+                "$ref": "#/components/headers/X-Result-Source"
+              },
+              "X-Report": {
+                "$ref": "#/components/headers/X-Report"
+              },
+              "X-Report-Version": {
+                "$ref": "#/components/headers/X-Report-Version"
+              },
+              "X-Report-Signed": {
+                "$ref": "#/components/headers/X-Report-Signed"
               }
             },
             "content": {
@@ -313,6 +334,23 @@
                 "schema": {
                   "$ref": "#/components/schemas/RunWithResult"
                 }
+              },
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "text/markdown": {
+                "schema": {
+                  "type": "string"
+                },
+                "example": "From signed report RPT-0093 version 1\n\n> Made from the report's HTML. Markdown is never signed: the PDF is the record.\n\n# Patient intake summary\n"
               }
             }
           },
@@ -864,8 +902,8 @@
           "runs"
         ],
         "operationId": "getRunResult",
-        "summary": "A completed run's answer: its final output's rows, masked, at most 100 rows and 16 KB.",
-        "description": "The rows of the last step of the run's latest attempt that kept an output, as the pipeline's own data -- the answer a run-and-wait gives when the run ends in time. Every column the workspace's data policy marks sensitive (the Data Catalog's sensitive assets, and a person's details in a pipeline marked sensitive) is masked, and named in `masked`; at most 100 rows and 16 KB of JSON (`truncated` says when there were more). An output past the pipeline's retention, or a run that kept none, answers no rows and says why in `problem`. A run that has not completed is a 409 (`run-not-completed`); another workspace's run a 404.\n",
+        "summary": "A completed run's answer: its final output's rows, masked, at most 100 rows and 16 KB -- or the run's report as PDF, HTML or Markdown.",
+        "description": "The rows of the last step of the run's latest attempt that kept an output, as the pipeline's own data -- the answer a run-and-wait gives when the run ends in time. Every column the workspace's data policy marks sensitive (the Data Catalog's sensitive assets, and a person's details in a pipeline marked sensitive) is masked, and named in `masked`; at most 100 rows and 16 KB of JSON (`truncated` says when there were more). An output past the pipeline's retention, or a run that kept none, answers no rows and says why in `problem`. A run that has not completed is a 409 (`run-not-completed`); another workspace's run a 404. The format is the client's choice -- `format` (json, pdf, html, md), or the Accept header (application/json, application/pdf, text/html, text/markdown; a wildcard is json); json when neither says, and any other format is a 400 (`unsupported-format`) naming the allowed ones. pdf, html and md are the run's report (its Generate report step): its PDF -- the signed one once approved and signed --, its HTML, or Markdown made from that HTML (headings, tables and lists; pictures, signatures, charts and the QR code as links to the PDF), whose first line names it (\"From signed report RPT-0093 version 1\") -- Markdown is never signed: the PDF is the record. A run that made several reports (one per row) names one with `report` (else 409 `several-reports`, listing them in `reports`). Without a report, html and md are the result rows above as a table (masked the same way), and pdf is a 404 (`no-report`). A pipeline marked sensitive keeps its report from API clients in every format (403 `sensitive-files`), as its files; a report made without the format's source (a PDF-only report has no HTML, so no Markdown) is a 404 (`format-not-kept`); one whose files the workspace's retention removed is a 410 (`report-expired`). A document's answer says what it is made from in X-Result-Source (report or rows) and, for a report, X-Report, X-Report-Version and X-Report-Signed; it is never cached (Cache-Control: no-store) and comes as an attachment.\n",
         "security": [
           {
             "clientCredentials": [
@@ -876,18 +914,61 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/RunId"
+          },
+          {
+            "$ref": "#/components/parameters/ResultFormat"
+          },
+          {
+            "$ref": "#/components/parameters/ResultReport"
+          },
+          {
+            "$ref": "#/components/parameters/ResultAccept"
           }
         ],
         "responses": {
           "200": {
-            "description": "The run's result.",
+            "description": "The run's result, in the format asked for.",
+            "headers": {
+              "X-Result-Source": {
+                "$ref": "#/components/headers/X-Result-Source"
+              },
+              "X-Report": {
+                "$ref": "#/components/headers/X-Report"
+              },
+              "X-Report-Version": {
+                "$ref": "#/components/headers/X-Report-Version"
+              },
+              "X-Report-Signed": {
+                "$ref": "#/components/headers/X-Report-Signed"
+              }
+            },
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RunResultEnvelope"
                 }
+              },
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "text/markdown": {
+                "schema": {
+                  "type": "string"
+                },
+                "example": "From the result of run 2985 (no report).\n\n> The output of step triage: 2 rows. Not signed: ask the pipeline for a report for a signed PDF.\n\n| patient | risk |\n| --- | --- |\n| •••••0103 | High |\n"
               }
             }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
@@ -901,8 +982,14 @@
           "409": {
             "$ref": "#/components/responses/Conflict"
           },
+          "410": {
+            "$ref": "#/components/responses/Gone"
+          },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
           }
         }
       }
@@ -2563,6 +2650,46 @@
           "type": "string",
           "pattern": "^[A-Za-z0-9._:-]{8,128}$"
         }
+      },
+      "ResultFormat": {
+        "name": "format",
+        "in": "query",
+        "required": false,
+        "description": "json (the default), pdf, html or md. Wins over Accept. Anything else is a 400 (unsupported-format).",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "json",
+            "pdf",
+            "html",
+            "md"
+          ]
+        }
+      },
+      "ResultReport": {
+        "name": "report",
+        "in": "query",
+        "required": false,
+        "description": "pdf, html and md of a run that made several reports: which one, by its number (RPT-0093).",
+        "schema": {
+          "type": "string",
+          "pattern": "^RPT-[0-9]{1,9}$",
+          "examples": [
+            "RPT-0093"
+          ]
+        }
+      },
+      "ResultAccept": {
+        "name": "Accept",
+        "in": "header",
+        "required": false,
+        "description": "Without format: application/json, application/pdf, text/html or text/markdown (by q, then order; */* is json). An Accept naming none of them is a 400 (unsupported-format). For POST /pipelines/{pipelineId}/runs only with wait.",
+        "schema": {
+          "type": "string",
+          "examples": [
+            "text/markdown"
+          ]
+        }
       }
     },
     "responses": {
@@ -2711,6 +2838,34 @@
           "minimum": 1
         }
       },
+      "X-Result-Source": {
+        "description": "A document's source: report (the run's report) or rows (its result rows; no report).",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "report",
+            "rows"
+          ]
+        }
+      },
+      "X-Report": {
+        "description": "The report a document is made from (RPT-0093); absent for rows.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "X-Report-Version": {
+        "description": "That report's version.",
+        "schema": {
+          "type": "integer"
+        }
+      },
+      "X-Report-Signed": {
+        "description": "Whether that version is approved and signed (its PDF is the signed one). Markdown is never signed itself.",
+        "schema": {
+          "type": "boolean"
+        }
+      },
       "RateLimit-Limit": {
         "description": "The size of the bucket that allows fewer calls now (the client's burst, or its workspace's): on every answer to a call that was counted.",
         "schema": {
@@ -2848,7 +3003,73 @@
         "title": "Conflict",
         "description": "The run has not completed (queued, running, failed, skipped or interrupted), so it has no result.",
         "operations": [
-          "getRunResult"
+          "getRunResult",
+          "startRun"
+        ]
+      },
+      "unsupported-format": {
+        "status": 400,
+        "title": "Bad Request",
+        "description": "format (or Accept) names no format the result is given in: json, pdf, html or md (application/json, application/pdf, text/html, text/markdown).",
+        "operations": [
+          "getRunResult",
+          "startRun"
+        ]
+      },
+      "no-report": {
+        "status": 404,
+        "title": "Not Found",
+        "description": "The run made no report, so it has no PDF; json, html and md give its result rows. Add a Generate report step for a PDF.",
+        "operations": [
+          "getRunResult",
+          "startRun"
+        ]
+      },
+      "no-such-report": {
+        "status": 404,
+        "title": "Not Found",
+        "description": "report names a report the run did not make; the problem names the ones it did.",
+        "operations": [
+          "getRunResult",
+          "startRun"
+        ]
+      },
+      "format-not-kept": {
+        "status": 404,
+        "title": "Not Found",
+        "description": "The run's report was made without this format's source: a PDF-only report has no HTML, so no Markdown either. Ask for a format it has, or add the format to the Generate report step.",
+        "operations": [
+          "getRunResult",
+          "startRun"
+        ]
+      },
+      "several-reports": {
+        "status": 409,
+        "title": "Conflict",
+        "description": "The run made several reports (one per row); name one with report=RPT-… (`reports` lists them), or read each item's files.",
+        "operations": [
+          "getRunResult",
+          "startRun"
+        ]
+      },
+      "report-expired": {
+        "status": 410,
+        "title": "Gone",
+        "description": "The report's files were removed by the workspace's retention policy; its record stays. Run the pipeline again for a new report.",
+        "operations": [
+          "getRunResult",
+          "startRun"
+        ]
+      },
+      "sensitive-files": {
+        "status": 403,
+        "title": "Forbidden",
+        "description": "The pipeline is marked sensitive: its files, and its report in every format (pdf, html, md), are downloaded in the console, not through the API. json stays masked.",
+        "operations": [
+          "downloadFile",
+          "readFileContent",
+          "getRunResult",
+          "startRun"
         ]
       },
       "run-not-failed": {
@@ -4704,6 +4925,9 @@
             ],
             "format": "date-time",
             "description": "While the previous secret still signs beside the new one."
+          },
+          "resultFormats": {
+            "$ref": "#/components/schemas/ResultFormats"
           }
         }
       },
@@ -4725,6 +4949,9 @@
             "items": {
               "type": "string"
             }
+          },
+          "resultFormats": {
+            "$ref": "#/components/schemas/ResultFormats"
           }
         }
       },
@@ -4744,8 +4971,159 @@
           },
           "active": {
             "type": "boolean"
+          },
+          "resultFormats": {
+            "$ref": "#/components/schemas/ResultFormats"
           }
         }
+      },
+      "ResultFormats": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "enum": [
+            "json",
+            "pdf",
+            "html",
+            "md"
+          ]
+        },
+        "maxItems": 4,
+        "examples": [
+          [
+            "json",
+            "pdf"
+          ],
+          [
+            "md"
+          ]
+        ],
+        "description": "MIG-426: the formats run.completed carries the run's result in, as data.results (WebhookRunResults): json, pdf, html, md -- each once, in the order given; [] (the default) sends the Run alone, as before. An unknown one is a 422 at resultFormats[i]. Asked at each attempt, so a retry or a redelivery carries the result as it stands then.\n"
+      },
+      "WebhookRunResults": {
+        "type": "object",
+        "description": "MIG-426: run.completed's data.results, for a webhook with resultFormats -- the same answers as GET /runs/{runId}/result in each format: json the RunResult (masked); md and html the text, pdf base64, each from the run's report (the signed PDF once signed; Markdown made from its HTML, never signed) or, with no report, html and md from the result rows. A format the run cannot be given in -- a sensitive pipeline's report (403), no report for a PDF (404), several reports (409), or past the 5 MB of documents a delivery carries (413, read it with the API) -- is in problems instead, by format.\n",
+        "properties": {
+          "formats": {
+            "$ref": "#/components/schemas/ResultFormats"
+          },
+          "json": {
+            "$ref": "#/components/schemas/RunResult"
+          },
+          "md": {
+            "$ref": "#/components/schemas/WebhookResultText"
+          },
+          "html": {
+            "$ref": "#/components/schemas/WebhookResultText"
+          },
+          "pdf": {
+            "type": "object",
+            "properties": {
+              "base64": {
+                "type": "string",
+                "description": "The PDF, base64."
+              },
+              "bytes": {
+                "type": "integer"
+              },
+              "contentType": {
+                "type": "string"
+              },
+              "fileName": {
+                "type": "string"
+              },
+              "report": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "version": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "signed": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              }
+            }
+          },
+          "problems": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "integer"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "detail": {
+                  "type": "string"
+                },
+                "reports": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "WebhookResultText": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "contentType": {
+            "type": "string"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "report": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The report it is made from; null for the result rows."
+          },
+          "version": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "signed": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        }
+      },
+      "RunCompletedData": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Run"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "results": {
+                "$ref": "#/components/schemas/WebhookRunResults"
+              }
+            }
+          }
+        ]
       },
       "Delivery": {
         "type": "object",
