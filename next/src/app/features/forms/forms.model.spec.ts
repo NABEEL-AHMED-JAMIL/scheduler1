@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  FormDraft, FormField, answerProblems, answerText, answersForSubmit, definitionProblems, draftForSave, keyFromLabel, submissionStatusText,
-  submissionsOf, uniqueKey,
+  FormDraft, FormField, answerProblems, answerText, answersForSubmit, defaultPlaceholder, definitionProblems, draftForSave, formatHint,
+  keyFromLabel, placeholderOf, submissionStatusText, submissionsOf, uniqueKey,
 } from './forms.model';
 
 /** Wave 5 Forms (lite): the rules the console checks as the person types -- the same ones Core applies (FormFields). */
@@ -138,5 +138,58 @@ describe('Forms -- the answers', () => {
     expect(answerText(WOUND_FIELDS[4], false)).toBe('No');
     expect(answerText(undefined, null)).toBe('—');
     expect(submissionsOf([{ submissionId: 1, status: 'Received' }, { nope: 1 }, null])).toEqual([{ submissionId: 1, status: 'Received', answers: {} }]);
+  });
+});
+
+describe('UX2: the default placeholder when a field has none (owner 2026-10-26, "need a placeholder")', () => {
+  const f = (label: string, type: FormField['type'], extra: Partial<FormField> & { min?: number; max?: number } = {}) =>
+    ({ key: extra.key ?? 'k', label, type, required: false, ...extra });
+
+  it('gives each type its default', () => {
+    expect(defaultPlaceholder(f('Case number', 'text'))).toBe('Enter case number');
+    expect(defaultPlaceholder(f('Visit notes', 'longText'))).toBe('Write visit notes…');
+    expect(defaultPlaceholder(f('Dressings used', 'number'))).toBe('0');
+    expect(defaultPlaceholder(f('Nurse e-mail', 'email'))).toBe('name@example.com');
+    expect(defaultPlaceholder(f('Phone number', 'text'))).toBe('e.g. +1 555 0100');
+    expect(defaultPlaceholder(f('Reach me on', 'text', { key: 'mobile_number' }))).toBe('e.g. +1 555 0100');
+    expect(defaultPlaceholder(f('Site', 'choice'))).toBe('Choose…');
+    expect(defaultPlaceholder(f('Ward', 'lookup'))).toBe('Choose…');
+    expect(defaultPlaceholder(f('Seen on', 'date'))).toBe('Pick a date');
+    for (const t of ['yesNo', 'table', 'file', 'signature'] as const) expect(defaultPlaceholder(f('X', t))).toBeNull();
+  });
+
+  it('shows a number\'s range, from min and max or from the label', () => {
+    expect(defaultPlaceholder(f('Pain', 'number', { min: 1, max: 10 }))).toBe('1–10');
+    expect(defaultPlaceholder(f('Pain score (0-10)', 'number'))).toBe('0–10');
+    expect(defaultPlaceholder(f('Percent [0 to 100]', 'number'))).toBe('0–100');
+    expect(defaultPlaceholder(f('Length (cm)', 'number'))).toBe('0');
+  });
+
+  it('takes a bracketed format hint as the example, and leaves units and remarks out', () => {
+    expect(formatHint('PATIENT ID (SYNTHETIC, SYN-NNN)')).toBe('SYN-NNN');
+    expect(formatHint('Patient id (synthetic, SYN-nnn)')).toBe('SYN-nnn');
+    expect(formatHint('Visit day [YYYY-MM-DD]')).toBe('YYYY-MM-DD');
+    expect(formatHint('Bed (e.g. 4 North)')).toBe('4 North');
+    expect(formatHint('Width (cm)')).toBeNull();
+    expect(formatHint('Name (optional)')).toBeNull();
+    expect(formatHint('Case number')).toBeNull();
+    expect(formatHint('Eggs (eggs, dozen)')).toBeNull();
+    expect(defaultPlaceholder(f('PATIENT ID (SYNTHETIC, SYN-NNN)', 'text'))).toBe('e.g. SYN-NNN');
+    expect(defaultPlaceholder(f('Work e-mail (e.g. you@clinic.org)', 'email'))).toBe('e.g. you@clinic.org');
+    expect(defaultPlaceholder(f('Name (optional)', 'text'))).toBe('Enter name');
+  });
+
+  it('reads the label in lower case, keeping an acronym in a mixed-case label', () => {
+    expect(defaultPlaceholder(f('Patient ID', 'text'))).toBe('Enter patient ID');
+    expect(defaultPlaceholder(f('PATIENT NAME', 'text'))).toBe('Enter patient name');
+    expect(defaultPlaceholder(f('Who referred you?', 'text'))).toBe('Enter who referred you');
+    expect(defaultPlaceholder(f('', 'text'))).toBe('Enter your answer');
+  });
+
+  it('lets the field\'s own placeholder win, a blank one falling back to the default', () => {
+    expect(placeholderOf(f('Case number', 'text', { placeholder: 'e.g. WC-2026-0142' }))).toBe('e.g. WC-2026-0142');
+    expect(placeholderOf(f('Site', 'choice', { placeholder: 'Choose the wound site' }))).toBe('Choose the wound site');
+    expect(placeholderOf(f('Case number', 'text', { placeholder: '  ' }))).toBe('Enter case number');
+    expect(placeholderOf(f('Healed', 'yesNo'))).toBeNull();
   });
 });

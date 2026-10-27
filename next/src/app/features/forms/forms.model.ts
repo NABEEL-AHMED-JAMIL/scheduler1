@@ -247,6 +247,82 @@ export const PLACEHOLDER_TYPES: FieldType[] = ['text', 'longText', 'number', 'da
 export function takesPlaceholder(type: FieldType | string): boolean {
   return (PLACEHOLDER_TYPES as string[]).includes(type);
 }
+
+/** A bracketed part of a label: "(synthetic, SYN-nnn)", "[YYYY-MM-DD]". */
+const BRACKETED = /\(([^()]*)\)|\[([^[\]]*)\]/g;
+/** A number field's range written in its label: "(1-10)", "(0 to 100)". */
+const RANGE = /^(-?\d+(?:\.\d+)?)\s*(?:-|–|—|to)\s*(-?\d+(?:\.\d+)?)$/i;
+/** "e.g.", "eg", "example:", "like", "format:" in front of a hint -- as words, so "eggs" is not one. */
+const EXAMPLE_PREFIX = /^(?:e\.\s?g\.?|eg|example|like|format)(?=[\s.:]|$)[.:]?\s*/i;
+/** Words that read as a phone number field (a text field; forms have no phone type of their own). */
+const PHONE_WORDS = /\b(?:phone|telephone|tel|mobile|cell)\b/i;
+
+/**
+ * UX2 (owner 2026-10-26, "need a placeholder"): what an empty control shows when its field has no placeholder of its
+ * own. Text, e-mail and a phone number take the format hint in the label's brackets as an example ("Patient ID (synthetic,
+ * SYN-nnn)" gives "e.g. SYN-nnn"); without one, an e-mail "name@example.com", a phone "e.g. +1 555 0100" and other text
+ * "Enter <label>". Long text "Write <label>…"; a number "0", or its range ("1–10") from min and max or the label;
+ * a choice or lookup "Choose…" and a date "Pick a date", as before. (Core keeps no number bounds on a field yet, so
+ * a form's range comes from its label today; min and max are read when a field carries them.) The label stays the field's name: this is an example,
+ * never instead of it. Null for the types with no empty box (yes/no, table, file, signature).
+ */
+export function defaultPlaceholder(f: Pick<FormField, 'label' | 'type' | 'key'> & { min?: number | null; max?: number | null }): string | null {
+  switch (f.type) {
+    case 'choice': case 'lookup': return 'Choose…';
+    case 'date': return 'Pick a date';
+    case 'number': return numberRange(f) ?? '0';
+    case 'longText': return `Write ${spokenLabel(f.label) || 'your answer'}…`;
+    case 'text': case 'email': {
+      const hint = formatHint(f.label);
+      if (hint) return `e.g. ${hint}`;
+      if (f.type === 'email') return 'name@example.com';
+      if (PHONE_WORDS.test(f.label) || PHONE_WORDS.test(f.key.replace(/_/g, ' '))) return 'e.g. +1 555 0100';
+      return `Enter ${spokenLabel(f.label) || 'your answer'}`;
+    }
+    default: return null;
+  }
+}
+
+/** What an empty control shows: the field's own placeholder when it has one, else the default for its type. */
+export function placeholderOf(f: FormField): string | null {
+  return f.placeholder?.trim() || defaultPlaceholder(f);
+}
+
+/**
+ * The format in a label's brackets, if it has one: the part that looks like a format ("SYN-nnn", "YYYY-MM-DD", "#123")
+ * or that the author marked as an example ("e.g. AB 12 34"). A unit ("cm") or a remark ("synthetic", "optional") is not.
+ */
+export function formatHint(label: string): string | null {
+  for (const m of (label ?? '').matchAll(BRACKETED)) {
+    for (const raw of (m[1] ?? m[2] ?? '').split(/[,;]/)) {
+      const part = raw.trim();
+      const marked = EXAMPLE_PREFIX.test(part) && part.replace(EXAMPLE_PREFIX, '').trim().length > 0;
+      const text = part.replace(EXAMPLE_PREFIX, '').trim();
+      if (!text || text.length > 40) continue;
+      if (marked || (!/\s/.test(text) && /[-/.:#]|\d/.test(text) && !RANGE.test(text))) return text;
+    }
+  }
+  return null;
+}
+
+function numberRange(f: { label: string; min?: number | null; max?: number | null }): string | null {
+  if (f.min != null && f.max != null) return `${f.min}–${f.max}`;
+  for (const m of (f.label ?? '').matchAll(BRACKETED)) {
+    const range = RANGE.exec((m[1] ?? m[2] ?? '').trim());
+    if (range) return `${range[1]}–${range[2]}`;
+  }
+  return null;
+}
+
+/**
+ * A label as it reads inside a sentence: brackets and a trailing colon, question mark or asterisk dropped, in lower case;
+ * in a label written in mixed case, an acronym keeps its capitals ("Patient ID" reads "patient ID", "PATIENT ID" "patient id").
+ */
+function spokenLabel(label: string): string {
+  const plain = (label ?? '').replace(BRACKETED, ' ').replace(/[\s:?*.]+$/, '').replace(/\s+/g, ' ').trim();
+  const mixed = /[a-z]/.test(plain);
+  return plain.split(' ').map(w => mixed && /^[A-Z0-9]{2,}$/.test(w) && /[A-Z]/.test(w) ? w : w.toLowerCase()).join(' ');
+}
 const KEY = /^[a-z][a-z0-9_]{0,39}$/;
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;

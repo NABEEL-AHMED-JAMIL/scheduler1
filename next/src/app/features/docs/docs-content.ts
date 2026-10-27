@@ -83,7 +83,8 @@ export const STEPS: Step[] = [
       'Then send documents in on Documents › Intake: Upload, or mail them to the workspace\'s Email-in address. File drop, on the same tab, stores files that start pipelines.',
       'An approved document\'s values land in Documents › Approved data. Document types says what each type\'s approval starts; set it on a schedule.',
       'Forms: build a form whose answers start a pipeline or feed a review. In a field\'s settings, a Placeholder shows example '
-        + 'text inside its empty box (up to 120 characters) and Help text a short hint under it (up to 500); the canvas shows both as you type.',
+        + 'text inside its empty box (up to 120 characters; left empty, the box shows a default such as "Enter case number", '
+        + 'greyed in the setting) and Help text a short hint under it (up to 500); the canvas shows both as you type.',
     ],
     notes: [
       'Values a document type is unsure of go to Review › Documents for a person to check.',

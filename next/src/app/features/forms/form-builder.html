@@ -178,10 +178,10 @@
                           <div class="field" data-placeholder-setting>
                             <label class="label" [for]="'fieldPlaceholder' + i">Placeholder <span class="font-normal normal-case text-[color:var(--text-muted)]">(optional)</span></label>
                             <input class="input" [id]="'fieldPlaceholder' + i" [attr.maxlength]="maxPlaceholder" [value]="f.placeholder || ''"
-                                   [attr.aria-describedby]="'fieldPlaceholderNote' + i" [placeholder]="placeholderExample(f.type)"
+                                   [attr.aria-describedby]="'fieldPlaceholderNote' + i" [placeholder]="defaultShown(f)"
                                    (input)="setField(i, { placeholder: $any($event.target).value })" />
                             <p class="field-note text-[color:var(--text-muted)] flex gap-2" [id]="'fieldPlaceholderNote' + i">
-                              <span class="flex-1">Example text inside the empty {{ f.type === 'choice' || f.type === 'lookup' ? 'list' : 'box' }}. The label stays; people still see it.</span>
+                              <span class="flex-1">Example text inside the empty {{ f.type === 'choice' || f.type === 'lookup' ? 'list' : 'box' }}; left empty, people see the default shown in it. The label stays; people still see it.</span>
                               <span class="tabular-nums shrink-0">{{ (f.placeholder || '').length }}/{{ maxPlaceholder }}</span>
                             </p>
                           </div>

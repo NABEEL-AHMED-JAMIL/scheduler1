@@ -13,7 +13,7 @@ import { AnswerChange, FormRenderer } from './form-renderer';
 import {
   ALLOWED_EXTENSIONS, Answers, COLUMN_TYPES, FIELD_TYPES, FORM_STATUSES, FieldRule, FieldType, FormDraft, FormField, FormStatus, FormSummary,
   LinkableJob, MAX_FIELDS, RULE_OPS, blankField, definitionProblems, draftForSave, formTone, formsOf, lookupSources, optionsFromText,
-  ruleText, typeDefaults, typeLabel, uniqueKey, MAX_PLACEHOLDER, MAX_HELP, takesPlaceholder,
+  ruleText, typeDefaults, typeLabel, uniqueKey, MAX_PLACEHOLDER, MAX_HELP, takesPlaceholder, defaultPlaceholder,
 } from './forms.model';
 
 type RuleKind = 'showWhen' | 'requiredWhen';
@@ -105,15 +105,12 @@ export class FormBuilder implements OnInit {
   readonly maxHelp = MAX_HELP;
   readonly takesPlaceholder = takesPlaceholder;
 
-  /** What the placeholder box itself suggests, by the field's type. */
-  placeholderExample(type: FieldType): string {
-    switch (type) {
-      case 'number': return 'e.g. 2.5';
-      case 'date': return 'e.g. Pick the day';
-      case 'email': return 'e.g. name@example.com';
-      case 'choice': case 'lookup': return 'e.g. Choose one';
-      default: return 'e.g. As written on the card';
-    }
+  /**
+   * What readers see when the field has no placeholder of its own (defaultPlaceholder): the placeholder box shows it
+   * greyed, "Default: Enter case number", so the author knows what an empty one means.
+   */
+  defaultShown(f: FormField): string {
+    return 'Default: ' + (defaultPlaceholder(f) ?? '');
   }
   readonly typeLabel = typeLabel;
   readonly tone = formTone;

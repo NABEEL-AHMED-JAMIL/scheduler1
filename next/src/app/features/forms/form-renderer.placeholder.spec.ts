@@ -44,12 +44,59 @@ describe('UX2: a field\'s placeholder and help text', () => {
     for (const f of FIELDS) expect(el.querySelector(`label[for="fill-${f.key}"]`)?.textContent).toContain(f.label);
   });
 
-  it('keeps the old defaults when a field has none: no placeholder on a box, "Choose…" on a list, "Pick a date" on a day', () => {
+  it('shows a default for its type when a field has none: "Enter ..." on a box, "Choose…" on a list, "Pick a date" on a day', () => {
     const { el } = render();
-    expect(el.querySelector('#fill-plain')?.hasAttribute('placeholder')).toBe(false);
+    expect(el.querySelector('#fill-plain')?.getAttribute('placeholder')).toBe('Enter plain');
     expect(el.querySelector('#fill-plain_site option[value=""]')?.textContent?.trim()).toBe('Choose…');
     const { el: day } = render([{ key: 'd', label: 'D', type: 'date', required: false }]);
     expect(day.querySelector('button#fill-d')?.textContent).toContain('Pick a date');
+  });
+
+  it('UX2 defaults (owner: "need a placeholder"): one per type, the label\'s format hint as the example, labels and help kept', () => {
+    const bare: FormField[] = [
+      { key: 'case_id', label: 'Case number', type: 'text', required: true },
+      { key: 'patient_id', label: 'PATIENT ID (SYNTHETIC, SYN-NNN)', type: 'text', required: true, help: 'From the visit sheet' },
+      { key: 'notes', label: 'Visit notes', type: 'longText', required: false },
+      { key: 'count', label: 'Dressings used', type: 'number', required: false },
+      { key: 'pain', label: 'Pain score (1-10)', type: 'number', required: false },
+      { key: 'mail', label: 'Nurse e-mail', type: 'email', required: false },
+      { key: 'phone', label: 'Contact phone', type: 'text', required: false },
+      { key: 'site', label: 'Site', type: 'choice', required: false, options: ['Heel'] },
+      { key: 'seen', label: 'Seen on', type: 'date', required: false },
+      { key: 'ok', label: 'Healed', type: 'yesNo', required: false },
+    ];
+    const { el } = render(bare);
+    const ph = (id: string) => el.querySelector(`#fill-${id}`)?.getAttribute('placeholder');
+    expect(ph('case_id')).toBe('Enter case number');
+    expect(ph('patient_id')).toBe('e.g. SYN-NNN');
+    expect(el.querySelector('textarea#fill-notes')?.getAttribute('placeholder')).toBe('Write visit notes…');
+    expect(ph('count')).toBe('0');
+    expect(ph('pain')).toBe('1–10');
+    expect(ph('mail')).toBe('name@example.com');
+    expect(ph('phone')).toBe('e.g. +1 555 0100');
+    expect(el.querySelector('#fill-site option[value=""]')?.textContent?.trim()).toBe('Choose…');
+    expect(el.querySelector('button#fill-seen')?.textContent).toContain('Pick a date');
+    expect(el.querySelector('#fill-ok input[placeholder]')).toBeNull();
+    // A placeholder is never the only name: every label stays, and the help is still what the box is described by.
+    for (const f of bare) expect(el.querySelector(`label[for="fill-${f.key}"]`)?.textContent).toContain(f.label);
+    const box = el.querySelector('#fill-patient_id')!;
+    const note = box.closest('.field')!.querySelector('.field-note')!;
+    expect(note.textContent?.trim()).toBe('From the visit sheet');
+    expect(box.getAttribute('aria-describedby')?.split(' ')).toContain(note.id);
+    expect(el.querySelector('#fill-case_id')?.hasAttribute('aria-describedby')).toBe(false);
+  });
+
+  it('lets a field\'s own placeholder win over the default, and a blank one fall back to it', () => {
+    const { el } = render([
+      { key: 'case_id', label: 'Case number', type: 'text', required: true, placeholder: 'e.g. WC-2026-0142' },
+      { key: 'patient_id', label: 'Patient id (synthetic, SYN-nnn)', type: 'text', required: true, placeholder: 'e.g. SYN-014' },
+      { key: 'site', label: 'Site', type: 'choice', required: false, options: ['Heel'], placeholder: 'Choose the wound site' },
+      { key: 'blank', label: 'Ward', type: 'text', required: false, placeholder: '   ' },
+    ]);
+    expect(el.querySelector('#fill-case_id')?.getAttribute('placeholder')).toBe('e.g. WC-2026-0142');
+    expect(el.querySelector('#fill-patient_id')?.getAttribute('placeholder')).toBe('e.g. SYN-014');
+    expect(el.querySelector('#fill-site option[value=""]')?.textContent?.trim()).toBe('Choose the wound site');
+    expect(el.querySelector('#fill-blank')?.getAttribute('placeholder')).toBe('Enter ward');
   });
 
   it('uses the placeholder on a long lookup\'s search box, "Type to find…" when it has none', () => {

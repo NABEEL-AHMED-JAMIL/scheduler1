@@ -57,7 +57,8 @@ describe('Public form (share link)', () => {
     const note = host.closest('.field')!.querySelector('.field-note')!;
     expect(note.textContent?.trim()).toBe('The person or the desk you came to see');
     expect(host.getAttribute('aria-describedby')?.split(' ')).toContain(note.id);
-    expect(el.querySelector('[data-field="visitor"]')?.hasAttribute('placeholder')).toBe(false);
+    // A field without one shows its type's default on the share link too (UX2, owner 2026-10-26).
+    expect(el.querySelector('[data-field="visitor"]')?.getAttribute('placeholder')).toBe('Enter your name');
   });
 
   it('opens the link\'s form by its token and draws its fields, with when the link stops working', () => {

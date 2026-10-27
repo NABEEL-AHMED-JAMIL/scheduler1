@@ -286,6 +286,9 @@ describe('Form builder -- the editor', () => {
     expect(placeholder.getAttribute('maxlength')).toBe('120');
     expect(help.getAttribute('maxlength')).toBe('500');
     expect(props.querySelector('label[for="fieldPlaceholder0"]')?.textContent).toContain('Placeholder');
+    // Left empty, readers see the type's default: the setting shows it greyed, so the author knows (owner 2026-10-26).
+    expect(placeholder.getAttribute('placeholder')).toBe('Default: Enter patient ID');
+    expect(el.querySelector<HTMLInputElement>('#canvas-0-patient_id')!.getAttribute('placeholder')).toBe('Enter patient ID');
 
     placeholder.value = 'e.g. P-00017';
     placeholder.dispatchEvent(new Event('input'));
