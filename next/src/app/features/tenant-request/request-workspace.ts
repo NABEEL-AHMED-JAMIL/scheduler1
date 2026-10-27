@@ -118,27 +118,29 @@ import { ThemeService } from '../../core/theme.service';
                          [control]="form.get('organisationName')" [submitted]="submitted()"
                          hint="The name your workspace will carry." [errorMessages]="tooLong">
                 <input id="organisationName" class="input" formControlName="organisationName" maxlength="255"
-                       placeholder="Acme Ltd" />
+                       placeholder="e.g. Summit Valley Health System" />
               </app-field>
 
               <div class="form-grid">
                 <app-field label="Your name" for="contactName" [required]="true"
                            [control]="form.get('contactName')" [submitted]="submitted()" [errorMessages]="tooLong">
-                  <input id="contactName" class="input" formControlName="contactName" maxlength="255" />
+                  <input id="contactName" class="input" formControlName="contactName" maxlength="255" placeholder="e.g. Jordan Lee" />
                 </app-field>
 
                 <app-field label="Your email" for="contactEmail" [required]="true"
                            [control]="form.get('contactEmail')" [submitted]="submitted()"
                            hint="Where the sign-in details will be sent, and your username."
                            [errorMessages]="{ email: 'That does not look like an email address.', maxlength: tooLong.maxlength }">
-                  <input id="contactEmail" type="email" class="input" formControlName="contactEmail" maxlength="255" />
+                  <input id="contactEmail" type="email" class="input" formControlName="contactEmail" maxlength="255"
+                         placeholder="name@yourcompany.com" />
                 </app-field>
               </div>
 
               <app-field label="What do you need it for?" for="purpose"
                          [control]="form.get('purpose')" [submitted]="submitted()"
                          hint="A sentence or two is plenty. It helps whoever reviews the request.">
-                <textarea id="purpose" class="input" rows="4" formControlName="purpose"></textarea>
+                <textarea id="purpose" class="input" rows="4" formControlName="purpose"
+                          placeholder="e.g. Read referral faxes and send summaries to our EHR"></textarea>
               </app-field>
 
               @if (error()) {

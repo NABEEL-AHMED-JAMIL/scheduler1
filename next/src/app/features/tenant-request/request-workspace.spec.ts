@@ -67,4 +67,23 @@ describe('RequestWorkspace', () => {
     expect(el.textContent).toContain('Organisation is required');
     expect(el.textContent).toContain('Your email is required');
   });
+
+  it('UX2: gives every box an example placeholder, keeping its label and the note it is described by', () => {
+    const { el } = mount();
+    const shown = Object.fromEntries([...el.querySelectorAll<HTMLInputElement>('input, textarea')].map(c => [c.id, c.getAttribute('placeholder')]));
+    expect(shown).toEqual({
+      organisationName: 'e.g. Summit Valley Health System',
+      contactName: 'e.g. Jordan Lee',
+      contactEmail: 'name@yourcompany.com',
+      purpose: 'e.g. Read referral faxes and send summaries to our EHR',
+    });
+    expect(el.querySelector('label[for="organisationName"]')!.textContent).toContain('Organisation');
+    expect(el.querySelector('label[for="contactName"]')!.textContent).toContain('Your name');
+    expect(el.querySelector('label[for="contactEmail"]')!.textContent).toContain('Your email');
+    expect(el.querySelector('label[for="purpose"]')!.textContent).toContain('What do you need it for?');
+    for (const id of ['organisationName', 'contactEmail', 'purpose']) {
+      const note = el.querySelector('#' + el.querySelector('#' + id)!.getAttribute('aria-describedby'))!;
+      expect(note.classList.contains('field-note')).toBe(true);
+    }
+  });
 });
