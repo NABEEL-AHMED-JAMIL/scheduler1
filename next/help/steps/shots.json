@@ -1,0 +1,165 @@
+[
+ {
+  "name": "step-read",
+  "route": "/pipelines/1235/edit?tab=steps",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": ".step-card[data-step=remits]"
+   },
+   {
+    "click": ".step-card[data-step=remits] .step-open"
+   },
+   {
+    "waitFor": "app-side-panel"
+   },
+   {
+    "wait": 1200
+   }
+  ],
+  "clip": "app-side-panel",
+  "pad": 0,
+  "thumb": true
+ },
+ {
+  "name": "step-shape",
+  "route": "/pipelines/1231/edit?tab=steps",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": ".step-card[data-step=tomorrow]"
+   },
+   {
+    "click": ".step-card[data-step=tomorrow] .step-open"
+   },
+   {
+    "waitFor": "app-side-panel"
+   },
+   {
+    "wait": 1200
+   }
+  ],
+  "clip": "app-side-panel",
+  "pad": 0,
+  "thumb": true
+ },
+ {
+  "name": "step-combine",
+  "route": "/pipelines/1235/edit?tab=steps",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": ".step-card[data-step=joined]"
+   },
+   {
+    "click": ".step-card[data-step=joined] .step-open"
+   },
+   {
+    "waitFor": "app-side-panel"
+   },
+   {
+    "wait": 1200
+   }
+  ],
+  "clip": "app-side-panel",
+  "pad": 0
+ },
+ {
+  "name": "step-check",
+  "route": "/pipelines/1231/edit?tab=steps",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": ".step-card[data-step=elig]"
+   },
+   {
+    "click": ".step-card[data-step=elig] .step-open"
+   },
+   {
+    "waitFor": "app-side-panel"
+   },
+   {
+    "wait": 1200
+   }
+  ],
+  "clip": "app-side-panel",
+  "pad": 0,
+  "thumb": true
+ },
+ {
+  "name": "step-ai",
+  "route": "/pipelines/1104/edit?tab=steps",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": ".step-card[data-step=describe]"
+   },
+   {
+    "click": ".step-card[data-step=describe] .step-open"
+   },
+   {
+    "waitFor": "app-side-panel"
+   },
+   {
+    "wait": 1200
+   }
+  ],
+  "clip": "app-side-panel",
+  "pad": 0,
+  "thumb": true
+ },
+ {
+  "name": "step-people",
+  "route": "/pipelines/1104/edit?tab=steps",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": ".step-card[data-step=approve]"
+   },
+   {
+    "click": ".step-card[data-step=approve] .step-open"
+   },
+   {
+    "waitFor": "app-side-panel"
+   },
+   {
+    "wait": 1200
+   }
+  ],
+  "clip": "app-side-panel",
+  "pad": 0
+ },
+ {
+  "name": "step-outputs",
+  "route": "/pipelines/1235/edit?tab=steps",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": ".step-card[data-step=report]"
+   },
+   {
+    "click": ".step-card[data-step=report] .step-open"
+   },
+   {
+    "waitFor": "app-side-panel"
+   },
+   {
+    "wait": 1200
+   }
+  ],
+  "clip": "app-side-panel",
+  "pad": 0,
+  "thumb": true
+ },
+ {
+  "name": "step-registry",
+  "route": "/settings/task-registry",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "wait": 1500
+   }
+  ],
+  "thumb": true
+ }
+]
