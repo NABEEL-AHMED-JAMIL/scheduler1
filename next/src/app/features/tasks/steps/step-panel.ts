@@ -39,6 +39,8 @@ export interface StepPanelData {
   problems: StepProblem[];
   /** Report Studio phase 5: the pipeline the step is in (key null while never saved), its name and its schedules. */
   pipeline?: { key: number | null; name: string; jobIds: number[] };
+  /** ZT-S4: Validate's warnings for this step, at the same relative paths. */
+  warnings?: StepProblem[];
   /** The settings' on-error, for what "Default" means here. */
   defaultOnError?: string;
   canManage: boolean;
@@ -105,6 +107,8 @@ export class StepPanel {
   /** The step's problems no field shows: the step as a whole, or its task. */
   readonly generalProblems = computed(() => this.data.problems.filter(p => p.field === '' || p.field === 'task')
     .map(p => (p.field ? `Task: ${p.message}` : p.message)));
+  /** ZT-S4: Validate's warnings for the step: valid, but it will not do what it seems. */
+  readonly warnings = (this.data.warnings ?? []).map(p => p.message);
   readonly columns = this.data.columns ?? [];
   /** Blank tries and timeout are the task's own defaults (the registry's retry and timeoutSeconds), else the pipeline's. */
   readonly triesHint = `1 to 10. Blank: ${this.plural(this.data.task?.retry?.maxAttempts ?? 1, 'try', 'tries')}, the task's default.`;

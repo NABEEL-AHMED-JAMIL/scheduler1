@@ -112,6 +112,8 @@ export interface ValidateResult {
   valid?: boolean;
   legacy?: boolean;
   problems?: Problem[];
+  /** ZT-S4: what is valid but will not do what it seems (a required prompt variable nothing fills), each at its path. */
+  warnings?: Problem[];
   definition?: Definition;
   json?: string;
   yaml?: string;

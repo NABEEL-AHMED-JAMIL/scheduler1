@@ -115,6 +115,8 @@ export class StepBuilder implements OnInit {
   readonly draft = linkedSignal<Definition>(() => structuredClone(this.meta().definition));
   readonly tasks = signal<StepTaskEntry[]>([]);
   readonly problems = signal<Problem[]>([]);
+  /** ZT-S4: the last Validate's warnings, shown on their steps (a move, an edit's save or Discard clears them with the problems). */
+  readonly warnings = signal<Problem[]>([]);
   readonly result = signal<{ tone: Tone; text: string } | null>(null);
   readonly busy = signal<'' | 'validate' | 'save' | 'yaml'>('');
   /** The step last opened, by key: it stays marked wherever it moves. */
@@ -416,7 +418,7 @@ export class StepBuilder implements OnInit {
     const data: StepPanelData = {
       step, index, task: this.taskOf(step), earlierKeys: this.earlierKeys(index),
       columns: inputColumns(this.draft(), index, this.tasks()),
-      problems: this.stepProblems(index), defaultOnError: this.draft().settings?.defaultOnError,
+      problems: this.stepProblems(index), warnings: problemsByStep(this.warnings()).steps[index] ?? [], defaultOnError: this.draft().settings?.defaultOnError,
       canManage: this.canManage() && step.task !== 'legacy',
       prompts: this.promptChoices() ?? [],
       buckets: this.bucketChoices() ?? [],
@@ -444,6 +446,7 @@ export class StepBuilder implements OnInit {
   private shiftProblems(): void {
     if (Object.keys(this.grouped().steps).length) {
       this.problems.set(this.problems().filter(p => !p.path.startsWith('steps[')));
+      this.warnings.set([]);
       this.say('warn', 'The steps moved: Validate again to see what is still wrong.');
     }
   }
@@ -581,13 +584,17 @@ export class StepBuilder implements OnInit {
   private took(r: ApiResponse<ValidateResult>, adopt: boolean): void {
     const data = r.data ?? {};
     this.problems.set(data.problems ?? []);
+    this.warnings.set(data.warnings ?? []);
     if (adopt && data.definition) {
       this.draft.set(data.definition);
       this.yamlTyped.set(false);
       this.jsonTyped.set(false);
       this.enter(this.tab());
     }
-    if (r.status === API_SUCCESS) this.say('ok', r.message || 'The definition is valid.');
+    const warned = data.warnings?.length ?? 0;
+    if (r.status === API_SUCCESS && warned) {
+      this.say('warn', `The definition is valid, with ${warned} warning${warned === 1 ? '' : 's'}: ${warned === 1 ? 'it is' : 'each is'} shown on its step.`);
+    } else if (r.status === API_SUCCESS) this.say('ok', r.message || 'The definition is valid.');
     else {
       const count = data.problems?.length ?? 0;
       this.say('crit', count ? `${count} problem${count === 1 ? '' : 's'}: each is shown on its step.` : r.message || 'The definition is not valid.');
@@ -641,6 +648,7 @@ export class StepBuilder implements OnInit {
               this.saved.emit(d.data);
             }
             this.problems.set([]);
+            this.warnings.set([]);
             this.yamlTyped.set(false);
             this.jsonTyped.set(false);
             this.enter(this.tab());
@@ -672,6 +680,7 @@ export class StepBuilder implements OnInit {
     this.yamlTyped.set(false);
     this.jsonTyped.set(false);
     this.problems.set([]);
+    this.warnings.set([]);
     this.result.set(null);
     this.enter(this.tab());
   }

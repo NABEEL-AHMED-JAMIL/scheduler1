@@ -431,6 +431,20 @@ describe('StepBuilder -- Validate points at the step', () => {
     expect(el.textContent).toContain('The definition is valid.');
   });
 
+  // ZT-S4: Validate's warnings -- valid, but a required prompt variable nothing fills -- are said, and shown on their step.
+  it('says a valid definition\'s warnings and shows each on its step', () => {
+    const { click, api, el, fixture, opened } = build();
+    api.validate.mockReturnValueOnce(of({ status: 'SUCCESS', message: 'The definition is valid.', data: { valid: true, problems: [], warnings: [
+      { path: 'steps[1].config.values', message: "Prompt variable 'reason' is required and not mapped in Variables." },
+    ] } }) as any);
+    click('Validate');
+    fixture.detectChanges();
+    expect(el.textContent).toContain('The definition is valid, with 1 warning: it is shown on its step.');
+    click('Edit step keep');
+    expect(opened.find(o => o.component === StepPanel)!.data.warnings)
+      .toEqual([{ field: 'config.values', message: "Prompt variable 'reason' is required and not mapped in Variables." }]);
+  });
+
   it('keeps a refused save\'s problems on the steps, and does not read the pipeline again', () => {
     const { click, api, el, fixture } = build();
     api.save.mockReturnValueOnce(of({ status: 'ERROR', message: 'The definition has 1 problem(s)', data: { valid: false, problems: [{ path: 'steps[0].key', message: 'lower case' }] } }) as any);

@@ -165,4 +165,13 @@ describe('StepPanel -- MIG-245', () => {
     expect(select.value).toBe('41');
     expect(select.selectedOptions[0].textContent!.trim()).toBe('Wound assessment');
   });
+
+  // ZT-S4: Validate's warnings for this step, above its settings, as a warning rather than a problem.
+  it('shows the step\'s warnings as a warning', () => {
+    const { el } = open({ warnings: [{ field: 'config.values', message: "Prompt variable 'reason' is required and not mapped in Variables." }] });
+    const notice = el.querySelector('.step-notice-warn')!;
+    expect(notice.getAttribute('role')).toBe('status');
+    expect(notice.textContent).toContain("Prompt variable 'reason' is required and not mapped in Variables.");
+    expect(el.querySelector('.step-notice-crit')).toBeNull();
+  });
 });

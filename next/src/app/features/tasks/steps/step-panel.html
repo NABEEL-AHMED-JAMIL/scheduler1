@@ -6,6 +6,11 @@
           @for (message of generalProblems(); track $index) { <p class="text-sm">{{ message }}</p> }
         </div>
       }
+      @if (warnings.length) {
+        <div class="step-notice step-notice-warn flex-col" role="status">
+          @for (message of warnings; track $index) { <p class="text-sm">{{ message }}</p> }
+        </div>
+      }
 
       <!-- UX review 2026-10-12 (A4, A9, P9): what the step is (key, name, what it reads), then its task's own settings --
            what the step is for -- and only then how it runs; related numbers share a row instead of each taking the width. -->
