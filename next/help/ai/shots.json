@@ -1,0 +1,108 @@
+[
+ {
+  "name": "ai-model-connections",
+  "route": "/settings/model-connections",
+  "as": "summit.admin",
+  "thumb": true
+ },
+ {
+  "name": "ai-prompts",
+  "route": "/pipelines/prompts",
+  "as": "summit.admin"
+ },
+ {
+  "name": "ai-prompt-editor",
+  "route": "/pipelines/prompts/1048/edit",
+  "as": "summit.admin",
+  "thumb": true
+ },
+ {
+  "name": "ai-step-settings",
+  "route": "/pipelines/1104/edit?tab=steps",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "click": "button[aria-label='Edit step describe']"
+   },
+   {
+    "wait": 1200
+   }
+  ],
+  "thumb": true
+ },
+ {
+  "name": "ai-run-answers",
+  "route": "/pipelines/schedules/1104/runs/2042?tab=ai",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "click": "text=Wound description (DRAFT)"
+   },
+   {
+    "wait": 1200
+   }
+  ]
+ },
+ {
+  "name": "ai-transcript",
+  "route": "/tools/transcript",
+  "as": "summit.admin",
+  "retake": "Summit Valley: a care-call recording transcribed (jobs 209, 210)"
+ },
+ {
+  "name": "ai-assistant",
+  "route": "/ai/assistant",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "click": "text=AI Assistant test \u00b7 SMS"
+   },
+   {
+    "wait": 2500
+   }
+  ],
+  "retake": "Summit Valley: the conversation of job 385 (Build a pipeline with the AI Assistant)",
+  "thumb": true
+ },
+ {
+  "name": "ai-assistant-context",
+  "route": "/ai/assistant",
+  "as": "summit.admin",
+  "clip": "section[aria-label='Result']",
+  "steps": [
+   {
+    "click": "role=tab[name='Context']"
+   },
+   {
+    "wait": 1500
+   }
+  ]
+ },
+ {
+  "name": "ai-ask-data",
+  "route": "/data/ask",
+  "as": "summit.admin",
+  "retake": "Summit Valley: an answered question drawn as a chart, pinned (job 58)"
+ },
+ {
+  "name": "ai-data-policies",
+  "route": "/administration/data-policies",
+  "as": "summit.admin",
+  "clip": "[data-policy-table]",
+  "thumb": true
+ },
+ {
+  "name": "ai-costs",
+  "route": "/billing/usage",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "click": "text=/Show \\d+ lines under a cent/"
+   },
+   {
+    "wait": 800
+   }
+  ],
+  "clip": "app-table-shell[heading='Line by line']"
+ }
+]
