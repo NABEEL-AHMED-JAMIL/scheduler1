@@ -51,7 +51,7 @@ async function render(role: Role, view: 'table' | 'cards' = 'table') {
   const el = fixture.nativeElement as HTMLElement;
   const headings = () => Array.from(el.querySelectorAll('thead th')).map(th => (th.textContent ?? '').trim());
   const cards = () => Array.from(el.querySelectorAll('article')).map(a => (a.textContent ?? '').replace(/\s+/g, ' '));
-  return { fixture, component: fixture.componentInstance, el, headings, cards, workspaceFilter: () => el.querySelector('#tasks-tenant') };
+  return { fixture, component: fixture.componentInstance, el, headings, cards, workspaceFilter: () => el.querySelector('app-page-header app-workspace-select [data-test="workspace-select"]') };
 }
 
 describe('Tasks workspace column, card line and filter', () => {
@@ -87,8 +87,7 @@ describe('Tasks workspace column, card line and filter', () => {
     it('filters by workspace alongside topic, pipeline and search, and Clear resets it', async () => {
       const { component, workspaceFilter } = await render('PLATFORM_ADMIN');
       expect(workspaceFilter()).not.toBeNull();
-      expect(component.workspaceOptions().map(o => o.label)).toEqual(['Acme Ops', 'Borealis', 'Workspace #3']);
-
+  
       component.workspaceFilter.set('2');
       expect(component.filtered().map(t => t.taskDetailId)).toEqual([22]);
       component.pipelineFilter.set('F100');

@@ -58,9 +58,15 @@ async function getJson(request: APIRequestContext, s: Session, path: string): Pr
   return (await request.get(`${api}${path}`, { headers: authOf(s) })).json().catch(() => ({}));
 }
 
-/** Opens a row's actions menu on a list screen and picks an item. */
+/**
+ * Opens a row's actions menu on a list screen and picks an item. The row is looked up as a person would in a full
+ * workspace, with the list's own search when it has one: a list pages its rows (50 a page), and the rebuilt workspace's
+ * schedules ran past one page (final-regression 10-20: the new schedule was on page 2 and the walk waited for ever).
+ */
 async function rowAction(page: Page, rowText: string, item: string): Promise<void> {
-  await page.locator('tbody tr', { hasText: rowText }).first().getByRole('button', { name: /^Actions for/ }).click();
+  const search = page.locator('main input[placeholder^="Search"]').first();
+  if (await search.count()) await search.fill(rowText);
+  await page.locator('tbody tr', { hasText: rowText }).first().getByRole('button', { name: /^Actions for/ }).click({ timeout: 30_000 });
   await page.getByRole('menuitem', { name: item }).click();
 }
 
@@ -112,9 +118,9 @@ test.describe('a new organisation\'s first hour (MIG-324)', () => {
 
     // ── 1. Storage ────────────────────────────────────────────────────────────────────────────────────────────────
     const connections = (await getJson(request, s, '/storageConnection.json/fetchAllConnections')).data ?? [];
-    await page.goto('/integration/storage-connections');
+    await page.goto('/connections/storage');
     if (!connections.some((c: any) => c.alias === ALIAS)) {
-      await page.getByRole('button', { name: 'New connection' }).click();
+      await page.getByRole('button', { name: 'New storage connection' }).click();
       const dialog = page.getByRole('dialog').last();
       await dialog.locator('#provider').selectOption('S3');
       await dialog.locator('#name').fill(STORAGE);
@@ -133,9 +139,11 @@ test.describe('a new organisation\'s first hour (MIG-324)', () => {
     lap('storage');
 
     // ── 2. The inbox, and a file in it ────────────────────────────────────────────────────────────────────────────
-    await page.goto('/documents/file-drop');
+    await page.goto('/documents/intake/file-drop');
     const setUp = page.getByRole('button', { name: 'Set up the inbox' });
-    await expect(page.getByRole('heading', { name: 'Inbox', exact: true })).toBeVisible();
+    // The inbox is Documents › Intake › File drop since 2026-10-20 (§0.1).
+    await expect(page.getByRole('heading', { level: 1, name: 'Intake', exact: true })).toBeVisible();
+    await expect(page.locator('[data-test="intake-sections"] [aria-current="page"]')).toHaveText('File drop');
     if (await setUp.isVisible()) {
       await setUp.click();
       const dialog = page.getByRole('dialog').last();
@@ -179,15 +187,16 @@ test.describe('a new organisation\'s first hour (MIG-324)', () => {
     if (!registry.some((p: any) => p.pipelineId === REGISTRY_ID)) {
       await page.goto('/settings/task-registry');
       await page.getByRole('button', { name: 'New registry task' }).click();
-      await page.getByRole('heading', { name: 'New registry task' }).waitFor();
-      const dialog = page.getByRole('dialog').last();
+      // Owner #18: New registry task is a page of its own now, not a dialog.
+      await page.getByRole('heading', { name: 'New registry task', level: 1 }).waitFor();
+      const dialog = page.locator('app-registry-task-editor');
       await dialog.locator('#pipelineId').fill(REGISTRY_ID);
       await dialog.locator('#pipelineName').fill(REGISTRY_NAME);
       await pick(page, 'pipelineTopic', TOPIC, TOPIC);
       await dialog.getByRole('button', { name: /Add (a )?field/i }).first().click();
       await dialog.locator('#tagKey0').fill('input_file');
       await dialog.locator('#label0').fill('Input file');
-      await dialog.getByRole('button', { name: 'Create pipeline' }).click();
+      await dialog.getByRole('button', { name: 'Create registry task' }).first().click();
       await expect(page.getByText(`"${REGISTRY_NAME}" saved`)).toBeVisible();
     }
     lap('registry task');
@@ -198,7 +207,8 @@ test.describe('a new organisation\'s first hour (MIG-324)', () => {
     if (existing) {
       await page.goto(`/pipelines/${existing.taskDetailId}/edit`);
     } else {
-      await page.goto('/pipelines/new');
+      // New pipeline starts from a choice (AI Assistant, steps, a copy); the full form for a topic's pipeline is /form.
+      await page.goto('/pipelines/new/form');
       await page.getByRole('heading', { name: 'New pipeline' }).waitFor();
       await page.locator('#taskName').fill(PIPELINE);
       await expect(page.locator('#taskProfile')).not.toHaveValue('');
@@ -210,10 +220,12 @@ test.describe('a new organisation\'s first hour (MIG-324)', () => {
       // MIG-324: a new pipeline opens on its own page, where its steps are built next.
       await expect(page).toHaveURL(/\/pipelines\/\d+\/edit/);
     }
-    await expect(page.getByRole('heading', { name: 'Edit pipeline' })).toBeVisible();
+    // The editor's title is the pipeline's own name (B2).
+    await expect(page.getByRole('heading', { level: 1, name: PIPELINE })).toBeVisible();
     const build = page.getByRole('button', { name: 'Build its steps' });
     const stepsTab = page.getByRole('tab', { name: 'Steps' });
-    await expect(build.or(stepsTab)).toBeVisible();
+    // B2: the Steps tab is there for a pipeline with no steps too, beside Details' "Build its steps".
+    await expect(build.or(stepsTab).first()).toBeVisible();
     if (await build.isVisible()) {
       // No steps yet: Details says what that means and offers the builder (MIG-324).
       await expect(page.getByText('This pipeline has no steps yet')).toBeVisible();
@@ -235,8 +247,9 @@ test.describe('a new organisation\'s first hour (MIG-324)', () => {
       await keep.locator('#cfg-fileName').fill('orders.csv');
       await keep.locator('#cfg-format').selectOption('csv');
       await keep.getByRole('button', { name: 'Apply' }).click();
+      // One save bar saves the details and the steps (B2); the first steps of a legacy pipeline are confirmed in a dialog.
       await page.getByRole('button', { name: 'Save', exact: true }).click();
-      await page.getByRole('button', { name: 'Save steps' }).click();
+      await page.getByRole('dialog').getByRole('button', { name: 'Save steps' }).click();
     } else {
       await stepsTab.click();
       await page.getByRole('button', { name: 'Edit step orders' }).click();
@@ -282,16 +295,18 @@ test.describe('a new organisation\'s first hour (MIG-324)', () => {
 
     // ── 8. Its output, where the console shows it ─────────────────────────────────────────────────────────────────
     await rowAction(page, SCHEDULE, 'Executions');
-    await page.locator('tr', { hasText: `#${run.jobQueueId}` }).getByRole('link', { name: 'Logs' }).click();
-    await expect(page.getByRole('heading', { name: 'Run logs' })).toBeVisible();
-    await expect(page.getByText('2 of 2 step(s) completed.').first()).toBeVisible();
-    await expect(page.getByText('orders.csv').first()).toBeVisible();
-    await expect(page.getByText(/Step result · 4 rows/)).toBeVisible();
+    // A run opens on its Steps (the run page, MIG-251): each step's rows, the kept file named on its step.
+    await page.getByRole('link', { name: `Open run #${run.jobQueueId}` }).click();
+    await expect(page).toHaveURL(new RegExp(`/runs/${run.jobQueueId}$`));
+    const steps = page.locator('[data-test="run-steps"]');
+    await expect(steps.locator('tr.exec-step')).toHaveCount(2);
+    await expect(steps).toContainText('orders.csv');
+    await expect(steps).toContainText(/4 rows/);
     lap('output');
 
     // ── Once a run has completed, the dashboard's guide has done its job ──────────────────────────────────────────
     await page.goto('/dashboard');
-    await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Home' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Get your first pipeline running' })).toHaveCount(0);
 
     const total = (Date.now() - started) / 1000;

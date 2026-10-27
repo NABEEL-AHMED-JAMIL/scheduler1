@@ -77,6 +77,16 @@ export const PINNED: Record<string, unknown> = {
       "title": "Storage connections",
       "minRole": "TENANT_ADMIN",
       "guards": [
+        "ownSignInOnly",
+        "roleGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/connections/storage",
+      "title": "Storage connections",
+      "minRole": "TENANT_ADMIN",
+      "guards": [
         "roleGuard"
       ],
       "lazy": true
@@ -104,6 +114,26 @@ export const PINNED: Record<string, unknown> = {
       "title": "API Collections",
       "pageKey": "api-collections",
       "guards": [
+        "ownSignInOnly",
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/connections/api-collections",
+      "title": "API Collections",
+      "pageKey": "api-collections",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/connections/api-collections/:collectionId",
+      "title": "API collection",
+      "pageKey": "api-collections",
+      "guards": [
+        "ownSignInOnly",
         "pageGuard"
       ],
       "lazy": true
@@ -122,6 +152,26 @@ export const PINNED: Record<string, unknown> = {
       "title": "Sources",
       "pageKey": "sources",
       "guards": [
+        "ownSignInOnly",
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/connections/sources",
+      "title": "Sources",
+      "pageKey": "sources",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/connections/databases",
+      "title": "Database connections",
+      "pageKey": "sources",
+      "guards": [
+        "ownSignInOnly",
         "pageGuard"
       ],
       "lazy": true
@@ -140,6 +190,26 @@ export const PINNED: Record<string, unknown> = {
       "title": "Data contracts",
       "pageKey": "sources",
       "guards": [
+        "ownSignInOnly",
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/connections/contracts",
+      "title": "Data contracts",
+      "pageKey": "sources",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/connections/connectors",
+      "title": "Connections",
+      "pageKey": "connector-hub",
+      "guards": [
+        "ownSignInOnly",
         "pageGuard"
       ],
       "lazy": true
@@ -158,6 +228,26 @@ export const PINNED: Record<string, unknown> = {
       "title": "Connecting",
       "pageKey": "connector-hub",
       "guards": [
+        "ownSignInOnly",
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/integration/connectors/oauth/callback",
+      "title": "Connecting",
+      "pageKey": "connector-hub",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/pipelines/list",
+      "title": "Pipelines",
+      "pageKey": "tasks",
+      "guards": [
+        "ownSignInOnly",
         "pageGuard"
       ],
       "lazy": true
@@ -188,6 +278,31 @@ export const PINNED: Record<string, unknown> = {
       "pageKey": "tasks",
       "minRole": "TENANT_ADMIN",
       "guards": [
+        "ownSignInOnly",
+        "pageGuard",
+        "roleGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/pipelines/new/form",
+      "title": "New pipeline",
+      "pageKey": "tasks",
+      "minRole": "TENANT_ADMIN",
+      "guards": [
+        "pageGuard",
+        "roleGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/pipelines/bulk",
+      "title": "Bulk pipelines",
+      "pageKey": "tasks",
+      "minRole": "TENANT_ADMIN",
+      "kind": "task",
+      "guards": [
+        "ownSignInOnly",
         "pageGuard",
         "roleGuard"
       ],
@@ -211,6 +326,18 @@ export const PINNED: Record<string, unknown> = {
       "pageKey": "tasks",
       "minRole": "TENANT_ADMIN",
       "guards": [
+        "ownSignInOnly",
+        "pageGuard",
+        "roleGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/pipelines/:taskDetailId/edit",
+      "title": "Pipeline",
+      "pageKey": "tasks",
+      "minRole": "TENANT_ADMIN",
+      "guards": [
         "pageGuard",
         "roleGuard"
       ],
@@ -221,6 +348,26 @@ export const PINNED: Record<string, unknown> = {
       "title": "Schedules & triggers",
       "pageKey": "jobs",
       "guards": [
+        "ownSignInOnly",
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/pipelines/schedules",
+      "title": "Schedules & triggers",
+      "pageKey": "jobs",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/pipelines/schedules/new",
+      "title": "New schedule",
+      "pageKey": "jobs",
+      "guards": [
+        "ownSignInOnly",
         "pageGuard"
       ],
       "lazy": true
@@ -240,6 +387,27 @@ export const PINNED: Record<string, unknown> = {
       "pageKey": "jobs",
       "kind": "job",
       "guards": [
+        "ownSignInOnly",
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/pipelines/schedules/bulk",
+      "title": "Bulk schedules",
+      "pageKey": "jobs",
+      "kind": "job",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/pipelines/schedules/:jobId/edit",
+      "title": "Schedule",
+      "pageKey": "jobs",
+      "guards": [
+        "ownSignInOnly",
         "pageGuard"
       ],
       "lazy": true
@@ -258,6 +426,26 @@ export const PINNED: Record<string, unknown> = {
       "title": "Schedule assistant",
       "pageKey": "jobs",
       "guards": [
+        "ownSignInOnly",
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/pipelines/schedules/:jobId/assistant",
+      "title": "Schedule assistant",
+      "pageKey": "jobs",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/pipelines/schedules/:jobId/executions",
+      "title": "Schedule runs",
+      "pageKey": "jobs",
+      "guards": [
+        "ownSignInOnly",
         "pageGuard"
       ],
       "lazy": true
@@ -270,6 +458,40 @@ export const PINNED: Record<string, unknown> = {
         "pageGuard"
       ],
       "lazy": true
+    },
+    {
+      "path": "/pipelines/schedules/:jobId/items",
+      "title": "Schedule items",
+      "pageKey": "jobs",
+      "guards": [
+        "ownSignInOnly",
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/pipelines/schedules/:jobId/items",
+      "title": "Schedule items",
+      "pageKey": "jobs",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/pipelines/schedules/:jobId/runs/:jobQueueId",
+      "title": "Run",
+      "pageKey": "jobs",
+      "guards": [
+        "ownSignInOnly",
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/pipelines/schedules/:jobId/runs/:jobQueueId/**",
+      "guards": [],
+      "lazy": false
     },
     {
       "path": "/pipelines/schedules/:jobId/runs/:jobQueueId",
@@ -295,6 +517,26 @@ export const PINNED: Record<string, unknown> = {
       "title": "Runs",
       "pageKey": "jobs",
       "guards": [
+        "ownSignInOnly",
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/runs/latest",
+      "title": "Runs",
+      "pageKey": "jobs",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/runs/by-date",
+      "title": "Runs by date",
+      "pageKey": "queue",
+      "guards": [
+        "ownSignInOnly",
         "pageGuard"
       ],
       "lazy": true
@@ -313,6 +555,16 @@ export const PINNED: Record<string, unknown> = {
       "title": "Failed runs",
       "pageKey": "queue",
       "guards": [
+        "ownSignInOnly",
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/runs/failed",
+      "title": "Failed runs",
+      "pageKey": "queue",
+      "guards": [
         "pageGuard"
       ],
       "lazy": true
@@ -322,6 +574,26 @@ export const PINNED: Record<string, unknown> = {
       "title": "Backfills",
       "pageKey": "jobs",
       "guards": [
+        "ownSignInOnly",
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/runs/backfills",
+      "title": "Backfills",
+      "pageKey": "jobs",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/runs/analytics",
+      "title": "Run analytics",
+      "pageKey": "reports",
+      "guards": [
+        "ownSignInOnly",
         "pageGuard"
       ],
       "lazy": true
@@ -354,8 +626,8 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
-      "path": "/documents/datasets",
-      "title": "Datasets",
+      "path": "/documents/approved-data",
+      "title": "Approved data",
       "pageKey": "document-intelligence",
       "guards": [
         "pageGuard"
@@ -363,11 +635,44 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
-      "path": "/documents/email-in",
+      "path": "/documents/intake",
+      "title": "Intake",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/documents/intake/",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/documents/intake/upload",
+      "title": "Upload documents",
+      "pageKey": "document-intelligence",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/documents/intake/email-in",
       "title": "Email-in",
       "pageKey": "document-intelligence",
       "guards": [
         "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/documents/intake/file-drop",
+      "title": "File drop",
+      "pageKey": "objects",
+      "minRole": "TENANT_USER",
+      "guards": [
+        "pageGuard",
+        "roleGuard"
       ],
       "lazy": true
     },
@@ -381,9 +686,231 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
-      "path": "/data/reports",
-      "title": "Generated reports",
+      "path": "/reports/from-pipelines",
+      "title": "Reports from pipelines",
       "pageKey": "tools-converter",
+      "guards": [
+        "ownSignInOnly",
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/reports/from-pipelines",
+      "title": "Reports from pipelines",
+      "pageKey": "tools-converter",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/reports/overview",
+      "title": "Reports overview",
+      "pageKey": "report-studio",
+      "guards": [
+        "ownSignInOnly",
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/reports/overview",
+      "title": "Reports overview",
+      "pageKey": "report-studio",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/reports/templates",
+      "title": "Report templates",
+      "guards": [
+        "ownSignInOnly",
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/reports/templates",
+      "title": "Report templates",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/reports/templates/:templateId/design",
+      "title": "Template designer",
+      "pageKey": "report-templates",
+      "guards": [
+        "ownSignInOnly",
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/reports/templates/:templateId/design",
+      "title": "Template designer",
+      "pageKey": "report-templates",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/reports/new",
+      "title": "Create report",
+      "pageKey": "report-generate",
+      "guards": [
+        "ownSignInOnly",
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/reports/new",
+      "title": "Create report",
+      "pageKey": "report-generate",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/reports/templates/:templateId",
+      "title": "Report template",
+      "guards": [
+        "ownSignInOnly",
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/reports/templates/:templateId",
+      "title": "Report template",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/reports/library",
+      "title": "Report library",
+      "pageKey": "report-library",
+      "guards": [
+        "ownSignInOnly",
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/reports/library",
+      "title": "Report library",
+      "pageKey": "report-library",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/reports/library/:reportId",
+      "title": "Report",
+      "pageKey": "report-library",
+      "guards": [
+        "ownSignInOnly",
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/reports/library/:reportId",
+      "title": "Report",
+      "pageKey": "report-library",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/reports/assets",
+      "title": "Assets & branding",
+      "pageKey": "report-assets",
+      "guards": [
+        "ownSignInOnly",
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/reports/assets",
+      "title": "Assets & branding",
+      "pageKey": "report-assets",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/reports/assets/branding/:profileId",
+      "title": "Brand profile",
+      "pageKey": "report-assets",
+      "guards": [
+        "ownSignInOnly",
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/reports/assets/branding/:profileId",
+      "title": "Brand profile",
+      "pageKey": "report-assets",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/reports/assets/:assetId",
+      "title": "Asset",
+      "guards": [
+        "ownSignInOnly",
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/reports/assets/:assetId",
+      "title": "Asset",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/reports/settings",
+      "title": "Report settings",
+      "minRole": "TENANT_ADMIN",
+      "guards": [
+        "roleGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/reports/data",
+      "title": "Report data",
+      "pageKey": "report-data",
+      "guards": [
+        "ownSignInOnly",
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/reports/data",
+      "title": "Report data",
+      "pageKey": "report-data",
       "guards": [
         "pageGuard"
       ],
@@ -395,14 +922,15 @@ export const PINNED: Record<string, unknown> = {
       "pageKey": "objects",
       "minRole": "TENANT_USER",
       "guards": [
+        "ownSignInOnly",
         "pageGuard",
         "roleGuard"
       ],
       "lazy": true
     },
     {
-      "path": "/documents/file-drop",
-      "title": "File drop",
+      "path": "/data/files",
+      "title": "Browse files",
       "pageKey": "objects",
       "minRole": "TENANT_USER",
       "guards": [
@@ -461,6 +989,16 @@ export const PINNED: Record<string, unknown> = {
       "title": "Forms",
       "pageKey": "forms",
       "guards": [
+        "ownSignInOnly",
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/forms/builder",
+      "title": "Forms",
+      "pageKey": "forms",
+      "guards": [
         "pageGuard"
       ],
       "lazy": true
@@ -470,6 +1008,26 @@ export const PINNED: Record<string, unknown> = {
       "title": "Fill in a form",
       "pageKey": "forms",
       "guards": [
+        "ownSignInOnly",
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/forms/:formId/fill",
+      "title": "Fill in a form",
+      "pageKey": "forms",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/forms/submissions",
+      "title": "Form submissions",
+      "pageKey": "form-submissions",
+      "guards": [
+        "ownSignInOnly",
         "pageGuard"
       ],
       "lazy": true
@@ -550,7 +1108,29 @@ export const PINNED: Record<string, unknown> = {
       "title": "Prompts",
       "pageKey": "ai-prompts",
       "guards": [
+        "ownSignInOnly",
         "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/pipelines/prompts",
+      "title": "Prompts",
+      "pageKey": "ai-prompts",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/pipelines/prompts/new",
+      "title": "New prompt",
+      "pageKey": "ai-prompts",
+      "minRole": "TENANT_ADMIN",
+      "guards": [
+        "ownSignInOnly",
+        "pageGuard",
+        "roleGuard"
       ],
       "lazy": true
     },
@@ -571,10 +1151,37 @@ export const PINNED: Record<string, unknown> = {
       "pageKey": "ai-prompts",
       "minRole": "TENANT_ADMIN",
       "guards": [
+        "ownSignInOnly",
         "pageGuard",
         "roleGuard"
       ],
       "lazy": true
+    },
+    {
+      "path": "/pipelines/prompts/:promptId/edit",
+      "title": "Prompt",
+      "pageKey": "ai-prompts",
+      "minRole": "TENANT_ADMIN",
+      "guards": [
+        "pageGuard",
+        "roleGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/ai/assistant",
+      "title": "AI Assistant",
+      "pageKey": "ai-prompts",
+      "guards": [
+        "ownSignInOnly",
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/ai/assistant/**",
+      "guards": [],
+      "lazy": false
     },
     {
       "path": "/ai/assistant",
@@ -608,6 +1215,16 @@ export const PINNED: Record<string, unknown> = {
       "title": "Model connections",
       "minRole": "TENANT_ADMIN",
       "guards": [
+        "ownSignInOnly",
+        "roleGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/settings/model-connections",
+      "title": "Model connections",
+      "minRole": "TENANT_ADMIN",
+      "guards": [
         "roleGuard"
       ],
       "lazy": true
@@ -615,6 +1232,44 @@ export const PINNED: Record<string, unknown> = {
     {
       "path": "/settings/task-registry",
       "title": "Task Registry",
+      "minRole": "TENANT_ADMIN",
+      "guards": [
+        "roleGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/settings/task-registry/new",
+      "title": "New registry task",
+      "minRole": "TENANT_ADMIN",
+      "guards": [
+        "ownSignInOnly",
+        "roleGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/settings/task-registry/new",
+      "title": "New registry task",
+      "minRole": "TENANT_ADMIN",
+      "guards": [
+        "roleGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/settings/task-registry/:pipelineKey",
+      "title": "Edit registry task",
+      "minRole": "TENANT_ADMIN",
+      "guards": [
+        "ownSignInOnly",
+        "roleGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/settings/task-registry/:pipelineKey",
+      "title": "Edit registry task",
       "minRole": "TENANT_ADMIN",
       "guards": [
         "roleGuard"
@@ -709,17 +1364,17 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
-      "path": "/platform/billing-analytics",
+      "path": "/billing/analytics",
       "title": "Billing analytics",
-      "minRole": "PLATFORM_ADMIN",
+      "minRole": "TENANT_ADMIN",
       "guards": [
         "roleGuard"
       ],
       "lazy": true
     },
     {
-      "path": "/platform/rate-cards",
-      "title": "Rate cards",
+      "path": "/billing/settings",
+      "title": "Billing settings",
       "minRole": "PLATFORM_ADMIN",
       "guards": [
         "roleGuard"
@@ -736,8 +1391,48 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
+      "path": "/administration/users/:appUserId",
+      "title": "Edit user",
+      "minRole": "TENANT_ADMIN",
+      "guards": [
+        "roleGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/administration/teams",
+      "title": "Teams",
+      "guards": [
+        "ownSignInOnly"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/administration/teams",
+      "title": "Teams",
+      "guards": [],
+      "lazy": true
+    },
+    {
       "path": "/administration/access-profiles",
       "title": "Page access",
+      "guards": [
+        "accessManagerGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/administration/access-profiles/new",
+      "title": "New access profile",
+      "minRole": "TENANT_ADMIN",
+      "guards": [
+        "roleGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/administration/access-profiles/:pageAccessProfileId",
+      "title": "Access profile",
       "minRole": "TENANT_ADMIN",
       "guards": [
         "roleGuard"
@@ -808,17 +1503,8 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
-      "path": "/platform/work-in-workspace",
-      "title": "Work in a workspace",
-      "minRole": "PLATFORM_ADMIN",
-      "guards": [
-        "roleGuard"
-      ],
-      "lazy": true
-    },
-    {
-      "path": "/platform/reliability",
-      "title": "Reliability",
+      "path": "/platform/service-health",
+      "title": "Service health",
       "minRole": "PLATFORM_ADMIN",
       "guards": [
         "roleGuard"
@@ -890,6 +1576,11 @@ export const PINNED: Record<string, unknown> = {
     },
     {
       "path": "/data",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/reports",
       "guards": [],
       "lazy": false
     },
@@ -1015,13 +1706,19 @@ export const PINNED: Record<string, unknown> = {
     },
     {
       "path": "/documents/inbox",
-      "redirectTo": "documents/file-drop",
+      "redirectTo": "documents/intake/file-drop",
       "guards": [],
       "lazy": false
     },
     {
       "path": "/documents/reports",
-      "redirectTo": "data/reports",
+      "redirectTo": "reports/library",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/data/reports",
+      "redirectTo": "reports/library",
       "guards": [],
       "lazy": false
     },
@@ -1128,14 +1825,8 @@ export const PINNED: Record<string, unknown> = {
       "lazy": false
     },
     {
-      "path": "/billing/analytics",
-      "redirectTo": "platform/billing-analytics",
-      "guards": [],
-      "lazy": false
-    },
-    {
       "path": "/billing/rates",
-      "redirectTo": "platform/rate-cards",
+      "redirectTo": "billing/settings",
       "guards": [],
       "lazy": false
     },
@@ -1165,13 +1856,61 @@ export const PINNED: Record<string, unknown> = {
     },
     {
       "path": "/administration/work-in-workspace",
-      "redirectTo": "platform/work-in-workspace",
+      "redirectTo": "platform/workspaces",
       "guards": [],
       "lazy": false
     },
     {
       "path": "/administration/reliability",
-      "redirectTo": "platform/reliability",
+      "redirectTo": "platform/service-health",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/documents/datasets",
+      "redirectTo": "documents/approved-data",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/documents/email-in",
+      "redirectTo": "documents/intake/email-in",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/documents/file-drop",
+      "redirectTo": "documents/intake/file-drop",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/documents/upload",
+      "redirectTo": "documents/intake/upload",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/platform/work-in-workspace",
+      "redirectTo": "platform/workspaces",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/platform/reliability",
+      "redirectTo": "platform/service-health",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/platform/billing-analytics",
+      "redirectTo": "billing/analytics",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/platform/rate-cards",
+      "redirectTo": "billing/settings",
       "guards": [],
       "lazy": false
     },
@@ -1398,12 +2137,6 @@ export const PINNED: Record<string, unknown> = {
       "lazy": false
     },
     {
-      "path": "/reports",
-      "redirectTo": "runs/analytics",
-      "guards": [],
-      "lazy": false
-    },
-    {
       "path": "/objects",
       "redirectTo": "data/files",
       "guards": [],
@@ -1531,13 +2264,13 @@ export const PINNED: Record<string, unknown> = {
     },
     {
       "path": "/administration/billing/analytics",
-      "redirectTo": "platform/billing-analytics",
+      "redirectTo": "billing/analytics",
       "guards": [],
       "lazy": false
     },
     {
       "path": "/administration/billing/rates",
-      "redirectTo": "platform/rate-cards",
+      "redirectTo": "billing/settings",
       "guards": [],
       "lazy": false
     },
@@ -1560,7 +2293,7 @@ export const PINNED: Record<string, unknown> = {
   },
   "old address /admin/storage": {
     "lands": "/connections/storage",
-    "heading": "Connections"
+    "heading": "Storage connections"
   },
   "old address /admin/tenant-requests": {
     "lands": "/platform/requests",
@@ -1579,8 +2312,8 @@ export const PINNED: Record<string, unknown> = {
     "heading": "Cost & usage"
   },
   "old address /administration/billing/analytics": {
-    "lands": "/platform/billing-analytics",
-    "heading": "Billing analytics"
+    "lands": "/billing/analytics",
+    "heading": "Analytics"
   },
   "old address /administration/billing/documents": {
     "lands": "/billing/documents",
@@ -1595,16 +2328,16 @@ export const PINNED: Record<string, unknown> = {
     "heading": "Invoices"
   },
   "old address /administration/billing/rates": {
-    "lands": "/platform/rate-cards",
-    "heading": "Rate cards"
+    "lands": "/billing/settings",
+    "heading": "Billing settings"
   },
   "old address /administration/managed-service": {
     "lands": "/platform/managed-service",
     "heading": "Managed service"
   },
   "old address /administration/reliability": {
-    "lands": "/platform/reliability",
-    "heading": "Reliability"
+    "lands": "/platform/service-health",
+    "heading": "Service health"
   },
   "old address /administration/staff-activity": {
     "lands": "/platform/staff-activity",
@@ -1619,8 +2352,8 @@ export const PINNED: Record<string, unknown> = {
     "heading": "Workspaces"
   },
   "old address /administration/work-in-workspace": {
-    "lands": "/platform/work-in-workspace",
-    "heading": "Work in a workspace"
+    "lands": "/platform/workspaces",
+    "heading": "Workspaces"
   },
   "old address /ai/agents": {
     "lands": "/pipelines/prompts",
@@ -1640,7 +2373,7 @@ export const PINNED: Record<string, unknown> = {
   },
   "old address /ai/prompts/:promptId/edit": {
     "lands": "/pipelines/prompts/1049/edit",
-    "heading": "UI-REVIEW Zürich – 東京 ✓ draft prompt (never activated) with a deliberately long name for truncation checks in the prompt list Claude Demo 75a611b4v1Inactive"
+    "heading": "Prompt"
   },
   "old address /ai/prompts/new": {
     "lands": "/pipelines/prompts/new",
@@ -1668,19 +2401,15 @@ export const PINNED: Record<string, unknown> = {
   },
   "old address /assistants/prompts/:promptId/edit": {
     "lands": "/pipelines/prompts/1049/edit",
-    "heading": "UI-REVIEW Zürich – 東京 ✓ draft prompt (never activated) with a deliberately long name for truncation checks in the prompt list Claude Demo 75a611b4v1Inactive"
+    "heading": "Prompt"
   },
   "old address /assistants/prompts/new": {
     "lands": "/pipelines/prompts/new",
     "heading": "New prompt"
   },
-  "old address /billing/analytics": {
-    "lands": "/platform/billing-analytics",
-    "heading": "Billing analytics"
-  },
   "old address /billing/rates": {
-    "lands": "/platform/rate-cards",
-    "heading": "Rate cards"
+    "lands": "/billing/settings",
+    "heading": "Billing settings"
   },
   "old address /configuration/engine": {
     "lands": "/platform/engine",
@@ -1704,7 +2433,7 @@ export const PINNED: Record<string, unknown> = {
   },
   "old address /configuration/storage-connections": {
     "lands": "/connections/storage",
-    "heading": "Connections"
+    "heading": "Storage connections"
   },
   "old address /configuration/task-groups": {
     "lands": "/settings/task-groups",
@@ -1718,25 +2447,41 @@ export const PINNED: Record<string, unknown> = {
     "lands": "/settings/values",
     "heading": "Configuration values"
   },
+  "old address /data/reports": {
+    "lands": "/reports/library",
+    "heading": "Report library"
+  },
   "old address /documents/converter": {
     "lands": "/tools/converter",
     "heading": "Document Converter"
+  },
+  "old address /documents/datasets": {
+    "lands": "/documents/approved-data",
+    "heading": "Approved data"
+  },
+  "old address /documents/email-in": {
+    "lands": "/documents/intake/email-in",
+    "heading": "Intake"
+  },
+  "old address /documents/file-drop": {
+    "lands": "/documents/intake/file-drop",
+    "heading": "Intake"
   },
   "old address /documents/files": {
     "lands": "/data/files",
     "heading": "Browse files"
   },
   "old address /documents/inbox": {
-    "lands": "/documents/file-drop",
-    "heading": "File drop"
+    "lands": "/documents/intake/file-drop",
+    "heading": "Intake"
   },
   "old address /documents/intelligence": {
     "lands": "/documents/in",
     "heading": "Documents in"
   },
   "old address /documents/reports": {
-    "lands": "/data/reports",
-    "heading": "Generated reports"
+    "lands": "/reports/library",
+    "heading": "Report library"
   },
   "old address /documents/review": {
     "lands": "/review/documents",
@@ -1744,11 +2489,15 @@ export const PINNED: Record<string, unknown> = {
   },
   "old address /documents/review/:extractionId": {
     "lands": "/review/documents/:extractionId",
-    "heading": "Document"
+    "heading": "Review a document"
   },
   "old address /documents/transcript": {
     "lands": "/tools/transcript",
     "heading": "Audio Transcript"
+  },
+  "old address /documents/upload": {
+    "lands": "/documents/intake/upload",
+    "heading": "Intake"
   },
   "old address /integration/api-clients": {
     "lands": "/developers/api-clients",
@@ -1768,7 +2517,7 @@ export const PINNED: Record<string, unknown> = {
   },
   "old address /integration/connectors/storage": {
     "lands": "/connections/storage",
-    "heading": "Connections"
+    "heading": "Storage connections"
   },
   "old address /integration/developer": {
     "lands": "/developers/portal",
@@ -1792,7 +2541,7 @@ export const PINNED: Record<string, unknown> = {
   },
   "old address /integration/storage-connections": {
     "lands": "/connections/storage",
-    "heading": "Connections"
+    "heading": "Storage connections"
   },
   "old address /jobs": {
     "lands": "/pipelines/schedules",
@@ -1800,19 +2549,19 @@ export const PINNED: Record<string, unknown> = {
   },
   "old address /jobs/:jobId/assistant": {
     "lands": "/pipelines/schedules/2833/assistant",
-    "heading": "Schedule assistant — Reference CSV check (e2e)"
+    "heading": "Schedule assistant"
   },
   "old address /jobs/:jobId/edit": {
     "lands": "/pipelines/schedules/2833/edit",
-    "heading": "Reference CSV check (e2e)"
+    "heading": "Schedule"
   },
   "old address /jobs/:jobId/history": {
     "lands": "/pipelines/schedules/2833/executions",
-    "heading": "Reference CSV check (e2e) · runs"
+    "heading": "Schedule runs"
   },
   "old address /jobs/:jobId/runs/:jobQueueId/logs": {
     "lands": "/pipelines/schedules/2833/runs/7331/logs",
-    "heading": "Run #7331 · Reference CSV check (e2e)"
+    "heading": "Run"
   },
   "old address /jobs/bulk": {
     "lands": "/pipelines/schedules/bulk",
@@ -1848,19 +2597,19 @@ export const PINNED: Record<string, unknown> = {
   },
   "old address /operations/jobs/:jobId/assistant": {
     "lands": "/pipelines/schedules/2833/assistant",
-    "heading": "Schedule assistant — Reference CSV check (e2e)"
+    "heading": "Schedule assistant"
   },
   "old address /operations/jobs/:jobId/edit": {
     "lands": "/pipelines/schedules/2833/edit",
-    "heading": "Reference CSV check (e2e)"
+    "heading": "Schedule"
   },
   "old address /operations/jobs/:jobId/history": {
     "lands": "/pipelines/schedules/2833/executions",
-    "heading": "Reference CSV check (e2e) · runs"
+    "heading": "Schedule runs"
   },
   "old address /operations/jobs/:jobId/runs/:jobQueueId/logs": {
     "lands": "/pipelines/schedules/2833/runs/7331/logs",
-    "heading": "Run #7331 · Reference CSV check (e2e)"
+    "heading": "Run"
   },
   "old address /operations/jobs/bulk": {
     "lands": "/pipelines/schedules/bulk",
@@ -1876,7 +2625,7 @@ export const PINNED: Record<string, unknown> = {
   },
   "old address /operations/queue": {
     "lands": "/runs/by-date",
-    "heading": "Runs"
+    "heading": "Runs by date"
   },
   "old address /operations/reports": {
     "lands": "/runs/analytics",
@@ -1888,7 +2637,7 @@ export const PINNED: Record<string, unknown> = {
   },
   "old address /operations/tasks/:taskDetailId/edit": {
     "lands": "/pipelines/1854/edit",
-    "heading": "Reference: CSV check and summarise"
+    "heading": "Pipeline"
   },
   "old address /operations/tasks/bulk": {
     "lands": "/pipelines/bulk",
@@ -1904,19 +2653,31 @@ export const PINNED: Record<string, unknown> = {
   },
   "old address /pipelines/queue": {
     "lands": "/runs/by-date",
-    "heading": "Runs"
+    "heading": "Runs by date"
   },
   "old address /pipelines/run-analytics": {
     "lands": "/runs/analytics",
     "heading": "Run analytics"
   },
+  "old address /platform/billing-analytics": {
+    "lands": "/billing/analytics",
+    "heading": "Analytics"
+  },
+  "old address /platform/rate-cards": {
+    "lands": "/billing/settings",
+    "heading": "Billing settings"
+  },
+  "old address /platform/reliability": {
+    "lands": "/platform/service-health",
+    "heading": "Service health"
+  },
+  "old address /platform/work-in-workspace": {
+    "lands": "/platform/workspaces",
+    "heading": "Workspaces"
+  },
   "old address /queue": {
     "lands": "/runs/by-date",
-    "heading": "Runs"
-  },
-  "old address /reports": {
-    "lands": "/runs/analytics",
-    "heading": "Run analytics"
+    "heading": "Runs by date"
   },
   "old address /settings/forms": {
     "lands": "/settings/task-registry",
@@ -1936,7 +2697,7 @@ export const PINNED: Record<string, unknown> = {
   },
   "old address /settings/storage-connections": {
     "lands": "/connections/storage",
-    "heading": "Connections"
+    "heading": "Storage connections"
   },
   "old address /settings/task-types": {
     "lands": "/settings/kafka",
@@ -1948,7 +2709,7 @@ export const PINNED: Record<string, unknown> = {
   },
   "old address /tasks/:taskDetailId/edit": {
     "lands": "/pipelines/1854/edit",
-    "heading": "Reference: CSV check and summarise"
+    "heading": "Pipeline"
   },
   "old address /tasks/bulk": {
     "lands": "/pipelines/bulk",

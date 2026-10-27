@@ -3,6 +3,7 @@ import { Subject } from 'rxjs';
 import { Client, StompSubscription } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
 import { AuthService } from '../auth/auth.service';
+import { isOwnPlatformSignIn } from '../auth/workspace-data';
 import { API_BASE } from '../api/api.config';
 
 export interface JobEvent {
@@ -56,13 +57,26 @@ export interface JobEvent {
 const WS_URL = `${API_BASE}/ws`;
 
 /**
+ * Which job feed a signed-in person joins (ZT-M8, owner 2026-10-21: the platform administrator's own sign-in never
+ * reads a workspace's data): their workspace's own, /topic/jobs.{tenantId} -- a tenant user, a workspace admin, and a managed
+ * session ("Work in this workspace", the workspace's TENANT_ADMIN token). The platform administrator's own sign-in joins
+ * none: the cross-tenant feed (/topic/jobs.all) streamed every workspace's run statuses to it, and the server now refuses
+ * that subscription. Home falls back to reading every minute without a feed.
+ */
+export function jobFeedDestination(auth: Pick<AuthService, 'isPlatformAdmin' | 'user'>): string | null {
+  const user = auth.user();
+  if (!user) return null;
+  if (isOwnPlatformSignIn(auth)) return null;
+  return user.tenantId ? `/topic/jobs.${user.tenantId}` : null;
+}
+
+/**
  * One STOMP connection for the whole app, feeding the screens that show job state.
  *
  * The packages for this were already in package.json and nothing imported them, so every
- * screen polled or reloaded wholesale instead. A tenant user joins its own tenant's feed; a
- * platform administrator, who sees every tenant's jobs, joins the cross-tenant one. The server
- * refuses any subscription whose tenant does not match the token, so the destination chosen
- * here is a convenience rather than the security boundary.
+ * screen polled or reloaded wholesale instead. A person joins their own workspace's feed
+ * (jobFeedDestination). The server refuses any subscription whose tenant does not match the
+ * token, so the destination chosen here is a convenience rather than the security boundary.
  */
 @Injectable({ providedIn: 'root' })
 export class JobEventsService {
@@ -77,18 +91,9 @@ export class JobEventsService {
   readonly connected = signal(false);
 
   /** Which feed this user is entitled to; null when signed out. */
-  private readonly destination = computed(() => {
-    const user = this.auth.user();
-    if (!user) return null;
-    // The role comes from the token by way of AuthService rather than from the stored blob's
-    // own userRole field. That field sits in localStorage where anything on the page can
-    // rewrite it, and this was the last role decision left reading it -- typing PLATFORM_ADMIN
-    // into devtools pointed the socket at the cross-tenant feed on a token the server refuses
-    // it for, so the console simply stopped receiving events.
-    return this.auth.isPlatformAdmin()
-      ? '/topic/jobs.all'
-      : `/topic/jobs.${user.tenantId}`;
-  });
+  // The role comes from the token by way of AuthService rather than from the stored blob's own
+  // userRole field, which sits in localStorage where anything on the page can rewrite it.
+  private readonly destination = computed(() => jobFeedDestination(this.auth));
 
   /**
    * The two facts the socket actually follows, compared by value.

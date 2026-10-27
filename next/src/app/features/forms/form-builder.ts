@@ -1,17 +1,19 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Dialog } from '@angular/cdk/dialog';
 import { RouterLink } from '@angular/router';
 import { API_SUCCESS } from '../../core/api/api.config';
 import { AuthService } from '../../core/auth/auth.service';
 import { Icon } from '../../shared/ui/icon';
 import { TableShell } from '../../shared/ui/data-table';
 import { ManagedBanner } from '../../shared/ui/managed-banner';
+import { confirmWith } from '../../shared/ui/confirm';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { ToastService } from '../../shared/ui/toast.service';
 import { AnswerChange, FormRenderer } from './form-renderer';
 import {
   ALLOWED_EXTENSIONS, Answers, COLUMN_TYPES, FIELD_TYPES, FORM_STATUSES, FieldRule, FieldType, FormDraft, FormField, FormStatus, FormSummary,
   LinkableJob, MAX_FIELDS, RULE_OPS, blankField, definitionProblems, draftForSave, formTone, formsOf, lookupSources, optionsFromText,
-  ruleText, typeDefaults, typeLabel, uniqueKey,
+  ruleText, typeDefaults, typeLabel, uniqueKey, MAX_PLACEHOLDER, MAX_HELP, takesPlaceholder, defaultPlaceholder,
 } from './forms.model';
 
 type RuleKind = 'showWhen' | 'requiredWhen';
@@ -51,11 +53,14 @@ export class FormBuilder implements OnInit {
   private readonly api = inject(FormsApi);
   private readonly auth = inject(AuthService);
   private readonly toast = inject(ToastService);
+  private readonly dialog = inject(Dialog);
   private readonly workflowsApi = inject(WorkflowsApi);
   /** MIG-279: the workspace's workflows a form may start (Active and published). */
   readonly workflows = signal<WorkflowSummary[]>([]);
 
   readonly forms = signal<FormSummary[]>([]);
+  /** The form whose dataset files are being rebuilt; one at a time. */
+  readonly rebuilding = signal<number | null>(null);
   readonly loading = signal(true);
   readonly error = signal('');
   readonly showArchived = signal(false);
@@ -96,6 +101,17 @@ export class FormBuilder implements OnInit {
   readonly fieldTypes = FIELD_TYPES;
   readonly statuses = FORM_STATUSES;
   readonly maxFields = MAX_FIELDS;
+  readonly maxPlaceholder = MAX_PLACEHOLDER;
+  readonly maxHelp = MAX_HELP;
+  readonly takesPlaceholder = takesPlaceholder;
+
+  /**
+   * What readers see when the field has no placeholder of its own (defaultPlaceholder): the placeholder box shows it
+   * greyed, "Default: Enter case number", so the author knows what an empty one means.
+   */
+  defaultShown(f: FormField): string {
+    return 'Default: ' + (defaultPlaceholder(f) ?? '');
+  }
   readonly typeLabel = typeLabel;
   readonly tone = formTone;
   readonly columnTypes = COLUMN_TYPES;
@@ -405,6 +421,32 @@ export class FormBuilder implements OnInit {
         this.load();
       },
       error: err => { this.saving.set(false); this.saveError.set(err?.error?.message || 'The form was not saved. Try again.'); },
+    });
+  }
+
+  /**
+   * A dataset form's files written again, one per submission, in the bucket its rows are kept in: for when the bucket
+   * lost them. An administrator's, in a MANAGED workspace too (it changes nothing that was built or answered).
+   */
+  async rebuildDataset(form: FormSummary): Promise<void> {
+    if (!this.isAdmin() || !form.dataset?.analyticsDatasetId || this.rebuilding() !== null) return;
+    const ok = await confirmWith(this.dialog, {
+      title: `Rebuild the dataset files of ${form.name}?`,
+      body: `Each submission's file in the bucket (${form.dataset.connection} / ${form.dataset.path}) is written again from `
+          + 'the submission as it is kept, so Analytics reads every row. No answers change. The newest 1,000 submissions are rebuilt.',
+      confirmLabel: 'Rebuild files',
+    });
+    if (!ok) return;
+    this.rebuilding.set(form.formId);
+    this.api.rebuildDataset(form.formId).subscribe({
+      next: r => {
+        this.rebuilding.set(null);
+        if (r.status === API_SUCCESS) this.toast.success(r.message); else this.toast.error(r.message || 'The dataset files were not rebuilt.');
+      },
+      error: err => {
+        this.rebuilding.set(null);
+        this.toast.error(err?.error?.message || 'The dataset files were not rebuilt. Try again.');
+      },
     });
   }
 

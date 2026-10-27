@@ -53,10 +53,10 @@
                (input)="search.set($any($event.target).value)" />
         @if (form(); as f) {
           @if (f.status === 'Active') {
-            <a class="btn btn-ghost btn-sm" [routerLink]="['/forms', f.formId, 'fill']"><app-icon name="send" />Fill in</a>
+            <a class="btn btn-default btn-sm" [routerLink]="['/forms', f.formId, 'fill']"><app-icon name="send" />Fill in</a>
           }
           @if (f.dataset && canAnalyse()) {
-            <a class="btn btn-ghost btn-sm" routerLink="/data/analytics" data-open-analytics
+            <a class="btn btn-default btn-sm" routerLink="/data/analytics" data-open-analytics
                [queryParams]="{ connection: f.dataset.connection, path: f.dataset.path, name: f.dataset.name }">
               <app-icon name="chart" />Open in Analytics Studio</a>
           }
@@ -103,10 +103,14 @@
               }
               <td class="text-xs max-w-96">
                 @if (s.reason) { <span class="text-crit-500">{{ s.reason }}</span> }
+                @else if (s.workflowStatus === 'Rejected' && s.workflowReason) {
+                  <!-- ZT-F4: the approver's reason, which they had to give. -->
+                  <span data-rejected-reason>Rejected: {{ s.workflowReason }}</span>
+                }
                 @else if (s.storageKey) { <span class="mono text-[color:var(--text-muted)] break-all">{{ s.bucket }}/{{ s.storageKey }}</span> }
               </td>
               <td class="text-right">
-                <button type="button" class="btn btn-ghost btn-sm" [attr.aria-expanded]="open() === s.submissionId"
+                <button type="button" class="btn btn-default btn-sm" [attr.aria-expanded]="open() === s.submissionId"
                         [attr.aria-label]="'Answers of submission ' + s.submissionId" (click)="toggle(s.submissionId)">
                   <app-icon [name]="open() === s.submissionId ? 'chevronDown' : 'chevronRight'" />View
                 </button>
@@ -142,7 +146,7 @@
                                       Being read — open Document Intelligence</a>
                                   }
                                   @case (undefined) {
-                                    <button type="button" class="btn btn-ghost btn-xs" (click)="readWithIntelligence(file)" data-read-file>
+                                    <button type="button" class="btn btn-default btn-xs" (click)="readWithIntelligence(file)" data-read-file>
                                       <app-icon name="sparkle" />Read with Document Intelligence</button>
                                   }
                                   @default { <span class="text-xs text-crit-500">{{ reads()[file.key ?? ''] }}</span> }

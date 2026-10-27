@@ -1,6 +1,7 @@
 import { Component, ChangeDetectionStrategy, computed, input } from '@angular/core';
 import { readableCell } from './number-format';
 import { capTitle } from '../ui/long-text';
+import { pointLabel } from './line-chart';
 
 export interface SummaryMark { name: string; value: number; }
 export type SummaryMode = 'dimension' | 'trend' | 'distribution';
@@ -133,8 +134,9 @@ export class ResultSummary {
     }
 
     return [
-      { label: 'First', value: readableCell(String(first.value)), note: first.name },
-      { label: 'Last', value: readableCell(String(last.value)), note: last.name },
+      // ZT-A14: a date as the line beside it writes it ("1 Jan 2025"), not as the ISO string the query returned.
+      { label: 'First', value: readableCell(String(first.value)), note: pointLabel(first.name) },
+      { label: 'Last', value: readableCell(String(last.value)), note: pointLabel(last.name) },
       {
         label: 'Change',
         value: first.value === 0
@@ -146,7 +148,7 @@ export class ResultSummary {
       {
         label: 'Biggest move',
         value: (biggest.move >= 0 ? '+' : '−') + readableCell(String(Math.abs(biggest.move))),
-        note: biggest.from ? `${biggest.from} to ${biggest.to}` : '',
+        note: biggest.from ? `${pointLabel(biggest.from)} to ${pointLabel(biggest.to)}` : '',
       },
     ];
   }

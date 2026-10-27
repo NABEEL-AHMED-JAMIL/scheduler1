@@ -57,7 +57,9 @@ import { TabHub } from './tab-hub';
     .page-header :is(.page-head-actions, .page-head > div:last-child:not(:first-child)) > [data-overflow] { order: 9; }
     .page-header :is(.page-head-actions, .page-head > div:last-child:not(:first-child)) > .btn-primary { order: 10; }
     .page-head-actions > div > .btn-primary { order: 10; }
-    .page-head-actions .input { width: auto; }
+    /* A plain field in the actions sizes to its content; a combobox (the workspace selector) keeps its box's width, or its
+       clear button sits outside the shrunken field (owner 2026-10-19, Appearance). */
+    .page-head-actions .input:not([role="combobox"]) { width: auto; }
   `,
   template: `
     <nav class="breadcrumbs" aria-label="Breadcrumb">

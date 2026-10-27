@@ -71,9 +71,16 @@ export function markNumberColumns(table: HTMLTableElement, labels: string[]): vo
     .table-toolbar-controls ::ng-deep .search-field { flex: 1 1 15rem; min-width: 12rem; max-width: 24rem; }
     /* Set when the controls would wrap beside the heading: the heading takes its own line and the controls the next. */
     .table-toolbar.is-stacked > h2 { flex-basis: 100%; }
+    /* Owner 2026-10-19: the card used to be overflow-hidden for its rounded corners, which cut off the date range's
+       pop-up and the Columns list whenever the table had only a row or two below them. The card now lets them out;
+       the corners are kept by rounding (and clipping) only the last block, the rows or the pager. */
+    .table-card { overflow: visible; }
+    .table-card > :last-child { border-bottom-left-radius: var(--radius-card); border-bottom-right-radius: var(--radius-card); overflow: hidden; }
+    .table-card > app-blur-loader { display: block; }
+    .table-toolbar { position: relative; z-index: 5; }
   `,
   template: `
-    <div class="card overflow-hidden">
+    <div class="card table-card">
       <div class="table-toolbar flex flex-wrap items-center justify-end gap-2 px-4 py-3 border-b border-subtle"
           >
         <h2 class="text-sm font-semibold mr-auto">
@@ -112,7 +119,7 @@ export function markNumberColumns(table: HTMLTableElement, labels: string[]): vo
                   </label>
                 }
                 @if (hiddenCount()) {
-                  <button type="button" class="btn btn-ghost btn-xs w-full mt-1" (click)="showAllColumns()">Show all</button>
+                  <button type="button" class="btn btn-default btn-xs w-full mt-1" (click)="showAllColumns()">Show all</button>
                 }
               </div>
             }

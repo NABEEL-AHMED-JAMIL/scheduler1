@@ -19,6 +19,9 @@ export interface TableSource {
   connection2?: string | null;
   path2?: string | null;
   sql: string;
+  /** ZT-A13: the board and the tile, sent with each page and the export (a Saved Analyses reader runs the tile's own statement). */
+  boardId?: number | null;
+  widgetId?: number | null;
 }
 
 /** What a table tells its tile after each read. */
@@ -93,7 +96,7 @@ export interface TableRead {
       }
       <span class="bt-count" data-test="bt-count">{{ countText() }}</span>
       <div class="relative">
-        <button type="button" class="btn btn-ghost btn-xs" [attr.aria-expanded]="columnsOpen()" (click)="columnsOpen.set(!columnsOpen())">
+        <button type="button" class="btn btn-default btn-xs" [attr.aria-expanded]="columnsOpen()" (click)="columnsOpen.set(!columnsOpen())">
           <app-icon name="table" size="0.9em" />Columns{{ hidden().length ? ' (' + hidden().length + ' hidden)' : '' }}
         </button>
         @if (columnsOpen()) {
@@ -194,9 +197,9 @@ export interface TableRead {
               @for (size of pageSizes; track size) { <option [value]="size" [selected]="size === pageSize()">{{ size }} per page</option> }
             </select>
           </label>
-          <button type="button" class="btn btn-ghost btn-icon btn-xs" aria-label="Previous page" [disabled]="pageAt() === 0 || loading()" (click)="goTo(pageAt() - 1)"><app-icon name="chevronLeft" /></button>
+          <button type="button" class="btn btn-default btn-icon btn-xs" aria-label="Previous page" [disabled]="pageAt() === 0 || loading()" (click)="goTo(pageAt() - 1)"><app-icon name="chevronLeft" /></button>
           <span class="tabular-nums">{{ pageAt() + 1 }} / {{ pageCount() }}</span>
-          <button type="button" class="btn btn-ghost btn-icon btn-xs" aria-label="Next page" [disabled]="pageAt() + 1 >= pageCount() || loading()" (click)="goTo(pageAt() + 1)"><app-icon name="chevronRight" /></button>
+          <button type="button" class="btn btn-default btn-icon btn-xs" aria-label="Next page" [disabled]="pageAt() + 1 >= pageCount() || loading()" (click)="goTo(pageAt() + 1)"><app-icon name="chevronRight" /></button>
         </div>
       </div>
     }

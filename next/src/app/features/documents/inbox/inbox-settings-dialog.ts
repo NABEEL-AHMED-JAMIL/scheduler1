@@ -28,7 +28,7 @@ const MB = 1048576;
                      [confirmLabel]="data.settings.configured ? 'Save changes' : 'Turn on the file drop'" [saving]="saving()"
                      [confirmDisabled]="loadingBuckets()" (confirmed)="save()" (cancelled)="cancel()">
       @if (data.settings.configured) {
-        <button footer-start type="button" class="btn btn-ghost btn-sm text-crit-500" [disabled]="saving()" (click)="turnOff()">
+        <button footer-start type="button" class="btn btn-default btn-intent-crit btn-sm" [disabled]="saving()" (click)="turnOff()">
           <app-icon name="power" />Turn off
         </button>
       }

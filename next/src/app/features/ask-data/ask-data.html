@@ -37,7 +37,7 @@
         <span class="text-xs text-[color:var(--text-muted)] flex items-center gap-1.5"><app-icon name="refresh" class="spin" size="0.9em" />Looking at what your workspace has…</span>
       } @else if (suggestionsError()) {
         <span class="text-xs text-crit-500 flex items-center gap-1.5"><app-icon name="alert" class="icon-crit" size="0.9em" />{{ suggestionsError() }}</span>
-        <button type="button" class="btn btn-ghost btn-sm" (click)="loadSuggestions()"><app-icon name="refresh" />Try again</button>
+        <button type="button" class="btn btn-default btn-sm" (click)="loadSuggestions()"><app-icon name="refresh" />Try again</button>
       } @else if (nothingToSearch()) {
         <span class="text-xs text-[color:var(--text-muted)]" data-test="nothing">
           Nothing to ask about yet: read a document in Document Intelligence or run a pipeline, then come back.
@@ -133,7 +133,7 @@
         @switch (t.state) {
           @case ('asking') {
             <p class="text-sm text-[color:var(--text-muted)] flex items-center gap-2" data-test="asking">
-              <app-icon name="refresh" class="spin" />Reading your data and asking the model… {{ elapsed() }}s
+              <app-icon name="refresh" class="spin" />Reading your data and asking the model… {{ elapsedText() }}
             </p>
           }
           @case ('failed') {
@@ -194,7 +194,7 @@
                     <a class="btn btn-default btn-sm" routerLink="/data/analytics" [queryParams]="analyticsParams(q)" data-test="open-analytics">
                       <app-icon name="chart" />Open in Analytics Studio</a>
                     @if (q.rows.length) {
-                      <button type="button" class="btn btn-ghost btn-sm" (click)="downloadCsv(q)" data-test="download-csv"><app-icon name="download" />Download CSV</button>
+                      <button type="button" class="btn btn-default btn-sm" (click)="downloadCsv(q)" data-test="download-csv"><app-icon name="download" />Download CSV</button>
                     }
                   </div>
                 </div>

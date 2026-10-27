@@ -4,11 +4,12 @@
       <div>
         <h1 class="page-title">Managed service</h1>
         <p class="page-subtitle">
-          Which of our staff may work in which customer's workspace. Every change they make there is recorded in
+          Which of our staff may work in which customer's workspace. Every change they make there, and every data they open, export or download, is recorded in
           <a routerLink="/platform/staff-activity" class="link-inline">Staff activity</a>.
         </p>
       </div>
       <div class="flex items-center gap-2">
+        <app-workspace-select [allowAll]="true" [value]="tenantFilter()" (valueChange)="setTenant($event === null ? '' : '' + $event)" />
         <app-refresh-button [loading]="loading()" (refresh)="load()" />
         <button type="button" class="btn btn-primary btn-sm" (click)="openGrant()"><app-icon name="plus" />Grant</button>
       </div>
@@ -20,11 +21,6 @@
                    [emptyMessage]="hasFilters() ? 'No grant matches those filters.' : 'No live grants. Grant a staff member a workspace to let them work in it.'"
                    emptyIcon="briefcase" (retry)="load()">
     <ng-container toolbar>
-      <select class="input max-w-48 min-w-0" aria-label="Filter by workspace" [value]="tenantFilter() ?? ''"
-              (change)="setTenant($any($event.target).value)">
-        <option value="">Every workspace</option>
-        @for (t of tenants(); track t.tenantId) { <option [value]="t.tenantId">{{ t.tenantName }}</option> }
-      </select>
       <select class="input max-w-48 min-w-0" aria-label="Filter by staff member" [value]="staffFilter() ?? ''"
               (change)="setStaff($any($event.target).value)">
         <option value="">Every staff member</option>
@@ -71,7 +67,7 @@
             </td>
             <td class="text-right">
               @if (isLive(g)) {
-                <button type="button" class="btn btn-ghost btn-sm btn-intent-crit" [disabled]="busy() === g.grantId"
+                <button type="button" class="btn btn-default btn-sm btn-intent-crit" [disabled]="busy() === g.grantId"
                         [attr.aria-label]="'Revoke ' + name(g) + ' in ' + workspaceName(g)" (click)="revoke(g)">
                   <app-icon name="power" [busy]="busy() === g.grantId" />Revoke
                 </button>

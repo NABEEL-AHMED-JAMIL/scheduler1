@@ -2,6 +2,7 @@
   <!-- UX review B7 (I1): the Storage tab of Connections -- one page, one title, its own address and gate (the hub's tabs: tab-hub.ts). -->
   <app-page-header title="Connections"
                    subtitle="S3, Azure, MinIO or FTP/FTPS that pipelines read and write. Passwords, secret keys and connection strings are encrypted and never sent back to the browser.">
+    <app-workspace-select [allowAll]="true" [value]="workspaceFilter() ? +workspaceFilter() : null" (valueChange)="workspaceFilter.set($event === null ? '' : '' + $event); pager.reset()" />
     <app-refresh-button [loading]="loading()" (refresh)="load()" />
     @if (!locked()) {
       <button type="button" class="btn btn-primary btn-sm" (click)="create()"><app-icon name="plus" />New storage connection</button>
@@ -70,13 +71,6 @@
         <option value="">All providers</option>
         @for (p of providers(); track p) { <option [value]="p">{{ p }}</option> }
       </select>
-      @if (canSeeWorkspace()) {
-        <select class="input max-w-48" [value]="workspaceFilter()" aria-label="Workspace"
-                (change)="workspaceFilter.set($any($event.target).value); pager.reset()">
-          <option value="">All workspaces</option>
-          @for (w of workspaces(); track w.id) { <option [value]="w.id">{{ w.name }}</option> }
-        </select>
-      }
       <div class="search-field max-w-56">
         <app-icon name="search" size="0.95em" />
         <input class="input" placeholder="Search name, alias or host" aria-label="Search connections"

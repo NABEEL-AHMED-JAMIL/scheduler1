@@ -12,11 +12,11 @@
             <span class="hidden md:inline text-xs text-[color:var(--text-muted)]" data-test="shortcuts">
               <kbd class="kbd">A</kbd> approve · <kbd class="kbd">R</kbd> reject · <kbd class="kbd">↓</kbd> next field
             </span>
-            <button type="button" class="btn btn-ghost btn-sm" [disabled]="!!busy()" (click)="claim()">
+            <button type="button" class="btn btn-default btn-sm" [disabled]="!!busy()" (click)="claim()">
               <app-icon [name]="claimedByMe() ? 'close' : 'lock'" />{{ claimedByMe() ? 'Let go' : 'Claim' }}
             </button>
             @if (dirty()) {
-              <button type="button" class="btn btn-ghost btn-sm" [disabled]="!!busy()" (click)="discard()">Discard changes</button>
+              <button type="button" class="btn btn-default btn-intent-crit btn-sm" [disabled]="!!busy()" (click)="discard()">Discard changes</button>
               <button type="button" class="btn btn-default btn-sm" [disabled]="!!busy()" (click)="save()">
                 @if (busy() === 'save') { <app-icon name="refresh" class="spin" /> } @else { <app-icon name="save" /> }Save corrections
               </button>
@@ -33,8 +33,18 @@
     </div>
   </app-page-header>
 
-  @if (loading() && !detail()) {
+  @if (noWorkspace()) {
+    <app-needs-workspace what="Documents are" todo="review documents, correct and approve them" icon="file" />
+  } @else if (loading() && !detail()) {
     <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]">Loading the document…</div>
+  } @else if (missing()) {
+    <!-- ZT-D10 (ZT-A10's rule): a document that is not here (deleted, or another workspace's link) is said as that, with the way back. -->
+    <div class="card p-8 flex flex-col items-center text-center gap-2" data-test="document-missing">
+      <span class="stat-glyph"><app-icon name="search" /></span>
+      <h2 class="text-base font-semibold">This document isn't here</h2>
+      <p class="text-sm text-[color:var(--text-secondary)] max-w-md">It may have been removed, or the link belongs to another workspace.</p>
+      <a routerLink="/review/documents" class="btn btn-default btn-sm mt-2">Document review</a>
+    </div>
   } @else if (error()) {
     <div class="card p-8 text-center" role="alert">
       <p class="text-sm text-crit-500">{{ error() }}</p>
@@ -49,7 +59,7 @@
             @if (d.autoApproved) {Approved on its own} @else {Approved by <app-avatar [appUserId]="d.reviewedBy" [name]="reviewer(d.reviewedBy, d.reviewedByName)" [size]="1.15" [decorative]="true" class="inline-block align-[-0.3em] mx-0.5" />{{ reviewer(d.reviewedBy, d.reviewedByName) }}}@if (d.dateReviewed) { on {{ d.dateReviewed | serverTime: 'dateTime' }}}@if (d.ruleOverride) {, over a failing rule}. It is in its type's dataset; this view is read-only.
           }
           @case ('Rejected') {
-            Rejected by <app-avatar [appUserId]="d.reviewedBy" [name]="reviewer(d.reviewedBy, d.reviewedByName)" [size]="1.15" [decorative]="true" class="inline-block align-[-0.3em] mx-0.5" />{{ reviewer(d.reviewedBy, d.reviewedByName) }}@if (d.dateReviewed) { on {{ d.dateReviewed | serverTime: 'dateTime' }}}@if (d.rejectReason) {: “{{ d.rejectReason }}”}. This view is read-only.
+            Rejected by <app-avatar [appUserId]="d.reviewedBy" [name]="reviewer(d.reviewedBy, d.reviewedByName)" [size]="1.15" [decorative]="true" class="inline-block align-[-0.3em] mx-0.5" />{{ reviewer(d.reviewedBy, d.reviewedByName) }}@if (d.dateReviewed) { on {{ d.dateReviewed | serverTime: 'dateTime' }}}@if (d.rejectReason) {: “{{ d.rejectReason }}”}@if (!endsSentence(d.rejectReason)) {.} This view is read-only.
           }
           @case ('Failed') { The extraction failed: {{ d.error || 'no reason was given' }}. Extract the document again from Document Intelligence. }
           @default { This document is {{ statusText().toLowerCase() }}; it is not waiting for review. This view is read-only. }
@@ -131,7 +141,7 @@
             <div class="flex items-center gap-2 mb-2">
               <h2 class="text-sm font-semibold mr-auto">{{ t.label }} ({{ t.rows.length }})</h2>
               @if (editable() && newRow()?.tableKey !== t.key) {
-                <button type="button" class="btn btn-ghost btn-xs" (click)="addRow(t)"><app-icon name="plus" />Add row</button>
+                <button type="button" class="btn btn-default btn-xs" (click)="addRow(t)"><app-icon name="plus" />Add row</button>
               }
             </div>
             <div class="overflow-x-auto">
@@ -200,7 +210,7 @@
 
         @if (inReview()) {
           <p class="text-xs text-[color:var(--text-muted)] flex items-start gap-1.5">
-            <app-icon name="send" size="0.95em" class="mt-0.5 shrink-0" />On approve, the document's values go to its type's dataset (Document Intelligence › Dataset), and your corrections are kept with it.
+            <app-icon name="send" size="0.95em" class="mt-0.5 shrink-0" />On approve, the document's values go to its type's approved data (Documents › Approved data), and your corrections are kept with it.
           </p>
         }
       </div>

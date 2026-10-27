@@ -11,6 +11,7 @@ import { LIST_LIMIT } from '../../../core/api/list-limit';
 import { AuthService } from '../../../core/auth/auth.service';
 import { roleLabel } from '../../../core/auth/auth.models';
 import { Icon } from '../../../shared/ui/icon';
+import { Markdown } from '../../../shared/ui/markdown';
 import { StatusPill } from '../../../shared/ui/status-pill';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
@@ -39,10 +40,23 @@ import { DataPolicyApi } from '../../admin/data-policies/data-policy.api';
 import { PolicyLevel, levelSummary, levelsOf, policyState } from '../../admin/data-policies/data-policy.model';
 import { sensitivityText } from '../../../shared/ui/sensitivity';
 import { PageHeader } from '../../../shared/ui/page-header';
+import { elapsedDuration, formatDuration } from '../../../shared/ui/time-format';
 
 interface Connection { connectionId: number; name: string; isDefault?: boolean; status?: string; defaultModel?: string | null; provider?: string; }
 interface TraceState { loading: boolean; error: string; trace: ToolTrace | null; }
 export type PanelTab = 'flow' | 'chart' | 'trace' | 'context';
+
+/**
+ * The result tab a conversation opens on (owner 2026-10-13: a question showed "No flow yet"): its flow, else its chart;
+ * a question -- neither -- opens on its tool calls when it made any; Tool calls and Context stay where the person put
+ * them.
+ */
+export function openingTab(current: PanelTab, has: { flow: boolean; chart: boolean; calls: boolean }): PanelTab {
+  if (has.flow) return 'flow';
+  if (has.chart) return 'chart';
+  if (current === 'trace' || current === 'context') return current;
+  return has.calls ? 'trace' : 'flow';
+}
 
 /**
  * What a person can ask first, by what they want. Healthcare shows up only here, as samples: everything the assistant
@@ -76,13 +90,15 @@ export const PROGRESS_MS = [1000, 2000] as const;
 @Component({
   selector: 'app-assistant',
   imports: [PageHeader, Icon, StatusPill, ServerTimePipe, StickToBottom, RouterLink, ModelSetupBanner, ManagedBanner, RunFollow,
-    FlowPanel, TracePanel, ChartAnswerSlot, ConversationList],
+    FlowPanel, TracePanel, ChartAnswerSlot, ConversationList, Markdown],
   templateUrl: './assistant.html',
   // Escape closes the history laid over the thread, as it closes a side panel.
   host: { '(document:keydown.escape)': 'historyOpen.set(false)' },
   // The page's own layout, kept with the page (lazy) rather than as new global utilities.
   styles: [`
-    .ai-grid { position: relative; display: grid; gap: 1rem; align-items: stretch; }
+    /* One column below 1024 that never grows past the page: an implicit column is as wide as its widest content (the
+       flow canvas, the composer), which pushed a phone's page 215px sideways (e2e assistant, 2026-10-13). */
+    .ai-grid { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; align-items: stretch; }
     .ai-history { display: none; flex-direction: column; min-height: 0; }
     /* Below 1280 the list opens as the console's side panels do (Batch A's app-side-panel, place 'right'): over the whole
        window, its full height, flush with the right edge, a scrim over everything behind it that closes it, and the
@@ -133,6 +149,8 @@ export class Assistant implements OnInit {
   readonly messages = signal<AssistantMessage[]>([]);
   readonly threadLoading = signal(false);
   readonly threadError = signal('');
+  /** ZT-I5 (ZT-A10's rule): a conversation the service does not find -- deleted, or another workspace's link -- said as that. */
+  readonly threadMissing = signal(false);
   /** The conversation list beside the thread; folded away on narrower screens until asked for. */
   readonly historyOpen = signal(false);
 
@@ -194,7 +212,7 @@ export class Assistant implements OnInit {
     const facts: string[] = [];
     if (picked?.provider) facts.push(picked.provider);
     if (last?.toolMode) facts.push(last.toolMode === 'native' ? 'native tool calling' : 'JSON tool protocol');
-    if (last?.seconds != null) facts.push(`last answer ${last.seconds.toFixed(1)} s`);
+    if (last?.seconds != null) facts.push(`last answer ${formatDuration(last.seconds)}`);
     return { name: this.modelLabel(), model, facts: facts.join(' · '), tone: last == null ? 'neutral' : last.ok ? 'ok' : 'warn' };
   });
 
@@ -225,6 +243,8 @@ export class Assistant implements OnInit {
     return newestFlow(this.messages())?.flow ?? null;
   });
   readonly flowMessageId = computed(() => this.pickedFlow() ?? newestFlow(this.messages())?.messageId ?? null);
+  /** A conversation with answers and no flow: a question (the Flow tab says so rather than "No flow yet"). */
+  readonly isQuestion = computed(() => !this.flow() && this.messages().some(m => m.role === 'assistant'));
 
   /** MIG-357: the message whose chart the Chart tab draws; null: the newest. */
   readonly pickedChart = signal<number | null>(null);
@@ -356,6 +376,7 @@ export class Assistant implements OnInit {
     if (this.working()) return;
     this.threadLoading.set(true);
     this.threadError.set('');
+    this.threadMissing.set(false);
     this.error.set('');
     this.stopped.set(false);
     this.renaming.set(false);
@@ -365,15 +386,23 @@ export class Assistant implements OnInit {
     this.api.conversation(conversationId).subscribe({
       next: r => {
         this.threadLoading.set(false);
-        if (r.status !== API_SUCCESS || !r.data) { this.threadError.set(r.message || 'Could not open the conversation.'); return; }
+        if (r.status !== API_SUCCESS || !r.data) {
+          if (/not found/i.test(r.message ?? '')) this.threadMissing.set(true);
+          else this.threadError.set(r.message || 'Could not open the conversation.');
+          return;
+        }
         this.conversation.set(r.data.conversation);
         this.messages.set(mergeMessages([], r.data.messages ?? []));
         this.remember(r.data.conversation.conversationId);
         const newest = this.traceRuns()[0];
         if (newest != null) this.showTrace(newest);
-        this.tab.set(this.flow() ? 'flow' : this.chart() ? 'chart' : this.tab());
+        this.tab.set(openingTab(this.tab(), { flow: !!this.flow(), chart: !!this.chart(), calls: newest != null }));
       },
-      error: err => { this.threadLoading.set(false); this.threadError.set(err?.error?.message || 'Could not open the conversation.'); },
+      error: err => {
+        this.threadLoading.set(false);
+        if (err?.status === 404) this.threadMissing.set(true);
+        else this.threadError.set(err?.error?.message || 'Could not open the conversation.');
+      },
     });
   }
 
@@ -389,6 +418,7 @@ export class Assistant implements OnInit {
     this.pickedChart.set(null);
     this.error.set('');
     this.threadError.set('');
+    this.threadMissing.set(false);
     this.stopped.set(false);
     this.renaming.set(false);
     this.remember(null);
@@ -549,6 +579,7 @@ export class Assistant implements OnInit {
           this.pickedChart.set(null);
           if (this.flowMessageId() !== hadFlow && this.flow()) this.tab.set('flow');
           else if (this.chartMessageId() !== hadChart && this.chart()) this.tab.set('chart');
+          else if (!this.flow() && !this.chart()) this.tab.set(openingTab(this.tab(), { flow: false, chart: false, calls: true }));
         }
         this.showTrace(f.runId, true);
       },
@@ -789,9 +820,10 @@ export class Assistant implements OnInit {
     return '';
   }
   elapsedText(): string {
-    const s = this.elapsed();
-    return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s`;
+    return elapsedDuration(this.elapsed());
   }
+  /** A tool call's time, from milliseconds, in the console's duration words. */
+  tookMs(ms: number): string { return formatDuration(ms / 1000); }
   liveCalls(): ToolCall[] { return this.live()?.calls ?? []; }
 
   private remember(conversationId: number | null): void {

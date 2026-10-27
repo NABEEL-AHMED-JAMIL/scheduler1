@@ -1,7 +1,7 @@
 import { test, expect, APIRequestContext, Browser, Page } from '@playwright/test';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { canSignIn, NEEDS, Session, sessionFor } from './support/session';
+import { canSignIn, NEEDS, Session, sessionFor, pageWith } from './support/session';
 import { ensureObject } from './support/workspace';
 import { hasFixtures, NEEDS_FIXTURES, riverside } from './support/fixtures';
 
@@ -29,13 +29,22 @@ const KEY = process.env['E2E_OCR_KEY'] ?? 'e2e/ocr/ocr-live-check.png';
 const VENDOR = `E2E vendor ${Date.now().toString(36)}`;
 
 interface Field { fieldId: number; fieldKey: string; tableKey?: string | null; label?: string; value: string | null; page?: number | null; box?: unknown; }
+interface Defined { key: string; label?: string; type?: string; required?: boolean; options?: string[] }
+interface ReviewDetail { fields: Field[]; definition?: string | { fields?: Defined[] } }
+
+/** The document type's required top-level fields the extraction left empty, each with a value of its type to type in. */
+function missingRequired(detail: ReviewDetail): { key: string; label: string; value: string }[] {
+  const definition = typeof detail.definition === 'string' ? JSON.parse(detail.definition) : detail.definition ?? {};
+  const read = new Map(detail.fields.filter(f => !f.tableKey).map(f => [f.fieldKey, f.value]));
+  return ((definition.fields ?? []) as Defined[])
+    .filter(d => d.required && !(read.get(d.key) ?? '').toString().trim())
+    .map(d => ({ key: d.key, label: d.label ?? d.key, value: d.type === 'date' ? '2026-09-28'
+      : d.type === 'money' || d.type === 'number' ? '1.00' : d.type === 'choice' ? (d.options?.[0] ?? 'E2E') : `E2E-${Date.now().toString(36)}` }));
+}
 
 async function pageAs(browser: Browser, s: Session, width = 1440, height = 900): Promise<Page> {
-  const context = await browser.newContext({ viewport: { width, height } });
-  const page = await context.newPage();
-  await page.goto('/');
-  await page.evaluate(user => window.localStorage.setItem('etl_auth_user', JSON.stringify(user)), s.data);
-  return page;
+  // Seeded before the app loads (support/session.ts pageWith): a dead stored session can no longer sign it out.
+  return pageWith(browser, s.data, { viewport: { width, height } });
 }
 
 /** GET or POST on the gateway, as the session; the envelope's data. */
@@ -61,6 +70,10 @@ async function settled<T extends { status: string }>(read: () => Promise<T>, wha
 /**
  * An extraction in Review: the scan read by OCR (an unchanged file answers its earlier read), then extracted as an
  * invoice. A small local model now and then answers something that is not an extraction (Failed): asked again.
+ *
+ * Zero-tolerance §0.5 (2026-10-20): the scan is one document, read once; every run used to extract it anew, which listed
+ * the same file once per run. An invoice extraction of it still waiting in Review (one an earlier run left, or the phone
+ * check's) is used again, so a run adds at most one, and Documents in labels each as "Extraction n of m of this file".
  */
 async function seed(request: APIRequestContext, s: Session): Promise<number> {
   const types = await call<{ documentTypeId: number; typeKey: string; builtIn: boolean; status: string }[]>(request, s, 'GET', '/documentType.json/fetchAll');
@@ -70,6 +83,11 @@ async function seed(request: APIRequestContext, s: Session): Promise<number> {
   const read = await settled(() => call<{ ocrDocumentId: number; status: string }>(request, s, 'GET',
     `/documentOcr.json/fetchById?ocrDocumentId=${asked.ocrDocumentId}`), 'the OCR read');
   expect(read.status, 'the OCR read').toBe('Done');
+  const earlier = await call<{ extractionId: number; status: string; documentTypeId?: number | null }[]>(request, s, 'GET',
+    `/documentExtraction.json/fetchAll?ocrDocumentId=${read.ocrDocumentId}`);
+  const waiting = earlier.filter(e => e.status === 'Review' && Number(e.documentTypeId) === Number(invoice!.documentTypeId))
+    .sort((a, b) => b.extractionId - a.extractionId)[0];
+  if (waiting) return waiting.extractionId;
   let last = '';
   for (let attempt = 0; attempt < 3; attempt++) {
     const queued = await call<{ extractionId: number; status: string }>(request, s, 'POST', '/documentExtraction.json/extract',
@@ -96,7 +114,7 @@ test.describe('Document Intelligence', () => {
   test('review: a field\'s box is highlighted, a value corrected, the document approved into its dataset', async ({ browser, request }, info) => {
     test.setTimeout(300_000);
     const extractionId = await seed(request, s);
-    const detail = await call<{ fields: Field[] }>(request, s, 'GET', `/documentReview.json/fetchById?extractionId=${extractionId}`);
+    const detail = await call<ReviewDetail>(request, s, 'GET', `/documentReview.json/fetchById?extractionId=${extractionId}`);
     const boxed = detail.fields.find(f => !f.tableKey && f.page && f.box);
     expect(boxed, 'a value read from the page, with its box').toBeTruthy();
 
@@ -119,9 +137,14 @@ test.describe('Document Intelligence', () => {
     await page.keyboard.press('ArrowDown');
     await expect(page.locator('.doc-field-active')).toHaveCount(1);
 
-    // ---- corrections: the vendor and the total the model did not find
+    // ---- corrections: the vendor and the total, and every other required field the model left empty. A small local
+    // model does not miss the same fields twice (final-regression 10-20: it also missed the invoice number once, and the
+    // screen rightly kept the document from approval), so what else is missing is read from the extraction, not assumed.
     await page.getByRole('textbox', { name: 'Vendor', exact: true }).fill(VENDOR);
     await page.getByRole('textbox', { name: 'Total', exact: true }).fill('9820.00');
+    for (const f of missingRequired(detail).filter(f => f.key !== 'vendor_name' && f.key !== 'total')) {
+      await page.getByRole('textbox', { name: f.label, exact: true }).fill(f.value);
+    }
     const saved = page.waitForResponse(r => r.url().includes('/documentReview.json/correct') && r.request().method() === 'POST');
     await page.getByRole('button', { name: 'Save corrections' }).click();
     expect((await saved).status()).toBe(200);
@@ -138,7 +161,7 @@ test.describe('Document Intelligence', () => {
     await expect(page).not.toHaveURL(new RegExp(`/documents/review/${extractionId}$`), { timeout: 20_000 });
 
     // ---- the dataset: the approved document's row, with the corrected vendor as typed
-    await page.goto('/documents/in?tab=dataset');
+    await page.goto('/documents/approved-data');
     const dataset = page.locator('[data-test="dataset"]');
     await dataset.getByRole('combobox', { name: 'Document type' }).selectOption({ label: 'Invoice' });
     const row = dataset.locator('tbody tr', { hasText: `#${extractionId}` });

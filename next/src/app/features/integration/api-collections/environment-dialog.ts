@@ -13,6 +13,8 @@ export interface EnvironmentDialogData {
   environment?: EnvironmentRow;
   /** The collection has no environment yet: this one becomes the default. */
   first?: boolean;
+  /** The workspace a platform administrator picked on the page; none for a workspace's people (their own). */
+  tenantId?: number | null;
 }
 
 /**
@@ -53,13 +55,13 @@ export interface EnvironmentDialogData {
                     <div class="flex items-center gap-2">
                       <span class="secret-mask mono" aria-hidden="true">•••••••</span>
                       <span class="text-xs text-[color:var(--text-secondary)]"><app-icon name="lock" size="0.85em" /> configured</span>
-                      <button type="button" class="btn btn-ghost btn-xs ml-auto" [attr.aria-label]="'Replace ' + v.key" (click)="replace(i)">Replace</button>
+                      <button type="button" class="btn btn-default btn-intent-crit btn-xs ml-auto" [attr.aria-label]="'Replace ' + v.key" (click)="replace(i)">Replace</button>
                     </div>
                   } @else if (v.replacing) {
                     <div class="flex items-center gap-2">
                       <input class="input input-sm mono" type="password" autocomplete="new-password" [value]="v.value" placeholder="the new value"
                              [attr.aria-label]="'New value of ' + v.key" (input)="setValue(i, $any($event.target).value)" />
-                      <button type="button" class="btn btn-ghost btn-xs" [attr.aria-label]="'Keep the stored ' + v.key" (click)="keep(i)">Keep</button>
+                      <button type="button" class="btn btn-default btn-xs" [attr.aria-label]="'Keep the stored ' + v.key" (click)="keep(i)">Keep</button>
                     </div>
                   } @else {
                     <div class="flex items-center gap-2">
@@ -84,7 +86,7 @@ export interface EnvironmentDialogData {
             }
           </tbody>
         </table></div>
-        <div><button type="button" class="btn btn-ghost btn-sm" (click)="addVariable()"><app-icon name="plus" size="0.85em" />Add variable</button></div>
+        <div><button type="button" class="btn btn-default btn-sm" (click)="addVariable()"><app-icon name="plus" size="0.85em" />Add variable</button></div>
         @if (discards().length) {
           <p class="text-xs text-warn-600" role="status">Saving discards the stored secret of {{ discards().join(', ') }}: it is not revealed, only replaced by what you type.</p>
         }
@@ -139,7 +141,7 @@ export class EnvironmentDialog {
     this.api.saveEnvironment({
       environmentId: this.data.environment?.environmentId ?? null, collectionId: this.data.collectionId, name,
       isDefault: this.isDefault(), variables: variableSaves(this.rows()),
-    }).subscribe({
+    }, this.data.tenantId).subscribe({
       next: r => {
         this.saving.set(false);
         if (r.status !== API_SUCCESS) { this.error.set(r.message); return; }

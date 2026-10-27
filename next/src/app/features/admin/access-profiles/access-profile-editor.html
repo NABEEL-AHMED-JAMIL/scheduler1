@@ -1,0 +1,189 @@
+<div class="page">
+  <app-page-header [title]="isEdit() ? profile()!.profileName : 'New access profile'"
+                   [crumb]="isEdit() ? profile()!.profileName : 'New access profile'"
+                   subtitle="A named bundle of pages for workspace members. Administrators always open everything.">
+    <button type="button" class="btn btn-default btn-sm" (click)="back()">Cancel</button>
+    <button type="button" class="btn btn-primary btn-sm" (click)="save()" [disabled]="saving() || loading() || !!error()"
+            data-testid="save-profile">
+      <app-icon name="check" />{{ saving() ? 'Saving…' : isEdit() ? 'Save changes' : 'Create profile' }}
+    </button>
+  </app-page-header>
+
+  @if (loading()) {
+    <div class="card p-12 text-center text-sm text-[color:var(--text-muted)]">
+      <div class="spinner mx-auto mb-3" role="status" aria-label="Loading"></div>Loading the page catalogue…
+    </div>
+  } @else if (error()) {
+    <div class="card p-10 text-center" role="alert">
+      <app-icon name="alert" size="1.5rem" class="icon-crit block mx-auto mb-2" />
+      <p class="text-sm text-crit-500">{{ error() }}</p>
+      <button type="button" class="btn btn-default btn-sm mt-3" (click)="back()">Back to Page access</button>
+    </div>
+  } @else {
+    <form [formGroup]="form" class="card p-4" (ngSubmit)="save()">
+      <app-form-row>
+        <app-field label="Profile name" for="profileName" class="fr-4" [required]="true"
+                   [control]="form.get('profileName')" [submitted]="submitted()">
+          <input id="profileName" class="input" formControlName="profileName" placeholder="Analyst" maxlength="100" />
+        </app-field>
+        <app-field label="Description" for="description" class="fr-8" hint="One line saying who this is for."
+                   [control]="form.get('description')" [submitted]="submitted()">
+          <input id="description" class="input" formControlName="description" placeholder="Runs pipelines and reads reports."
+                 maxlength="500" />
+        </app-field>
+      </app-form-row>
+      <label class="flex items-start gap-2 text-sm cursor-pointer select-none mt-4">
+        <input type="checkbox" class="checkbox mt-0.5" formControlName="defaultProfile" />
+        <span>
+          <span class="font-medium">Default for this workspace</span>
+          <span class="block text-xs text-[color:var(--text-muted)]">
+            @if (first()) {
+              The first profile is the default: anyone without one of their own gets it.
+            } @else if (profile()?.defaultProfile) {
+              This is the default. Make another profile the default on Page access to change it.
+            } @else {
+              Anyone without a profile of their own gets the default.
+            }
+          </span>
+        </span>
+      </label>
+      <!-- MIG-424: two-factor sign-in for this profile's people, beside the workspace-wide rule (Administration › Security). -->
+      <label class="flex items-start gap-2 text-sm cursor-pointer select-none mt-3" data-testid="profile-require-mfa">
+        <input type="checkbox" class="checkbox mt-0.5" formControlName="requireMfa" />
+        <span>
+          <span class="font-medium">Require two-factor sign-in</span>
+          <span class="block text-xs text-[color:var(--text-muted)]">
+            People on this profile set up an authenticator app at their next sign-in, and cannot switch it off.
+            @if (profile(); as p) {
+              @if (p.mfaEnrolledCount != null) {
+                {{ p.mfaEnrolledCount }} of the {{ p.mfaEnrolledCount + (p.mfaNotEnrolledCount ?? 0) }} {{ p.mfaEnrolledCount + (p.mfaNotEnrolledCount ?? 0) === 1 ? 'person' : 'people' }} on it {{ p.mfaEnrolledCount === 1 ? 'has' : 'have' }} it on@if (p.mfaNotEnrolledCount) {;
+                not yet: {{ (p.mfaNotEnrolledNames ?? []).slice(0, 5).join(', ') }}@if ((p.mfaNotEnrolledNames ?? []).length > 5) { and {{ (p.mfaNotEnrolledNames ?? []).length - 5 }} more }}.
+              }
+            }
+          </span>
+        </span>
+      </label>
+    </form>
+
+    <div class="ap-editor">
+      <app-section title="Pages this profile opens" [card]="true" data-testid="profile-pages"
+                   sub="Grouped as the menu groups them. Dashboard, Profile and Notifications are always open; Administration stays admin-only.">
+        <span section-actions class="pill pill-neutral tabular" data-testid="page-counter" aria-live="polite">
+          {{ chosen() }} of {{ total() }} pages
+        </span>
+
+        <div class="flex flex-wrap items-center gap-2 mb-4" role="toolbar" aria-label="Find pages">
+          <div class="search-field flex-1 min-w-48 max-w-96">
+            <app-icon name="search" size="0.95em" />
+            <input type="search" class="input" placeholder="Find a page, a hub or a menu group…" aria-label="Find a page"
+                   [value]="search()" (input)="search.set($any($event.target).value)" data-testid="page-search" />
+          </div>
+          <div class="seg" role="group" aria-label="Show">
+            @for (f of [{ v: 'all', l: 'All' }, { v: 'on', l: 'Chosen' }, { v: 'off', l: 'Not chosen' }]; track f.v) {
+              <button type="button" class="seg-btn" [class.seg-on]="filter() === f.v" [attr.aria-pressed]="filter() === f.v"
+                      (click)="filter.set($any(f.v))">{{ f.l }}</button>
+            }
+          </div>
+          <div class="ml-auto flex items-center gap-1">
+            <button type="button" class="btn btn-default btn-sm" (click)="everything(true)">Select every page</button>
+            <button type="button" class="btn btn-ghost btn-sm" (click)="everything(false)">Clear</button>
+          </div>
+        </div>
+
+        @if (shownCount() === 0) {
+          <p class="text-sm text-[color:var(--text-muted)] py-8 text-center" data-testid="no-pages">
+            @if (search()) { No page matches “{{ search() }}”. } @else { No page is {{ filter() === 'on' ? 'chosen' : 'left to choose' }}. }
+          </p>
+        }
+
+        <div class="ap-groups">
+          @for (group of shown(); track group.label) {
+            <div class="ap-group" role="group" [attr.aria-labelledby]="'apg-' + $index" [attr.data-group]="group.label">
+              <div class="ap-group-head">
+                <label class="flex items-center gap-2 min-w-0 cursor-pointer">
+                  <input type="checkbox" class="checkbox" [checked]="stateOf(rowsOf(group)) === 'all'"
+                         [indeterminate]="stateOf(rowsOf(group)) === 'some'" (change)="toggleAll(rowsOf(group))"
+                         [attr.aria-label]="'Every page in ' + group.label" [attr.data-select-group]="group.label" />
+                  <span [id]="'apg-' + $index" class="font-semibold">{{ group.label }}</span>
+                </label>
+                <span class="text-xs text-[color:var(--text-muted)] tabular ml-auto">{{ countOf(rowsOf(group)) }}</span>
+              </div>
+              @for (hub of group.hubs; track hub.label) {
+                <div class="ap-hub">
+                  @if (hub.rows.length > 1 || hub.label !== hub.rows[0].label) {
+                    <div class="ap-hub-head">
+                      <span class="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">{{ hub.label }}</span>
+                      <button type="button" class="btn btn-default btn-xs" (click)="toggleAll(hub.rows)"
+                              [attr.aria-label]="(stateOf(hub.rows) === 'all' ? 'Clear every page in ' : 'Select every page in ') + hub.label">
+                        {{ stateOf(hub.rows) === 'all' ? 'None' : 'All' }}
+                      </button>
+                    </div>
+                  }
+                  @for (row of hub.rows; track row.key) {
+                    <div class="ap-row" [attr.data-page]="row.key">
+                      <label class="ap-row-main">
+                        <input type="checkbox" class="checkbox" [checked]="isOn(row.key)" (change)="toggleView(row)"
+                               [attr.aria-label]="row.edit ? 'View ' + row.label : row.label" [attr.data-view]="row.key" />
+                        <span class="min-w-0">
+                          <span class="block text-sm font-medium">{{ row.label }}</span>
+                          @if (row.places.length) {
+                            <span class="block text-xs text-[color:var(--text-muted)]">{{ row.places.join(' · ') }}</span>
+                          }
+                        </span>
+                      </label>
+                      @if (isOn(row.key) && tabsOf(row.key).length) {
+                        <div class="ap-row-tabs" role="group" [attr.aria-label]="row.label + ' tabs'" [attr.data-tabs]="row.key">
+                          <span class="text-[11px] text-[color:var(--text-muted)]">{{ tabSummary(row.key) }}</span>
+                          @for (tab of tabsOf(row.key); track tab.key) {
+                            <label class="ap-tab" [title]="tab.apiGated ? 'Closed, its own data is refused too' : 'Hides the tab; its data is the page\'s'">
+                              <input type="checkbox" class="checkbox" [checked]="tabOn(row.key, tab.key)" (change)="toggleTab(row.key, tab.key)"
+                                     [attr.data-tab]="tab.key" [attr.aria-label]="tab.label" />
+                              <span>{{ tab.label }}@if (!tab.apiGated) { <span class="text-[color:var(--text-muted)]"> · hides the tab</span> }</span>
+                            </label>
+                          }
+                        </div>
+                      }
+                      @if (row.edit; as edit) {
+                        <label class="ap-row-edit" [title]="edit.label + ': saving, pinning and deleting. Brings View with it.'">
+                          <input type="checkbox" class="checkbox" [checked]="isOn(edit.key)" (change)="toggleEdit(row)"
+                                 [attr.aria-label]="edit.label" [attr.data-edit]="edit.key" />
+                          <span class="text-xs">Edit</span>
+                        </label>
+                      }
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          }
+        </div>
+      </app-section>
+
+      <aside class="ap-preview card p-4" aria-labelledby="ap-preview-title" data-testid="profile-preview">
+        <h2 id="ap-preview-title" class="section-title">What this person will see</h2>
+        <p class="section-sub">The menu of a member on this profile: {{ previewPlaces() }} {{ previewPlaces() === 1 ? 'place' : 'places' }} to open.</p>
+        <div class="flex flex-col gap-3 mt-3">
+          @for (group of preview(); track group.label) {
+            <div>
+              <p class="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--text-muted)]">{{ group.label }}</p>
+              <ul class="mt-1 flex flex-col gap-1">
+                @for (entry of group.entries; track entry.label) {
+                  <li class="text-sm">
+                    <span class="inline-flex items-center gap-1.5"><app-icon [name]="entry.icon" size="0.9em" class="opacity-70" />{{ entry.label }}</span>
+                    @if (entry.tabs.length) {
+                      <span class="block pl-5 text-xs text-[color:var(--text-secondary)]">{{ entry.tabs.join(' · ') }}</span>
+                    }
+                  </li>
+                }
+              </ul>
+            </div>
+          }
+        </div>
+        <p class="text-xs text-[color:var(--text-muted)] mt-4">
+          Their profile page and notifications are always there. A page opened or withheld for one person (People × pages)
+          changes only theirs.
+        </p>
+      </aside>
+    </div>
+  }
+</div>

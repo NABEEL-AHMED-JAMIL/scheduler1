@@ -11,6 +11,7 @@ import { Icon } from '../../../shared/ui/icon';
 import { StatusPill } from '../../../shared/ui/status-pill';
 import { Timeline, runFinished } from '../../tasks/steps/steps.model';
 import { RetryDialog, RetryDialogData } from '../../jobs/retry/retry-dialog';
+import { formatDuration } from '../../../shared/ui/time-format';
 
 /**
  * How long to wait before reading an unfinished run again when no push arrives: quick at first (a run's first steps take
@@ -80,7 +81,7 @@ export function runState(t: Pick<Timeline, 'runStatus'> & { reviewStatus?: strin
         @if (jobQueueId() != null) {
           <a class="btn btn-default btn-sm" [routerLink]="['/pipelines/schedules', jobId(), 'runs', jobQueueId()]"><app-icon name="list" />Open the run</a>
         }
-        <a class="btn btn-ghost btn-sm" [routerLink]="['/pipelines/schedules', jobId(), 'executions']"><app-icon name="history" />All runs</a>
+        <a class="btn btn-default btn-sm" [routerLink]="['/pipelines/schedules', jobId(), 'executions']"><app-icon name="history" />All runs</a>
         @if (state().label === 'Failed' && jobQueueId() != null) {
           <button type="button" class="btn btn-default btn-sm" (click)="retry()"><app-icon name="refresh" />Retry</button>
         }
@@ -128,7 +129,7 @@ export class RunFollow implements OnInit {
     const ended = steps.map(s => s.endedAt).filter(Boolean).sort().reverse()[0];
     const ms = started && ended && this.state().final ? Date.parse(ended) - Date.parse(started) : null;
     return { done, total: steps.length, percent: Math.round((done / steps.length) * 100), failed, current: running?.key ?? null,
-      duration: ms != null && ms >= 0 ? (ms < 1000 ? `${ms} ms` : ms < 60000 ? `${(ms / 1000).toFixed(1)} s` : `${Math.round(ms / 60000)} min`) : null };
+      duration: ms != null && ms >= 0 ? formatDuration(ms / 1000) : null };
   });
 
   readonly failure = computed(() => {
@@ -195,6 +196,8 @@ export class RunFollow implements OnInit {
   /** Once, for a completed run: the first dashboard its schedule's output feeds (a reader without dashboards gets none). */
   private findBoard(): void {
     if (this.boardAsked || (typeof this.auth?.canOpen === 'function' && !this.auth.canOpen('analytics-dashboards'))) return;
+    // ZT-A12: a platform administrator's own sign-in (no workspace) reads no workspace's boards; Analytics answers it 403.
+    if (typeof this.auth?.isPlatformAdmin === 'function' && this.auth.isPlatformAdmin() && !this.auth.user()?.tenantId) return;
     this.boardAsked = true;
     this.http.get<ApiResponse<{ analyticsDashboardId?: number; dashboardName: string; pipelines?: { jobId: number }[] }[]>>(
       `${API_BASE}/analyticsWorkspace.json/fetchAllDashboards`).pipe(takeUntilDestroyed(this.destroy)).subscribe({

@@ -80,9 +80,11 @@ function storedView(): CostView {
     <ul class="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-[11px] text-[color:var(--text-secondary)]" aria-label="Legend" data-test="cost-by-day-legend">
       @if (view() === 'daily') {
         @for (s of legend(); track s.service) {
-          <li class="flex items-center gap-1.5" [class.opacity-50]="s.zero" [attr.data-zero]="s.zero ? 'true' : null"
+          <!-- ZT-C10: a service under a cent dims its swatch, not its name: opacity on the whole entry took the name to under
+               4.5:1 (axe, WCAG AA). -->
+          <li class="flex items-center gap-1.5" [attr.data-zero]="s.zero ? 'true' : null"
               [title]="s.zero ? s.service + ': under a cent this month' : s.service + ': ' + money(s.amount) + ' this month'">
-            <span class="cbd-swatch" [style.background]="s.color"></span>{{ s.service }}
+            <span class="cbd-swatch" [class.opacity-40]="s.zero" [style.background]="s.color"></span>{{ s.service }}
           </li>
         }
         @if (hasFuture() && pace() !== null) {

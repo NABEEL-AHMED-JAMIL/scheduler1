@@ -174,10 +174,27 @@
                             Required
                           </label>
                         </div>
-                        <div class="field">
-                          <label class="label" [for]="'fieldHelp' + i">Help text</label>
-                          <input class="input" [id]="'fieldHelp' + i" maxlength="500" [value]="f.help || ''"
-                                 (input)="setField(i, { help: $any($event.target).value })" />
+                        @if (takesPlaceholder(f.type)) {
+                          <div class="field" data-placeholder-setting>
+                            <label class="label" [for]="'fieldPlaceholder' + i">Placeholder <span class="font-normal normal-case text-[color:var(--text-muted)]">(optional)</span></label>
+                            <input class="input" [id]="'fieldPlaceholder' + i" [attr.maxlength]="maxPlaceholder" [value]="f.placeholder || ''"
+                                   [attr.aria-describedby]="'fieldPlaceholderNote' + i" [placeholder]="defaultShown(f)"
+                                   (input)="setField(i, { placeholder: $any($event.target).value })" />
+                            <p class="field-note text-[color:var(--text-muted)] flex gap-2" [id]="'fieldPlaceholderNote' + i">
+                              <span class="flex-1">Example text inside the empty {{ f.type === 'choice' || f.type === 'lookup' ? 'list' : 'box' }}; left empty, people see the default shown in it. The label stays; people still see it.</span>
+                              <span class="tabular-nums shrink-0">{{ (f.placeholder || '').length }}/{{ maxPlaceholder }}</span>
+                            </p>
+                          </div>
+                        }
+                        <div class="field" data-help-setting>
+                          <label class="label" [for]="'fieldHelp' + i">Help text <span class="font-normal normal-case text-[color:var(--text-muted)]">(optional)</span></label>
+                          <textarea class="input" rows="2" [id]="'fieldHelp' + i" [attr.maxlength]="maxHelp" [value]="f.help || ''"
+                                    [attr.aria-describedby]="'fieldHelpNote' + i" placeholder="A short hint shown under the field"
+                                    (input)="setField(i, { help: $any($event.target).value })"></textarea>
+                          <p class="field-note text-[color:var(--text-muted)] flex gap-2" [id]="'fieldHelpNote' + i">
+                            <span class="flex-1">Shown under the field and read out with it.</span>
+                            <span class="tabular-nums shrink-0">{{ (f.help || '').length }}/{{ maxHelp }}</span>
+                          </p>
                         </div>
                         @if (f.type === 'choice') {
                           <div class="field">
@@ -466,6 +483,12 @@
                     @if (isAdmin()) {
                       <button cdkMenuItem type="button" class="menu-item" (cdkMenuItemTriggered)="edit(f)" [attr.aria-label]="(canBuild() ? 'Edit ' : 'View ') + f.name">
                         <app-icon [name]="canBuild() ? 'edit' : 'eye'" />{{ canBuild() ? 'Edit' : 'View' }}
+                      </button>
+                    }
+                    @if (isAdmin() && f.dataset?.analyticsDatasetId) {
+                      <button cdkMenuItem type="button" class="menu-item" (cdkMenuItemTriggered)="rebuildDataset(f)" [disabled]="rebuilding() !== null"
+                              [attr.aria-label]="'Rebuild dataset files of ' + f.name" data-rebuild-dataset>
+                        <app-icon name="refresh" />{{ rebuilding() === f.formId ? 'Rebuilding files…' : 'Rebuild dataset files' }}
                       </button>
                     }
                     @if (canBuild()) {

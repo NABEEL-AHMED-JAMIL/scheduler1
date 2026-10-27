@@ -19,12 +19,12 @@ import { PAGE_SIZES } from './pager';
         </span>
 
         <div class="ml-auto flex items-center gap-1">
-          <button type="button" class="btn btn-ghost btn-sm" [disabled]="page() === 1"
+          <button type="button" class="btn btn-default btn-sm" [disabled]="page() === 1"
                   (click)="goTo.emit(page() - 1)" aria-label="Previous page">
             <app-icon name="chevronLeft" />Prev
           </button>
           <span class="text-xs px-2 tabular">Page {{ page() }} of {{ totalPages() }}</span>
-          <button type="button" class="btn btn-ghost btn-sm" [disabled]="page() === totalPages()"
+          <button type="button" class="btn btn-default btn-sm" [disabled]="page() === totalPages()"
                   (click)="goTo.emit(page() + 1)" aria-label="Next page">
             Next<app-icon name="chevronRight" />
           </button>

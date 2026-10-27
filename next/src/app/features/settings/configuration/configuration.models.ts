@@ -37,6 +37,58 @@ export interface EngineSetting {
   updatedByName?: string;
 }
 
+/**
+ * Owner #24 (2026-10-19): one engine setting on the allow-list (Core's EngineDial) -- its value on the platform, its
+ * default, range and unit, when a change takes effect, and the workspaces with a value of their own (where it allows one).
+ */
+export interface EngineDial {
+  key: string;
+  label: string;
+  description: string;
+  unit: string;
+  min: number;
+  max: number;
+  defaultValue: number;
+  /** The environment property the default comes from, or "built-in". */
+  defaultFrom: string;
+  value: number;
+  atDefault: boolean;
+  perWorkspace: boolean;
+  takesEffect: string;
+  updatedAt?: string | null;
+  updatedByName?: string | null;
+  overrides: { tenantId: number; value: number; updatedAt?: string | null; updatedByName?: string | null }[];
+}
+
+export interface EngineSettingsAnswer {
+  settings: EngineDial[];
+  watermarks: EngineSetting[];
+  cacheSeconds: number;
+}
+
+export interface EngineSettingChange {
+  id: number;
+  key: string;
+  label: string;
+  tenantId: number | null;
+  action: 'SET' | 'RESET';
+  oldValue: string | null;
+  newValue: string | null;
+  changedByName: string | null;
+  changedAt: string | null;
+}
+
+/** What is wrong with a typed value for this setting, in words; null when it may be saved. */
+export function dialValueError(dial: Pick<EngineDial, 'min' | 'max' | 'unit'>, raw: string | null | undefined): string | null {
+  const text = raw ?? '';
+  const range = `${dial.min.toLocaleString('en-US')} to ${dial.max.toLocaleString('en-US')} ${dial.unit}`;
+  if (!text.trim()) return `Enter a whole number from ${range}.`;
+  if (!/^\d+$/.test(text)) return 'Digits only: no commas, spaces, signs or decimals.';
+  const n = Number(text);
+  if (n < dial.min || n > dial.max) return `Enter a whole number from ${range}.`;
+  return null;
+}
+
 export type TaskReferenceKind = 'HOME_PAGE' | 'TASK_GROUP';
 
 /** A home page or a task group; its id is what a task stores as homePageId / groupId. */
@@ -84,21 +136,6 @@ export const httpUrl: ValidatorFn = (control: AbstractControl): ValidationErrors
   if (!value) return null;
   return HTTP_URL_PATTERN.test(value) ? null : { url: true };
 };
-
-export const FETCH_LIMIT_MAX = 1_000_000;
-
-/**
- * Why a queue fetch limit cannot be saved, or null when it can. Digits only: "5,000", " 50" and
- * "1e3" are all refused rather than guessed at, because the server refuses them too.
- */
-export function fetchLimitError(raw: string | null | undefined): string | null {
-  const text = raw ?? '';
-  if (!text.trim()) return 'Enter a whole number from 1 to 1,000,000.';
-  if (!/^\d+$/.test(text)) return 'Digits only: no commas, spaces, signs or decimals.';
-  const n = Number(text);
-  if (n < 1 || n > FETCH_LIMIT_MAX) return 'Enter a whole number from 1 to 1,000,000.';
-  return null;
-}
 
 /** Names each workspace; the id stands in when listTenants did not return it. */
 export function workspaceLabel(tenants: TenantOption[], tenantId: number | null | undefined): string {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { matchesWorkspace, workspaceName, workspaceOptions } from './workspace-name';
+import { matchesWorkspace, workspaceName } from './workspace-name';
 
 /**
  * MIG-296: a platform administrator's Jobs, Tasks and hour drill-down hold every workspace's rows, and
@@ -18,23 +18,6 @@ describe('workspaceName', () => {
 
   it('says nothing for a row with no workspace at all', () => {
     expect(workspaceName({})).toBe('');
-  });
-});
-
-describe('workspaceOptions', () => {
-  it('lists each workspace in the rows once, by name, with its id as the hint', () => {
-    const options = workspaceOptions([
-      { tenantId: 2, tenantName: 'Zeta' },
-      { tenantId: 1, tenantName: 'Alpha' },
-      { tenantId: 2, tenantName: 'Zeta' },
-      { tenantId: 9 },
-      {},
-    ]);
-    expect(options).toEqual([
-      { value: '1', label: 'Alpha', hint: '#1' },
-      { value: '9', label: 'Workspace #9', hint: '#9' },
-      { value: '2', label: 'Zeta', hint: '#2' },
-    ]);
   });
 });
 

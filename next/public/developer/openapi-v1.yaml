@@ -137,16 +137,34 @@ paths:
         record and the files are handed to the run as its intake: one JSON object with the record's fields and the start's
         own under names beginning with "_" (_reference, _files, _file_ids, _file_bucket, _file_key, ...). One run of a
         pipeline is in flight at a time (409 while one is). Sending the same Idempotency-Key again returns the first run.
+        `parameters` are the run's parameter values by name, checked as the pipeline declares them (GET /pipelines/{id}
+        lists them): a name it does not declare, a value of the wrong type or a required one with no value and no default is
+        a 422 at "parameters.<name>", and nothing starts. Run and wait: with `wait` (1 to 60 seconds), the answer waits for
+        the run to end -- ended in time, 200 with the run and its `result` (a completed run's final output, as
+        GET /runs/{runId}/result gives it); still going, the 202 and its Location, as without `wait`. A replay with the same
+        Idempotency-Key waits again for the same run.
       security: [{ clientCredentials: [runs:write] }]
       parameters:
         - $ref: '#/components/parameters/PipelineId'
         - $ref: '#/components/parameters/IdempotencyKey'
+        - name: wait
+          in: query
+          required: false
+          description: "Seconds to wait for the run to end, 1 to 60 (`30` or `30s`). Absent: answer at once (202)."
+          schema: { type: string, pattern: '^[0-9]{1,2}s?$', examples: ['30s'] }
       requestBody:
         required: true
         content:
           application/json:
             schema: { $ref: '#/components/schemas/StartRun' }
       responses:
+        '200':
+          description: "Run and wait: the run ended within `wait` -- the run, and its result when it completed."
+          headers:
+            Location: { schema: { type: string }, description: "/v1/runs/{runId}" }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RunWithResult' }
         '202':
           description: Queued.
           headers:
@@ -394,6 +412,84 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '503': { $ref: '#/components/responses/Unavailable' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+  /runs/{runId}/result:
+    get:
+      tags: [runs]
+      operationId: getRunResult
+      summary: "A completed run's answer: its final output's rows, masked, at most 100 rows and 16 KB."
+      description: >
+        The rows of the last step of the run's latest attempt that kept an output, as the pipeline's own data -- the
+        answer a run-and-wait gives when the run ends in time. Every column the workspace's data policy marks sensitive
+        (the Data Catalog's sensitive assets, and a person's details in a pipeline marked sensitive) is masked, and named
+        in `masked`; at most 100 rows and 16 KB of JSON (`truncated` says when there were more). An output past the
+        pipeline's retention, or a run that kept none, answers no rows and says why in `problem`. A run that has not
+        completed is a 409 (`run-not-completed`); another workspace's run a 404.
+      security: [{ clientCredentials: [runs:read] }]
+      parameters: [{ $ref: '#/components/parameters/RunId' }]
+      responses:
+        '200':
+          description: The run's result.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RunResultEnvelope' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+  /runs/{runId}/items:
+    get:
+      tags: [runs]
+      operationId: listRunItems
+      summary: "The run's items: each file, recording, document or row it processed one by one, with its status."
+      description: >
+        A pipeline that works item by item (a step per recording, per file, per document, per row of a per-row call, or one
+        that splits a PDF into its pages) keeps one item per thing it processed: its status (running, done, failed), the step
+        it failed at and why in words, how many of its sub-items (a document's pages) failed, and the files its steps made
+        for it, by file id (GET /v1/files/{fileId} downloads one). In the run's order, cursor paging; parentId lists one
+        item's sub-items. Any other run -- one that reads a table whole -- has no items: an empty list. An item retried in a
+        later attempt shows its latest version (attempt). Never a bucket, a key in a bucket or a storage key.
+      security: [{ clientCredentials: [runs:read] }]
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+        - { name: status, in: query, schema: { type: string, enum: [running, done, failed] }, description: "failed takes in an item with failed sub-items." }
+        - { name: parentId, in: query, schema: { type: string }, description: "An item's id: its sub-items." }
+      responses:
+        '200':
+          description: The items.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RunItemPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+  /runs/{runId}/items/{itemKey}:
+    get:
+      tags: [runs]
+      operationId: getRunItem
+      summary: "One item of a run, with each of its steps."
+      description: >
+        The item by its id ("2"; a sub-item "3.12") -- or by its key, when the key has no '/'. As listRunItems lists it, with
+        steps: each step's status for this item (done, failed, not_run, shared -- a combining step whose output belongs to
+        many items, sharedBy saying how many -- or left_out, when a filter left the item out), its message, rows and files.
+      security: [{ clientCredentials: [runs:read] }]
+      parameters:
+        - $ref: '#/components/parameters/RunId'
+        - { name: itemKey, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: The item.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RunItem' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
   /runs/{runId}/review:
     get:
       tags: [reviews]
@@ -452,7 +548,7 @@ paths:
       description: >
         A link to the console's page /embed/runs/{token}: the run's status and times, its steps, the files it made (each
         with a download) and its review, read-only, with no console navigation and no sign-in. Open it on its own or show
-        it in an iframe: only the origins the API client's frame allow-list names may frame it (Integration › API Clients;
+        it in an iframe: only the origins the API client's frame allow-list names may frame it (Developers › API Clients;
         the page answers Content-Security-Policy frame-ancestors with them, 'none' when there are none), and it refuses
         everything once it has expired. Append `?theme=light` or `dark`, and `accent=<hex colour>` (e.g. 0b6bcb), to fit
         the portal. The link opens that one run only: no other run, no file it does not list, nothing of the API. A
@@ -579,7 +675,9 @@ paths:
         A file of the workspace's -- one it uploaded, or one a run made (the manifest's) -- answered with a 302 to its
         signed link on this API (/v1/files/{fileId}/content?token=...), valid 5 minutes. The link needs no token, so a
         portal may hand it to a browser; it opens that one file only, and never names a bucket or a storage key. The body
-        says the same for a caller that does not follow redirects. A made file past its expiry is 410.
+        says the same for a caller that does not follow redirects. A made file past its expiry is 410. A file a pipeline marked
+        sensitive made (a saved file, a report's PDF) is the pipeline's real output, never masked: an API client is refused it
+        with a 403 of type sensitive-files until a scope for it is offered -- its meta still describes it.
       security: [{ clientCredentials: [files:read] }]
       parameters: [{ $ref: '#/components/parameters/FileId' }]
       responses:
@@ -604,7 +702,7 @@ paths:
       description: >
         No access token: the link's signature is the permission, for this file only, until it expires (5 minutes). A
         link that has expired is 410 (ask GET /v1/files/{fileId} for a new one); a link that is not one this API made, or
-        names another file, is 404.
+        names another file, is 404. A file a pipeline marked sensitive made is 403 (sensitive-files), as GET /v1/files/{fileId}.
       security: []
       parameters:
         - $ref: '#/components/parameters/FileId'
@@ -618,6 +716,7 @@ paths:
             application/octet-stream:
               schema: { type: string, format: binary }
         '404': { $ref: '#/components/responses/NotFound' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '410': { $ref: '#/components/responses/Gone' }
         '503': { $ref: '#/components/responses/Unavailable' }
   /files/{fileId}/meta:
@@ -1106,6 +1205,7 @@ components:
     run-in-flight: { status: 409, title: Conflict, description: "A run of this pipeline is still in flight; one runs at a time. Start (or retry) the next once it has finished.", operations: [startRun, retryRun] }
     pipeline-inactive: { status: 409, title: Conflict, description: "The pipeline is not active.", operations: [startRun, retryRun, startBackfill] }
     workspace-paused: { status: 409, title: Conflict, description: "The workspace is suspended or inactive, so its runs are paused.", operations: [startRun, retryRun] }
+    run-not-completed: { status: 409, title: Conflict, description: "The run has not completed (queued, running, failed, skipped or interrupted), so it has no result.", operations: [getRunResult] }
     run-not-failed: { status: 409, title: Conflict, description: "Only a failed run is retried; this one is queued, running, completed, skipped or interrupted.", operations: [retryRun] }
     pipeline-changed: { status: 409, title: Conflict, description: "The pipeline changed before the step that failed (its source, or a step's key, task, input or settings), so the kept outputs no longer match it. Retry with from start.", operations: [retryRun] }
     input-changed: { status: 409, title: Conflict, description: "A file a step before the failed one read has changed since (its sha256), or is gone; a resume would mix old and new data. Retry with from start.", operations: [retryRun] }
@@ -1117,7 +1217,7 @@ components:
     pipeline-not-backfillable: { status: 409, title: Conflict, description: "The pipeline has no steps, so it cannot be backfilled.", operations: [startBackfill] }
     backfill-closed: { status: 409, title: Conflict, description: "The backfill has ended already (completed, failed or cancelled).", operations: [cancelBackfill] }
     invalid-parameters: { status: 422, title: Unprocessable Content, description: "A parameter value does not suit its parameter (its type, its choices), a required one has no value, or the pipeline has no parameter of that name.", operations: [startBackfill] }
-    workspace-not-ready: { status: 409, title: Conflict, description: "The workspace has no inbox for API uploads yet; an administrator chooses one under Documents > Inbox.", operations: [uploadFile, startRun] }
+    workspace-not-ready: { status: 409, title: Conflict, description: "The workspace has no inbox for API uploads yet; an administrator chooses one under Documents › Intake › File drop.", operations: [uploadFile, startRun] }
     review-not-open: { status: 409, title: Conflict, description: "The run's review cannot take this decision: not completed, no customer review asked for, or already decided.", operations: [decideReview] }
     file-expired: { status: 410, title: Gone, description: "The file is past its expiry: still listed (expired true), no longer downloadable. Run the pipeline again for a new one.", operations: [downloadFile, readFileContent] }
     link-expired: { status: 410, title: Gone, description: "A signed link (a file link, 5 minutes; a view link, 15 minutes) has expired. Ask for a new one.", operations: [readFileContent, readRunView] }
@@ -1154,7 +1254,8 @@ components:
       enum: [queued, running, completed, failed, skipped, interrupted]
     ReviewStatus:
       type: string
-      enum: [not_required, pending, approved, rejected]
+      description: "not_applicable: the pipeline asks for a review, but the run ended without results (failed, skipped, interrupted or missed) -- nothing waits for a reviewer."
+      enum: [not_required, pending, approved, rejected, not_applicable]
     Pipeline:
       type: object
       required: [id, name]
@@ -1190,6 +1291,39 @@ components:
         record: { type: object, additionalProperties: true, description: "Validated against the input contract." }
         files: { type: array, items: { type: string }, description: "File ids from POST /v1/files." }
         reference: { type: string, maxLength: 128, description: "The organisation's own id for this work, echoed back." }
+        parameters:
+          type: object
+          additionalProperties: { type: [string, number, boolean] }
+          description: "The run's parameter values by name, as the pipeline declares them (GET /pipelines/{id}: parameters)."
+    RunResult:
+      type: object
+      required: [columns, rowCount, rows, truncated, masked]
+      properties:
+        step: { type: [string, 'null'], description: "The key of the step whose output this is." }
+        columns: { type: array, items: { type: string } }
+        rowCount: { type: integer, description: "How many rows the output has; rows holds at most 100 of them." }
+        rows: { type: array, items: { type: object, additionalProperties: true } }
+        truncated: { type: boolean, description: "More rows (or more than 16 KB) than given." }
+        masked: { type: array, items: { type: string }, description: "The columns masked by the workspace's data policy." }
+        problem: { type: [string, 'null'], description: "Why there are no rows: past its retention, or the run kept no output." }
+    RunWithResult:
+      allOf:
+        - { $ref: '#/components/schemas/Run' }
+        - type: object
+          properties:
+            result:
+              oneOf:
+                - { $ref: '#/components/schemas/RunResult' }
+                - { type: 'null' }
+              description: "A completed run's result; null for a run that failed, was skipped or interrupted."
+    RunResultEnvelope:
+      type: object
+      required: [runId, pipelineId, status, result]
+      properties:
+        runId: { type: string }
+        pipelineId: { type: string }
+        status: { $ref: '#/components/schemas/RunStatus' }
+        result: { $ref: '#/components/schemas/RunResult' }
     Run:
       type: object
       required: [id, pipelineId, status, createdAt]
@@ -1289,7 +1423,7 @@ components:
       properties:
         key: { type: string }
         name: { type: [string, 'null'] }
-        task: { type: string, description: "The step's task, e.g. read_file, validate, save_file; legacy for a run without steps." }
+        task: { type: string, description: "The step's task, e.g. read_file, validate, save_file, generate_report; legacy for a run without steps." }
         status: { type: string, enum: [pending, running, completed, failed, skipped, interrupted] }
         rowsIn: { type: [integer, 'null'] }
         rowsOut: { type: [integer, 'null'] }
@@ -1309,6 +1443,73 @@ components:
         generatedAt: { type: string, format: date-time }
         files: { type: array, items: { $ref: '#/components/schemas/ManifestFile' } }
         review: { $ref: '#/components/schemas/Review' }
+    RunItemPage:
+      type: object
+      required: [runId, summary, data, nextCursor]
+      properties:
+        runId: { type: string }
+        summary:
+          type: object
+          required: [items, done, failed, running]
+          description: "Over the run's items (not sub-items): failed counts an item with failed sub-items."
+          properties:
+            items: { type: integer }
+            done: { type: integer }
+            failed: { type: integer }
+            running: { type: integer }
+        data: { type: array, items: { $ref: '#/components/schemas/RunItem' } }
+        nextCursor: { type: [string, 'null'] }
+    RunItem:
+      type: object
+      required: [id, key, name, status, attempt, files]
+      properties:
+        id: { type: string, description: "The item's id in the run: \"2\", a sub-item \"3.12\". The same in every attempt." }
+        key: { type: string, description: "What names the item: the file's path in the run's own folder, a document id, a row's key." }
+        name: { type: string }
+        parentId: { type: [string, 'null'], description: "A sub-item's item (a page's document)." }
+        status: { type: string, enum: [running, done, failed] }
+        failedStep: { type: [string, 'null'], description: "The key of the step it failed at." }
+        failedStepName: { type: [string, 'null'] }
+        reason: { type: [string, 'null'], description: "Why it failed, in words." }
+        attempt: { type: integer, description: "The run attempt this version of the item is from: a retried item's latest." }
+        startedAt: { type: [string, 'null'], format: date-time }
+        endedAt: { type: [string, 'null'], format: date-time }
+        durationMs: { type: [integer, 'null'] }
+        subItems:
+          type: [object, 'null']
+          properties:
+            total: { type: integer }
+            done: { type: integer }
+            failed: { type: integer }
+        files:
+          type: array
+          items:
+            type: object
+            required: [fileId, name]
+            properties:
+              fileId: { type: string, description: "GET /v1/files/{fileId} downloads it." }
+              name: { type: string }
+              step: { type: [string, 'null'] }
+              format: { type: [string, 'null'] }
+              bytes: { type: [integer, 'null'] }
+              expiresAt: { type: [string, 'null'], format: date-time }
+        steps:
+          type: array
+          description: "getRunItem only."
+          items:
+            type: object
+            required: [key, status]
+            properties:
+              key: { type: string }
+              name: { type: [string, 'null'] }
+              task: { type: [string, 'null'] }
+              status: { type: string, enum: [done, failed, not_run, shared, left_out] }
+              message: { type: [string, 'null'] }
+              rows: { type: [integer, 'null'] }
+              files: { type: integer }
+              sharedBy: { type: [integer, 'null'] }
+              durationMs: { type: [integer, 'null'] }
+              reusedFromAttempt: { type: [integer, 'null'] }
     ManifestFile:
       allOf:
         - $ref: '#/components/schemas/File'
@@ -1330,6 +1531,12 @@ components:
         sha256: { type: [string, 'null'], description: "Hex; null for a file a run made before files carried one." }
         createdAt: { type: string, format: date-time }
         expiresAt: { type: [string, 'null'], format: date-time }
+        sensitive:
+          type: boolean
+          description: "Present (true) on a file a pipeline marked sensitive made: listed here, refused by GET /v1/files/{fileId} and its link (403 sensitive-files)."
+        downloadable:
+          type: boolean
+          description: "Present (false) beside sensitive: an API client cannot download it yet."
     FileLink:
       type: object
       required: [url, expiresAt]
@@ -1427,6 +1634,17 @@ components:
               label: { type: string }
               type: { type: string }
               required: { type: boolean }
+              help:
+                type: string
+                maxLength: 500
+                description: "A short hint shown under the field. Display text only, never markup; absent when it has none."
+              placeholder:
+                type: string
+                maxLength: 120
+                description: >-
+                  Example text shown inside the field's empty control (text, longText, number, date, email, choice and
+                  lookup fields only). One line of display text, never markup and never a substitute for `label`; absent
+                  when it has none.
               options: { type: array, items: { type: string } }
     Submission:
       type: object

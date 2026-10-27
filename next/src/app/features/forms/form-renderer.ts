@@ -2,7 +2,7 @@ import { DateField } from '../../shared/ui/date-field';
 import { Component, computed, input, output } from '@angular/core';
 import { Field } from '../../shared/ui/field';
 import { Icon } from '../../shared/ui/icon';
-import { AnswerValue, Answers, FormField, TableRow, UploadRef, requiredNow, visibleFields } from './forms.model';
+import { AnswerValue, Answers, FormField, TableRow, UploadRef, placeholderOf, requiredNow, visibleFields } from './forms.model';
 import { SignaturePad } from './signature-pad';
 
 /** One answer changed: the field's key and what it holds now (text as typed, a yes/no as a boolean, rows, uploads). */
@@ -19,7 +19,9 @@ export interface UploadWanted {
 
 /**
  * A form's fields as controls (Wave 5 Forms lite; MIG-277): text, long text, number, date, a choice, yes/no, e-mail, a
- * table of rows, files, a signature and a lookup -- each with its label, help text, required mark and problem, in the
+ * table of rows, files, a signature and a lookup -- each with its label, help text (under the control, which names it in
+ * aria-describedby), placeholder (inside an empty one, a default for its type when the author set none -- placeholderOf;
+ * never instead of the label), required mark and problem, in the
  * form's order, and only those its rules show now. It holds nothing itself: the answers and the problems are the page's,
  * every change is handed back, and chosen files and drawn signatures are handed to the page to upload. The fill-in page
  * and the builder's preview both draw it.
@@ -64,8 +66,14 @@ const IMAGE_MIME: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpe
                                   <option value="false" [selected]="row[c.key] === false">No</option>
                                 </select>
                               }
+                              @case ('date') {
+                                <!-- ZT-F1: a day as the console writes it ("19 Oct 2026"), not the computer's locale ("10/19/2026"). -->
+                                <app-date-field class="date-field-sm" [inputId]="idPrefix() + '-' + f.key + '-' + r + '-' + c.key"
+                                                [label]="c.label + ', row ' + (r + 1)" [value]="cellText(row, c.key)" [inactive]="disabled()"
+                                                [clearable]="true" (valueChange)="setCell(f.key, r, c.key, $event)" />
+                              }
                               @default {
-                                <input class="input input-sm" [type]="c.type === 'date' ? 'date' : c.type === 'email' ? 'email' : 'text'"
+                                <input class="input input-sm" [type]="c.type === 'email' ? 'email' : 'text'"
                                        [attr.inputmode]="c.type === 'number' ? 'decimal' : null" [disabled]="disabled()"
                                        [value]="cellText(row, c.key)" [attr.aria-label]="c.label + ', row ' + (r + 1)"
                                        (input)="setCell(f.key, r, c.key, $any($event.target).value)" />
@@ -115,7 +123,7 @@ const IMAGE_MIME: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpe
                 @if (signature(f.key); as sig) {
                   <div class="flex items-center gap-2 text-sm" data-signed>
                     <app-icon name="checkCircle" class="icon-ok" />Signed
-                    <button type="button" class="btn btn-ghost btn-xs" [disabled]="disabled()" (click)="set(f.key, null)">Sign again</button>
+                    <button type="button" class="btn btn-default btn-xs" [disabled]="disabled()" (click)="set(f.key, null)">Sign again</button>
                   </div>
                 } @else if (uploading()[f.key]) {
                   <p class="text-sm text-[color:var(--text-muted)]">Keeping your signature…</p>
@@ -127,7 +135,7 @@ const IMAGE_MIME: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpe
             @case ('lookup') {
               @if (valuesOf(f.key).length > 30) {
                 <input class="input" [id]="idPrefix() + '-' + f.key" [attr.list]="idPrefix() + '-' + f.key + '-values'" [value]="text(f.key)"
-                       [disabled]="disabled()" [attr.data-field]="f.key" placeholder="Type to find…"
+                       [disabled]="disabled()" [attr.data-field]="f.key" [attr.placeholder]="f.placeholder || 'Type to find…'"
                        (input)="set(f.key, $any($event.target).value)" />
                 <datalist [id]="idPrefix() + '-' + f.key + '-values'">
                   @for (v of valuesOf(f.key); track v) { <option [value]="v"></option> }
@@ -135,19 +143,19 @@ const IMAGE_MIME: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpe
               } @else {
                 <select class="input" [id]="idPrefix() + '-' + f.key" [disabled]="disabled()" [attr.data-field]="f.key"
                         (change)="set(f.key, $any($event.target).value)">
-                  <option value="" [selected]="!text(f.key)">{{ valuesOf(f.key).length ? 'Choose…' : 'Nothing to choose from yet' }}</option>
+                  <option value="" [selected]="!text(f.key)">{{ valuesOf(f.key).length ? (f.placeholder || 'Choose…') : 'Nothing to choose from yet' }}</option>
                   @for (v of valuesOf(f.key); track v) { <option [value]="v" [selected]="text(f.key) === v">{{ v }}</option> }
                 </select>
               }
             }
             @case ('longText') {
               <textarea class="input" rows="4" [id]="idPrefix() + '-' + f.key" [value]="text(f.key)" [disabled]="disabled()"
-                        [attr.data-field]="f.key" (input)="set(f.key, $any($event.target).value)"></textarea>
+                        [attr.data-field]="f.key" [attr.placeholder]="placeholder(f)" (input)="set(f.key, $any($event.target).value)"></textarea>
             }
             @case ('choice') {
               <select class="input" [id]="idPrefix() + '-' + f.key" [disabled]="disabled()" [attr.data-field]="f.key"
                       (change)="set(f.key, $any($event.target).value)">
-                <option value="" [selected]="!text(f.key)">Choose…</option>
+                <option value="" [selected]="!text(f.key)">{{ placeholder(f) }}</option>
                 @for (o of f.options ?? []; track o) {
                   <option [value]="o" [selected]="text(f.key) === o">{{ o }}</option>
                 }
@@ -168,19 +176,21 @@ const IMAGE_MIME: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpe
             }
             @case ('date') {
               <app-date-field [inputId]="idPrefix() + '-' + f.key" [label]="f.label" [value]="text(f.key)" [inactive]="disabled()"
+                              [placeholder]="placeholder(f) ?? 'Pick a date'"
                               [clearable]="!f.required" [attr.data-field]="f.key" (valueChange)="set(f.key, $event)" />
             }
             @case ('number') {
               <input class="input" type="text" inputmode="decimal" [id]="idPrefix() + '-' + f.key" [value]="text(f.key)"
-                     [disabled]="disabled()" [attr.data-field]="f.key" (input)="set(f.key, $any($event.target).value)" />
+                     [disabled]="disabled()" [attr.data-field]="f.key" [attr.placeholder]="placeholder(f)"
+                     (input)="set(f.key, $any($event.target).value)" />
             }
             @case ('email') {
               <input class="input" type="email" autocomplete="off" [id]="idPrefix() + '-' + f.key" [value]="text(f.key)"
-                     [disabled]="disabled()" [attr.data-field]="f.key" (input)="set(f.key, $any($event.target).value)" />
+                     [disabled]="disabled()" [attr.data-field]="f.key" [attr.placeholder]="placeholder(f)" (input)="set(f.key, $any($event.target).value)" />
             }
             @default {
               <input class="input" type="text" [id]="idPrefix() + '-' + f.key" [value]="text(f.key)" [disabled]="disabled()"
-                     [attr.data-field]="f.key" (input)="set(f.key, $any($event.target).value)" />
+                     [attr.data-field]="f.key" [attr.placeholder]="placeholder(f)" (input)="set(f.key, $any($event.target).value)" />
             }
           }
         </app-field>
@@ -207,6 +217,11 @@ export class FormRenderer {
 
   /** The fields asked now: those whose rules show them. */
   readonly shown = computed(() => visibleFields(this.fields(), this.answers()));
+
+  /** The field's own placeholder, else its type's default ("Enter case number", "e.g. SYN-nnn", "Choose…"). */
+  placeholder(f: FormField): string | null {
+    return placeholderOf(f);
+  }
 
   isRequired(f: FormField): boolean {
     return requiredNow(f, this.answers());

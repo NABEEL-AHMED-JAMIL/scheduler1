@@ -4,7 +4,7 @@ import { Subscription } from 'rxjs';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { StorageService } from '../../objects/storage.service';
-import { refusalOf } from '../../bulk/bulk-transfer';
+import { refusalOf } from '../../../shared/ui/blob-refusal';
 import { DatasetFormat, RunOutput, StepLogLine, StepTimeline, attachmentName, engineTimeline, outputsOf, stepStillGoing } from './run-steps.model';
 
 /** Run statuses after which nothing about the run's steps changes again. */

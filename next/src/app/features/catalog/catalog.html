@@ -8,10 +8,16 @@
         </p>
       </div>
       <div class="flex flex-wrap items-center gap-2">
-        <app-refresh-button [loading]="loading()" (refresh)="refresh()" />
+        @if (!noWorkspace()) {
+          <app-refresh-button [loading]="loading()" (refresh)="refresh()" />
+        }
       </div>
     </div>
   </app-page-header>
+
+  @if (noWorkspace()) {
+    <app-needs-workspace what="The catalog is" todo="see its datasets, files and sensitive fields" icon="database" />
+  } @else {
 
   @if (kpis().length) {
     <app-stat-strip [items]="kpis()" [cols]="2" [smCols]="4" align="start" size="md" label="The catalog at a glance" />
@@ -97,4 +103,5 @@
     </table>
     <app-pagination pager [total]="total() ?? 0" [page]="page()" [size]="size()" (goTo)="goTo($event)" (setSize)="setSize($event)" />
   </app-table-shell>
+  }
 </div>

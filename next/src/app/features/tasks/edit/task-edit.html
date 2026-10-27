@@ -26,7 +26,7 @@
           </div>
         </ng-template>
       } @else {
-        <button type="button" class="btn btn-primary btn-sm" data-test="header-run" [disabled]="!!running() || !jobs().length"
+        <button type="button" class="btn btn-primary btn-sm" data-test="header-run" [disabled]="!!running() || (!jobs().length && (locked() || !jobsLoaded()))"
                 [attr.title]="runHint() || null" (click)="runNow()">
           <app-icon name="play" [class.spin]="running()" />{{ runLabel() }}
         </button>
@@ -271,7 +271,8 @@
     </form>
     @if (stepsMode() && stepsView(); as view) {
       <app-step-builder [class.hidden]="activeTab() === 'details' || activeTab() === 'schedules'" [view]="view" [tab]="builderTab()"
-                        [canManage]="!locked()" [isAdmin]="isAdmin()" (saved)="stepsSaved($event)" />
+                        [canManage]="!locked()" [isAdmin]="isAdmin()" [pipelineName]="loadedName()" [jobIds]="jobIdsOf()"
+                        [tenantId]="pipelineTenantId()" [openStep]="step()" (saved)="stepsSaved($event)" />
     }
     @if (activeTab() === 'schedules') {
       <app-section title="Schedules & triggers" [card]="true" data-test="pipeline-schedules"
@@ -319,7 +320,7 @@
         @if (!isEdit()) {
           <a routerLink="/pipelines/list" class="btn btn-ghost"><app-icon name="close" />Cancel</a>
         } @else if (dirty() && !locked()) {
-          <button type="button" class="btn btn-ghost" [disabled]="saving()" (click)="discardAll()"><app-icon name="close" />Discard</button>
+          <button type="button" class="btn btn-default btn-intent-crit" [disabled]="saving()" (click)="discardAll()"><app-icon name="close" />Discard</button>
         }
         @if (builder(); as b) {
           <button type="button" class="btn btn-default" data-test="validate" [disabled]="!!b.busy()" (click)="b.validate()">

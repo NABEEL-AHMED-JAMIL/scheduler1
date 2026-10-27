@@ -285,9 +285,9 @@ describe('Queue duration column', () => {
   it('writes a run\'s length as the run history does', () => {
     const queue = queueFor();
     const ending = (end: string) => row({ startTime: '2026-09-08T10:00:00', endTime: `2026-09-08T${end}` });
-    expect(queue.duration(ending('10:00:25.300'))).toBe('25.3s');
-    expect(queue.duration(ending('10:01:59.600'))).toBe('2m');
-    expect(queue.duration(ending('10:00:00.420'))).toBe('420ms');
+    expect(queue.duration(ending('10:00:25.300'))).toBe('25 sec');
+    expect(queue.duration(ending('10:01:59.600'))).toBe('2 min');
+    expect(queue.duration(ending('10:00:00.420'))).toBe('420 ms');
     expect(queue.duration(row({ endTime: undefined }))).toBeNull();
   });
 });

@@ -25,18 +25,18 @@ export interface StartState {
 const STEPS: Omit<StartStep, 'done'>[] = [
   { key: 'storage', title: 'Connect your storage', link: '/connections/storage', linkLabel: 'Connections › Storage',
     why: 'Where pipelines read files from and keep what they write: an S3, Azure, MinIO or FTP connection of your own.' },
-  { key: 'inbox', title: 'Turn on the inbox and upload a file', link: '/documents/file-drop', linkLabel: 'Inbox', optional: true,
+  { key: 'inbox', title: 'Turn on the inbox and upload a file', link: '/documents/intake/file-drop', linkLabel: 'Documents › Intake › File drop', optional: true,
     why: 'Files people upload land in your storage, each under a key a pipeline step can read. A schedule can also start when one arrives.' },
-  { key: 'topic', title: 'Add a topic', link: '/settings/kafka', linkLabel: 'Kafka & Topics',
+  { key: 'topic', title: 'Add a topic', link: '/settings/kafka', linkLabel: 'Settings › Kafka & Topics',
     why: 'Every pipeline publishes on a topic. It goes through the platform’s Kafka connection unless you add your own.' },
-  { key: 'registry', title: 'Define its registry task', link: '/settings/task-registry', linkLabel: 'Task Registry',
+  { key: 'registry', title: 'Define its registry task', link: '/settings/task-registry', linkLabel: 'Settings › Task Registry',
     why: 'New pipeline there: an id, a name and the topic. This is what a pipeline picks as its registry task.' },
   { key: 'pipeline', title: 'Create the pipeline and build its steps', link: '/pipelines/new', linkLabel: 'New pipeline',
     why: 'Pick the topic and the registry task, create it, then Build its steps: read a file, work on the rows, keep the result.' },
   { key: 'schedule', title: 'Schedule it', link: '/pipelines/schedules/new', linkLabel: 'New schedule',
     why: 'A schedule says when the pipeline runs. Manual is fine to start with: it runs when you say so.' },
-  { key: 'run', title: 'Run it and look at the output', link: '/pipelines/schedules', linkLabel: 'Schedules',
-    why: 'Run now from the schedule’s menu. The run’s Logs page shows each step and the files it kept.' },
+  { key: 'run', title: 'Run it and look at the output', link: '/pipelines/schedules', linkLabel: 'Schedules & triggers',
+    why: 'Run now from the schedule’s menu. The run’s page shows each step, and its Outputs the files it kept, each with View.' },
 ];
 
 /** The checklist for a workspace in the state given: every step, each marked done or not. */
@@ -69,7 +69,7 @@ const hiddenKey = (tenantId: unknown) => `etl_get_started_hidden:${tenantId ?? '
               {{ doneCount() }} of {{ steps().length }} done. Each step opens the screen it happens on; come back here for the next one.
             </p>
           </div>
-          <button type="button" class="btn btn-ghost btn-sm" (click)="hide()"><app-icon name="close" />Hide this guide</button>
+          <button type="button" class="btn btn-default btn-sm" (click)="hide()"><app-icon name="close" />Hide this guide</button>
         </div>
         <ol class="grid gap-2 md:grid-cols-2 2xl:grid-cols-4">
           @for (step of steps(); track step.key; let i = $index) {
@@ -128,7 +128,8 @@ export class GetStarted implements OnInit {
       storage: get('/storageConnection.json/fetchAllConnections').pipe(map(r => rows(r).length > 0)),
       inbox: get('/storage.json/inbox').pipe(map(r => ok(r) && !!r!.data?.configured)),
       topic: get('/setting.json/topics?q=&limit=1').pipe(map(r => rows(r).length > 0)),
-      registry: get('/pipeline.json/list?page=1&limit=1').pipe(map(r => rows(r).length > 0)),
+      // ZT-P11 (owner 2026-10-21): Home reads the count, never a pipeline's definition (those are Pipelines' or Schedules').
+      registry: get('/pipeline.json/count').pipe(map(r => ok(r) && Number(r!.data?.total ?? 0) > 0)),
       pipeline: this.http.post<ApiResponse<any>>(`${API_BASE}/sourceTask.json/listSourceTask?page=1&limit=1`, {})
         .pipe(catchError(() => of(null)), map(r => rows(r).length > 0)),
       jobs: get('/sourceJob.json/listSourceJob?page=1&limit=50').pipe(map(r => rows(r))),

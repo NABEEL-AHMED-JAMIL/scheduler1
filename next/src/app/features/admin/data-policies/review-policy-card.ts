@@ -80,7 +80,7 @@ interface Draft { runs: boolean; documents: boolean; ruleFailures: boolean; }
           </p>
           @if (canEdit()) {
             <div class="flex items-center justify-end gap-2">
-              <button type="button" class="btn btn-ghost btn-sm" [disabled]="!changed() || saving()" (click)="discard()">Discard</button>
+              <button type="button" class="btn btn-default btn-intent-crit btn-sm" [disabled]="!changed() || saving()" (click)="discard()">Discard</button>
               <button type="button" class="btn btn-primary btn-sm" [disabled]="!changed() || saving()" (click)="save()" data-review-policy-save>
                 <app-icon name="save" [busy]="saving()" />{{ saving() ? 'Saving…' : 'Save review policy' }}
               </button>

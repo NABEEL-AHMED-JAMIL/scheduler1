@@ -4,7 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { routes } from './app.routes';
-import { pageGuard, roleGuard } from './core/auth/auth.guard';
+import { accessManagerGuard, pageGuard, roleGuard } from './core/auth/auth.guard';
 import { HUBS } from './core/nav/nav-tree';
 import { toFirstTab } from './core/nav/nav-access';
 
@@ -107,6 +107,8 @@ describe('tab hubs: every tab is its own guarded route', () => {
   /** The one tab whose route is deliberately wider than the tab: a member holding Prompts reads Data policies from the
    * AI Assistant (MIG-254); the Administration hub still shows it to administrators only. */
   const WIDER_ROUTE = new Set(['/administration/data-policies']);
+  /** F4: the Teams tab is an administrator's entry, its page every member's (see below). */
+  const MEMBER_ROUTE = new Set(['/administration/teams']);
 
   it('has a lazy page with its own address for every tab, and one tab per address', () => {
     const paths = tabs.map(t => t.tab.path);
@@ -130,12 +132,27 @@ describe('tab hubs: every tab is its own guarded route', () => {
         expect(guards).toContain(pageGuard);
         return;
       }
+      // F4: the Teams tab is an administrator's menu entry, but its page opens to every member -- they read the teams,
+      // and a team's lead changes its members (from Review › Approvals' My teams). The server decides each change.
+      if (MEMBER_ROUTE.has(tab.path)) {
+        expect(route.data?.minRole).toBeUndefined();
+        expect(guards).toEqual([]);
+        return;
+      }
       expect(keys.sort()).toEqual(tabKeys.sort());
       if (keys.length) expect(guards).toContain(pageGuard);
       // The route's floor is the tab's: TENANT_USER is every signed-in member, no floor at all as far as a tab goes.
       const floor = route.data?.minRole === 'TENANT_USER' ? undefined : route.data?.minRole;
+      // F3: an administrator's tab an access delegate opens too is guarded by accessManagerGuard (admin or delegate).
+      if (tab.delegateOk) {
+        expect(floor).toBeUndefined();
+        expect(guards).toContain(accessManagerGuard);
+        return;
+      }
       expect(floor).toBe(role);
       if (role) expect(guards).toContain(roleGuard);
+      // F3: a tab granted apart from its page's other tabs asks for its tab key too.
+      expect(route.data?.tabKey, tab.path).toBe(tab.tabKey);
     });
   }
 

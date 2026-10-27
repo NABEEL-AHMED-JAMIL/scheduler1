@@ -17,8 +17,8 @@
           <th class="access-grid-person">Person</th>
           <th class="access-grid-profile">Profile</th>
           @for (page of columns(); track page.key) {
-            <th class="access-grid-page" [class.access-grid-first]="isFirstOfSection($index)">
-              <span>{{ page.label }}</span>
+            <th class="access-grid-page" [class.access-grid-first]="isFirstOfSection($index)" [title]="page.label">
+              <span class="line-clamp-2 break-words">{{ page.label }}</span>
             </th>
           }
         </tr>
@@ -28,11 +28,13 @@
           <!-- The profile's own row: what everyone beneath it gets. -->
           <tr class="access-grid-group">
             <td class="access-grid-person">
-              <div class="flex items-center gap-2 whitespace-nowrap">
-                <app-icon name="shield" size="0.95rem" class="opacity-70 shrink-0" />
-                <span class="font-semibold truncate">{{ group.title }}</span>
+              <!-- Owner 2026-10-19 #2: the profile's name and its description wrap; past three lines, the tooltip has the rest. -->
+              <div class="flex items-start gap-2">
+                <app-icon name="shield" size="0.95rem" class="opacity-70 shrink-0 mt-0.5" />
+                <span class="font-semibold line-clamp-2 break-words" [title]="group.title" data-test="group-title">{{ group.title }}</span>
               </div>
-              <div class="text-xs text-[color:var(--text-muted)] mt-0.5 truncate" [title]="group.subtitle">
+              <div class="text-xs text-[color:var(--text-muted)] mt-0.5 pl-6 line-clamp-3 break-words" [title]="group.subtitle"
+                   data-test="group-subtitle">
                 {{ group.rows.length }} {{ group.rows.length === 1 ? 'person' : 'people' }}{{ group.subtitle ? ' · ' + group.subtitle : '' }}
               </div>
             </td>
@@ -51,19 +53,29 @@
                 <div class="flex items-center gap-2.5 pl-6">
                   <app-avatar [appUserId]="row.person.appUserId" [version]="row.person.avatarVersion ?? null" [name]="row.person.fullName" [size]="1.9" [decorative]="true" />
                   <div class="min-w-0">
-                    <div class="font-medium truncate leading-tight">{{ row.person.fullName }}</div>
-                    <div class="text-xs text-[color:var(--text-muted)] truncate">{{ row.person.position || row.person.username }}</div>
+                    <div class="font-medium line-clamp-2 break-words leading-tight" [title]="row.person.fullName">{{ row.person.fullName }}</div>
+                    <div class="text-xs text-[color:var(--text-muted)] line-clamp-2 break-words"
+                         [title]="row.person.position ? row.person.position + ' · ' + row.person.username : row.person.username">{{ row.person.position || row.person.username }}</div>
                   </div>
                 </div>
               </td>
               <td class="access-grid-profile">
                 <select class="input py-1 text-xs" (change)="pick(row.person, $any($event.target).value, $any($event.target))"
-                        [disabled]="busy() === row.person.appUserId" [attr.aria-label]="'Profile for ' + row.person.fullName">
+                        [disabled]="busy() === row.person.appUserId" [attr.aria-label]="'Profile for ' + row.person.fullName"
+                        [title]="row.person.pageAccessProfileName || ('Default' + (defaultProfile() ? ' · ' + defaultProfile()!.profileName : ''))">
                   <option value="" [selected]="row.person.pageAccessProfileId == null">Default{{ defaultProfile() ? ' · ' + defaultProfile()!.profileName : '' }}</option>
                   @for (profile of profiles(); track profile.pageAccessProfileId) {
                     <option [value]="profile.pageAccessProfileId" [selected]="profile.pageAccessProfileId === row.person.pageAccessProfileId">{{ profile.profileName }}</option>
                   }
                 </select>
+                @if (row.person.twoFactorRequired || row.person.twoFactorEnabled) {
+                  <!-- MIG-424: two-factor on, or required (by the workspace or the profile) and not set up yet. -->
+                  <span class="mt-1 pill text-[11px]" [class.pill-ok]="row.person.twoFactorEnabled" [class.pill-warn]="!row.person.twoFactorEnabled"
+                        [attr.data-mfa]="row.person.username"
+                        [title]="row.person.twoFactorRequired ? 'Required by ' + (row.person.twoFactorRequiredBy === 'profile' ? 'their profile' : 'the workspace') : 'Their own choice'">
+                    {{ row.person.twoFactorEnabled ? 'Two-factor on' : 'Two-factor not set up' }}
+                  </span>
+                }
                 @if (row.exceptions) {
                   <button type="button" class="mt-1 text-[11px] text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] hover:underline inline-flex items-center gap-1"
                           (click)="reset.emit(row.person)" [disabled]="busy() === row.person.appUserId"

@@ -44,11 +44,6 @@ import { RunStepLogData, RunStepLogPanel } from './run-step-log-panel';
     .rs-row.is-warn td:first-child { box-shadow: inset 3px 0 0 var(--warn-text); }
     .rs-no { width: 2.5rem; color: var(--text-muted); text-align: right; }
     .rs-name { font-weight: 500; color: var(--text-primary); line-height: 1.15rem; max-width: 34rem; }
-    /* At a laptop's width (1187) the table fits without a sideways scroll: the step and its files take less room. */
-    @media (max-width: 1439px) {
-      .rs-table thead th, .rs-table td { padding-left: 0.5rem; padding-right: 0.5rem; }
-      .rs-name, .rs-sub { max-width: 18rem; } .rs-out-col { min-width: 0; max-width: 13rem; } .rs-step-col { min-width: 12rem; }
-    }
     .rs-dot { display: inline-block; width: 0.5rem; height: 0.5rem; border-radius: 9999px; vertical-align: middle; margin-right: 0.25rem; background: var(--color-warn-500); }
     .rs-sub { font-size: 11px; line-height: 0.875rem; color: var(--text-muted); }
     .rs-problem { font-size: 11px; line-height: 1rem; margin-top: 0.125rem; white-space: normal; overflow-wrap: anywhere; }
@@ -60,6 +55,16 @@ import { RunStepLogData, RunStepLogPanel } from './run-step-log-panel';
     .rs-step-col { min-width: 16rem; }
     .rs-chip-detail { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
     .rs-out-col { min-width: 13rem; max-width: 24rem; }
+    /* ZT-P14: after the rules it narrows -- placed before them, they won (same specificity) and a 1024 tablet scrolled sideways.
+       At a laptop's width (1187) the table fits without a sideways scroll: the step and its files take less room. */
+    @media (max-width: 1439px) {
+      .rs-table thead th, .rs-table td { padding-left: 0.5rem; padding-right: 0.5rem; }
+      .rs-name, .rs-sub { max-width: 18rem; } .rs-out-col { min-width: 0; max-width: 13rem; } .rs-step-col { min-width: 12rem; }
+    }
+    /* ZT-P14: a 1024 tablet (958 px of card) needs the step column narrower still. */
+    @media (max-width: 1279px) {
+      .rs-name, .rs-sub { max-width: 14rem; } .rs-step-col { min-width: 10rem; }
+    }
   `,
   template: `
     @if (store.timeline(); as t) {
@@ -257,7 +262,7 @@ export class RunStepsTable {
     return t?.attemptDetails?.find(detail => detail.attempt === t.attempt) ?? null;
   });
 
-  outcome(approval: StepApproval): string { return approvalOutcome(approval, this.approvals?.groupNames()); }
+  outcome(approval: StepApproval): string { return approvalOutcome(approval, this.approvals?.teamNames()); }
 
   chooseAttempt(value: string): void {
     const attempt = Number(value);

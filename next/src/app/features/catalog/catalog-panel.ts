@@ -80,7 +80,7 @@ export interface CatalogPanelData {
                         (input)="description.set($any($event.target).value)" placeholder="What it holds and what it is for"></textarea>
               <div class="flex flex-wrap items-center gap-2 text-sm">
                 <span class="text-[color:var(--text-secondary)]">Owner: {{ ownerName() || 'nobody' }}</span>
-                @if (owner() !== me()) { <button type="button" class="btn btn-ghost btn-sm" (click)="owner.set(me()); ownerName.set('you')">Make me the owner</button> }
+                @if (owner() !== me()) { <button type="button" class="btn btn-default btn-sm" (click)="owner.set(me()); ownerName.set('you')">Make me the owner</button> }
                 @if (owner() !== null) { <button type="button" class="btn btn-ghost btn-sm" (click)="owner.set(null); ownerName.set('')">Clear owner</button> }
                 <button type="button" class="btn btn-default btn-sm" [disabled]="busy()" (click)="saveDetails()" data-save-details>
                   <app-icon name="save" />Save details</button>
@@ -102,8 +102,8 @@ export interface CatalogPanelData {
             <div class="flex flex-wrap items-center gap-2">
               <h3 class="text-sm font-semibold flex-1">Columns</h3>
               @if (a.kind !== 'document_type' && a.status === 'Active') {
-                <button type="button" class="btn btn-ghost btn-sm" [disabled]="busy()" (click)="profile()" data-profile><app-icon name="chart" />Profile</button>
-                <button type="button" class="btn btn-ghost btn-sm" [disabled]="busy()" (click)="scan()" data-scan><app-icon name="shield" />Scan for sensitive data</button>
+                <button type="button" class="btn btn-default btn-sm" [disabled]="busy()" (click)="profile()" data-profile><app-icon name="chart" />Profile</button>
+                <button type="button" class="btn btn-default btn-sm" [disabled]="busy()" (click)="scan()" data-scan><app-icon name="shield" />Scan for sensitive data</button>
               }
             </div>
             <!-- UX review B5 (CT1): columns whose names read like patient data but carry no tag, said where the scan is. -->
@@ -189,7 +189,7 @@ export interface CatalogPanelData {
                     @if (g.reason) { · "{{ g.reason }}" }</span>
                   @if (g.expiresAt && g.status === 'Granted') { <span class="text-xs">until {{ g.expiresAt | serverTime: 'dateTime' }}</span> }
                   @if (g.status === 'Granted' || g.status === 'Requested') {
-                    <button type="button" class="btn btn-ghost btn-sm" [disabled]="busy()" (click)="revoke(g)">End</button>
+                    <button type="button" class="btn btn-default btn-intent-crit btn-sm" [disabled]="busy()" (click)="revoke(g)">End</button>
                   }
                 </div>
               }

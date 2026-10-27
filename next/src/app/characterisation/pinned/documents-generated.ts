@@ -1,13 +1,13 @@
 // Recorded by scripts/characterisation/record.mjs -- see ../harness.ts. Review the diff: it is the baseline.
 export const PINNED: Record<string, unknown> = {
   "Reports, as a tenant user without the page": {
-    "url": "/unauthorized?page=tools-converter&title=Generated%20reports",
+    "url": "/unauthorized?page=tools-converter&title=Reports%20from%20pipelines",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1"
     ],
     "headings": [
-      "Generated reports isn't part of your access"
+      "Reports from pipelines isn't part of your access"
     ],
     "buttons": [
       "Request access"
@@ -19,7 +19,7 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "Reports, as a workspace administrator": {
-    "url": "/data/reports",
+    "url": "/reports/from-pipelines",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -31,7 +31,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /sourceJob.json/runOutputs?jobQueueId=7405"
     ],
     "headings": [
-      "Generated reports",
+      "Reports from pipelines",
       "Generated outputs (3 of 3)"
     ],
     "buttons": [
@@ -62,22 +62,15 @@ export const PINNED: Record<string, unknown> = {
       "reports/"
     ],
     "links": [
-      "/data",
-      "/data/analytics",
-      "/data/ask",
-      "/data/catalog",
-      "/data/files",
-      "/data/reports",
       "/pipelines/schedules/2849/runs/7405",
+      "/reports",
       "/tools/converter?mode=dataset"
     ]
   },
   "a file's details, written by a recent run": {
     "requests": [
       "GET /storage.json/objectMetadata?bucket=ui-review-s3&key=registry-live-check/customers-clean.json",
-      "GET /sourceJob.json/listSourceJob",
-      "GET /sourceJob.json/fetchSourceJobQueueListWithJobId?jobId=2849&limit=3",
-      "GET /sourceJob.json/runOutputs?jobQueueId=7405"
+      "GET /sourceJob.json/objectWriter?bucket=ui-review-s3&key=registry-live-check/customers-clean.json"
     ],
     "headings": [
       "customers-clean.json",
@@ -102,11 +95,17 @@ export const PINNED: Record<string, unknown> = {
     ],
     "headings": [
       "Document Converter",
+      "Convert",
       "Recent conversions (1 of 1)"
     ],
     "buttons": [
+      "30 days",
+      "7 days",
+      "90 days",
       "A table in a bucket",
+      "All time",
       "Columns",
+      "Custom",
       "Delete this conversion",
       "From a bucket",
       "Make PDF",
@@ -114,8 +113,9 @@ export const PINNED: Record<string, unknown> = {
       "PDF from a run",
       "Paste rows",
       "Preview",
+      "Read the limits and queue again",
       "Refresh",
-      "Supported formats",
+      "Supported formats 2",
       "Upload a file",
       "View the converted file",
       "View the original file"
@@ -140,6 +140,8 @@ export const PINNED: Record<string, unknown> = {
       "Page size",
       "Rows (JSON)",
       "Save the file to a bucket",
+      "Search name, file or format",
+      "Search recent conversions",
       "Template",
       "The dataset's own title",
       "The title, or report",
@@ -163,18 +165,25 @@ export const PINNED: Record<string, unknown> = {
     ],
     "headings": [
       "Document Converter",
+      "Convert",
       "Recent conversions (1 of 1)"
     ],
     "buttons": [
+      "30 days",
+      "7 days",
+      "90 days",
+      "All time",
       "Columns",
+      "Custom",
       "Delete this conversion",
       "From a bucket",
       "Make PDF",
       "PDF from a dataset",
       "PDF from a run",
       "Preview",
+      "Read the limits and queue again",
       "Refresh",
-      "Supported formats",
+      "Supported formats 2",
       "Upload a file",
       "View the converted file",
       "View the original file"
@@ -202,6 +211,8 @@ export const PINNED: Record<string, unknown> = {
       "Run",
       "Save the file to a bucket",
       "Schedule",
+      "Search name, file or format",
+      "Search recent conversions",
       "Template",
       "The dataset's own title",
       "The title, or report",

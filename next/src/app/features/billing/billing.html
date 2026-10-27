@@ -3,13 +3,14 @@
     <div class="page-head">
       <div>
         <h1 class="page-title">Cost &amp; usage</h1>
-        <p class="page-subtitle">What this workspace used, and what it costs — the same lines the invoice will carry.</p>
+        @if (workspaces.effectiveIsSandbox()) {
+          <p class="page-subtitle">What this sandbox used, and what it would cost — a sandbox is never billed.</p>
+        } @else {
+          <p class="page-subtitle">What this workspace used, and what it costs — the same lines the invoice will carry.</p>
+        }
       </div>
       <div class="flex items-center gap-2 flex-wrap">
-        @if (isPlatformAdmin()) {
-          <label for="usageWorkspace" class="sr-only">Workspace</label>
-          <app-combobox id="usageWorkspace" class="w-56" [selected]="workspaces.effective()" (selectedChange)="pickTenant($event)" placeholder="Workspace" [allowClear]="false" [options]="workspaces.options()" />
-        }
+        <app-workspace-select [value]="workspaces.effectiveId()" (valueChange)="pickTenant($event === null ? '' : '' + $event)" />
         <div class="btn-join" role="group" aria-label="Month">
           <button type="button" class="btn btn-default btn-icon btn-sm" (click)="shiftMonth(-1)" aria-label="Previous month"><app-icon name="chevronLeft" /></button>
           <span class="btn btn-default btn-sm btn-label min-w-32" aria-live="polite">{{ monthLabel() }}</span>
@@ -34,16 +35,25 @@
       <button type="button" class="btn btn-default btn-sm mt-3" (click)="load()"><app-icon name="refresh" />Try again</button>
     </div>
   } @else {
-    <p class="text-xs text-[color:var(--text-muted)]">
+    <!-- Owner #7: the facts of the month as chips -- the card that prices it, the currency, the day, yesterday and the
+         billing time zone -- rather than one dotted line that wrapped mid-fact at 1024. -->
+    <div class="bill-meta" data-test="usage-meta">
+      @if (workspaces.effectiveIsSandbox()) {
+        <span class="pill pill-warn" data-test="usage-sandbox" title="Test usage through API test keys: priced here to show what it would cost, never drafted or invoiced">Sandbox · never billed</span>
+      }
       @if (rateCard(); as card) {
-        Priced with <b>{{ card.name }}</b> v{{ card.version }}@if (card.tenantSpecific) { <span class="pill pill-brand ml-1">This workspace's card</span> }
-        @if (card.fallback; as f) { <span data-fallback-card>· meters it does not name are priced from <b>{{ f.name }}</b> v{{ f.version }}</span> } · {{ currency() }}
-        @if (isPlatformAdmin()) { · <a routerLink="/platform/rate-cards" class="link-inline">rate cards</a> }
-      } @else { Priced with the rate card in effect · {{ currency() }} }
-      · day {{ daysElapsed() }} of {{ daysInMonth() }}
-      @if (isCurrentMonth()) { · yesterday {{ fmtMoney(yesterday()) }} }
-      @if (timeZone(); as zone) { · <span data-billing-zone title="Days and months on this page and on the invoice are counted in this workspace's billing time zone">days in {{ zone }}</span> }
-    </p>
+        <span class="bill-meta-chip" data-test="usage-card" [title]="'Priced with ' + card.name + ' v' + card.version"><app-icon name="layers" size="0.9em" />Priced with <b>{{ card.name }}</b> v{{ card.version }}</span>
+        @if (card.tenantSpecific) { <span class="pill pill-brand">This workspace's card</span> }
+        @if (card.fallback; as f) { <span class="bill-meta-chip" data-fallback-card [title]="'Meters it does not name are priced from ' + f.name + ' v' + f.version"><app-icon name="layers" size="0.9em" />others priced from <b>{{ f.name }}</b> v{{ f.version }}</span> }
+      } @else {
+        <span class="bill-meta-chip"><app-icon name="layers" size="0.9em" />Priced with the rate card in effect</span>
+      }
+      <span class="bill-meta-chip"><b>{{ currency() }}</b></span>
+      <span class="bill-meta-chip tabular"><app-icon name="calendar" size="0.9em" />Day {{ daysElapsed() }} of {{ daysInMonth() }}</span>
+      @if (isCurrentMonth()) { <span class="bill-meta-chip tabular">Yesterday <b>{{ fmtMoney(yesterday()) }}</b></span> }
+      @if (timeZone(); as zone) { <span class="bill-meta-chip" data-billing-zone title="Days and months on this page and on the invoice are counted in this workspace's billing time zone"><app-icon name="globe" size="0.9em" />Days in <b>{{ zone }}</b></span> }
+      @if (isPlatformAdmin()) { <a routerLink="/billing/settings" class="bill-meta-chip"><app-icon name="settings" size="0.9em" />Rate cards</a> }
+    </div>
 
     @if (unpricedLines().length) {
       <!-- Rate card fallback: what is left unpriced is on no card at all -- billed at 0 until a card prices it. -->
@@ -53,7 +63,7 @@
           <b>Usage with no price anywhere:</b>
           @for (l of unpricedLines(); track l.meter) { <span class="mono">{{ l.label }} ({{ l.meter }})</span>{{ $last ? '' : ', ' }} }
           — on {{ unpricedWhere() }}, so it is billed at 0.
-          @if (isPlatformAdmin()) { <a routerLink="/platform/rate-cards" class="link-inline">Price it on a rate card</a> and the month is priced again. }
+          @if (isPlatformAdmin()) { <a routerLink="/billing/settings" class="link-inline">Price it on a rate card</a> and the month is priced again. }
         </div>
       </div>
     }
@@ -70,7 +80,8 @@
 
     <!-- Owner review 2026-10-12: the chart and By service are one height; the chart fills its card. -->
     <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,28rem)] items-stretch mt-4">
-      <div class="card p-4 flex flex-col min-w-0" data-test="cost-by-day-card">
+      <!-- ZT-C4: the card keeps the drawn chart's height while the meter is read (it grew 175 px and moved every line below). -->
+      <div class="card p-4 flex flex-col min-w-0 min-h-[25.5rem]" data-test="cost-by-day-card">
         @if (loading() && !days().length) {
           <h2 class="font-semibold text-sm">Cost by day</h2>
           <div class="flex-1 py-10 text-center text-sm text-[color:var(--text-muted)]"><div class="spinner mx-auto mb-2"></div>Reading the meter…</div>
@@ -90,9 +101,10 @@
             <tbody>
               @for (s of byService(); track s.service) {
                 <tr [attr.data-service]="s.service">
-                  <td><span class="inline-block size-2.5 rounded-sm mr-2 align-middle" [style.background]="s.color"></span>{{ s.service }}</td>
+                  <td><span class="inline-block size-2.5 rounded-sm mr-2 align-middle" [style.background]="s.color"></span>{{ s.service }}
+                    <div class="svc-share" aria-hidden="true"><span [style.width.%]="s.amount > 0 ? Math.max(s.share, 1) : 0" [style.background]="s.color"></span></div></td>
                   <td class="text-right tabular" [title]="fmtExact(s.amount)">{{ fmtAmount(s.amount) }}</td>
-                  <td class="text-right tabular text-[color:var(--text-muted)] w-14">{{ s.share }}%</td>
+                  <td class="text-right tabular text-[color:var(--text-muted)] w-14">{{ shareLabel(s.share, s.amount) }}</td>
                 </tr>
               }
             </tbody>
@@ -158,6 +170,31 @@
                             [attr.aria-label]="'Show what is behind ' + line.label" (click)="$event.stopPropagation(); toggleLine(line)">
                   <app-icon [name]="openLine()?.meter === line.meter ? 'chevronDown' : 'chevronRight'" size="0.9em" class="icon-muted" /></button></td>
               </tr>
+              <!-- Owner #23: usage pricing rules priced, each rule's part under its meter; the meter's line is their sum. -->
+              @if (line.rules?.length) {
+                @if ((line.cardQuantity ?? 0) !== 0 || (line.cardAmount ?? 0) !== 0) {
+                <tr class="rule-part" data-test="rule-part-card">
+                  <td class="!pl-6 text-xs text-[color:var(--text-secondary)]">↳ At the card's price</td>
+                  <td class="hidden md:table-cell"></td>
+                  <td class="text-right tabular text-xs">{{ fmtUnits(line, line.cardQuantity ?? 0) }}
+                    @if ((line.cardIncludedQuantity ?? 0) > 0) { <div class="text-[11px] text-[color:var(--text-muted)]">{{ fmtUnits(line, line.cardIncludedQuantity ?? 0) }} included</div> }</td>
+                  <td class="text-right tabular text-xs text-[color:var(--text-muted)] hidden md:table-cell whitespace-nowrap">{{ fmtRate(line) }}</td>
+                  <td class="text-right tabular text-xs" [title]="fmtExact(line.cardAmount ?? 0)">{{ fmtAmount(line.cardAmount ?? 0) }}</td>
+                  <td></td>
+                </tr>
+                }
+                @for (part of line.rules; track part.ruleNo) {
+                  <tr class="rule-part" data-test="rule-part" [attr.data-rule]="part.ruleNo">
+                    <td class="!pl-6 text-xs">↳ {{ part.label }} <span class="text-[color:var(--text-muted)]">· pricing rule</span></td>
+                    <td class="hidden md:table-cell"></td>
+                    <td class="text-right tabular text-xs">{{ fmtUnits(line, part.quantity) }}
+                      @if (part.includedQuantity > 0) { <div class="text-[11px] text-[color:var(--text-muted)]">{{ fmtUnits(line, part.includedQuantity) }} included</div> }</td>
+                    <td class="text-right tabular text-xs text-[color:var(--text-muted)] hidden md:table-cell whitespace-nowrap">{{ fmtUnitPrice(part.unitPrice, line.per, line.unit) }}</td>
+                    <td class="text-right tabular text-xs" [title]="fmtExact(part.amount)">{{ fmtAmount(part.amount) }}</td>
+                    <td></td>
+                  </tr>
+                }
+              }
               @if (openLine()?.meter === line.meter) {
                 <tr class="bg-sunken">
                   <td colspan="6" class="!py-3">
@@ -209,64 +246,9 @@
       <app-pipeline-costs [query]="usageQuery()" [runId]="runParam()" [currency]="currency()" />
     </div>
 
-    <div class="mt-4">
-      <app-table-shell heading="Cost per model call" [shown]="runs().length" [total]="runsTotal()" [loading]="runsLoading() && !runs().length"
-                       [isEmpty]="!runs().length" [error]="runsError()" (retry)="retryRuns()" emptyMessage="No model calls in this month yet." emptyIcon="chart">
-        <ng-container toolbar>
-          <span class="text-xs text-[color:var(--text-muted)]">Each model call at its own model's rate — before the month's allowances and tiers, which the lines above apply.</span>
-        </ng-container>
-        @if (runRateNote().length) {
-          <!-- Owner review 2026-10-12: the rate is said once here, not on every row; a row's tooltip has its full pricing. -->
-          <p class="px-4 py-2 text-xs text-[color:var(--text-secondary)] border-b border-subtle" data-test="run-rates">
-            <b class="font-medium">Rates:</b> {{ runRateNote().join(' · ') }}
-            @if (runActors().length === 1) { <span class="text-[color:var(--text-muted)]"> · every call by {{ runActors()[0] }}</span> }
-          </p>
-        }
-        <div class="day-table-scroll" data-test="model-call-scroll">
-        <table class="table-modern day-table" data-test="model-calls">
-          <thead>
-            <tr>
-              <th class="w-20">Time</th>
-              <th>Run</th>
-              <th>Model</th>
-              <th class="text-right">Tokens in</th>
-              <th class="text-right">Tokens out</th>
-              @if (runActors().length > 1) { <th class="hidden lg:table-cell">By</th> }
-              <th class="text-right">Cost</th>
-            </tr>
-          </thead>
-          @for (g of runGroups(); track g.day) {
-            <tbody>
-              <tr class="day-group" data-test="day-group">
-                <th [attr.colspan]="runActors().length > 1 ? 7 : 6" scope="colgroup">
-                  <div class="day-group-line"><span>{{ g.day ? dayTitle(g.day) : 'Time not known' }}</span>
-                    <span class="day-group-sum">{{ g.count | number: '1.0-0' }} {{ g.count === 1 ? 'call' : 'calls' }} · {{ fmtMoney(g.amount) }}</span></div>
-                </th>
-              </tr>
-              @for (r of g.rows; track r.run) {
-                <tr [title]="runRates(r)">
-                  <td class="text-xs tabular whitespace-nowrap" data-test="run-time">{{ runTime(r) }}</td>
-                  <td>
-                    <div class="font-medium">{{ runLabel(r) }}</div>
-                    <div class="text-[11px] mono text-[color:var(--text-muted)]">{{ r.run }}@if (r.job_queue_id) { · run {{ r.job_queue_id }} }</div>
-                  </td>
-                  <td class="mono text-xs">{{ r.model || '—' }}</td>
-                  <td class="text-right tabular">{{ r.tokens_in | number: '1.0-0' }}</td>
-                  <td class="text-right tabular">{{ r.tokens_out | number: '1.0-0' }}</td>
-                  @if (runActors().length > 1) { <td class="hidden lg:table-cell text-xs text-[color:var(--text-muted)]">{{ runActor(r) }}</td> }
-                  <td class="text-right tabular font-medium">{{ fmtRunAmount(r.amount) }}</td>
-                </tr>
-              }
-            </tbody>
-          }
-        </table>
-        </div>
-        @if (moreRuns()) {
-          <div class="p-3 text-center">
-            <button type="button" class="btn btn-default btn-sm" (click)="loadRuns()" [disabled]="runsLoading()">{{ runsLoading() ? 'Reading…' : 'Show more runs' }}</button>
-          </div>
-        }
-      </app-table-shell>
+    <!-- Cost & usage redesign (2026-10-19): AI model calls -- the month's calls by what called the model, and every call. -->
+    <div class="mt-6">
+      <app-model-calls [query]="usageQuery()" [currency]="currency()" [timeZone]="timeZone()" />
     </div>
 
     <p class="text-xs text-[color:var(--text-muted)] mt-3 max-w-3xl">

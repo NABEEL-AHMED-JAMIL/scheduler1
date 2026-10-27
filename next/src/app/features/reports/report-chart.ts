@@ -239,7 +239,7 @@ export class ReportChart {
        * distinct labels, telling the reader nothing about where a point sits between them.
        *
        * formatDuration already picks the unit that suits each value -- milliseconds below a
-       * second, tenths below a minute, minutes and hours above -- so handing it the real number is
+       * second, tenths below ten seconds, whole seconds to a minute, minutes and hours above -- so handing it the real number is
        * all that is needed. Counting measures are unaffected: compactNumber rounds inside itself
        * below a thousand, so a tally axis prints exactly what it printed before.
        *

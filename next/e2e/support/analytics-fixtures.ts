@@ -273,6 +273,14 @@ async function ensureBoard(request: APIRequestContext, s: Session, connection: s
   }
 }
 
+/**
+ * The orders dataset (ORDERS) in another workspace's bucket, made the same way when it is missing: what the Meridian
+ * chart check reads (2026-10-20: LocalStack was emptied and meridian/analytics-samples/orders.csv with it).
+ */
+export async function ensureOrders(request: APIRequestContext, s: Session, connection: string): Promise<void> {
+  await ensureObject(request, s, connection, ORDERS.path, ordersCsv);
+}
+
 async function build(request: APIRequestContext, s: Session): Promise<AnalyticsFixtures> {
   const connection = await connectionOf(request, s);
   await ensureObject(request, s, connection, BENCHMARK.path, benchmarkCsv);

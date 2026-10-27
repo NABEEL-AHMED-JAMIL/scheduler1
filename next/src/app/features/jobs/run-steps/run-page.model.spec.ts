@@ -36,6 +36,10 @@ describe('run page: the tab an address opens', () => {
 describe('run page: the header\'s one status', () => {
   it('says the run and its review in one pill', () => {
     expect(runStatusLook('Completed', 'PENDING')).toEqual({ label: 'Completed · waiting for review', tone: 'warn', icon: 'clock' });
+    // AI hard-workflow test: a failed run has nothing to review -- Core says NOT_APPLICABLE, and an older PENDING is not shown either.
+    expect(runStatusLook('Failed', 'PENDING')).toEqual({ label: 'Failed', tone: 'crit', icon: 'xCircle' });
+    expect(runStatusLook('Failed', 'NOT_APPLICABLE')).toEqual({ label: 'Failed', tone: 'crit', icon: 'xCircle' });
+    expect(runStatusLook('Interrupt', 'NOT_APPLICABLE')?.label).toBe('Interrupted');
     expect(runStatusLook('Completed', 'APPROVED')?.label).toBe('Completed · approved');
     expect(runStatusLook('Completed', 'REJECTED')?.tone).toBe('crit');
     expect(runStatusLook('Completed', 'NOT_REQUIRED')).toEqual({ label: 'Completed', tone: 'ok', icon: 'checkCircle' });
@@ -139,7 +143,7 @@ describe('run page: the steps table\'s rows', () => {
     expect(rows.map(r => r.slowest)).toEqual([false, true, false]);
     expect(rows[1].share).toBe(1);
     expect(rows[0].share).toBeCloseTo(24 / 3097);
-    expect(rows[1].duration).toBe('3.1s');
+    expect(rows[1].duration).toBe('3.1 sec');
     expect(stepRows(timeline([steps[0]]), [])[0].slowest).toBe(false);
   });
 

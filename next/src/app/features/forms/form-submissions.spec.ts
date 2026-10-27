@@ -30,11 +30,11 @@ const SUBMISSIONS: Submission[] = [
     answers: { patient_id: 'P-17', infection_signs: false } },
 ];
 
-function render(formId?: string) {
+function render(formId?: string, submissions: Submission[] = SUBMISSIONS) {
   const api = {
     list: vi.fn(() => of({ status: 'SUCCESS', message: '', data: FORMS })),
     fetch: vi.fn(() => of({ status: 'SUCCESS', message: '', data: { ...FORMS[0], fields: FIELDS } })),
-    submissionsOf: vi.fn(() => of({ status: 'SUCCESS', message: '', data: SUBMISSIONS })),
+    submissionsOf: vi.fn(() => of({ status: 'SUCCESS', message: '', data: submissions })),
     exportCsv: vi.fn(() => of(new HttpResponse({ body: new Blob(['a,b']),
       headers: new HttpHeaders({ 'Content-Disposition': 'attachment; filename="wound-intake-submissions-2026-10-02.csv"' }) }))),
   };
@@ -73,6 +73,16 @@ describe('Form submissions', () => {
     expect(run.textContent).toContain('Run started #7331');
     expect(run.getAttribute('href')).toBe('/pipelines/schedules/2833/runs/7331');
     expect(rows[1].textContent).toContain('User 4537');
+  });
+
+  /** ZT-F4 (2026-10-21): a rejected submission said "Rejected" and nothing more, though the approver had to give a reason. */
+  it('ZT-F4: says why a submission was rejected, in the approver\'s words', () => {
+    const rejected: Submission = { submissionId: 5003, formId: 1000, formVersion: 2, status: 'Received', submittedBy: 4537,
+      submittedByName: 'Nora Clinic', submittedAt: '2026-10-02T16:00:00Z', answers: { patient_id: 'P-19' },
+      workflowInstanceId: 1548, workflowStatus: 'Rejected', workflowReason: 'The wound photo is missing.' };
+    const { el } = render(undefined, [rejected]);
+    const row = el.querySelector('tr[data-submission="5003"]') as HTMLElement;
+    expect(row.querySelector('[data-rejected-reason]')?.textContent?.trim()).toBe('Rejected: The wound photo is missing.');
   });
 
   it('opens a submission\'s answers in the form\'s order, a removed field\'s under its key', () => {

@@ -26,8 +26,4 @@ export class DataPolicyApi {
   connections(): Observable<ApiResponse<ModelConnection[]>> {
     return this.http.get<ApiResponse<ModelConnection[]>>(`${API_BASE}/aiConnection.json/list`);
   }
-
-  tenants(): Observable<ApiResponse<{ tenantId: number; tenantName: string }[]>> {
-    return this.http.get<ApiResponse<{ tenantId: number; tenantName: string }[]>>(`${API_BASE}/tenant.json/listTenants`);
-  }
 }

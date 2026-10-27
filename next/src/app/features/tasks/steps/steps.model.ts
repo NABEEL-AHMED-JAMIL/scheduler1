@@ -1,4 +1,5 @@
 import type { RunParameter } from '../../jobs/run-parameters/run-parameters';
+import { formatDuration } from '../../../shared/ui/time-format';
 
 /**
  * MIG-249: the step builder's shapes and the pure rules behind them.
@@ -42,6 +43,8 @@ export interface Settings {
   defaultOnError?: string;
   /** MIG-243: public, internal or sensitive -- the level of the data the pipeline handles; the data policy for it applies. */
   sensitivity?: string;
+  /** Owner #23: short words a rate card's pricing rule may price this pipeline's usage by (a TAG rule); none when absent. */
+  tags?: string[] | null;
   /**
    * MIG-237: whose review the run's results wait for (internal, customer); absent means no review. MIG-361: whose Task
    * inbox the internal review goes to (reviewers). Bulk review (2026-10-12): individual -- the run's review and the
@@ -109,6 +112,8 @@ export interface ValidateResult {
   valid?: boolean;
   legacy?: boolean;
   problems?: Problem[];
+  /** ZT-S4: what is valid but will not do what it seems (a required prompt variable nothing fills), each at its path. */
+  warnings?: Problem[];
   definition?: Definition;
   json?: string;
   yaml?: string;
@@ -167,6 +172,8 @@ export interface StepTaskEntry {
   /** Whether a workspace admin may switch it (legacy never: existing pipelines always stay runnable). */
   overridable?: boolean;
   aiToolName?: string | null;
+  /** Owner 2026-10-21: a try can be made again without doing anything twice; such a step is tried again on a passing error. */
+  repeatSafe?: boolean;
   runsInEngine?: boolean;
   /** On in this workspace: its default, or the workspace's switch. */
   enabled?: boolean;
@@ -174,6 +181,19 @@ export interface StepTaskEntry {
   /** Whether the platform can run it at all (a backing service may not be there yet). */
   available?: boolean;
   disabledReason?: string | null;
+  /** Owner #16: what the task is in this workspace -- unavailable, blocked, off or on -- and who set that. */
+  effectiveState?: 'unavailable' | 'blocked' | 'off' | 'on' | null;
+  setBy?: 'default' | 'workspace' | 'platform' | null;
+  switchedBy?: number | null;
+  switchedByName?: string | null;
+  switchedByRole?: string | null;
+  switchedAt?: string | null;
+  /** Owner #16: a platform administrator's block for this workspace: off whatever the switch says. */
+  blocked?: boolean;
+  blockedBy?: number | null;
+  blockedByName?: string | null;
+  blockedAt?: string | null;
+  blockReason?: string | null;
   pipelineKey?: number | null;
   pipelineId?: string | null;
   config?: Record<string, unknown> | null;
@@ -242,7 +262,7 @@ const DEFINITION_ORDER = ['version', 'source', 'parameters', 'steps', 'settings'
 const PARAMETER_ORDER = ['name', 'type', 'label', 'description', 'required', 'default', 'choices'];
 const STEP_ORDER = ['key', 'name', 'task', 'input', 'config', 'retry', 'timeoutSeconds', 'onError'];
 const RETRY_ORDER = ['maxAttempts', 'delaySeconds'];
-const SETTINGS_ORDER = ['datasetRetentionHours', 'defaultTimeoutSeconds', 'defaultOnError', 'sensitivity', 'review'];
+const SETTINGS_ORDER = ['datasetRetentionHours', 'defaultTimeoutSeconds', 'defaultOnError', 'sensitivity', 'tags', 'review'];
 const SOURCE_ORDER = ['type', 'config'];
 
 const blank = (value: unknown) => value === undefined || value === null || value === '';
@@ -420,10 +440,12 @@ export function taskEntry(tasks: StepTaskEntry[], code: string | null | undefine
 export const taskLabel = (task: StepTaskEntry | undefined, code?: string) => task?.name || task?.code || code || '';
 
 /** A task's state in a workspace: Unavailable (the platform cannot run it), Off (switched off, or off by default), On. */
-export type TaskState = 'On' | 'Off' | 'Unavailable';
+export type TaskState = 'On' | 'Off' | 'Blocked' | 'Unavailable';
 
 export function stateOf(t: StepTaskEntry): { state: TaskState; reason: string } {
   if (t.available === false) return { state: 'Unavailable', reason: t.disabledReason || 'The platform cannot run it yet.' };
+  // Owner #16: a platform administrator's block, with the reason they gave.
+  if (t.blocked) return { state: 'Blocked', reason: t.disabledReason || 'Blocked for this workspace by a platform administrator.' };
   if (t.enabled === false) {
     return { state: 'Off', reason: t.disabledReason || (t.overridden ? 'Switched off in this workspace.' : 'Off by default.') };
   }
@@ -643,25 +665,110 @@ export function outputColumns(definition: Definition, index: number, tasks: Step
       const right = definition.steps.findIndex(s => s.key === config['with']);
       return union(input(), right >= 0 && right < index ? outputColumns(definition, right, tasks) : null);
     }
-    case 'filter': case 'save_file': case 'send_notification': case 'validate':
+    case 'filter': case 'save_file': case 'upload_bucket': case 'send_notification': case 'validate':
+    case 'dedupe': case 'fill_missing': case 'sort': case 'limit':
       return input();
+    // Transcribe audio and Convert file: a row per file, then what each file gave.
+    case 'transcribe_audio': {
+      const tracked = config['onError'] === 'skip' || config['onError'] === 'null';
+      return fileRowColumns(definition, index, tasks, ['file_name', 'file_stem', 'transcript', 'language', 'duration_seconds',
+        ...(config['timestamps'] === true ? ['segments'] : []), ...(tracked ? ['transcribe_status', 'transcribe_error'] : [])]);
+    }
+    case 'convert_file': {
+      const tracked = config['onError'] === 'skip' || config['onError'] === 'null';
+      return fileRowColumns(definition, index, tasks, ['file_name', 'file_stem', 'converted_key', 'converted_pages', 'converted_bytes',
+        'convert_status', ...(tracked ? ['convert_error'] : [])]);
+    }
+    // MIG-420: Split pages -- a row per page of each PDF, with its text and its image kept with the run.
+    case 'split_pages':
+      return fileRowColumns(definition, index, tasks, ['file_name', 'file_stem', 'page', 'page_count', 'page_text', 'page_chars',
+        'page_image', 'page_status', 'page_error']);
+    // MIG-424: Run pipeline -- per row, each row with its call's outcome and the answer's fields; once, the called run's own
+    // columns, which only its run knows (the chosen fields, when named).
+    case 'run_pipeline': {
+      const prefix = typeof config['prefix'] === 'string' && config['prefix'] ? config['prefix'] as string : 'called_';
+      const fields = (Array.isArray(config['fields']) ? config['fields'] as Record<string, unknown>[] : [])
+        .map(f => (typeof f?.['as'] === 'string' && f['as'] ? f['as'] : typeof f?.['path'] === 'string' ? (f['path'] as string).split('.').pop()! : ''))
+        .filter(Boolean) as string[];
+      if (config['mode'] === 'each') {
+        const columns = input();
+        return columns ? union(columns, [`${prefix}run_id`, `${prefix}status`, `${prefix}ok`, `${prefix}error`, ...fields]) : null;
+      }
+      return fields.length ? fields : null;
+    }
+    // MIG-421: Read text from pages -- each page's row, then what OCR read on it.
+    case 'ocr_pages': {
+      const columns = input();
+      return columns ? union(columns, ['ocr_text', 'ocr_sureness', 'ocr_source', 'ocr_words', 'ocr_status', 'ocr_note', 'ocr_rotation']) : null;
+    }
+    // Owner #16 (2026-10-19): the common tasks added to the registry.
+    case 'unpivot': {
+      const columns = input();
+      if (!columns) return null;
+      const turned = strings(config['columns']);
+      const nameAs = typeof config['nameAs'] === 'string' && config['nameAs'] ? config['nameAs'] as string : 'name';
+      const valueAs = typeof config['valueAs'] === 'string' && config['valueAs'] ? config['valueAs'] as string : 'value';
+      return [...columns.filter(c => !turned.includes(c)), nameAs, valueAs];
+    }
+    case 'split_column': {
+      const columns = input();
+      if (!columns) return null;
+      const column = typeof config['column'] === 'string' ? config['column'] as string : '';
+      const into = strings(config['into']);
+      if (config['mode'] === 'rows') return columns.map(c => (c === column && into.length ? into[0] : c));
+      const out: string[] = [];
+      for (const c of columns) {
+        if ((c !== column || config['keepOriginal'] === true) && !into.includes(c)) out.push(c);
+        if (c === column) out.push(...into);
+      }
+      return out;
+    }
+    case 'pivot': {
+      // The new columns are the data's unless the step names them.
+      const named = strings(config['columns']);
+      return named.length ? [...strings(config['groupBy']), ...named] : null;
+    }
     default:
       return null;
   }
 }
 
+/** The place of the step whose rows a step reads (the one it names, else the one before it), or -1 when there is none. */
+function inputIndex(definition: Definition, index: number): number {
+  const step = definition.steps[index];
+  if (!step) return -1;
+  const from = step.input ? definition.steps.findIndex(s => s.key === step.input) : index - 1;
+  return from >= 0 && from < index ? from : -1;
+}
+
 /** The columns a step reads: the output of the step it names, else of the step before it. */
 export function inputColumns(definition: Definition, index: number, tasks: StepTaskEntry[] = []): string[] | null {
-  const step = definition.steps[index];
-  if (!step) return null;
-  const from = step.input ? definition.steps.findIndex(s => s.key === step.input) : index - 1;
-  return from >= 0 && from < index ? outputColumns(definition, from, tasks) : null;
+  const from = inputIndex(definition, index);
+  return from >= 0 ? outputColumns(definition, from, tasks) : null;
+}
+
+/**
+ * A step that reads files (Transcribe audio, Convert file): its rows are the run's own files -- bucket and key -- when it
+ * names no key column and its input has no key column; else they are its input's rows. Then the columns it adds. null
+ * when that cannot be told: a key column named, or a step before it, whose columns are not known.
+ */
+function fileRowColumns(definition: Definition, index: number, tasks: StepTaskEntry[], own: string[]): string[] | null {
+  const config = definition.steps[index]?.config ?? {};
+  const keyColumn = typeof config['keyColumn'] === 'string' ? (config['keyColumn'] as string).trim() : '';
+  const from = inputIndex(definition, index);
+  const input = from >= 0 ? outputColumns(definition, from, tasks) : null;
+  if (input) return union(!keyColumn && !input.includes('key') ? ['bucket', 'key'] : input, own);
+  return keyColumn || from >= 0 ? null : union(['bucket', 'key'], own);
 }
 
 // ---------------------------------------------------------------------------------------------- a config form
 
 export type FieldKind = 'text' | 'textarea' | 'number' | 'integer' | 'boolean' | 'enum' | 'multi' | 'list' | 'objects' | 'object' | 'json'
-  | 'scalar' | 'column' | 'step' | 'columns' | 'prompt' | 'bucket' | 'webhook' | 'document-type';
+  | 'scalar' | 'column' | 'step' | 'columns' | 'prompt' | 'bucket' | 'webhook' | 'document-type' | 'api-request' | 'api-environment'
+  | 'schedule';
+
+/** MIG-424: one of the workspace's schedules (jobs) a step may call (Run pipeline): its id, and its name as the choice shows it. */
+export interface ScheduleChoice { id: number; label: string; }
 
 /** MIG-245: a saved AI prompt a step may name: its id, and its name as the choice shows it. */
 export interface PromptChoice { id: number; label: string; }
@@ -671,6 +778,21 @@ export interface PromptChoice { id: number; label: string; }
  * take a step's delivery now (active, and subscribed to run.step.sent).
  */
 export interface WebhookChoice { id: number; label: string; ready: boolean; }
+
+/**
+ * Owner #25: one of the workspace's saved API requests (integration-service's API collections), for a step that names one
+ * (Read API, Enrich, Call API, a workflow's Call API): its id, "Collection › Request", its method, and its collection's
+ * environments -- what an environment setting beside it offers.
+ */
+export interface ApiRequestChoice {
+  id: number;
+  label: string;
+  method: string;
+  collectionId: number;
+  collection: string;
+  enabled: boolean;
+  environments: { id: number; label: string }[];
+}
 
 /** MIG-346: the event type a webhook must take for a pipeline step to send to it. */
 export const STEP_WEBHOOK_EVENT = 'run.step.sent';
@@ -687,7 +809,7 @@ export interface BucketChoice { alias: string; label: string; }
  * TODO(MIG-249): pickers for api-request, api-environment, data-contract, db-connection, pipeline and user.
  */
 export const FORMATS = ['column', 'step', 'sql', 'template', 'multiline', 'api-request', 'api-environment', 'data-contract',
-  'db-connection', 'bucket', 'pipeline', 'user', 'prompt', 'expression', 'webhook', 'document-type'] as const;
+  'db-connection', 'bucket', 'pipeline', 'user', 'prompt', 'expression', 'webhook', 'document-type', 'schedule'] as const;
 const LONG_TEXT_FORMATS = ['sql', 'template', 'multiline', 'textarea'];
 
 export interface FieldSpec {
@@ -736,7 +858,8 @@ function kindOf(schema: JsonSchema): FieldKind {
       return (schema.maxLength ?? 0) > 200 || LONG_TEXT_FORMATS.includes(schema.format ?? '') ? 'textarea' : 'text';
     case 'integer':
       return schema.format === 'prompt' ? 'prompt' : schema.format === 'webhook' ? 'webhook'
-        : schema.format === 'document-type' ? 'document-type' : 'integer';
+        : schema.format === 'document-type' ? 'document-type' : schema.format === 'api-request' ? 'api-request'
+        : schema.format === 'api-environment' ? 'api-environment' : schema.format === 'schedule' ? 'schedule' : 'integer';
     case 'number': return 'number';
     case 'boolean': return 'boolean';
     case 'array': {
@@ -827,14 +950,10 @@ export function parseJson(text: string): { value?: unknown; error?: string } {
   }
 }
 
-/** "1.2 s", "340 ms", "2 min 5 s": how long a step took. */
+/** "1.2 sec", "340 ms", "2 min 5 sec": how long a step took, in formatDuration's words. */
 export function durationText(ms: number | null | undefined): string {
   if (ms === null || ms === undefined) return '';
-  if (ms < 1000) return `${ms} ms`;
-  const seconds = ms / 1000;
-  if (seconds < 60) return `${seconds.toFixed(seconds < 10 ? 1 : 0)} s`;
-  const minutes = Math.floor(seconds / 60);
-  return `${minutes} min ${Math.round(seconds - minutes * 60)} s`;
+  return formatDuration(ms / 1000);
 }
 
 /** A step error's words: the engine stores {message, ...}; anything else as text. */
@@ -862,6 +981,16 @@ export function usesPrompt(schema: JsonSchema | null | undefined): boolean {
 /** MIG-346: whether a task's settings name a webhook anywhere (so its panel offers the workspace's webhooks). */
 export function usesWebhook(schema: JsonSchema | null | undefined): boolean {
   return usesFormat(schema, 'webhook');
+}
+
+/** Owner #25: whether a task's settings name a saved API request anywhere (so its panel offers the workspace's requests). */
+export function usesApiRequest(schema: JsonSchema | null | undefined): boolean {
+  return usesFormat(schema, 'api-request');
+}
+
+/** MIG-424: whether a task's settings name a schedule anywhere (Run pipeline: its panel offers the workspace's schedules). */
+export function usesSchedule(schema: JsonSchema | null | undefined): boolean {
+  return usesFormat(schema, 'schedule');
 }
 
 /** MIG-364: whether a task's settings name a document type anywhere (so its panel offers the workspace's types). */

@@ -13,7 +13,7 @@ export const PINNED: Record<string, unknown> = {
       "Recent runs"
     ],
     "buttons": [
-      "40s#7331",
+      "40 sec#7331",
       "Actions for Reference CSV check (e2e)",
       "Actions for UI-REVIEW Clean customers (manual, notify on completion)",
       "Change",
@@ -89,7 +89,8 @@ export const PINNED: Record<string, unknown> = {
       "GET /sourceJob.json/fetchSourceJobQueueListWithJobId?jobId=2833&limit=500",
       "GET /sourceJob.json/fetchSourceJobDetailWithSourceJobId?jobId=2833",
       "GET /sourceJob.json/documentTrigger?jobId=2833",
-      "GET /sourceJob.json/inboxTrigger?jobId=2833"
+      "GET /sourceJob.json/inboxTrigger?jobId=2833",
+      "POST /sourceJob.json/runItems/counts {jobQueueIds}"
     ],
     "headings": [
       "Reference CSV check (e2e) · runs",
@@ -124,6 +125,7 @@ export const PINNED: Record<string, unknown> = {
     "links": [
       "/pipelines",
       "/pipelines/schedules",
+      "/pipelines/schedules/2833/items",
       "/pipelines/schedules/2833/runs/7331"
     ]
   },
@@ -194,6 +196,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /aiPrompt.json/runsForJob?jobQueueId=7331",
       "GET /billing.json/runCost?jobQueueId=7331",
       "GET /sourceJob.json/stepExecutions?jobQueueId=7331",
+      "POST /sourceJob.json/runItems {jobQueueId,page,size,status}",
       "GET /sourceJob.json/review?jobQueueId=7331"
     ],
     "headings": [
@@ -313,7 +316,8 @@ export const PINNED: Record<string, unknown> = {
       "GET /sourceJob.json/listSourceJob",
       "POST /message.json/runFacets {fromDate,limit,toDate}",
       "POST /message.json/fetchLogs {fromDate,limit,toDate}",
-      "GET /sourceJob.json/review/waiting"
+      "GET /sourceJob.json/review/waiting",
+      "POST /sourceJob.json/runItems/counts {jobQueueIds}"
     ],
     "headings": [
       "Runs",

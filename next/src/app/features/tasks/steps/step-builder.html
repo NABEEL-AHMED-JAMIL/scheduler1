@@ -68,6 +68,12 @@
                 @for (s of sensitivities; track s) { <option [value]="s" [selected]="draft().settings?.sensitivity === s">{{ sensitivityText(s) }}</option> }
               </select>
             </app-field>
+            <!-- Owner #23: what a rate card's pricing rule may price this pipeline by (Billing › Settings, a Tag rule). -->
+            <app-field label="Tags" for="defTags" [error]="tagProblems()"
+                       hint="Short words, separated by commas — say research, pilot. A rate card may price a tag's pipelines at a price of their own.">
+              <input id="defTags" class="input" [value]="tagsText()" [disabled]="!canManage()" placeholder="research, pilot"
+                     (change)="setTags($any($event.target).value)" />
+            </app-field>
           </div>
         </app-section>
         <!-- MIG-237, MIG-334: whose review a run's results wait for. The customer decides through the API
@@ -143,7 +149,7 @@
             </table>
           </div>
         } @else {
-          <p class="text-sm text-[color:var(--text-muted)]">None yet: the pipeline runs as its legacy step until steps are saved.</p>
+          <p class="text-sm text-[color:var(--text-muted)]">{{ unscheduled() ? 'None yet: saving the steps makes version 1.' : 'None yet: the pipeline runs as its legacy step until steps are saved.' }}</p>
         }
       </app-section>
     }
@@ -169,7 +175,12 @@
     }
     @default {
       <div class="card p-4 flex flex-col gap-3 min-w-0">
-        @if (legacy()) {
+        @if (legacy() && unscheduled()) {
+          <div class="step-notice" role="note">
+            <app-icon name="info" class="shrink-0 mt-0.5" />
+            <span class="min-w-0">No steps yet.@if (canManage()) { Add the first from the Task Registry, or Test with sample to start from rows. }</span>
+          </div>
+        } @else if (legacy()) {
           <div class="step-notice step-notice-warn" role="note">
             <app-icon name="info" class="shrink-0 mt-0.5" />
             <span class="min-w-0">This pipeline runs as its legacy step: the task payload, sent to its worker, exactly as before.

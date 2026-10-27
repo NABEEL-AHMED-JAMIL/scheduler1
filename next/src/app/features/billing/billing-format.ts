@@ -20,6 +20,21 @@ export function formatMoney(value: number, currency = 'USD', digits?: number): s
   return new Intl.NumberFormat(undefined, { style: 'currency', currency, minimumFractionDigits: digits, maximumFractionDigits: digits }).format(value);
 }
 
+/**
+ * A run's or a row's amount as a cell reads it (Cost & usage redesign, 2026-10-19): cents, and "<$0.01" for a real amount
+ * under a cent -- "$0.0020" beside "$0.82" was noise. The exact figure goes on the cell's tooltip (`formatMoneyExact`).
+ * A day's or a pipeline's total keeps `formatMoney`, which shows a sub-cent total exactly.
+ */
+export function formatMoneyCell(value: number, currency = 'USD'): string {
+  const v = Number(value) || 0;
+  return v !== 0 && Math.abs(v) < 0.01 ? `<${formatMoney(0.01, currency, 2)}` : formatMoney(v, currency, 2);
+}
+
+/** An amount to the meter's fifth place, for a tooltip. */
+export function formatMoneyExact(value: number, currency = 'USD'): string {
+  return formatMoney(Number(value) || 0, currency, 5);
+}
+
 /** The precision a column of amounts shares: four decimals when any real amount in it is under a cent. */
 export function moneyDigits(values: number[]): number {
   return values.some(v => { const abs = Math.abs(Number(v) || 0); return abs > 0 && abs < 0.01; }) ? 4 : 2;
@@ -43,6 +58,15 @@ export function formatTotals(totals: MoneyTotals): string {
   const codes = Object.keys(totals).sort();
   if (!codes.length) return formatMoney(0, 'USD');
   return codes.map(code => formatMoney(totals[code], code)).join(' · ');
+}
+
+/**
+ * A share of a total as a column writes it (owner #7): "77%", and "<1%" for a real amount that rounds to nothing --
+ * "0%" beside $0.16 read as if that line cost nothing.
+ */
+export function formatShare(sharePercent: number, amount: number): string {
+  if (amount > 0 && sharePercent < 1) return '<1%';
+  return `${Math.round(sharePercent)}%`;
 }
 
 /** Money as a headline figure: whole units. */
@@ -90,7 +114,7 @@ export function formatQuantity(quantity: number, unit: string | undefined): stri
   if (unit === 'byte') return formatBytes(quantity);
   if (unit === 'GB') return formatGb(quantity);
   if (unit === 'GB-hour') return quantity < 1 ? `${formatGb(quantity / HOURS_PER_DAY)} · day` : `${quantity.toLocaleString(undefined, { maximumFractionDigits: 1 })}`;
-  if (unit === 'minute') return quantity < 1 ? `${(quantity * 60).toLocaleString(undefined, { maximumFractionDigits: 1 })} s` : quantity.toLocaleString(undefined, { maximumFractionDigits: 1 });
+  if (unit === 'minute') return quantity < 1 ? `${(quantity * 60).toLocaleString(undefined, { maximumFractionDigits: 1 })} sec` : quantity.toLocaleString(undefined, { maximumFractionDigits: 1 });
   return quantity.toLocaleString(undefined, { maximumFractionDigits: quantity < 10 ? 3 : 0 });
 }
 
@@ -99,6 +123,18 @@ export function daysOverdue(dueAt: string | null | undefined, now = Date.now()):
   return dueAt ? Math.max(0, Math.floor((now - new Date(dueAt).getTime()) / MS_PER_DAY)) : 0;
 }
 
+/** ZT-B2: the calendar day "yyyy-MM-dd" at an instant in a time zone (a workspace's billing zone). */
+export function dayInZone(zone: string, at: Date): string {
+  try {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(at);
+  } catch {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Chicago', year: 'numeric', month: '2-digit', day: '2-digit' }).format(at);
+  }
+}
+/** "October 2026" for a month's first day, "2026-10-01". */
+export function monthName(firstDay: string): string {
+  return new Intl.DateTimeFormat('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${firstDay.slice(0, 10)}T00:00:00Z`));
+}
 export function firstOfMonth(d: Date): string { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`; }
 export function daysInMonth(d: Date): number { return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate(); }
 /** "2026-09": the month a period is closed under. */
@@ -165,6 +201,11 @@ export function zonedDay(at: Date, zone: string | null | undefined): string {
 /** The time of day an instant is in a zone, 24-hour: "22:50". */
 export function zonedTime(at: Date, zone: string | null | undefined): string {
   return zoned(zone, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(at);
+}
+
+/** An instant as a recent-activity cell writes it, 24-hour, in a zone (the workspace's): "19 Oct, 19:26". */
+export function zonedStamp(at: Date, zone: string | null | undefined): string {
+  return `${zoned(zone, { day: 'numeric', month: 'short' }).format(at)}, ${zonedTime(at, zone)}`;
 }
 
 /** A billing day as a day header names it: "Mon 12 Oct 2026". */

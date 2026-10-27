@@ -28,10 +28,11 @@
           @if (i.issuedAt) { · issued {{ i.issuedAt | serverTime: 'date' }} }@if (i.dueAt && i.kind === 'invoice' && i.status !== 'paid') { · due {{ i.dueAt | serverTime: 'date' }} }
           @if (paidByCardAt(); as at) { · <span data-paid-by-card>Paid by card on {{ at | serverTime: 'date' }}</span> }
         </p>
+        @if (isPlatformAdmin() && stillRunning(); as why) { <p class="text-xs text-[color:var(--text-muted)] mt-1" data-month-running>{{ why }}</p> }
       </div>
       <div class="flex items-center gap-1.5 shrink-0">
         @if (isPlatformAdmin() && i.status === 'draft') {
-          <button type="button" class="btn btn-primary btn-sm" (click)="issue()" [disabled]="busy() === 'issue'"><app-icon name="check" [busy]="busy() === 'issue'" />Issue</button>
+          <button type="button" class="btn btn-primary btn-sm" (click)="issue()" [disabled]="busy() === 'issue' || !!stillRunning()" [attr.title]="stillRunning() || null"><app-icon name="check" [busy]="busy() === 'issue'" />Issue</button>
         } @else if (canPayByCard() && !isPlatformAdmin()) {
           <button type="button" class="btn btn-primary btn-sm" (click)="payNow()" [disabled]="busy() === 'card'" title="Pay by card on Stripe's secure page" data-pay-now><app-icon name="external" [busy]="busy() === 'card'" />Pay now</button>
         } @else if (isOpen()) {
@@ -130,6 +131,7 @@
                 <tr>
                   <td>{{ l.description }}@if (l.periodLabel) { <span class="pill pill-neutral ml-1">{{ l.periodLabel }}</span> }@if (l.manual) { <span class="pill pill-neutral ml-1">Manual</span> }
                     @if (l.meter) { <div class="text-[11px] mono text-[color:var(--text-muted)]">{{ l.meter }}</div> }
+                    @if (l.ruleNo) { <div class="text-[11px] text-[color:var(--text-muted)]" data-rule-line>Pricing rule {{ l.ruleNo }} of rate card v{{ i.rateCardVersion }}: this usage's own price</div> }
                     @if (l.pricedFromVersion) { <div class="text-[11px] text-[color:var(--text-muted)]" data-priced-from>Priced from the {{ l.pricedFromName || 'standard' }} card (v{{ l.pricedFromVersion }}): not on this workspace's card</div> }
                     @if (l.includedQuantity) { <div class="text-[11px] text-[color:var(--text-muted)]">Includes {{ quantity({ quantity: l.includedQuantity, unit: l.unit }) }} at no charge · {{ quantity({ quantity: l.billableQuantity ?? l.quantity, unit: l.unit }) }} billable</div> }
                     @for (x of subjects(l); track $index) { <div class="text-[11px] text-[color:var(--text-muted)]" data-line-subject>{{ subjectName(x) }}: {{ quantity({ quantity: x.quantity, unit: l.unit }) }}</div> }
@@ -174,6 +176,10 @@
                 <button type="button" class="link-inline text-sm block truncate text-left" (click)="openDocument(d.documentId)">{{ d.fileName }}</button>
                 <div class="text-[11px] text-[color:var(--text-muted)]">{{ kindLabel[d.kind] }}@if (d.number) { · {{ d.number }} } · {{ d.issuedAt | serverTime: 'recent' }}@if (d.createdByName) { · {{ d.createdByName }} }@if (d.amount != null) { · {{ money(d.amount) }} }@if (d.sizeBytes) { · {{ humanSize(d.sizeBytes) }} }</div>
               </div>
+              @if (d.kind === 'receipt' && d.signed) {
+                <button type="button" class="pill pill-pay pill-pay-verified" (click)="verifyReceipt(d.number)" [attr.aria-label]="'Signed: verify ' + d.number"
+                        title="Digitally signed with the platform's certificate — click to verify" data-signed-chip><app-icon name="shield" size="0.85em" />Signed</button>
+              }
               <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="openDocument(d.documentId)" aria-label="View" title="View here"><app-icon name="eye" /></button>
               <a class="btn btn-ghost btn-icon btn-sm" [routerLink]="['/billing/documents']" [queryParams]="{ document: d.documentId }" title="Open in Billing documents" aria-label="Open in Billing documents"><app-icon name="folder" /></a>
               <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="downloadDocument(d.documentId, d.fileName)" aria-label="Download"><app-icon name="download" /></button>
@@ -192,30 +198,46 @@
         @if (!i.payments.length) {
           <div class="lookup-entries-empty"><p>None yet.</p></div>
         } @else {
-          <table class="table-modern lookup-entry-table">
-            <thead><tr><th>Received</th><th>Method</th><th class="hidden md:table-cell">Reference</th><th class="hidden md:table-cell">By</th><th class="text-right">Amount</th><th class="text-right">State</th></tr></thead>
+          <!-- Owner #8/#11: five columns that fit the pane at 1024 -- the method chip carries the reference under it, the state
+               chip the receipt -- and "By" folds away when the pane is narrow (a container query, not the window's width). -->
+          <div class="bill-pay-wrap">
+          <table class="table-modern lookup-entry-table bill-payments" data-test="invoice-payments">
+            <thead><tr><th class="w-[6.5rem]">Received</th><th>Payment</th><th class="bill-col-by w-[10rem]">Sent by</th><th class="text-right w-[5.5rem]">Amount</th><th class="w-[11.5rem]">State</th></tr></thead>
             <tbody>
               @for (p of i.payments; track p.paymentId) {
-                <tr>
-                  <td class="tabular text-xs" [title]="'Filed ' + (p.dateCreated | serverTime: 'recent')">{{ paymentDay(p) }}</td>
-                  <td>{{ methodLabel(p.method) }}@if (p.provider === 'stripe') { <span class="text-xs text-[color:var(--text-muted)]"> · Stripe</span> }</td>
-                  <td class="mono text-xs hidden md:table-cell">{{ p.reference || '—' }}</td>
-                  <td class="text-xs text-[color:var(--text-muted)] hidden md:table-cell">{{ p.submittedBy || 'System' }}</td>
-                  <td class="text-right tabular">{{ money(p.amount) }}</td>
-                  <td class="text-right whitespace-nowrap">
-                    @if (p.status === 'verified') {
-                      @if (p.receiptNumber && receiptOf(p); as doc) { <button type="button" class="link-inline mono text-xs mr-1.5" (click)="openDocument(doc)" [title]="'Open receipt ' + p.receiptNumber" data-receipt-link>{{ p.receiptNumber }}</button> }
-                      <span class="pill pill-ok">{{ p.method === 'credit_note' ? 'Applied' : 'Verified' }}</span> }
-                    @else if (p.status === 'rejected') { <span class="pill pill-crit" [title]="p.note || ''">{{ p.method === 'card' && p.provider ? 'Declined' : 'Rejected' }}</span> }
-                    @else if (isPlatformAdmin()) {
-                      <button type="button" class="btn btn-primary btn-xs" (click)="verify(p, true)" [disabled]="busy() === 'verify' + p.paymentId">Verify</button>
-                      <button type="button" class="btn btn-ghost btn-xs" (click)="verify(p, false)" [disabled]="busy() === 'verify' + p.paymentId">Reject</button>
-                    } @else { <span class="pill pill-warn">Awaiting verification</span> }
+                <tr [attr.data-payment-state]="stateChip(p).kind">
+                  <td class="tabular text-xs whitespace-nowrap" [title]="'Filed ' + (p.dateCreated | serverTime: 'recent')">{{ paymentDay(p) }}</td>
+                  <td class="min-w-0">
+                    @if (methodChip(p); as m) { <span [class]="m.cls" [title]="m.title || m.label" data-method-chip><app-icon [name]="m.icon" size="0.85em" />{{ m.label }}</span> }
+                    @if (p.reference) { <div class="bill-ref mono" [title]="p.reference">{{ p.reference }}</div> }
+                  </td>
+                  <td class="bill-col-by text-xs text-[color:var(--text-secondary)]">
+                    <div class="truncate" [title]="p.submittedBy || ''">{{ p.method === 'card' && p.provider ? 'Paid online' : (p.submittedBy || 'The platform') }}</div>
+                  </td>
+                  <td class="text-right tabular whitespace-nowrap">{{ money(p.amount) }}</td>
+                  <td>
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                      @if (p.status === 'submitted' && isPlatformAdmin()) {
+                        <button type="button" class="btn btn-primary btn-xs" (click)="verify(p, true)" [disabled]="busy() === 'verify' + p.paymentId">Verify</button>
+                        <button type="button" class="btn btn-default btn-intent-crit btn-xs" (click)="verify(p, false)" [disabled]="busy() === 'verify' + p.paymentId">Reject</button>
+                      } @else {
+                        @if (stateChip(p); as c) { <span [class]="c.cls" [title]="c.title || c.label" data-state-chip><app-icon [name]="c.icon" size="0.85em" />{{ c.label }}</span> }
+                      }
+                    </div>
+                    @if (p.status === 'verified' && p.receiptNumber && receiptOf(p); as doc) {
+                      <button type="button" class="link-inline mono text-[11px] mt-0.5 whitespace-nowrap" (click)="openDocument(doc)" [title]="'Open receipt ' + p.receiptNumber" data-receipt-link>{{ p.receiptNumber }}</button>
+                    }
+                    <!-- Owner #10: who verified it, as the receipt names them. -->
+                    @if (p.status !== 'submitted' && (p.approverName || p.verifiedBy)) {
+                      <div class="text-[11px] text-[color:var(--text-muted)] truncate" [title]="(p.approverName || p.verifiedBy) + (p.approverRole ? ', ' + p.approverRole : '')" data-approver>
+                        {{ p.status === 'rejected' ? 'by' : p.provider ? 'confirmed by' : 'by' }} {{ p.approverName || p.verifiedBy }}</div>
+                    }
                   </td>
                 </tr>
               }
             </tbody>
           </table>
+          </div>
         }
       </section>
     }

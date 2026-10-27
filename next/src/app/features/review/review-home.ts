@@ -17,12 +17,13 @@ import { BulkPanel, BulkPanelData } from '../../shared/ui/bulk/bulk-panel';
 import { BulkReviewApi } from '../../shared/ui/bulk/bulk-review.api';
 import { BULK_CAP, BulkAction, BulkAnswer, BulkSelection } from '../../shared/ui/bulk/bulk.model';
 import { TaskCountService } from '../workflows/task-count.service';
+import { NeedsWorkspace } from '../../shared/ui/needs-workspace';
 import { REVIEW_PAGE, ReviewItem, ReviewKind, ReviewLoad, ReviewViewer, ageOf, dueIn, loadReview } from './review-sources';
 import { KIND_ICON, KIND_LABEL, linkOf, sendMixed } from './review-home.model';
 import { ReviewItemPanel, ReviewItemPanelData, ReviewItemPanelResult } from './review-item-panel';
 
 type KindFilter = '' | ReviewKind;
-type WaitsFilter = '' | 'me' | 'groups' | 'open';
+type WaitsFilter = '' | 'me' | 'teams' | 'open';
 
 /**
  * Review › All waiting (UX review DR2, owner 2026-10-13, "go for best"): the reviewer's one list. Approvals (and the
@@ -37,7 +38,7 @@ type WaitsFilter = '' | 'me' | 'groups' | 'open';
  */
 @Component({
   selector: 'app-review-home',
-  imports: [PageHeader, RefreshButton, EmptyState, Icon, RouterLink, ServerTimePipe, BulkBar],
+  imports: [PageHeader, RefreshButton, EmptyState, Icon, RouterLink, ServerTimePipe, BulkBar, NeedsWorkspace],
   styles: `
     .review-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; padding: 0.75rem 1rem;
       border-bottom: 1px solid var(--border-subtle); }
@@ -55,13 +56,19 @@ type WaitsFilter = '' | 'me' | 'groups' | 'open';
     <div class="page" [attr.data-load-ms]="loadMs()">
       <app-page-header title="Review"
                        subtitle="Everything waiting for your decision — approvals, run results and documents — overdue first, then the longest waiting. Open one to see it, or pick several to decide together.">
-        <app-refresh-button [loading]="loading()" (refresh)="load()" />
+        @if (!noWorkspace()) { <app-refresh-button [loading]="loading()" (refresh)="load()" /> }
       </app-page-header>
+
+      @if (noWorkspace()) {
+        <!-- A platform administrator's own sign-in has no workspace: the Task inbox's mine, teams and count each answered
+             400 "Pick a workspace (tenantId)" and the page showed their errors (2026-10-20). Nothing is read. -->
+        <app-needs-workspace what="Review is" todo="decide its approvals, runs and documents" icon="inbox" />
+      } @else {
 
       @for (kind of failedKinds(); track kind) {
         <p class="flex items-center gap-2 rounded-md px-3 py-2 text-sm bg-sunken text-warn-500 mb-3" role="alert" [attr.data-failed]="kind">
           <app-icon name="alert" size="0.95em" />{{ failedText(kind) }}
-          <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="load()"><app-icon name="refresh" />Try again</button></p>
+          <button type="button" class="btn btn-default btn-sm ml-auto" (click)="load()"><app-icon name="refresh" />Try again</button></p>
       }
 
       <section class="card overflow-hidden" data-test="review-list" aria-labelledby="review-list-title">
@@ -80,7 +87,7 @@ type WaitsFilter = '' | 'me' | 'groups' | 'open';
           <select class="input w-auto" aria-label="Waits on" [value]="waits()" (change)="waits.set($any($event.target).value)" data-test="review-waits">
             <option value="">Anyone</option>
             <option value="me">You</option>
-            @if (viewer().tasks) { <option value="groups">Your groups</option> }
+            @if (viewer().tasks) { <option value="teams">Your teams</option> }
             <option value="open">Not claimed</option>
           </select>
           @if (filtered()) { <button type="button" class="btn btn-ghost btn-sm" (click)="clear()"><app-icon name="close" />Clear</button> }
@@ -146,6 +153,7 @@ type WaitsFilter = '' | 'me' | 'groups' | 'open';
         }
       </section>
       <app-bulk-bar [selection]="bulk" [pageRows]="pagePicks()" (decided)="decided($event)" />
+      }
     </div>
   `,
 })
@@ -162,11 +170,15 @@ export class ReviewHome implements OnInit {
   readonly label = KIND_LABEL;
   readonly linkOf = linkOf;
 
+  /** A sign-in with no workspace (a platform administrator's own): Review is a workspace's, so nothing is read. */
+  readonly noWorkspace = computed(() => !this.auth.user()?.tenantId);
+
   readonly viewer = computed<ReviewViewer>(() => ({
     tasks: this.auth.canOpen('task-inbox'),
     documents: this.auth.canOpen('document-review'),
     admin: this.auth.isTenantAdmin(),
     me: this.auth.user()?.appUserId ?? null,
+    runs: this.auth.canOpen('jobs') || this.auth.canOpen('queue'),
   }));
   /** The kinds the reader may see, in the tabs' order: a kind they may not open is not offered as a filter. */
   readonly kinds = computed<ReviewKind[]>(() => {
@@ -194,7 +206,7 @@ export class ReviewHome implements OnInit {
     const q = this.query().trim().toLowerCase();
     const waits = this.waits();
     return this.items().filter(i => (!kind || i.kind === kind)
-      && (!waits || (waits === 'me' ? i.waitsOn.startsWith('You') : waits === 'groups' ? i.waitsOn === 'Your groups'
+      && (!waits || (waits === 'me' ? i.waitsOn.startsWith('You') : waits === 'teams' ? i.waitsOn === 'Your teams'
         : !i.waitsOn.startsWith('Claimed by')))
       && (!q || [this.nameOf(i), i.title, i.from, i.waitsOn, this.subOf(i)].join(' ').toLowerCase().includes(q)));
   });
@@ -242,6 +254,7 @@ export class ReviewHome implements OnInit {
 
   ngOnInit(): void {
     this.destroyRef.onDestroy(() => this.reading?.unsubscribe());
+    if (this.noWorkspace()) { this.loading.set(false); return; }
     this.load();
     if (this.viewer().documents) this.readNames();
   }

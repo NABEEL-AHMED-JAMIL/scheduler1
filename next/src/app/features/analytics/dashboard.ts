@@ -1,10 +1,11 @@
 import { PageHeader } from '../../shared/ui/page-header';
 import { Crumb } from '../../core/nav/nav-tree';
 import { AuthService } from '../../core/auth/auth.service';
+import { NeedsWorkspace } from '../../shared/ui/needs-workspace';
 import { Component, DestroyRef, Injector, LOCALE_ID, OnDestroy, OnInit, afterNextRender, computed, effect, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Dialog } from '@angular/cdk/dialog';
-import { Subscription, catchError, from, mergeMap, of } from 'rxjs';
+import { Subscription } from 'rxjs';
 import { API_SUCCESS } from '../../core/api/api.config';
 import { Icon } from '../../shared/ui/icon';
 import { Field } from '../../shared/ui/field';
@@ -43,6 +44,7 @@ import { BoardSection, parseSections, sectionsByWidget, segmentsOf, withSection 
 import { colorKeysOf } from './charts/board-colors';
 import { CHART_SLOTS } from '../../shared/charts/status-color';
 import { Mark, widgetConfigOf, widgetConfigString, WidgetView, combineFilters, analysisView, queryView, WidgetRun, SavedAnalysisConfig, mintQueryId, TILE_ROWS, WidgetSpan, fillRows, SM_SPAN, LG_SPAN, ROW_KINDS, SEARCH_FROM, fileName, SPANS } from './widget-view';
+import { formatDuration } from '../../shared/ui/time-format';
 
 /**
  * How many of a board's tiles run at once (owner 2026-10-12: tiles load in parallel). Three of the four permits the
@@ -103,14 +105,21 @@ export { DatasetRegistry } from './dataset-registry';
  */
 @Component({
   selector: 'app-dashboards',
-  imports: [PageHeader, Icon, LoadError, RouterLink, CdkMenu, CdkMenuGroup, CdkMenuItem, CdkMenuItemRadio, CdkMenuTrigger, FilterBuilder, AnalyticsWidget, WidgetChart, Field, ServerTimePipe, KindPicker, ThemePicker, BoardFilterBar, BoardTable],
+  imports: [PageHeader, NeedsWorkspace, Icon, LoadError, RouterLink, CdkMenu, CdkMenuGroup, CdkMenuItem, CdkMenuItemRadio, CdkMenuTrigger, FilterBuilder, AnalyticsWidget, WidgetChart, Field, ServerTimePipe, KindPicker, ThemePicker, BoardFilterBar, BoardTable],
   templateUrl: './dashboard.html',
   styleUrls: ['./dashboard.css', './board/board.css'],
 })
 export class Dashboards implements OnInit, OnDestroy {
+  /** Milliseconds in the console's duration words (formatDuration): "420 ms", "1.4 sec", "15 sec". */
+  took(ms: number): string { return formatDuration(ms / 1000); }
 
   private readonly analytics = inject(AnalyticsService);
   private readonly auth = inject(AuthService);
+  /**
+   * ZT-A12 (owner 2026-10-21, "Managed session only"): a platform administrator's own sign-in has no workspace, and
+   * Analytics answers it 403 on a workspace's data; the boards say so (NeedsWorkspace) and makes no call.
+   */
+  readonly noWorkspace = computed(() => !!this.auth.isPlatformAdmin?.() && !this.auth.user?.()?.tenantId);
   /**
    * UX review 2026-10-12: whether the reader may change the boards -- a new board, a tile added, re-charted, re-set or
    * removed, the board's theme, a board deleted. A viewer's profile holds Saved Analyses only: they read the boards, run
@@ -236,7 +245,7 @@ export class Dashboards implements OnInit, OnDestroy {
     const connection = key.slice(0, cut);
     const path = key.slice(cut + 1);
     this.boardColumnsLoading.set(true);
-    this.analytics.schema(connection, path).subscribe({
+    this.analytics.schema(connection, path, this.board()?.analyticsDashboardId).subscribe({
       next: response => {
         this.boardColumnsLoading.set(false);
         if (response.status !== API_SUCCESS || !response.data) {
@@ -587,6 +596,7 @@ export class Dashboards implements OnInit, OnDestroy {
       sources.set(widget.analyticsDashboardWidgetId, {
         connection: saved.connectionAlias, path: saved.datasetPath, sql: saved.queryText,
         connection2: saved.secondDatasetPath ? saved.secondConnectionAlias : null, path2: saved.secondDatasetPath || null,
+        boardId: widget.analyticsDashboardId ?? null, widgetId: widget.analyticsDashboardWidgetId,
       });
     }
     return sources;
@@ -769,6 +779,11 @@ export class Dashboards implements OnInit, OnDestroy {
   readonly boardError = signal('');
   /** UX review 2026-10-12: the board read was refused (403): the page says so, with whom to ask, and offers no retry. */
   readonly boardRefused = signal(false);
+  /**
+   * ZT-A10: the board the address names is not here -- deleted, or another workspace's (a link shared across workspaces).
+   * The server answers both with the same "not found" (it never tells them apart), and that is not a failure to retry.
+   */
+  readonly boardMissing = signal(false);
   readonly widgetError = signal('');
 
   /**
@@ -831,9 +846,10 @@ export class Dashboards implements OnInit, OnDestroy {
   readonly widgets = computed<DashboardWidget[]>(() => this.board()?.widgets ?? []);
 
   /**
-   * Each board's widgets, for the counts on its card. The listing carries no widgets, so each
-   * board is read once by id: metadata only, no session and no query permit (see
-   * fetchDashboardById). Kept up to date when a board is opened, added to or trimmed.
+   * The widgets of the boards opened on this page, for the counts on their cards. ZT-M7: a card
+   * that was never opened reads its counts from the listing (widgetCount, fileCount) -- this page
+   * opens no board to draw its cards, because in a managed session each open is an audited read
+   * ("Opened board N"). Kept up to date when a board is opened, added to or trimmed.
    */
   readonly cardWidgets = signal<Record<number, DashboardWidget[]>>({});
 
@@ -915,6 +931,7 @@ export class Dashboards implements OnInit, OnDestroy {
   });
 
   ngOnInit(): void {
+    if (this.noWorkspace()) return;
     this.loadDashboards();
     this.loadSources();
     // The URL says which board is open: a link to ?board=7 opens it, and Back and Forward move
@@ -958,7 +975,6 @@ export class Dashboards implements OnInit, OnDestroy {
           return;
         }
         this.dashboards.set(response.data);
-        this.loadCardFacts(response.data);
       },
       error: err => {
         this.loading.set(false);
@@ -969,37 +985,16 @@ export class Dashboards implements OnInit, OnDestroy {
   }
 
   /**
-   * Reads the widgets of each board not already known, three at a time, for the card counts.
-   * A board that cannot be read keeps a card without counts rather than an error: the card still
-   * opens it, and opening says why.
+   * "7 widgets · 3 files" for a card: from the board's widgets once it was opened here, else from
+   * the listing's counts; '' from an older server that sends neither.
    */
-  private loadCardFacts(list: Dashboard[]): void {
-    const known = this.cardWidgets();
-    const ids = list.map(item => item.analyticsDashboardId)
-      .filter((id): id is number => typeof id === 'number' && !(id in known));
-    if (!ids.length) return;
-    from(ids).pipe(
-      // UX review 2026-10-12: one board that cannot be read (a refusal, a dropped connection) leaves its card without
-      // counts; it no longer ends the reading of every card after it, as an error in mergeMap did.
-      mergeMap(id => this.analytics.fetchDashboardById(id).pipe(catchError(() => of(null))), 3),
-      takeUntilDestroyed(this.destroyRef),
-    ).subscribe({
-      next: response => {
-        const id = response?.data?.analyticsDashboardId;
-        if (!response || response.status !== API_SUCCESS || !id) return;
-        this.cardWidgets.update(all => ({ ...all, [id]: response.data!.widgets ?? [] }));
-      },
-      error: () => {},
-    });
-  }
-
-  /** "7 widgets · 3 files" for a card, or '' until that board's widgets are known. */
   cardFacts(item: Dashboard): string {
     const widgets = item.analyticsDashboardId ? this.cardWidgets()[item.analyticsDashboardId] : undefined;
-    if (!widgets) return '';
-    if (!widgets.length) return 'No widgets yet';
-    const files = this.filesOf(widgets).length;
-    return `${widgets.length} widget${widgets.length === 1 ? '' : 's'}`
+    const count = widgets ? widgets.length : item.widgetCount;
+    if (count == null) return '';
+    if (!count) return 'No widgets yet';
+    const files = widgets ? this.filesOf(widgets).length : (item.fileCount ?? 0);
+    return `${count} widget${count === 1 ? '' : 's'}`
       + (files ? ` · ${files} file${files === 1 ? '' : 's'}` : '');
   }
 
@@ -1173,6 +1168,7 @@ export class Dashboards implements OnInit, OnDestroy {
     this.boardLoading.set(true);
     this.boardError.set('');
     this.boardRefused.set(false);
+    this.boardMissing.set(false);
     this.widgetError.set('');
     // Two boards asked for in quick succession answer in whatever order the server manages, and
     // the one that answers last is not necessarily the one the reader is waiting for. Only the
@@ -1183,6 +1179,7 @@ export class Dashboards implements OnInit, OnDestroy {
         if (token !== this.boardToken) return;
         this.boardLoading.set(false);
         if (response.status !== API_SUCCESS || !response.data) {
+          this.boardMissing.set(/not found/i.test(response.message ?? ''));
           this.boardError.set(response.message || 'The dashboard could not be read.');
           return;
         }
@@ -1811,6 +1808,21 @@ export class Dashboards implements OnInit, OnDestroy {
     return Math.min(WIDGET_HEIGHT_MAX, Math.max(WIDGET_HEIGHT_MIN, Math.round(asked)));
   }
 
+  /**
+   * MIG-416: what a running tile's skeleton holds -- a chart's drawing height (every chart is drawn at heightOf) -- so the
+   * board does not move when it lands. Figures, tables and ranked lists take their rows' height: theirs is not known yet.
+   */
+  reserveOf(widget: DashboardWidget): number | null {
+    const kind = kindInfo(widget.visualizationType);
+    if (!kind || kind.category === 'Figures and tables' || kind.id === 'ranked' || kind.id === 'rankedShare') return null;
+    return this.heightOf(widget);
+  }
+
+  /** ZT §3.11: a figure tile's skeleton holds a figure card of the size it will draw (the row layout's at a quarter width). */
+  reserveKpiOf(widget: DashboardWidget): 'lg' | 'md' | null {
+    return kindInfo(widget.visualizationType)?.id === 'kpi' ? (this.spanOf(widget) === 3 ? 'lg' : 'md') : null;
+  }
+
   /** Whether the author set this tile's height; when not, horizontal bars may grow to fit theirs. */
   hasOwnHeight(widget: DashboardWidget): boolean {
     const asked = widgetConfigOf(widget).height;
@@ -2076,6 +2088,8 @@ export class Dashboards implements OnInit, OnDestroy {
         dimensions: config.dimensions ?? [],
         measure: { aggregation, field: config.measure?.field },
         queryId,
+        // ZT-A13: which tile this is. A Saved Analyses reader is run the tile's own saved analysis by the server.
+        ...tileOf(widget),
       };
       /*
        * The saved filters and the board's, ANDed. boardFilterFor returns null unless this widget
@@ -2143,6 +2157,7 @@ export class Dashboards implements OnInit, OnDestroy {
       path2: saved.secondDatasetPath || undefined,
       queryId,
       boardFilters: this.filterWire(),
+      ...tileOf(widget),
     }).subscribe({
       next: response => {
         if (response.status !== API_SUCCESS || !response.data) {
@@ -2228,6 +2243,16 @@ export class Dashboards implements OnInit, OnDestroy {
  * A saved work's name without the board's own name in front of it ("Riverside — Patient 360 — Risk level" on that
  * board is "Risk level"): the board says it once, in its header.
  */
+/**
+ * ZT-A13: a tile's board and widget ids, as a run carries them. A reader whose only Analytics page is Saved Analyses is run
+ * the tile's own saved statement or analysis by the server (TileScope); nothing at all when the widget has no id yet (the
+ * add form's preview of a tile that is not saved).
+ */
+export function tileOf(widget: DashboardWidget): { boardId?: number; widgetId?: number } {
+  return widget.analyticsDashboardId != null && widget.analyticsDashboardWidgetId != null
+    ? { boardId: widget.analyticsDashboardId, widgetId: widget.analyticsDashboardWidgetId } : {};
+}
+
 export function withoutBoardName(name: string | null | undefined, board: string | null | undefined): string {
   const n = (name ?? '').trim();
   const b = (board ?? '').trim();

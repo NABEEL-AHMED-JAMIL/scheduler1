@@ -39,7 +39,7 @@ function screenAt(connection: string | null) {
     providers: [
       { provide: HttpClient, useValue: { get: (url: string, options?: { params?: { connectionId?: number } }) => {
         asked.push(url + (options?.params?.connectionId != null ? '?' + options.params.connectionId : ''));
-        return of({ status: 'SUCCESS', message: '', data: url.endsWith('/activity') ? ACTIVITY : ROWS });
+        return of({ status: 'SUCCESS', message: '', data: url.endsWith('/activity') ? ACTIVITY : url.endsWith('/history') ? [] : ROWS });
       } } },
       { provide: Dialog, useValue: {} },
       { provide: ToastService, useValue: { success: () => {}, error: () => {} } },
@@ -109,7 +109,7 @@ describe('Model connections -- what the selected connection has been doing', () 
 
   it('says a run\'s time in seconds, or milliseconds under one', () => {
     const { screen } = screenAt(null);
-    expect(screen.latency(2400)).toBe('2.4 s');
+    expect(screen.latency(2400)).toBe('2.4 sec');
     expect(screen.latency(380)).toBe('380 ms');
     expect(screen.latency(null)).toBe('—');
   });
@@ -138,5 +138,54 @@ describe('Model connections -- a failed run says why in words (UX final MC1)', (
     expect(block).not.toContain('truncate');
     expect(block).toContain('<details');
     expect(html).not.toContain('{{ r.error }}');
+  });
+});
+
+describe('Model connections -- Active / Inactive and the chips (owner items #12, #13)', () => {
+  function withPut(confirmed: boolean) {
+    const puts: { url: string; params: Record<string, unknown> }[] = [];
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: HttpClient, useValue: {
+          get: (url: string) => of({ status: 'SUCCESS', message: '', data: url.endsWith('/activity') ? ACTIVITY : url.endsWith('/history') ? [] : ROWS }),
+          put: (url: string, _body: unknown, options: { params: Record<string, unknown> }) => {
+            puts.push({ url, params: options.params });
+            return of({ status: 'SUCCESS', message: 'Done.' });
+          },
+        } },
+        { provide: Dialog, useValue: { open: () => ({ closed: of(confirmed) }) } },
+        { provide: ToastService, useValue: { success: () => {}, error: () => {} } },
+        { provide: AuthService, useValue: { isPlatformAdmin: () => false, user: signal({ appUserId: 1 }), builderLocked: () => false } },
+        { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: { get: () => null } } } },
+        { provide: Router, useValue: { navigate: vi.fn() } },
+      ],
+    });
+    const screen = TestBed.runInInjectionContext(() => new Connections());
+    screen.ngOnInit();
+    TestBed.tick();
+    return { screen, puts };
+  }
+
+  it('makes a connection inactive only after the person confirms, and active again at once', async () => {
+    const declined = withPut(false);
+    await declined.screen.setActive(ROWS[0], false);
+    expect(declined.puts).toEqual([]);
+
+    const { screen, puts } = withPut(true);
+    await screen.setActive(ROWS[0], false);
+    expect(puts).toEqual([{ url: expect.stringContaining('/aiConnection.json/setActive'), params: { connectionId: 1, active: false } }]);
+    await screen.setActive({ ...ROWS[0], status: 'Inactive' }, true);
+    expect(puts[1].params).toEqual({ connectionId: 1, active: true });
+  });
+
+  it('gives each provider its own chip and says the status in a chip of its own', () => {
+    const { screen } = withPut(true);
+    expect(screen.providerChip(ROWS[0])).toBe('pill pill-prov-openai');
+    expect(screen.providerChip(ROWS[1])).toBe('pill pill-prov-anthropic');
+    expect(screen.providerChip({ ...ROWS[1], provider: 'Ollama' })).toBe('pill pill-prov-ollama');
+    expect(screen.providerChip({ ...ROWS[1], provider: 'Something new' })).toBe('pill pill-prov-compat');
+    expect(screen.statusChip(ROWS[0])).toEqual({ cls: 'pill pill-ok', label: 'Active', icon: 'check' });
+    expect(screen.statusChip({ ...ROWS[0], status: 'Inactive' })).toEqual({ cls: 'pill pill-warn', label: 'Inactive', icon: 'pause' });
   });
 });

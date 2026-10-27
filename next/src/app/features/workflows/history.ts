@@ -91,7 +91,8 @@ function detailOf(detail: string | null | undefined): Record<string, unknown> {
 function assignee(d: Record<string, unknown>, name: Names): string {
   if (d['userId'] != null) return name(num(d['userId']));
   if (d['assignee'] === 'role') return d['value'] === 'TENANT_ADMIN' ? 'the administrators' : 'any member';
-  if (d['assignee'] === 'group') return 'the group';
+  // F4: groups became teams; a history written before 2026-10-21 still says group.
+  if (d['assignee'] === 'team' || d['assignee'] === 'group') return 'the team';
   return 'someone';
 }
 
@@ -99,7 +100,7 @@ function target(to: string, name: Names): string {
   const [kind, value] = to.split(':');
   if (kind === 'user' || kind === 'manager') return name(Number(value));
   if (kind === 'role') return value === 'TENANT_ADMIN' ? 'the administrators' : 'any member';
-  return kind === 'group' ? 'the group' : to;
+  return kind === 'team' || kind === 'group' ? 'the team' : to;
 }
 
 function endTone(state: string): HistoryLine['tone'] {

@@ -19,6 +19,8 @@ export interface RankedItem {
    * not contain. The caller says which rows those are and why, on the tile.
    */
   inert?: boolean;
+  /** The rolled-up rest of a Top-N: listed after the ranked rows, however large it is (ZT-A7). */
+  rollup?: boolean;
 }
 
 /**
@@ -77,6 +79,12 @@ export class RankedBar {
   readonly clickable = input(false);
   /** Formats the rolled-up "Other" row so it matches the rows it summarises. */
   readonly formatValue = input<((value: number) => string) | null>(null);
+  /**
+   * One measure ranked across its categories (an analytics chart): every bar one colour -- the length says the value, and a
+   * rainbow would say the bars were different things (AI hard-workflow test, 2026-10-13). Off for a breakdown whose rows
+   * are kinds of things (files by type, jobs on a queue), each its own colour.
+   */
+  readonly single = input(false);
   readonly picked = output<RankedItem>();
 
   /* Built from the palette rather than hand-listed, so a colour added to styles.css is drawn
@@ -88,7 +96,8 @@ export class RankedBar {
     const source = this.data().filter(d => (d.value ?? 0) > 0);
     if (!source.length) return [];
 
-    const ordered = this.sorted() ? [...source].sort((a, b) => b.value - a.value) : source;
+    // ZT-A7: the rest of a Top-N is not a rank -- "Other (2 groups)" of 200,000 sat above eight departments of 100,000.
+    const ordered = this.sorted() ? [...source].sort((a, b) => Number(!!a.rollup) - Number(!!b.rollup) || b.value - a.value) : source;
     const limit = this.max();
     const head = ordered.slice(0, limit);
     const tail = ordered.slice(limit);
@@ -132,7 +141,7 @@ export class RankedBar {
       title: capTitle(row.name),
       percent: Math.round((row.value / total) * 100),
       width: Math.max(2, (row.value / largest) * 100),
-      color: row.color ?? this.palette[index % this.palette.length],
+      color: row.color ?? this.palette[this.single() ? 0 : index % this.palette.length],
     }));
   });
 }

@@ -7,7 +7,12 @@ import { PipelineTaskLike, aiFlowGraph } from '../../../shared/flow-graph/flow-a
  * free text the console parses -- and the pure readings the flow panel and the Create pipeline dialog make of it.
  */
 
-export interface FlowProblem { step?: string | null; path?: string | null; message: string; kind: 'error' | 'setting' | string; }
+/** error: the definition is wrong; setting: a required setting to fill; warning: it can be created, but does not do what it reads as. */
+export interface FlowProblem { step?: string | null; path?: string | null; message: string; kind: 'error' | 'setting' | 'warning' | string; }
+
+/** The pipeline Create pipeline made from this conversation's flow (recorded on the flow by ai-service). */
+export interface CreatedFlow { pipelineKey: number; pipelineId?: string | null; taskDetailId?: number | null; jobId?: number | null; name?: string | null;
+  version?: number | null; }
 
 export interface FlowNodeSpec {
   id: string;
@@ -25,7 +30,13 @@ export interface FlowNodeSpec {
   problems?: FlowProblem[];
 }
 
-export interface FlowTrigger { type: 'manual' | 'schedule' | 'inbox' | string; every?: string | null; at?: string | null; }
+/**
+ * What starts a designed pipeline's runs; document (ZT-I1): an approved document of the type, as a job's document trigger
+ * (MIG-364); form (ZT-AI): a form's submission (the form links the job); event (ZT-AI): an event posted to the API, through an
+ * event route to the job.
+ */
+export interface FlowTrigger { type: 'manual' | 'schedule' | 'inbox' | 'document' | 'form' | 'event' | string; every?: string | null; at?: string | null;
+  documentTypeId?: number | null; formId?: number | null; eventType?: string | null; }
 
 export interface FlowDefinitionStep {
   key: string;
@@ -53,9 +64,13 @@ export interface PipelineFlowArtifact {
   flow: { nodes: FlowNodeSpec[]; edges: { from: string; to: string; label?: string | null; dashed?: boolean }[]; direction?: string };
   definition: FlowDefinition;
   problems: FlowProblem[];
+  /** What the check moved or left out, worked out again on every edit: shown under the flow. */
   notes?: string[];
   valid: boolean;
   settingsToFill?: number;
+  warnings?: number;
+  /** Created from this conversation: an edit is an update of that pipeline (a new version), never a second pipeline. */
+  created?: CreatedFlow | null;
   coreChecked?: boolean;
   saved: boolean;
   changes?: string[];
@@ -76,13 +91,33 @@ export function graphOf(artifact: PipelineFlowArtifact, tasks?: readonly Pipelin
   return aiFlowGraph(artifact, tasks);
 }
 
-/** One line on the flow: how many steps, and whether it can be created as it is. */
+/**
+ * One line on the flow: how many steps, and whether it can be created as it is. A warning (an aggregate with no groupBy
+ * collapses every row into one; two reviews) is never "Ready to create": it says so, in the flow's own words, below.
+ */
 export function flowVerdict(a: PipelineFlowArtifact): { label: string; tone: 'ok' | 'warn' | 'crit' } {
   const errors = a.problems.filter(p => p.kind === 'error').length;
   const settings = a.problems.filter(p => p.kind === 'setting').length;
+  const warnings = a.problems.filter(p => p.kind === 'warning').length;
   if (errors) return { label: errors === 1 ? '1 error' : `${errors} errors`, tone: 'crit' };
   if (settings) return { label: settings === 1 ? '1 setting to fill' : `${settings} settings to fill`, tone: 'warn' };
-  return { label: 'Ready to create', tone: 'ok' };
+  if (warnings) return { label: warnings === 1 ? 'Check 1 warning' : `Check ${warnings} warnings`, tone: 'warn' };
+  return { label: a.created && a.saved ? 'Created' : 'Ready to create', tone: 'ok' };
+}
+
+/** What starts the pipeline, in words for the Create dialog: when it really runs once created. */
+export function triggerWhen(t: FlowTrigger, startDate: string): string {
+  if (t.type === 'schedule') {
+    const at = t.at ? ` at ${t.at}` : '';
+    const every = t.every === 'hour' ? 'every hour' : t.every === 'week' ? 'every week (Mondays)' : t.every === 'month' ? 'every month (on the 1st)'
+      : 'every day';
+    return `It runs ${every}${at} (America/Chicago), from ${startDate}.`;
+  }
+  if (t.type === 'inbox') return 'It runs when a file lands in its inbox.';
+  if (t.type === 'document') return 'It runs when a document of its type is approved, once per document.';
+  if (t.type === 'form') return 'It runs each time its form is submitted, once per submission.';
+  if (t.type === 'event') return 'It runs each time an event of its type is posted to the API, once per event.';
+  return 'Nothing runs until you press Run now.';
 }
 
 /** The required settings the design left empty: what the Create dialog asks for, per step. */

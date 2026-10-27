@@ -1,0 +1,83 @@
+{
+ "_about": "MIG-416 (2026-10-21): what e2e/perf.spec.ts holds each main page to, as a workspace administrator at 1920 and 1024, a full load with the HTTP cache warm. Measured on the development Mac (Lakeside Home Health, 428 reports, 7 templates): time to content 94-266 ms, LCP 52-232 ms, no long task, 57-98 requests a page, heap 11-15 MB after a GC with 1-3 MB over two more walks. Budgets: time to content 2,000 ms (about 8x, so a busy Mac passes and a page that waits on a slow call fails); LCP 2,500 ms and CLS 0.1, the Web Vitals 'good' thresholds; 300 ms of long tasks; requests about 1.5x the page's count (a page that starts fetching per row fails); heap 60 MB and 10 MB of growth over two walks (a leak). Runs measured CLS 0.29 at 1024 before its explorer was drawn whole (MIG-416). AWS budgets come with MIG-327.",
+ "widths": [
+  1920,
+  1024
+ ],
+ "pages": {
+  "home": {
+   "ttcMs": 2000,
+   "lcpMs": 2500,
+   "cls": 0.1,
+   "longTaskMs": 300,
+   "requests": 150
+  },
+  "runs": {
+   "ttcMs": 2000,
+   "lcpMs": 2500,
+   "cls": 0.1,
+   "longTaskMs": 300,
+   "requests": 140
+  },
+  "run": {
+   "ttcMs": 2000,
+   "lcpMs": 2500,
+   "cls": 0.1,
+   "longTaskMs": 300,
+   "requests": 140
+  },
+  "dashboards": {
+   "ttcMs": 2000,
+   "lcpMs": 2500,
+   "cls": 0.1,
+   "longTaskMs": 300,
+   "requests": 120
+  },
+  "analysis": {
+   "ttcMs": 2000,
+   "lcpMs": 2500,
+   "cls": 0.1,
+   "longTaskMs": 300,
+   "requests": 110
+  },
+  "report-library": {
+   "ttcMs": 2000,
+   "lcpMs": 2500,
+   "cls": 0.1,
+   "longTaskMs": 300,
+   "requests": 100
+  },
+  "report-designer": {
+   "ttcMs": 2000,
+   "lcpMs": 2500,
+   "cls": 0.1,
+   "longTaskMs": 300,
+   "requests": 100
+  },
+  "report": {
+   "ttcMs": 2000,
+   "lcpMs": 2500,
+   "cls": 0.1,
+   "longTaskMs": 300,
+   "requests": 90
+  },
+  "billing": {
+   "ttcMs": 2000,
+   "lcpMs": 2500,
+   "cls": 0.1,
+   "longTaskMs": 300,
+   "requests": 110
+  },
+  "forms": {
+   "ttcMs": 2000,
+   "lcpMs": 2500,
+   "cls": 0.1,
+   "longTaskMs": 300,
+   "requests": 90
+  }
+ },
+ "heap": {
+  "usedMbMax": 60,
+  "growthMbMax": 10
+ }
+}

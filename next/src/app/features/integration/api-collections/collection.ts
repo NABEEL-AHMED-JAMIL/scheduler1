@@ -29,6 +29,9 @@ import { SensitivityTag } from '../../../shared/ui/sensitivity';
 import { ManagedBanner } from '../../../shared/ui/managed-banner';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
+import { WorkspaceSelect } from '../../../shared/ui/workspace-select';
+import { WorkspaceDirectory } from '../../../core/workspaces/workspace-directory';
+import { formatDuration } from '../../../shared/ui/time-format';
 
 const USER_KINDS: Record<string, string> = { PIPELINE: 'Pipeline', SOURCE: 'Source', AI_TOOL: 'AI tool' };
 
@@ -37,18 +40,30 @@ const USER_KINDS: Record<string, string> = { PIPELINE: 'Pipeline', SOURCE: 'Sour
  * secret is "••• configured" and can only be replaced; its versions; and who uses its APIs. Reading is for every
  * member who holds the api-collections page; Add API, Edit, Enable/Disable, Delete and the environments' writes
  * are a workspace administrator's.
+ *
+ * A platform administrator reads it in the workspace he picked (the shared selector in the header, opening on this
+ * session's last pick); until he picks one the page asks for it. Another workspace's collection is not found there.
  */
 @Component({
   selector: 'app-api-collection',
-  imports: [RefreshButton, PageHeader, Icon, SensitivityTag, TableShell, StatusPill, StatStrip, ViewToggle, DataText, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, RouterLink, ManagedBanner],
+  imports: [RefreshButton, PageHeader, Icon, SensitivityTag, TableShell, StatusPill, StatStrip, ViewToggle, DataText, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, RouterLink, ManagedBanner, WorkspaceSelect],
   templateUrl: './collection.html',
 })
 export class Collection implements OnChanges {
+  /** Milliseconds in the console's duration words (formatDuration): "420 ms", "1.4 sec", "15 sec". */
+  took(ms: number): string { return formatDuration(ms / 1000); }
+
   private readonly api = inject(ApiCollectionsApi);
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);
   private readonly auth = inject(AuthService);
   private readonly lastTests = inject(LastTests);
+  private readonly directory = inject(WorkspaceDirectory);
+
+  /** The workspace a platform administrator picked (this session's last choice to start with); null for anyone else. */
+  readonly tenantId = signal<number | null>(this.directory.remembered());
+  /** A platform administrator who has not picked a workspace yet: the page asks for one and reads nothing. */
+  readonly needsWorkspace = computed(() => this.directory.picks() && this.tenantId() === null);
 
   /** From the route, :collectionId. */
   readonly collectionId = input<string>();
@@ -103,6 +118,14 @@ export class Collection implements OnChanges {
 
   ngOnChanges(): void { this.load(); }
 
+  /** A platform administrator's pick: the collection is read again in that workspace. */
+  pickWorkspace(id: number | null): void {
+    this.tenantId.set(id);
+    this.detail.set(null);
+    this.usage.set([]);
+    this.load();
+  }
+
   private id(): number | null {
     const raw = this.collectionId();
     return isRecordId(raw) ? Number(raw) : null;
@@ -113,9 +136,12 @@ export class Collection implements OnChanges {
     this.error.set('');
     this.missing.set(false);
     if (id === null) { this.loading.set(false); this.missing.set(true); this.error.set('There is no API collection at this address.'); return; }
+    if (this.needsWorkspace()) { this.loading.set(false); return; }
     this.loading.set(true);
-    this.api.get(id).subscribe({
+    const asked = this.tenantId();
+    this.api.get(id, asked).subscribe({
       next: r => {
+        if (asked !== this.tenantId()) return;
         this.loading.set(false);
         if (r.status !== API_SUCCESS || !r.data) {
           this.missing.set(isMissingRecord(r));
@@ -127,14 +153,15 @@ export class Collection implements OnChanges {
         this.defaultAuth.set(r.data.collection.defaultAuth ?? null);
       },
       error: err => {
+        if (asked !== this.tenantId()) return;
         this.loading.set(false);
         this.missing.set(isMissingRecord({ status: err?.status }));
         this.error.set(err?.error?.message || 'Could not load the collection.');
       },
     });
-    this.api.usage(id).subscribe({
-      next: r => this.usage.set(r.status === API_SUCCESS ? r.data ?? [] : []),
-      error: () => this.usage.set([]),
+    this.api.usage(id, asked).subscribe({
+      next: r => { if (asked === this.tenantId()) this.usage.set(r.status === API_SUCCESS ? r.data ?? [] : []); },
+      error: () => { if (asked === this.tenantId()) this.usage.set([]); },
     });
   }
 
@@ -155,7 +182,7 @@ export class Collection implements OnChanges {
   editDetails(): void {
     const c = this.collection();
     if (!c) return;
-    const data: CollectionDialogData = { collection: c };
+    const data: CollectionDialogData = { collection: c, tenantId: this.tenantId() };
     this.dialog.open<number | null>(CollectionDialog, { data }).closed.subscribe(id => { if (id) this.load(); });
   }
 
@@ -164,7 +191,7 @@ export class Collection implements OnChanges {
     if (!d) return;
     const data: RequestPanelData = {
       collection: d.collection, requestId, folderId, folders: d.folders, environments: d.environments,
-      defaultAuth: this.defaultAuth(), canManage: this.canManage(),
+      defaultAuth: this.defaultAuth(), canManage: this.canManage(), tenantId: this.tenantId(),
     };
     // Reloaded whatever the panel says on closing: the X and the backdrop close it without an answer.
     this.dialog.open<boolean>(RequestPanel, sidePanelConfig(data, 'wide', 'right')).closed.subscribe(() => this.load());
@@ -178,7 +205,7 @@ export class Collection implements OnChanges {
   }
 
   toggleEnabled(r: RequestRow): void {
-    this.api.setEnabled(r.requestId, !r.enabled).subscribe({
+    this.api.setEnabled(r.requestId, !r.enabled, this.tenantId()).subscribe({
       next: res => { if (res.status === API_SUCCESS) { this.toast.success(res.message); this.load(); } else this.toast.error(res.message); },
       error: err => this.toast.error(err?.error?.message || 'The API could not be changed.'),
     });
@@ -191,7 +218,7 @@ export class Collection implements OnChanges {
       confirmLabel: 'Delete API', danger: true,
     });
     if (!ok) return;
-    this.api.deleteRequest(r.requestId).subscribe({
+    this.api.deleteRequest(r.requestId, this.tenantId()).subscribe({
       next: res => {
         if (res.status === API_SUCCESS) { this.toast.success(res.message); this.load(); return; }
         const users = usersOf(res);
@@ -207,14 +234,14 @@ export class Collection implements OnChanges {
   newEnvironment(): void {
     const d = this.detail();
     if (!d) return;
-    const data: EnvironmentDialogData = { collectionId: d.collection.collectionId, first: !d.environments.length };
+    const data: EnvironmentDialogData = { collectionId: d.collection.collectionId, first: !d.environments.length, tenantId: this.tenantId() };
     this.dialog.open<boolean>(EnvironmentDialog, { data }).closed.subscribe(saved => { if (saved) this.load(); });
   }
 
   editEnvironment(env: EnvironmentRow): void {
     const d = this.detail();
     if (!d) return;
-    const data: EnvironmentDialogData = { collectionId: d.collection.collectionId, environment: env };
+    const data: EnvironmentDialogData = { collectionId: d.collection.collectionId, environment: env, tenantId: this.tenantId() };
     this.dialog.open<boolean>(EnvironmentDialog, { data }).closed.subscribe(saved => { if (saved) this.load(); });
   }
 
@@ -225,7 +252,7 @@ export class Collection implements OnChanges {
       confirmLabel: 'Delete environment', danger: true,
     });
     if (!ok) return;
-    this.api.deleteEnvironment(env.environmentId).subscribe({
+    this.api.deleteEnvironment(env.environmentId, this.tenantId()).subscribe({
       next: r => { if (r.status === API_SUCCESS) { this.toast.success(r.message); this.load(); } else this.toast.error(r.message); },
       error: err => this.toast.error(err?.error?.message || 'The environment could not be deleted.'),
     });

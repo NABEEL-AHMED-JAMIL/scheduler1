@@ -1,0 +1,6 @@
+DISCHARGE NOTE (synthetic test document, not a real patient)
+Patient: Test Patient A, MRN TEST-0001
+Admitted: 2026-10-01  Discharged: 2026-10-04
+Diagnosis: Community-acquired pneumonia, resolved.
+Medications: Amoxicillin 500 mg three times a day for 5 days.
+Follow-up: Primary care in 7 days.

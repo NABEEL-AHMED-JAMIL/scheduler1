@@ -1,5 +1,6 @@
 import { Component, DestroyRef, ElementRef, Injector, OnInit, computed, effect, inject, input, linkedSignal, signal, untracked, viewChild } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
+import { firstValueFrom } from 'rxjs';
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { parseTopicPartition } from '../../../shared/ui/topic';
@@ -14,7 +15,7 @@ import { Combobox, ComboboxOption } from '../../../shared/ui/combobox';
 import { Icon } from '../../../shared/ui/icon';
 import { LoadError } from '../../../shared/ui/load-error';
 import { focusFirstInvalid } from '../../../shared/ui/focus-first-invalid';
-import { FieldChoice, Pipeline, PipelineField, parseFieldChoices } from '../../settings/pipelines/pipeline-dialog';
+import { FieldChoice, Pipeline, PipelineField, parseFieldChoices } from '../../settings/pipelines/pipeline.model';
 import { TaskReference, TaskReferenceKind, notBlank } from '../../settings/configuration/configuration.models';
 import { isPlatformDefault, profileLabel } from '../../settings/kafka/platform-default';
 import { StepBuilder, BuilderTab } from '../steps/step-builder';
@@ -83,6 +84,8 @@ export class TaskEdit implements OnInit {
   readonly taskDetailId = input<string>('');
   /** ?tab= -- which of the step builder's tabs is open (MIG-249); ignored for a legacy pipeline unless it names one. */
   readonly tab = input<string>('');
+  /** Owner 2026-10-21: ?step= opens that step's settings (a report over its page limit links to its Generate report step). */
+  readonly step = input<string>('');
 
   private readonly fb = inject(FormBuilder);
   private readonly http = inject(HttpClient);
@@ -153,6 +156,8 @@ export class TaskEdit implements OnInit {
   readonly isEdit = computed(() => !!this.taskDetailId());
   /** UX review 2026-10-12 (P4): the page is titled with the pipeline's name, and its status beside it. */
   readonly loadedName = signal('');
+  /** The loaded pipeline's workspace, for the step builder's reads a platform administrator makes in it. */
+  readonly pipelineTenantId = signal<number | null>(null);
   readonly loadedStatus = signal('');
   readonly heading = computed(() => this.isEdit() ? (this.loadedName() || 'Pipeline') : 'New pipeline');
 
@@ -388,6 +393,7 @@ export class TaskEdit implements OnInit {
         this.topicFromLoad.set(task.sourceTaskType?.sourceTaskTypeId ?? null);
         this.topicVersion.set('load');
         this.taskTenantId = task.tenantId ?? null;
+        this.pipelineTenantId.set(this.taskTenantId);
         this.loadReferences(this.taskTenantId);
         const topicId = task.sourceTaskType?.sourceTaskTypeId ?? null;
         if (topicId != null) {
@@ -857,12 +863,17 @@ export class TaskEdit implements OnInit {
 
   /** The schedules that run this pipeline: Run now runs one, the Schedules tab lists them, the overview counts them. */
   readonly jobs = signal<LinkedJob[]>([]);
+  /** Report Studio phase 5: the pipeline's schedules, whose latest run is a generate_report step's data. */
+  readonly jobIdsOf = computed(() => this.jobs().map(j => j.jobId));
   readonly jobsLoaded = signal(false);
   readonly running = signal(false);
   readonly runLabel = computed(() => (this.dirty() && !this.locked() ? 'Save & run now' : 'Run now'));
   readonly runHint = computed(() => {
     if (!this.jobsLoaded()) return '';
-    if (!this.jobs().length) return 'No schedule runs this pipeline yet. Schedule one, then Run now runs it.';
+    if (!this.jobs().length) {
+      return this.locked() ? 'No schedule runs this pipeline yet.'
+        : 'No schedule runs this pipeline yet: Run now gives it an on-demand schedule (runs only when started) and runs it.';
+    }
     return this.dirty() && !this.locked() ? 'Unsaved changes are saved first: a run runs the saved steps.' : '';
   });
 
@@ -919,11 +930,15 @@ export class TaskEdit implements OnInit {
 
   /** Run now: the one schedule, or the one picked; unsaved changes are saved first, as the runner runs what is saved. */
   async runNow(jobId?: number): Promise<void> {
-    const id = jobId ?? this.jobs()[0]?.jobId;
-    if (!id || this.running()) return;
+    let id: number | null | undefined = jobId ?? this.jobs()[0]?.jobId;
+    if (this.running() || (!id && (this.locked() || !this.jobsLoaded()))) return;
     if (this.dirty() && !this.locked()) {
       const saved = await this.saveAll();
       if (!saved) return;
+    }
+    if (!id) {
+      id = await this.onDemandSchedule();
+      if (!id) return;
     }
     const job = this.jobs().find(j => j.jobId === id);
     this.running.set(true);
@@ -945,6 +960,32 @@ export class TaskEdit implements OnInit {
       },
       error: err => { this.running.set(false); this.toast.error(err?.error?.message || 'The run could not be started.'); },
     });
+  }
+
+  /**
+   * ZT-P6: a pipeline made from Add steps yourself has no schedule, so Run now (and Test with sample's "Save & run now")
+   * had nothing to run. It gets one that runs only when started -- what Schedules › New makes with "Only when started" --
+   * named after the pipeline; answers its id, or null (said) when it could not be made.
+   */
+  private async onDemandSchedule(): Promise<number | null> {
+    const task = this.taskIdNumber();
+    if (!task) return null;
+    const jobName = `${this.loadedName() || 'Pipeline'} (on demand)`;
+    try {
+      const made = await firstValueFrom(this.http.post<ApiResponse>(`${API_BASE}/sourceJob.json/addSourceJob`, {
+        jobName, taskDetail: { taskDetailId: task }, execution: 'Manual', priority: 1, maxAttempts: 1, retryBackoffSeconds: 30,
+        jobStatus: 'Active', completeJob: false, failJob: false, skipJob: false }));
+      if (made.status !== API_SUCCESS) { this.toast.error(made.message || 'The on-demand schedule could not be made.'); return null; }
+      const linked = await firstValueFrom(this.stepsApi.jobsOf(task));
+      const jobs = linked.status === API_SUCCESS ? linked.data ?? [] : [];
+      this.jobs.set(jobs);
+      const job = jobs.find(j => j.jobName === jobName) ?? jobs[0];
+      if (job) this.toast.info(`Made the schedule ${job.jobName}: it runs only when started.`);
+      return job?.jobId ?? null;
+    } catch (err: any) {
+      this.toast.error(err?.error?.message || 'The on-demand schedule could not be made.');
+      return null;
+    }
   }
 
   /** A new schedule for this pipeline. */

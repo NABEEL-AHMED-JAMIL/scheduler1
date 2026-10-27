@@ -21,8 +21,8 @@ import { Component, computed, input, output } from '@angular/core';
                   (click)="toFront(slot.index)"></button>
         }
       </span>
-      <button type="button" class="btn btn-ghost btn-xs" (click)="reverse()">Reverse</button>
-      @if (order()?.length) { <button type="button" class="btn btn-ghost btn-xs" (click)="orderChange.emit(undefined)">Theme order</button> }
+      <button type="button" class="btn btn-default btn-xs" (click)="reverse()">Reverse</button>
+      @if (order()?.length) { <button type="button" class="btn btn-default btn-xs" (click)="orderChange.emit(undefined)">Theme order</button> }
     </div>
   `,
   styles: [`

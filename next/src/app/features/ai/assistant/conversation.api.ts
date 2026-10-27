@@ -31,7 +31,8 @@ export class ConversationApi {
   }
 
   /** Create pipeline saved the conversation's design in Core (as the person): the list then links to it. */
-  pipelineCreated(conversationId: number, created: { pipelineKey: number; pipelineId?: string; taskDetailId?: number; jobId?: number; name?: string })
+  pipelineCreated(conversationId: number, created: { pipelineKey: number; pipelineId?: string; taskDetailId?: number; jobId?: number; name?: string;
+    version?: number | null; messageId?: number | null })
     : Observable<ApiResponse<ConversationRow>> {
     return this.http.post<ApiResponse<ConversationRow>>(`${BASE()}/outcome`, { conversationId, ...created });
   }

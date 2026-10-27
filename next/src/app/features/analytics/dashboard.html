@@ -1,5 +1,10 @@
 <div class="page">
-  @if (openId() === null) {
+  @if (noWorkspace()) {
+    <app-page-header>
+      <div class="page-head"><div><h1 class="page-title">Dashboards</h1></div></div>
+    </app-page-header>
+    <app-needs-workspace what="Dashboards are" todo="open, run and change its boards" icon="layers" />
+  } @else if (openId() === null) {
     <!-- ---- the cards: every board in the workspace ------------------------------------------ -->
     <!-- UX review 2026-10-12 (A2, G3, G12): Dashboards, the primary rightmost. -->
     <app-page-header>
@@ -21,7 +26,7 @@
 
     @if (!canEdit()) {
       <!-- UX review 2026-10-12: a viewer reads the boards; changing them is another page's. -->
-      <p class="text-xs text-[color:var(--text-muted)] flex items-center gap-1.5" data-test="read-only"><app-icon name="lock" size="0.95em" />You can open, run and filter these dashboards. Changing them needs the Edit dashboards page; ask your workspace admin.</p>
+      <p class="text-xs text-[color:var(--text-muted)] flex items-center gap-1.5" data-test="read-only"><app-icon name="lock" size="0.95em" />You can open, run and filter these dashboards. Changing them needs the Edit dashboards page, and reading data outside their tiles needs Analytics Studio; ask your workspace admin.</p>
     }
     @if (createOpen() && canEdit()) {
       <div class="card p-4 flex flex-wrap items-end gap-2">
@@ -142,6 +147,15 @@
           <p class="text-sm text-[color:var(--text-secondary)] max-w-md">{{ boardError() }}</p>
           <a [routerLink]="[]" class="btn btn-default btn-sm mt-2" (click)="leaveBoard()">All dashboards</a>
         </div>
+      } @else if (boardMissing()) {
+        <app-page-header title="Dashboard" [trail]="boardTrail" />
+        <!-- ZT-A10: a board that is not here (deleted, or another workspace's link) is said as that, with the way back. -->
+        <div class="card p-8 flex flex-col items-center text-center gap-2" data-test="board-missing">
+          <span class="stat-glyph"><app-icon name="search" /></span>
+          <h2 class="text-base font-semibold">This dashboard isn't here</h2>
+          <p class="text-sm text-[color:var(--text-secondary)] max-w-md">It may have been deleted, or the link belongs to another workspace.</p>
+          <a [routerLink]="[]" class="btn btn-default btn-sm mt-2" (click)="leaveBoard()">All dashboards</a>
+        </div>
       } @else if (boardError()) {
         <app-page-header title="Dashboard" [trail]="boardTrail" />
         <div class="card"><app-load-error [message]="boardError()" (retry)="retryBoard()" /></div>
@@ -166,7 +180,6 @@
               @else if (lastRun()) {
                 <span class="dash-run" [title]="'Last run: ' + lastRun() + ' · ' + lastRunText()"><span [class.text-crit-500]="failedCount() > 0">Last run: {{ lastRun() }}</span> · {{ lastRunText() }}</span>
               }
-              @if (loadMs() !== null && !running()) { <span data-test="load-time" [attr.data-load-ms]="loadMs()">Loaded in {{ (loadMs()! / 1000).toFixed(1) }} s</span> }
               @if (boardFilterCount()) {
                 <!-- In the facts line, which is there anyway: a click on a mark that narrows the board
                      changes this line's words and nothing's position. -->
@@ -176,6 +189,9 @@
                   <button type="button" class="btn btn-ghost btn-icon btn-xs dash-filter-clear" aria-label="Clear the board filter" title="Clear the board filter" [disabled]="running()" (click)="clearBoardFilter()"><app-icon name="close" size="0.85em" /></button>
                 </span>
               }
+              <!-- Last on the line: it goes while the board runs and comes back with another length, and nothing may sit
+                   after it to be moved (the filter pill did, on every click that narrowed: e2e board-layout). -->
+              @if (loadMs() !== null && !running()) { <span data-test="load-time" [attr.data-load-ms]="loadMs()">Loaded in {{ took(loadMs()!) }}</span> }
             </p>
           </div>
           <div class="flex items-center gap-1.5 shrink-0">
@@ -187,7 +203,7 @@
             }
             <!-- The theme every tile draws in. Stored on the board; choosing one runs nothing. -->
             @if (canEdit()) {
-              <button type="button" class="btn btn-ghost btn-sm dash-theme" [cdkMenuTriggerFor]="themeMenu" [attr.aria-label]="'Chart theme: ' + boardThemeLabel()"><app-icon name="sun" />{{ boardThemeLabel() }}</button>
+              <button type="button" class="btn btn-default btn-sm dash-theme" [cdkMenuTriggerFor]="themeMenu" [attr.aria-label]="'Chart theme: ' + boardThemeLabel()"><app-icon name="sun" />{{ boardThemeLabel() }}</button>
             }
             <ng-template #themeMenu>
               <div cdkMenu class="card shadow-xl p-4 w-[34rem] max-w-[92vw] text-sm">
@@ -216,7 +232,7 @@
         <!-- The filter bar (board/board-filter-bar.ts): a date range and the dimensions the board's editor chose. Every tile
              runs under it, applied by the server; the state is in the URL and kept for this viewer. -->
         @if (filterDefs().length) {
-          <app-board-filter-bar [defs]="filterDefs()" [state]="filterState()" [canEdit]="canEdit()" (stateChange)="setFilterState($event)" (edit)="openFilterEditor()" />
+          <app-board-filter-bar [defs]="filterDefs()" [state]="filterState()" [canEdit]="canEdit()" [boardId]="board()?.analyticsDashboardId ?? null" (stateChange)="setFilterState($event)" (edit)="openFilterEditor()" />
         }
 
         <!-- Reference, not the work: folded away so the widgets start near the top. -->
@@ -241,7 +257,7 @@
                   @for (dataset of boardDatasets(); track dataset.key) { <option [value]="dataset.key" [selected]="dataset.key === boardFilterOn()">{{ dataset.label }}</option> }
                 </select>
               </label>
-              <button type="button" class="btn btn-ghost btn-sm ms-auto" (click)="filterOpen.set(false)">Hide</button>
+              <button type="button" class="btn btn-default btn-sm ms-auto" (click)="filterOpen.set(false)">Hide</button>
             </div>
             @if (boardColumnsLoading()) {
               <p class="field-note text-[color:var(--text-muted)]">Reading that dataset's columns — one of the four queries this server runs at a time, which is why it is only read when you open this.</p>
@@ -353,7 +369,7 @@
               }
               <app-analytics-widget [class]="spanClass(widget)" [attr.data-span]="spanOf(widget)" [attr.data-widget]="widget.analyticsDashboardWidgetId"
                                     [style.height.px]="heldHeight(widget)" [class.is-held]="heldHeight(widget) !== null" [title]="widget.widgetTitle" [subtitle]="shortSourceOf(widget)" [subtitleTitle]="sourceOf(widget)"
-                                    [state]="table ? 'ready' : stateOf(run)" [busy]="table ? tableReads()[widget.analyticsDashboardWidgetId!]?.state === 'running' : updating(run)" [error]="run?.error || ''" (refresh)="runOne(widget)">
+                                    [state]="table ? 'ready' : stateOf(run)" [reserve]="table ? null : reserveOf(widget)" [reserveKpi]="table ? null : reserveKpiOf(widget)" [busy]="table ? tableReads()[widget.analyticsDashboardWidgetId!]?.state === 'running' : updating(run)" [error]="run?.error || ''" (refresh)="runOne(widget)">
                 <ng-container actions>
                   @if (canEdit() || (shown && hasMoreRows(shown))) {
                     <button type="button" class="btn btn-ghost btn-icon btn-xs" [cdkMenuTriggerFor]="tileMenu" [attr.aria-label]="'Actions for ' + widget.widgetTitle"
@@ -485,7 +501,7 @@
                   @if (shown; as view) {
                     @let kind = drawn(widget, view);
                     @if (hiddenRowTotal(view, kind); as total) {
-                      <button type="button" class="btn btn-ghost btn-xs dash-show-all" [attr.aria-expanded]="isExpanded(widget)" (click)="toggleRows(widget)">
+                      <button type="button" class="btn btn-default btn-xs dash-show-all" [attr.aria-expanded]="isExpanded(widget)" (click)="toggleRows(widget)">
                         {{ isExpanded(widget) ? 'Show fewer' : 'Show all ' + total }}
                       </button>
                     }
@@ -499,6 +515,9 @@
                          text that changes length moves its start, which the browser scores as a shift. -->
                     @let count = counted(view, kind, rowLimit(widget), settingsOf(widget)) + ' · ran ' + clock(view.ranAt);
                     <span class="dash-count text-[11px] text-[color:var(--text-muted)] ml-auto whitespace-nowrap" [title]="view.notes.join(' ')">@for (words of [count]; track words) {<span>{{ words }}</span>}</span>
+                  } @else if (!table && (stateOf(run) === 'queued' || stateOf(run) === 'running')) {
+                    <!-- ZT §3.11: the count line's place, held while the tile waits and runs (it came with the answer, 30 px). -->
+                    <span class="dash-count text-[11px] ml-auto whitespace-nowrap" aria-hidden="true" data-test="tile-count-pending">&nbsp;</span>
                   }
                 </div>
               </app-analytics-widget>

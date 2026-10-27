@@ -7,7 +7,7 @@ import { ToastService } from './toast.service';
 export type Inline = { text: string; code?: boolean; bold?: boolean; italic?: boolean; href?: string };
 export type Block =
   | { kind: 'p' | 'h'; level?: number; spans: Inline[] }
-  | { kind: 'ul' | 'ol'; items: Inline[][] }
+  | { kind: 'ul' | 'ol'; items: Inline[][]; depth?: number[] }
   | { kind: 'code'; lang: string; code: string }
   | { kind: 'hr' };
 
@@ -29,7 +29,7 @@ export type Block =
             <div class="md-code">
               <div class="md-code-head">
                 <span>{{ block.lang || 'code' }}</span>
-                <button type="button" class="btn btn-ghost btn-sm" (click)="copyBlock($index, block.code)">
+                <button type="button" class="btn btn-default btn-sm" (click)="copyBlock($index, block.code)">
                   <app-icon [name]="copiedIndex() === $index ? 'check' : 'copy'"
                             [class.icon-ok]="copiedIndex() === $index" size="0.85em" />
                   {{ copiedIndex() === $index ? 'Copied' : 'Copy' }}
@@ -50,7 +50,7 @@ export type Block =
           @case ('ul') {
             <ul class="md-list">
               @for (item of block.items; track $index) {
-                <li>@for (span of item; track $index) { <ng-container [ngTemplateOutlet]="inline"
+                <li [class]="block.depth?.[$index] ? 'md-depth-' + block.depth![$index] : ''">@for (span of item; track $index) { <ng-container [ngTemplateOutlet]="inline"
                   [ngTemplateOutletContext]="{ $implicit: span }" /> }</li>
               }
             </ul>
@@ -58,7 +58,7 @@ export type Block =
           @case ('ol') {
             <ol class="md-list md-list-ol">
               @for (item of block.items; track $index) {
-                <li>@for (span of item; track $index) { <ng-container [ngTemplateOutlet]="inline"
+                <li [class]="block.depth?.[$index] ? 'md-depth-' + block.depth![$index] : ''">@for (span of item; track $index) { <ng-container [ngTemplateOutlet]="inline"
                   [ngTemplateOutletContext]="{ $implicit: span }" /> }</li>
               }
             </ol>
@@ -71,19 +71,13 @@ export type Block =
       }
     </div>
 
-    <ng-template #inline let-span>
-      @if (span.href) {
-        <a [href]="span.href" target="_blank" rel="noopener noreferrer" class="md-link">{{ span.text }}</a>
-      } @else if (span.code) {
-        <code class="md-inline-code">{{ span.text }}</code>
-      } @else if (span.bold) {
-        <strong>{{ span.text }}</strong>
-      } @else if (span.italic) {
-        <em>{{ span.text }}</em>
-      } @else {
-        {{ span.text }}
-      }
-    </ng-template>
+    <!-- On as few lines as Angular allows: a line break around a span's text is a space on the page ("**bold**:" read
+         "bold :"). -->
+    <ng-template #inline let-span>@if (span.href) {<a [href]="span.href" target="_blank" rel="noopener noreferrer" class="md-link">{{ span.text }}</a>}
+      @else if (span.code) {<code class="md-inline-code">{{ span.text }}</code>}
+      @else if (span.bold) {<strong>{{ span.text }}</strong>}
+      @else if (span.italic) {<em>{{ span.text }}</em>}
+      @else {<ng-container>{{ span.text }}</ng-container>}</ng-template>
   `,
 })
 export class Markdown {
@@ -148,21 +142,25 @@ export function parseMarkdown(source: string): Block[] {
 
       if (/^\s*[-*+]\s+/.test(line)) {
         const items: Inline[][] = [];
+        const depth: number[] = [];
         while (i < lines.length && /^\s*[-*+]\s+/.test(lines[i])) {
+          depth.push(indentOf(lines[i]));
           items.push(parseInlines(lines[i].replace(/^\s*[-*+]\s+/, '')));
           i++;
         }
-        out.push({ kind: 'ul', items });
+        out.push(withDepth({ kind: 'ul', items }, depth));
         continue;
       }
 
       if (/^\s*\d+[.)]\s+/.test(line)) {
         const items: Inline[][] = [];
+        const depth: number[] = [];
         while (i < lines.length && /^\s*\d+[.)]\s+/.test(lines[i])) {
+          depth.push(indentOf(lines[i]));
           items.push(parseInlines(lines[i].replace(/^\s*\d+[.)]\s+/, '')));
           i++;
         }
-        out.push({ kind: 'ol', items });
+        out.push(withDepth({ kind: 'ol', items }, depth));
         continue;
       }
 
@@ -183,6 +181,21 @@ export function parseMarkdown(source: string): Block[] {
 
     return out;
   }
+
+/**
+ * How deep each list item sits: models nest a list by indenting its items two or four spaces, or a tab ("- **AI
+ * prompts**:" then "  - `Drug safety`"). Each distinct indent in the list is one level deeper than the one before it,
+ * at most 3, so the nesting reads without a tree of blocks. A list with no nesting carries no depth at all.
+ */
+function indentOf(line: string): number {
+  return (/^[ \t]*/.exec(line)?.[0] ?? '').replace(/\t/g, '    ').length;
+}
+
+function withDepth(block: { kind: 'ul' | 'ol'; items: Inline[][] }, indents: number[]): Block {
+  const levels = [...new Set(indents)].sort((a, b) => a - b);
+  if (levels.length < 2) return block;
+  return { ...block, depth: indents.map(n => Math.min(3, levels.indexOf(n))) };
+}
 
   /** Inline code first: its contents must not then be read as bold or italic markers. */
 export function parseInlines(source: string): Inline[] {

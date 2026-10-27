@@ -140,8 +140,10 @@ describe('Configuration values -- the list', () => {
 
   it('lets a platform administrator narrow to one workspace', () => {
     const { component, http } = screen(true);
-    http.expectOne(r => r.url.endsWith('/tenant.json/listTenants'))
-      .flush({ status: API_SUCCESS, data: [{ tenantId: 2901, tenantName: 'CareBridge' }] });
+    // The page's own list (names its rows) and the shared workspace selector's (owner #5).
+    for (const r of http.match(r => r.url.endsWith('/tenant.json/listTenants'))) {
+      r.flush({ status: API_SUCCESS, data: [{ tenantId: 2901, tenantName: 'CareBridge' }] });
+    }
     flushList(http);
     component.setTenant('2901');
     TestBed.tick();

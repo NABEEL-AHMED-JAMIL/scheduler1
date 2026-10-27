@@ -6,9 +6,12 @@ import { Icon } from '../../../shared/ui/icon';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { ApiClientsApi, AttemptRow, DeliveryRow, WebhookRow } from './api-clients.api';
+import { formatDuration } from '../../../shared/ui/time-format';
 
 export interface DeliveriesDialogData {
   webhook: WebhookRow;
+  /** The workspace a platform administrator picked; none for a workspace administrator (their own). */
+  tenantId?: number | null;
 }
 
 const PAGE = 50;
@@ -68,17 +71,17 @@ const PAGE = 50;
                   <td class="text-right tabular-nums">{{ d.attempt }}</td>
                   <td class="text-sm max-w-80">
                     @if (d.responseStatus) { <span class="mono">{{ d.responseStatus }}</span> }
-                    @if (d.durationMs !== null) { <span class="text-[color:var(--text-muted)]"> · {{ d.durationMs }} ms</span> }
+                    @if (d.durationMs !== null) { <span class="text-[color:var(--text-muted)]"> · {{ took(d.durationMs) }}</span> }
                     @if (d.error) { <div class="text-xs text-[color:var(--text-secondary)] line-clamp-2" [title]="d.error">{{ d.error }}</div> }
                   </td>
                   <td class="text-right whitespace-nowrap">
                     @if (d.attempt > 0) {
-                      <button type="button" class="btn btn-ghost btn-sm" [attr.aria-expanded]="open() === d.id" aria-label="Attempts"
+                      <button type="button" class="btn btn-default btn-sm" [attr.aria-expanded]="open() === d.id" aria-label="Attempts"
                               title="Attempts" (click)="toggle(d)">
                         <app-icon name="list" /><span class="hidden xl:inline">Attempts</span>
                       </button>
                     }
-                    <button type="button" class="btn btn-ghost btn-sm" [disabled]="!data.webhook.active || busy() === d.id"
+                    <button type="button" class="btn btn-default btn-sm" [disabled]="!data.webhook.active || busy() === d.id"
                             [title]="data.webhook.active ? 'Send this event again' : 'Resume the webhook to send again'"
                             [attr.aria-label]="'Send ' + d.eventType + ' again'" (click)="resend(d)">
                       <app-icon name="send" [busy]="busy() === d.id" /><span class="hidden xl:inline">Send again</span>
@@ -94,7 +97,7 @@ const PAGE = 50;
                           <span class="whitespace-nowrap text-[color:var(--text-secondary)]">{{ a.at | serverTime: 'dateTimeSec' }}</span>
                           <span [class]="a.outcome === 'delivered' ? 'pill pill-ok' : 'pill pill-crit'">{{ a.outcome }}</span>
                           @if (a.responseStatus) { <span class="mono">{{ a.responseStatus }}</span> }
-                          @if (a.durationMs !== null) { <span class="text-[color:var(--text-muted)]">{{ a.durationMs }} ms</span> }
+                          @if (a.durationMs !== null) { <span class="text-[color:var(--text-muted)]">{{ took(a.durationMs) }}</span> }
                           @if (a.error) { <span class="text-[color:var(--text-secondary)]">{{ a.error }}</span> }
                         </div>
                       } @empty {
@@ -117,6 +120,9 @@ const PAGE = 50;
   `,
 })
 export class DeliveriesDialog implements OnInit {
+  /** Milliseconds in the console's duration words (formatDuration): "420 ms", "1.4 sec", "15 sec". */
+  took(ms: number): string { return formatDuration(ms / 1000); }
+
   readonly ref = inject<DialogRef<boolean>>(DialogRef);
   readonly data = inject<DeliveriesDialogData>(DIALOG_DATA);
   private readonly api = inject(ApiClientsApi);
@@ -148,7 +154,7 @@ export class DeliveriesDialog implements OnInit {
   private fetch(before: string | null): void {
     this.loading.set(true);
     this.error.set('');
-    this.api.deliveries(this.data.webhook.id, before, PAGE).subscribe({
+    this.api.deliveries(this.data.webhook.id, before, PAGE, this.data.tenantId).subscribe({
       next: r => {
         this.loading.set(false);
         if (r.status !== API_SUCCESS) {
@@ -179,7 +185,7 @@ export class DeliveriesDialog implements OnInit {
     }
     this.open.set(d.id);
     this.attempts.set([]);
-    this.api.attempts(this.data.webhook.id, d.id).subscribe({
+    this.api.attempts(this.data.webhook.id, d.id, this.data.tenantId).subscribe({
       next: r => this.attempts.set(r.status === API_SUCCESS ? r.data ?? [] : []),
       error: () => this.attempts.set([]),
     });
@@ -187,7 +193,7 @@ export class DeliveriesDialog implements OnInit {
 
   resend(d: DeliveryRow): void {
     this.busy.set(d.id);
-    this.api.redeliver(this.data.webhook.id, d.id).subscribe({
+    this.api.redeliver(this.data.webhook.id, d.id, this.data.tenantId).subscribe({
       next: r => {
         this.busy.set(null);
         if (r.status === API_SUCCESS && r.data) {

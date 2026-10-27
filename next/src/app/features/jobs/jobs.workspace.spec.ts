@@ -52,7 +52,7 @@ async function render(role: Role, rows: SourceJob[] = ROWS) {
   const el = fixture.nativeElement as HTMLElement;
   const headings = () => Array.from(el.querySelectorAll('thead th')).map(th => (th.textContent ?? '').trim());
   const bodyRows = () => Array.from(el.querySelectorAll('tbody > tr'));
-  const workspaceFilter = () => el.querySelector('#jobs-tenant');
+  const workspaceFilter = () => el.querySelector('app-page-header app-workspace-select [data-test="workspace-select"]');
   return { fixture, component: fixture.componentInstance, el, headings, bodyRows, workspaceFilter };
 }
 
@@ -67,10 +67,9 @@ describe('Jobs workspace column and filter (platform administrator)', () => {
     expect(cells).toEqual(['Acme Ops', 'Borealis', 'Workspace #3']);
   });
 
-  it('offers a Workspace filter whose options are the workspaces in the list', async () => {
-    const { component, workspaceFilter } = await render('PLATFORM_ADMIN');
+  it('offers the shared workspace selector in the page header (owner #5)', async () => {
+    const { workspaceFilter } = await render('PLATFORM_ADMIN');
     expect(workspaceFilter()).not.toBeNull();
-    expect(component.workspaceOptions().map(o => o.label)).toEqual(['Acme Ops', 'Borealis', 'Workspace #3']);
   });
 
   it('narrows to one workspace, combines with the other filters, and Clear resets it', async () => {

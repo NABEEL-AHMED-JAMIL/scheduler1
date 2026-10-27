@@ -193,4 +193,24 @@ describe('P2 #34: the people grid draws a page of people at a time', () => {
     expect(g.shown()).toBe(20);
     expect(g.groups().map(x => x.key)).toEqual(['2']);
   });
+
+  it('marks each person\'s two-factor: on, or required and not set up yet (MIG-424)', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [provideZonelessChangeDetection(), provideHttpClient(), provideHttpClientTesting()] });
+    const fixture = TestBed.createComponent(AccessPeopleGrid);
+    fixture.componentRef.setInput('people', [
+      { ...person(51, 'Cara Clinician', 2, 'Analyst', ['jobs']), twoFactorRequired: true, twoFactorRequiredBy: 'profile', twoFactorEnabled: false },
+      { ...person(52, 'Dev Desk', null, null, ['jobs']), twoFactorRequired: false, twoFactorEnabled: true },
+      { ...person(53, 'Eli Else', null, null, ['jobs']), twoFactorRequired: false, twoFactorEnabled: false }]);
+    fixture.componentRef.setInput('profiles', [OPERATOR, ANALYST, COMPLIANCE]);
+    fixture.componentRef.setInput('pages', PAGES);
+    fixture.componentRef.setInput('search', '');
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const pill = (u: string) => el.querySelector(`[data-mfa="${u}"]`);
+    expect(pill('cara.clinician@a.example')!.textContent!.trim()).toBe('Two-factor not set up');
+    expect(pill('cara.clinician@a.example')!.getAttribute('title')).toBe('Required by their profile');
+    expect(pill('dev.desk@a.example')!.textContent!.trim()).toBe('Two-factor on');
+    expect(pill('eli.else@a.example')).toBeNull();
+  });
 });

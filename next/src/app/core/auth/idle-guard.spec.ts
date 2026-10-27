@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { signal } from '@angular/core';
-import { TestBed } from '@angular/core/testing';
+import { Component, signal } from '@angular/core';
+import { ToastHost } from '../../shared/ui/toast-host';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { of } from 'rxjs';
 import { IdleGuard } from './idle-guard';
 import { AuthService, LAST_ACTIVITY_KEY } from './auth.service';
@@ -31,8 +33,14 @@ describe('IdleGuard', () => {
 
   afterEach(() => vi.useRealTimers());
 
+  /** The guard pins its warning in the toast stack (owner 2026-10-19 #29), so both are on the page, as in the app. */
+  @Component({ selector: 'app-idle-page', imports: [ToastHost, IdleGuard], template: '<app-toast-host /><app-idle-guard />' })
+  class IdlePage {}
+
+  const guardOf = (fixture: ComponentFixture<unknown>) => fixture.debugElement.query(By.directive(IdleGuard)).componentInstance as IdleGuard;
+
   function mount() {
-    const fixture = TestBed.createComponent(IdleGuard);
+    const fixture = TestBed.createComponent(IdlePage);
     fixture.detectChanges();
     return fixture;
   }
@@ -46,6 +54,7 @@ describe('IdleGuard', () => {
     vi.advanceTimersByTime(2_000);
     fixture.detectChanges();
     expect(page.querySelector('[data-test="idle-warning"]')?.textContent).toContain('signed out in');
+    expect(page.querySelector('[data-test="toast-stack"] [data-test="idle-warning"]')).not.toBeNull();
     expect(logout).not.toHaveBeenCalled();
     vi.advanceTimersByTime(60_000);
     expect(logout).toHaveBeenCalledWith('idle');
@@ -62,7 +71,7 @@ describe('IdleGuard', () => {
   it('"Stay signed in" moves the server\'s deadline too', () => {
     const fixture = mount();
     vi.advanceTimersByTime(4 * 60_000 + 10_000);
-    fixture.componentInstance.stay();
+    guardOf(fixture).stay();
     expect(refresh).toHaveBeenCalledTimes(1);
     vi.advanceTimersByTime(60_000);
     expect(logout).not.toHaveBeenCalled();

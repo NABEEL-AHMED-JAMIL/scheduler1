@@ -1,6 +1,7 @@
+import { WorkspaceSelect } from '../../../shared/ui/workspace-select';
+import { WorkspaceDirectory } from '../../../core/workspaces/workspace-directory';
 import { toneClass } from '../../../shared/ui/tone';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { Combobox } from '../../../shared/ui/combobox';
 import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute, Router } from '@angular/router';
 
@@ -8,11 +9,11 @@ import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { AuthService } from '../../../core/auth/auth.service';
+import { isOwnPlatformSignIn } from '../../../core/auth/workspace-data';
 import { ROLE_META, ROLE_RANK, isUserRole, roleLabel as labelOf } from '../../../core/auth/auth.models';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { copyText } from '../../../shared/ui/clipboard.util';
 import { MineFilter, isMine } from '../../../shared/ui/mine-filter';
-import { StatTile } from '../../../shared/ui/stat-tile';
 import { confirmWith } from '../../../shared/ui/confirm';
 import { TableShell } from '../../../shared/ui/data-table';
 import { StatusPill } from '../../../shared/ui/status-pill';
@@ -24,7 +25,8 @@ import { createSort } from '../../../shared/ui/sort';
 import { UserDialog } from './user-dialog';
 import { AccessProfile, AccessProfilesService } from '../access-profiles/access-profiles.service';
 import { ResetPasswordData, ResetPasswordDialog, ResetPasswordResult } from './reset-password-dialog';
-import { ResetPasswordNotice } from './reset-password-notice';
+import { announceReset } from './reset-password-announce';
+import { StatStrip, StatStripItem } from '../../../shared/ui/stat-strip';
 import { createPager } from '../../../shared/ui/pager';
 import { Pagination } from '../../../shared/ui/pagination';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
@@ -69,6 +71,8 @@ export interface AppUser {
   pageCount?: number | null;
   pageExceptionCount?: number | null;
   defaultProfileName?: string | null;
+  /** A one-time password still to be replaced: a new account's, or after an administrator's reset. */
+  mustChangePassword?: boolean;
   userRole: string;
   status: string;
   tenantId?: number;
@@ -82,7 +86,7 @@ export interface AppUser {
 
 @Component({
   selector: 'app-users',
-  imports: [RefreshButton, PageHeader, MineFilter, ViewToggle, StatTile, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Icon, CopyButton, Avatar, Pagination, Combobox, ResetPasswordNotice],
+  imports: [WorkspaceSelect, RefreshButton, PageHeader, MineFilter, ViewToggle, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Icon, CopyButton, Avatar, Pagination, StatStrip],
   templateUrl: './users.html',
 })
 export class Users implements OnInit {
@@ -111,7 +115,7 @@ export class Users implements OnInit {
   readonly search = signal('');
   readonly roleFilter = signal('');
   readonly statusFilter = signal('');
-  readonly tenantFilter = signal('');
+  readonly tenantFilter = signal(String(inject(WorkspaceDirectory).remembered() ?? ''));
   /** '' = any, 'default' = on the workspace default, else a profile name. */
   readonly profileFilter = signal('');
   /** Which contact line was just copied, as '<userId>:<field>'. One signal rather than one
@@ -119,8 +123,8 @@ export class Users implements OnInit {
   readonly copiedKey = signal<string | null>(null);
 
   readonly busy = signal<number | null>(null);
-  /** The last reset that happened, for its notice (and its one "Copy password"); null once that notice is gone. */
-  readonly resetDone = signal<ResetPasswordResult | null>(null);
+  /** Owner 2026-10-19 #30: the card the list is narrowed to ('' = none). */
+  readonly cardFilter = signal<UserCard | ''>('');
   readonly focusedTenantId = signal<number | null>(null);
 
   readonly sort = createSort<AppUser>('fullName');
@@ -152,10 +156,9 @@ export class Users implements OnInit {
   // somebody could filter down to nothing, press Clear, and still see nothing.
   readonly hasFilters = computed(() =>
     !!(this.search() || this.roleFilter() || this.statusFilter() || this.tenantFilter() || this.profileFilter()
-       || this.focusedTenantId() !== null || this.onlyMine()));
+       || this.focusedTenantId() !== null || this.onlyMine() || this.cardFilter()));
 
   /** Tenants that actually have users, so the filter never offers an empty result. */
-  readonly tenantComboOptions = computed(() => this.tenantOptions().map(t => ({ value: String(t.id), label: t.name })));
   readonly tenantOptions = computed(() => {
     const seen = new Map<number, string>();
     for (const user of this.users()) {
@@ -179,7 +182,10 @@ export class Users implements OnInit {
     const profile = this.profileFilter();
     const focusedTenant = this.focusedTenantId();
     const tenant = this.tenantFilter();
+    const card = this.cardFilter();
+    const standing = this.standing();
     const rows = this.users().filter(user => {
+      if (card && !cardHolds(card, user, standing[String(user.appUserId)])) return false;
       if (focusedTenant !== null && user.tenantId !== focusedTenant) return false;
       if (tenant && String(user.tenantId) !== tenant) return false;
       if (role && user.userRole !== role) return false;
@@ -228,6 +234,32 @@ export class Users implements OnInit {
     };
   });
 
+  /**
+   * Owner 2026-10-19 #30: the cards over the list -- who is here, who can get in, how they get in, and who uses it --
+   * each one the filter it counts (aria-pressed; again to clear). Counted over the same workspace narrowing as the list.
+   */
+  readonly cards = computed<StatStripItem[]>(() => {
+    const focusedTenant = this.focusedTenantId();
+    const tenant = this.tenantFilter();
+    const list = this.users().filter(u => (focusedTenant === null || u.tenantId === focusedTenant) && (!tenant || String(u.tenantId) === tenant));
+    const standing = this.standing();
+    const picked = this.cardFilter();
+    return USER_CARDS.map(card => {
+      const count = list.filter(u => cardHolds(card.key, u, standing[String(u.appUserId)])).length;
+      return { label: card.label, value: count, icon: card.icon, tone: count ? card.tone : 'muted', hint: card.hint,
+        foot: card.key === 'all' ? `${list.length} in ${this.canPickTenant() && !tenant && focusedTenant === null ? 'every workspace' : 'this workspace'}`
+          : list.length ? `${Math.round((count / list.length) * 100)}% of people` : '',
+        clickable: true, pressed: card.key === 'all' ? !picked : picked === card.key, quiet: !count };
+    });
+  });
+
+  pickCard(item: StatStripItem): void {
+    const card = USER_CARDS.find(c => c.label === item.label);
+    if (!card) return;
+    this.cardFilter.set(card.key === 'all' || this.cardFilter() === card.key ? '' : card.key);
+    this.pager.reset();
+  }
+
   ngOnInit(): void {
     this.route.queryParamMap.subscribe(params => {
       const raw = params.get('tenantId');
@@ -268,6 +300,9 @@ export class Users implements OnInit {
    * row can read its own numbers without scanning.
    */
   private loadStats(): void {
+    // ZT-A12 follow-up (owner 2026-10-21, "Managed session only"): what each person's schedules and runs came to is a
+    // workspace's data, which Core answers the platform administrator's own sign-in 403; their rows show no counts.
+    if (isOwnPlatformSignIn(this.auth)) return;
     this.http.get<ApiResponse<UserStatistic[]>>(`${API_BASE}/dashboard.json/userStatistics`)
       .subscribe({
         next: response => {
@@ -323,10 +358,9 @@ export class Users implements OnInit {
     }).closed.subscribe(saved => { if (saved) this.load(); }));
   }
 
+  /** Owner 2026-10-19 #31: a person is edited on a page of their own, not in a dialog. */
   edit(user: AppUser): void {
-    this.withAccessProfiles(accessProfiles => this.dialog.open<boolean>(UserDialog, {
-      data: { user, tenants: this.tenants(), canPickTenant: this.canPickTenant(), accessProfiles, people: this.users() }, hasBackdrop: true,
-    }).closed.subscribe(saved => { if (saved) this.load(); }));
+    void this.router.navigate(['/administration/users', user.appUserId]);
   }
 
   /**
@@ -455,12 +489,15 @@ export class Users implements OnInit {
     });
   }
 
+  /** The toast of the last reset that happened: a new reset takes it, and its password, away first. */
+  private resetToast: number | null = null;
+
   resetPassword(user: AppUser): void {
     // The dialog makes the call and stays open until the server accepts the password: a refusal (a recent password,
     // a common one) is said under its field, in the server's words. It used to close on submit and leave the call to
     // this screen, whose toast was the only sign a reset had been refused -- and was easy to miss (2026-10-13).
-    // A new reset drops the previous notice, and its password, first.
-    this.resetDone.set(null);
+    if (this.resetToast !== null) this.toast.dismiss(this.resetToast);
+    this.resetToast = null;
     const data: ResetPasswordData = {
       appUserId: user.appUserId,
       name: user.fullName || user.username,
@@ -468,7 +505,8 @@ export class Users implements OnInit {
       own: this.isSelf(user),
     };
     this.dialog.open<ResetPasswordResult>(ResetPasswordDialog, { hasBackdrop: true, data }).closed.subscribe(done => {
-      if (done) this.resetDone.set(done);
+      // A toast at the top right like every notice (owner 2026-10-19 #29), two minutes, with "Copy password".
+      if (done) this.resetToast = announceReset(this.toast, done);
     });
   }
 
@@ -487,6 +525,7 @@ export class Users implements OnInit {
     this.tenantFilter.set('');
     this.profileFilter.set('');
     this.onlyMine.set(false);
+    this.cardFilter.set('');
     // The tenant focus counts towards hasFilters, so leaving it behind meant Clear left the list
     // filtered and the button on screen -- it looked broken because it was. It lives in the URL,
     // so clearing it means navigating; otherwise a refresh brings it straight back.
@@ -609,5 +648,48 @@ export class Users implements OnInit {
 
   statusRing(status: string): string {
     return status === 'Active' ? 'var(--color-ok-500)' : 'var(--text-muted)';
+  }
+}
+
+/** The Users screen's cards (owner 2026-10-19 #30): each is a count and the filter it counts. */
+export type UserCard = 'all' | 'active' | 'inactive' | 'invited' | 'locked' | 'mfa' | 'noMfa' | 'sso' | 'admins' | 'members'
+  | 'recent' | 'never';
+
+export const USER_CARDS: { key: UserCard; label: string; icon: string; tone: 'ok' | 'warn' | 'crit' | 'info' | 'muted'; hint: string }[] = [
+  { key: 'all', label: 'People', icon: 'users', tone: 'info', hint: 'Everyone on the list; shows them all again' },
+  { key: 'active', label: 'Active', icon: 'checkCircle', tone: 'ok', hint: 'Can sign in' },
+  { key: 'inactive', label: 'Deactivated', icon: 'pause', tone: 'warn', hint: 'Switched off: cannot sign in until activated' },
+  { key: 'invited', label: 'Invited', icon: 'mail', tone: 'info', hint: 'Given a one-time password and not signed in yet' },
+  { key: 'locked', label: 'Locked', icon: 'lock', tone: 'crit', hint: 'Locked out after failed sign-ins; an administrator can unlock' },
+  { key: 'mfa', label: '2FA on', icon: 'shield', tone: 'ok', hint: 'Sign in with a code from an authenticator app' },
+  { key: 'noMfa', label: '2FA off', icon: 'shield', tone: 'warn', hint: 'Sign in with a password alone' },
+  { key: 'sso', label: 'Single sign-on', icon: 'key', tone: 'info', hint: 'Last signed in through the workspace\'s identity provider (OpenID Connect or SAML)' },
+  { key: 'admins', label: 'Administrators', icon: 'shield', tone: 'info', hint: 'Workspace and platform administrators: Page access does not apply' },
+  { key: 'members', label: 'Members', icon: 'user', tone: 'info', hint: 'Workspace members: their Page access profile decides what they open' },
+  { key: 'recent', label: 'Signed in · 30 days', icon: 'history', tone: 'ok', hint: 'Signed in at least once in the last 30 days' },
+  { key: 'never', label: 'Never signed in', icon: 'clock', tone: 'warn', hint: 'Has not signed in since the account was made' },
+];
+
+const MONTH_MS = 30 * 24 * 60 * 60 * 1000;
+
+/** Whether a person is counted by a card -- the one rule the count and the filter share. */
+export function cardHolds(card: UserCard, user: AppUser, standing?: PersonStanding | null, now = Date.now()): boolean {
+  switch (card) {
+    case 'all': return true;
+    case 'active': return user.status === 'Active';
+    case 'inactive': return user.status !== 'Active';
+    case 'invited': return user.status === 'Active' && !!user.mustChangePassword && !user.lastLoginAt;
+    case 'locked': return !!standing?.lockedUntil;
+    case 'mfa': return !!standing?.mfaEnabled;
+    case 'noMfa': return !standing?.mfaEnabled;
+    case 'sso': return standing?.lastSignInMethod === 'SSO' || standing?.lastSignInMethod === 'SAML';
+    case 'admins': return isUserRole(user.userRole) && ROLE_RANK[user.userRole] > ROLE_RANK.TENANT_USER;
+    case 'members': return user.userRole === 'TENANT_USER';
+    case 'recent': {
+      if ((standing?.signIns30d ?? 0) > 0) return true;
+      const last = user.lastLoginAt ? Date.parse(user.lastLoginAt.replace(' ', 'T')) : NaN;
+      return Number.isFinite(last) && now - last <= MONTH_MS;
+    }
+    case 'never': return !user.lastLoginAt;
   }
 }

@@ -1,0 +1,137 @@
+<div class="page">
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Reports</h1>
+        <p class="page-subtitle">Every report and its versions. Generating again makes a new version; nothing is overwritten.</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <app-workspace-select [(value)]="tenantId" [allowAll]="true" (valueChange)="load()" />
+        <app-refresh-button [loading]="loading()" (refresh)="refresh()" />
+        @if (canPipelineFiles()) { <a class="btn btn-default btn-sm" routerLink="/reports/from-pipelines"><app-icon name="folder" />From pipelines</a> }
+        @if (canGenerate()) { <a class="btn btn-primary btn-sm" routerLink="/reports/new"><app-icon name="plus" />New report</a> }
+      </div>
+    </div>
+  </app-page-header>
+
+  @if (view() === 'reports') {
+    <app-table-shell heading="Reports" columnsKey="report-library" [loading]="loading()" [error]="error()" [isEmpty]="!total()"
+                     [shown]="reports().length" [total]="total()" emptyIcon="file" (retry)="read()"
+                     [emptyMessage]="filtered() ? 'No report matches the filters.' : 'No reports yet: publish a template, then generate one.'">
+      <ng-container toolbar>
+        <!-- Owner 2026-10-20: Reports / Generation jobs in the table's own top bar, as Table / Cards is on the other lists. -->
+        <app-segmented [options]="views" [value]="view()" (valueChange)="setView($event)" ariaLabel="Reports or jobs" />
+        <select class="input max-w-40" [value]="status()" aria-label="Status" (change)="setStatus($any($event.target).value)">
+          <option value="">All</option><option value="GENERATED">Ready</option><option value="FAILED">Failed</option>
+        </select>
+        <div class="search-field max-w-64">
+          <app-icon name="search" size="0.95em" />
+          <input class="input" placeholder="Search report or template" aria-label="Search reports" [value]="search()"
+                 (input)="onSearch($any($event.target).value)" />
+        </div>
+      </ng-container>
+      <table class="table-modern">
+        <thead><tr>
+          @if (canGenerate()) {
+            <th class="w-8"><input type="checkbox" [checked]="allPicked()" [disabled]="!pickable().length || deleting()"
+                                   (change)="togglePage($any($event.target).checked)" aria-label="Select the deletable reports on this page" data-pick-page /></th>
+          }
+          <th>Report</th><th>Template</th><th>Version</th><th>Files</th><th>Status</th><th>Signed</th><th>Last job</th><th>Updated</th>
+          @if (canGenerate()) { <th class="text-right"><span class="sr-only">Actions</span></th> }
+        </tr></thead>
+        <tbody>
+          @for (r of reports(); track r.reportId) {
+            <tr [class.is-selected]="isPicked(r)">
+              @if (canGenerate()) {
+                <td><input type="checkbox" [checked]="isPicked(r)" [disabled]="r.approved || deleting()" (change)="togglePick(r)"
+                           [attr.aria-label]="r.approved ? r.name + ': ' + keptWords : 'Select ' + r.name" [title]="r.approved ? keptWords : ''"
+                           data-pick-report /></td>
+              }
+              <td class="max-w-96">
+                <a class="link-inline font-medium" [routerLink]="['/reports/library', r.reportId]">{{ r.name }}</a>
+                <div class="text-xs text-[color:var(--text-muted)] mono">{{ r.label }}</div>
+              </td>
+              <td class="text-sm"><a class="link-inline" [routerLink]="['/reports/templates', r.templateId]">{{ r.templateName }}</a>
+                @if (r.current) { <span class="text-xs text-[color:var(--text-muted)]"> · v{{ r.current.templateVersion }}</span> }</td>
+              <td class="tabular">@if (r.currentVersion) { v{{ r.currentVersion }} } @else { — }</td>
+              <td class="text-xs">@for (o of r.current?.outputs ?? []; track o.format) { <span class="pill pill-neutral mr-1">{{ o.format }}</span> }</td>
+              <td><app-status [label]="chipWord(r.status)" /></td>
+              <td>@if (r.current?.approval?.signed) { <span class="pill pill-ok" [title]="'Approved and signed by ' + r.current!.approval!.approverName">{{ r.current!.approval!.approverName }}</span> }
+                @else if (r.current?.approval) { <span class="pill pill-neutral">Approved</span> }
+                @else if (r.currentVersion) { <span class="text-xs text-[color:var(--text-muted)]">Not yet</span> } @else { — }</td>
+              <td class="text-xs">
+                @if (r.lastJob; as j) {
+                  @if (isRunning(j.status)) { {{ stageWord(j.status) }} · {{ j.progressPct }}% }
+                  @else { <span class="mono">{{ j.label }}</span> {{ chipWord(j.status) }}@if (j.errorCode) { · <span class="mono">{{ j.errorCode }}</span> } }
+                } @else { — }
+              </td>
+              <td class="text-xs whitespace-nowrap">{{ r.updatedAt | rsTime: 'recent' }}</td>
+              @if (canGenerate()) {
+                <td class="text-right">
+                  <button type="button" class="btn btn-ghost btn-xs btn-intent-crit" (click)="removeOne(r)" [disabled]="r.approved || deleting()"
+                          [title]="r.approved ? keptWords : 'Delete ' + r.name" [attr.aria-label]="'Delete ' + r.name" data-delete-report>
+                    <app-icon name="trash" /></button>
+                </td>
+              }
+            </tr>
+          }
+        </tbody>
+      </table>
+      @if (picked().size) {
+        <div class="rs-bulk-bar" role="region" aria-label="The selected reports" data-delete-bar>
+          <span class="font-semibold tabular">{{ picked().size }} selected</span>
+          <span class="text-xs text-[color:var(--text-secondary)]">Reports with an approved version cannot be selected: they are kept records.</span>
+          <span class="ml-auto flex gap-2">
+            <button type="button" class="btn btn-default btn-sm" (click)="clearPicked()" [disabled]="deleting()">Clear</button>
+            <button type="button" class="btn btn-default btn-sm btn-intent-crit" (click)="removePicked()" [disabled]="deleting()" data-delete-picked>
+              @if (deleting()) { <span class="spinner"></span> } @else { <app-icon name="trash" /> }Delete {{ picked().size }}</button>
+          </span>
+        </div>
+      }
+      <app-pagination pager [total]="total()" [page]="page()" [size]="size()" (goTo)="goTo($event)" (setSize)="setSize($event)" />
+    </app-table-shell>
+  } @else {
+    <app-table-shell heading="Generation jobs" columnsKey="report-jobs" [loading]="loading()" [error]="error()" [isEmpty]="!total()"
+                     [shown]="jobs().length" [total]="total()" emptyIcon="history" (retry)="read()"
+                     [emptyMessage]="filtered() ? 'No job matches the filters.' : 'No jobs yet.'">
+      <ng-container toolbar>
+        <!-- Owner 2026-10-20: Reports / Generation jobs in the table's own top bar, as Table / Cards is on the other lists. -->
+        <app-segmented [options]="views" [value]="view()" (valueChange)="setView($event)" ariaLabel="Reports or jobs" />
+        <select class="input max-w-40" [value]="status()" aria-label="Status" (change)="setStatus($any($event.target).value)">
+          <option value="">All</option><option value="RUNNING">Running</option><option value="SUCCEEDED">Completed</option>
+          <option value="FAILED">Failed</option><option value="CANCELLED">Cancelled</option>
+        </select>
+        <div class="search-field max-w-64">
+          <app-icon name="search" size="0.95em" />
+          <input class="input" placeholder="Search job, report or code" aria-label="Search jobs" [value]="search()"
+                 (input)="onSearch($any($event.target).value)" />
+        </div>
+      </ng-container>
+      <table class="table-modern">
+        <thead><tr><th>Job</th><th>Report</th><th>Template</th><th>Progress</th><th>Made</th><th>Started</th><th>Finished</th></tr></thead>
+        <tbody>
+          @for (j of jobs(); track j.jobId) {
+            <tr>
+              <td class="mono whitespace-nowrap">{{ j.label }}</td>
+              <td class="max-w-80"><a class="link-inline" [routerLink]="['/reports/library', j.reportId]">{{ j.reportName }}</a>
+                <div class="text-xs text-[color:var(--text-muted)] mono">{{ j.reportLabel }}</div></td>
+              <td class="text-sm">{{ j.templateName }}@if (j.templateVersion) { · v{{ j.templateVersion }} }</td>
+              <td>
+                @if (isRunning(j.status)) { <span class="text-sm">{{ stageWord(j.status) }} · {{ j.progressPct }}%</span> }
+                @else {
+                  <app-status [label]="chipWord(j.status)" />
+                  @if (j.errorCode) { <div class="text-xs mono mt-0.5">{{ j.errorCode }}</div> <div class="text-xs text-[color:var(--text-muted)] max-w-80">{{ j.error }}</div>
+                    <app-page-limit-actions [job]="j" [compact]="true" /> }
+                }
+              </td>
+              <td class="text-xs whitespace-nowrap">@if (j.resultVersion) { v{{ j.resultVersion }}@if (j.pages) { · {{ j.pages }} p. } } @else { — }</td>
+              <td class="text-xs whitespace-nowrap">{{ (j.startedAt || j.createdAt) | rsTime: 'recent' }}</td>
+              <td class="text-xs whitespace-nowrap">{{ j.finishedAt | rsTime: 'recent' }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+      <app-pagination pager [total]="total()" [page]="page()" [size]="size()" (goTo)="goTo($event)" (setSize)="setSize($event)" />
+    </app-table-shell>
+  }
+</div>

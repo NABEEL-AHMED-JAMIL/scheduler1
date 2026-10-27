@@ -8,6 +8,7 @@
         </p>
       </div>
       <div class="flex items-center gap-2">
+        <app-workspace-select [value]="workspaceId()" (valueChange)="pickWorkspace($event)" [allowAll]="true" />
         <!-- UX review 2026-10-12 (RA1): one date-range control, as Home and Runs › By date. -->
         <app-date-range [value]="range()" [presets]="rangePresets" [storageKey]="rangeStore" [maxSpanDays]="366"
                         label="Date range for run analytics" (rangeChange)="applyRange($event)" />
@@ -32,10 +33,6 @@
       <option value="">All outcomes</option>
       @for (option of statusOptions(); track option) { <option [value]="option">{{ option }}</option> }
     </select>
-    @if (showTenantFilter()) {
-      <div class="w-44"><app-combobox id="r-f-tenant" ariaLabel="Workspace" [selected]="tenantFilter()" (selectedChange)="tenantFilter.set($event)"
-              placeholder="All workspaces" clearLabel="All workspaces" [options]="asOptions(tenantOptions())" /></div>
-    }
     <div class="w-44"><app-combobox id="r-f-owner" ariaLabel="Owner" [selected]="ownerFilter()" (selectedChange)="ownerFilter.set($event)"
               placeholder="All owners" clearLabel="All owners" [options]="asOptions(ownerOptions())" /></div>
     @if (!loading() && !error()) {

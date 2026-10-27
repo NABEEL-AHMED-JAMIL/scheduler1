@@ -35,6 +35,17 @@ export const STEP_PAYLOAD = '<data></data>';
     <div class="page">
       <app-page-header title="New pipeline" subtitle="Start from what it should do. A schedule, triggers and a review come after it is made." />
 
+      @if (noWorkspace()) {
+      <!-- A platform administrator's own sign-in has no workspace, and a pipeline is a workspace's: the topic list offered
+           every workspace's topics, the first (another workspace's) was picked by itself, and Create answered "That topic
+           belongs to another workspace" (owner 2026-10-20). Same guard as Workflows and the Task inbox. -->
+      <div class="card p-10 flex flex-col items-center text-center gap-2" data-test="needs-workspace">
+        <app-icon name="layers" size="1.5rem" class="icon-muted" />
+        <p class="text-sm text-[color:var(--text-primary)]">Pipelines belong to a workspace, and this sign-in has none.</p>
+        <p class="text-sm text-[color:var(--text-secondary)]">Open the workspace with "Work in this workspace" on Platform › Workspaces to build its pipelines.</p>
+        <a routerLink="/platform/workspaces" class="btn btn-default btn-sm mt-2"><app-icon name="external" />Choose a workspace</a>
+      </div>
+      } @else {
       <div class="grid gap-4 lg:grid-cols-3 items-start" data-test="start-with">
         <!-- 1. The AI Assistant -->
         <section class="card p-4 flex flex-col gap-3 new-start" [class.is-on]="chosen() === 'assistant'" data-start="assistant">
@@ -120,6 +131,7 @@ export const STEP_PAYLOAD = '<data></data>';
 
       <p class="text-xs text-[color:var(--text-muted)]">A pipeline a Kafka message starts, with its own XML payload?
         <a class="link-inline" routerLink="/pipelines/new/form" data-test="full-form">Use the full form</a>.</p>
+      }
     </div>
   `,
 })
@@ -143,7 +155,11 @@ export class NewPipeline implements OnInit {
   /** A pipeline with steps of its own (a registry pipeline) can be copied; an XML-only task has none to copy. */
   readonly copyable = computed(() => this.sources().filter(p => !!p.pipelineId && p.taskStatus !== 'Delete'));
 
+  /** A platform administrator's own sign-in: no workspace to put a pipeline in (they open one first). */
+  readonly noWorkspace = computed(() => !this.auth.user()?.tenantId);
+
   ngOnInit(): void {
+    if (this.noWorkspace()) return;
     this.http.get<ApiResponse<Topic[]>>(`${API_BASE}/setting.json/topics`, { params: { q: '', limit: 50 } }).subscribe({
       next: r => {
         const list = (r.status === API_SUCCESS ? r.data ?? [] : []).filter(t => (t.status ?? 'Active') === 'Active');
@@ -159,7 +175,10 @@ export class NewPipeline implements OnInit {
   }
 
   toAssistant(): void {
-    const prompt = this.ask().trim();
+    // ZT-P12: what is typed here is a pipeline to design, said the way the assistant's own suggestions say it; without it
+    // "Read the visits file, ..." was answered as a question (the file read, no pipeline drawn).
+    const asked = this.ask().trim();
+    const prompt = asked && !/^design a pipeline\b/i.test(asked) ? `Design a pipeline: ${asked}` : asked;
     this.router.navigate(['/ai/assistant'], { queryParams: prompt ? { prompt } : {} });
   }
 

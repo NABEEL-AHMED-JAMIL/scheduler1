@@ -7,22 +7,42 @@ import { StatTile } from '../../shared/ui/stat-tile';
 import { Segmented, SegmentOption } from '../../shared/ui/segmented';
 import { Bar, BarChart } from '../../shared/charts/bar-chart';
 import { chartColor } from '../../shared/charts/status-color';
-import { WorkspacePicker } from './workspace-picker';
-import { BillingApi, BillingAnalytics as Analytics, INVOICE_STATUS_LABEL, INVOICE_STATUS_TONE, PaymentListRow, paymentMethodLabel } from './billing.service';
+import { BillingApi, BillingAnalytics as Analytics, CostTrends, INVOICE_STATUS_LABEL, INVOICE_STATUS_TONE, PaymentListRow, paymentMethodLabel } from './billing.service';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { formatBytes, formatMoney, formatMoneyRound, monthShort, workspaceLabels } from './billing-format';
 import { PageHeader } from '../../shared/ui/page-header';
+import { AuthService } from '../../core/auth/auth.service';
+import { WorkspaceDirectory } from '../../core/workspaces/workspace-directory';
+import { WorkspaceSelect } from '../../shared/ui/workspace-select';
 
-/** The platform's view: invoiced, collected, open and overdue across every workspace, and who churns data. */
+/** Every service's own colour in the month bars, in a stable order (Rates.LABELS' services). */
+const SERVICE_ORDER = ['Pipelines', 'Model calls', 'Storage', 'Analytics & tools', 'API', 'Seats', 'Other'];
+
+/**
+ * Billing › Analytics (owner #22, 2026-10-19; before, Platform › Billing analytics). Everyone who opens it sees the trends
+ * of what was used -- by month, by service and by pipeline -- for their own workspace: a workspace administrator always
+ * their own (the server decides that, billing.json/costTrends). A platform administrator picks a workspace with the shared
+ * selector, or every workspace together (then by workspace instead of by pipeline), and with every workspace also sees the
+ * cross-customer revenue -- invoiced, collected, open, overdue, churn and payments -- which stays the platform's alone.
+ */
 @Component({
   selector: 'app-billing-analytics',
-  imports: [PageHeader, Icon, StatTile, BarChart, RouterLink, DecimalPipe, Segmented, ServerTimePipe],
+  imports: [PageHeader, Icon, StatTile, BarChart, RouterLink, DecimalPipe, Segmented, ServerTimePipe, WorkspaceSelect],
   templateUrl: './billing-analytics.html',
 })
 export class BillingAnalyticsPage implements OnInit {
   private readonly api = inject(BillingApi);
-  readonly workspaces = inject(WorkspacePicker);
-  readonly loading = signal(true);
+  private readonly auth = inject(AuthService);
+  readonly directory = inject(WorkspaceDirectory);
+  readonly isPlatform = computed(() => this.auth.isPlatformAdmin() && !this.auth.isManagedSession());
+  /** The platform administrator's pick; null is every workspace. A workspace administrator's is theirs (the server's). */
+  readonly tenantId = signal<number | null>(this.directory.remembered());
+  /** Cross-customer revenue: the platform's, over every workspace. */
+  readonly showRevenue = computed(() => this.isPlatform() && this.tenantId() === null);
+  readonly trends = signal<CostTrends | null>(null);
+  readonly trendsError = signal('');
+  readonly trendsLoading = signal(true);
+  readonly loading = signal(false);
   readonly error = signal('');
   readonly months = signal(6);
   readonly rangeOptions: SegmentOption<string>[] = [3, 6, 12].map(n => ({ id: String(n), label: `Last ${n} months` }));
@@ -47,7 +67,7 @@ export class BillingAnalyticsPage implements OnInit {
    * workspace list, not the bills -- and two that share a name carry their ids, or a table shows one row twice.
    */
   readonly labels = computed(() => {
-    const known = new Map<number, string>(this.workspaces.tenants().map(t => [t.tenantId, t.tenantName]));
+    const known = new Map<number, string>(this.directory.workspaces().map(t => [t.tenantId, t.tenantName]));
     for (const t of this.data()?.tenants ?? []) if (!known.has(t.tenantId)) known.set(t.tenantId, t.tenantName);
     return workspaceLabels([...known].map(([tenantId, tenantName]) => ({ tenantId, tenantName })));
   });
@@ -74,13 +94,45 @@ export class BillingAnalyticsPage implements OnInit {
     const days = Number(d.medianDaysToPay);
     return `${this.collectedShare()}% · median ${days} day${days === 1 ? '' : 's'} to pay`;
   });
+  /** The months the revenue covers (an answer without any says none). */
+  readonly monthCount = computed(() => this.data()?.months?.length ?? 0);
   readonly collectedShare = computed(() => { const d = this.data(); return d && Number(d.invoiced) > 0 ? Math.round(Number(d.collected) / Number(d.invoiced) * 100) : 0; });
   readonly money = (v: number) => formatMoneyRound(v);
   readonly money2 = (v: number) => formatMoney(v);
   fmtBytes(b: number): string { return formatBytes(b); }
 
-  ngOnInit(): void { this.workspaces.ready(() => this.load()); }
+  // ---- the trends ------------------------------------------------------------------------------------------------
+  readonly services = computed(() => {
+    const seen = new Set<string>((this.trends()?.byService ?? []).map(s => s.service));
+    return [...SERVICE_ORDER.filter(s => seen.has(s)), ...[...seen].filter(s => !SERVICE_ORDER.includes(s))];
+  });
+  readonly monthBars = computed<Bar[]>(() => (this.trends()?.months ?? []).map(m => ({
+    name: monthShort(m.month), value: Math.round(Number(m.amount ?? 0) * 100) / 100,
+    segments: this.services().map((service, i) => ({ label: service, value: Math.round(Number(m.byService?.[service] ?? 0) * 100) / 100, color: chartColor(i) })),
+  })));
+  readonly total = computed(() => Number(this.trends()?.total ?? 0));
+  readonly thisMonth = computed(() => { const m = this.trends()?.months ?? []; return m.length ? Number(m[m.length - 1].amount) : 0; });
+  readonly lastMonth = computed(() => { const m = this.trends()?.months ?? []; return m.length > 1 ? Number(m[m.length - 2].amount) : null; });
+  readonly topService = computed<{ service: string; amount: number } | null>(() => (this.trends()?.byService ?? [])[0] ?? null);
+  readonly serviceRows = computed(() => {
+    const total = this.total();
+    return (this.trends()?.byService ?? []).map(s => ({ ...s, amount: Number(s.amount), share: total > 0 ? Math.round(Number(s.amount) / total * 100) : 0 }));
+  });
+  readonly pipelineRows = computed(() => (this.trends()?.byPipeline ?? []).slice(0, 15).map(p => ({ ...p, cost: Number(p.cost) })));
+  readonly workspaceRows = computed(() => {
+    const total = this.total();
+    return (this.trends()?.byWorkspace ?? []).map(w => ({ tenantId: w.tenantId, name: this.directory.nameOf(w.tenantId), amount: Number(w.amount),
+      share: total > 0 ? Math.round(Number(w.amount) / total * 100) : 0 }));
+  });
+  readonly scopeName = computed(() => {
+    if (!this.isPlatform()) return this.auth.user()?.tenantName || 'your workspace';
+    return this.tenantId() === null ? 'every workspace' : this.directory.nameOf(this.tenantId());
+  });
+
+  ngOnInit(): void { this.load(); }
   setMonths(n: number): void { this.months.set(n); this.load(); }
+  pickWorkspace(id: number | null): void { this.tenantId.set(id); this.load(); }
+  monthWord(m: string): string { return monthShort(m); }
   loadPayments(): void {
     this.paymentsError.set('');
     this.api.payments(null).subscribe({
@@ -94,9 +146,16 @@ export class BillingAnalyticsPage implements OnInit {
     return { label: 'To verify', tone: 'pill-warn' };
   }
   load(): void {
-    this.loading.set(true); this.error.set('');
     const to = new Date(); const from = new Date(to.getFullYear(), to.getMonth() - (this.months() - 1), 1);
     const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    this.trendsLoading.set(true); this.trendsError.set('');
+    this.api.costTrends(iso(from), iso(to), this.isPlatform() ? this.tenantId() : null).subscribe({
+      next: r => { this.trendsLoading.set(false); if (r.status !== API_SUCCESS) { this.trendsError.set(r.message); this.trends.set(null); return; } this.trends.set(r.data ?? null); },
+      error: err => { this.trendsLoading.set(false); this.trendsError.set(err?.error?.message || 'Could not read the cost trends.'); },
+    });
+    if (!this.showRevenue()) { this.data.set(null); return; }
+    // Cross-customer revenue: the platform's alone, over every workspace.
+    this.loading.set(true); this.error.set('');
     this.loadPayments();
     this.api.analytics(iso(from), iso(to)).subscribe({
       next: r => { this.loading.set(false); if (r.status !== API_SUCCESS) { this.error.set(r.message); return; } this.data.set(r.data ?? null); },

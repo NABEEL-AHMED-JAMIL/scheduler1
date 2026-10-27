@@ -16,6 +16,7 @@ import { Section } from '../../shared/ui/section';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import type { PinnedChart } from '../analytics/analytics.service';
 import { AskHistory, EXAMPLE_QUESTIONS, clearHistory, historyKey, readHistory, saveHistory, withPin, withQuestion } from './ask-history';
+import { formatDuration, elapsedDuration } from '../../shared/ui/time-format';
 
 /**
  * Ask your data (Wave 5, Data > Ask your data, page key ask-data): a question in plain language, answered by the
@@ -233,8 +234,14 @@ export class AskData implements OnInit {
     return linkParts(s.link);
   }
 
+  /** How long an answer took, in the console's duration words ("4.2 sec", "15 sec"); nothing when unmeasured. */
   seconds(ms: number | null | undefined): string {
-    return ms == null ? '' : `${(ms / 1000).toFixed(ms < 10_000 ? 1 : 0)}s`;
+    return ms == null ? '' : formatDuration(ms / 1000);
+  }
+
+  /** The counter while the model reads: "45 sec", "2 min 05 sec". */
+  elapsedText(): string {
+    return elapsedDuration(this.elapsed());
   }
 
   private settle(id: number, patch: Partial<AskTurn>): void {

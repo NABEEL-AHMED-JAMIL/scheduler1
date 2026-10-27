@@ -51,7 +51,7 @@ describe('Invoices', () => {
     expect(component.visible()).toHaveLength(3);
     expect(component.money(198.4)).toBe('$198.40');
     expect(component.overdueDays(component.rows()[0])).toBeGreaterThan(0);
-    expect(component.tone(component.rows()[0])).toBe('crit');
+    expect(component.statusTone[component.rows()[0].status]).toBe('pill-crit');
     expect(component.docsLabel(component.rows()[0])).toBe('PDF · slip pending');
     expect(component.docsLabel(component.rows()[1])).toBe('PDF · slip · receipt');
     expect(component.docsLabel(component.rows()[3])).toBe('');
@@ -131,10 +131,11 @@ describe('Invoices tiles in the currency billed', () => {
 
 /** Audit 09-22: the rail agrees with the pane, and a statement is made once per click. */
 describe('Invoices, rail tone and statement', () => {
-  it('draws an issued or partly paid bill in the tone the pane gives it (warn), not a near-black info dot', () => {
+  it('labels the state of each bill on the rail with the chip the pane gives it, each state its own (owner #8)', () => {
     const { component } = page(false);
-    expect(component.tone({ ...component.rows()[0], status: 'issued', pendingPayments: 0 })).toBe('warn');
-    expect(component.tone({ ...component.rows()[0], status: 'partially_paid', pendingPayments: 0 })).toBe('warn');
+    expect(component.statusTone['issued']).toBe('pill-info');
+    expect(component.statusTone['partially_paid']).toBe('pill-warn');
+    expect(new Set(['draft', 'issued', 'partially_paid', 'paid', 'overdue', 'void'].map(s => component.statusTone[s])).size).toBe(6);
   });
 
   it('ignores a second Statement while the first is being made, and says so when it cannot be opened', () => {

@@ -737,13 +737,65 @@ describe('a tile over a saved query, which has no types to read', () => {
     expect(view.issues.bar).toContain('a length cannot be negative');
   });
 
-  it('has nothing to label a one-column result with, and says that rather than drawing it', () => {
+  it('has nothing to label a one-column result with, and says that for every kind that names its figures', () => {
     const view = queryView(queryResult({
       columns: ['total'],
       rows: [['100'], ['250']],
     }));
-    expect(view.marks).toEqual([]);
     expect(view.issues.ranked).toContain('one column');
+    expect(view.issues.bar).toContain('one column');
+    expect(view.issues.line).toContain('one column');
+  });
+
+  /**
+   * ZT-A1 (2026-10-21, Meridian): a saved query whose figures go below zero drew nothing at all. Every kind was handed no
+   * marks, so a "Net result" of -4,887,895.84 read "a single figure needs one row, and this returned 1", and a month of
+   * profit with one loss month was refused as a line because "a length cannot be negative".
+   */
+  it('ZT-A1: draws a negative single figure, line, trend and comparison; only the lengths from zero refuse it', () => {
+    const net = queryView(queryResult({ columns: ['metric', 'value'], rows: [['Net result', '-4887895.84']], rowCount: 1 }));
+    expect(net.issues.kpi).toBe('');
+    expect(net.marks).toEqual([{ name: 'Net result', value: -4887895.84 }]);
+
+    const months = queryView(queryResult({
+      columns: ['month', 'result'],
+      rows: [['2025-01-01', '59096.56'], ['2025-02-01', '-138179.62'], ['2025-03-01', '217202.91']],
+      rowCount: 3,
+    }));
+    for (const kind of ['line', 'trendSummary', 'kpiTrend', 'distributionSummary', 'table'] as const) {
+      expect(months.issues[kind], kind).toBe('');
+    }
+    expect(months.issues.ranked).toContain('a length cannot be negative');
+    expect(months.issues.bar).toContain('a length cannot be negative');
+
+    const pair = queryView(queryResult({ columns: ['region', 'result'], rows: [['north', '120'], ['south', '-40']], rowCount: 2 }));
+    expect(pair.issues.comparison).toBe('');
+  });
+
+  it('ZT-A1: a scatter of a figure that goes below zero is drawn (profit against sales)', () => {
+    const view = queryView(queryResult({
+      columns: ['net_sales', 'profit'],
+      rows: [['2018.41', '-22.47'], ['2815.84', '1113.61'], ['144.13', '88.36']],
+      rowCount: 3,
+    }));
+    expect(view.issues.scatter).toBe('');
+  });
+
+  /**
+   * ZT-A2 (2026-10-21): "Distribution of the figures" needs "several numbers", and `SELECT bmi FROM dataset` -- several
+   * numbers -- was refused because one column has nothing to label its values with. The spread was refused the same way.
+   */
+  it('ZT-A2: one column of figures draws as a distribution and a spread', () => {
+    const view = queryView(queryResult({
+      columns: ['bmi'],
+      rows: ['21.5', '24.1', '27.9', '30.2', '19.8', '33.4', '25.0', '28.7', '22.2', '26.6'].map(v => [v]),
+      rowCount: 10,
+    }));
+    expect(view.issues.histogram).toBe('');
+    expect(view.issues.distributionSummary).toBe('');
+    expect(view.marks.map(m => m.value)).toEqual([21.5, 24.1, 27.9, 30.2, 19.8, 33.4, 25.0, 28.7, 22.2, 26.6]);
+    expect(view.issues.ranked).toContain('one column');
+    expect(view.issues.comparison).not.toBe('');
   });
 
   it('leaves out a row with no label and a row with no number, apart', () => {
@@ -828,6 +880,20 @@ describe('the board on screen', () => {
     // is that the figures were read just now rather than remembered.
     expect(rendered.text()).toContain('ran ');
     expect(rendered.text()).toContain('2 rows');
+  });
+
+  /** ZT §3.11 (CLS 0.12-0.62 at 1024): a figure tile ran as three lines and no foot, then drew a figure and its count line. */
+  it('holds a running figure tile at its figure\'s size and its count line\'s place until the answer lands', () => {
+    const rendered = renderedBoard({ widgets: [widgetOn({ visualizationType: 'kpi', widgetConfig: JSON.stringify({ span: 3 }) })] });
+    rendered.text();
+    const el = rendered.fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('[aria-busy="true"] app-kpi-card.kpi-reserve .kpi-figure.is-lg')).not.toBeNull();
+    expect(el.querySelector('[data-test="tile-count-pending"]')).not.toBeNull();
+    rendered.finishAnalysis(analysisResult({ columns: [{ name: 'revenue', type: 'DECIMAL(18,3)', role: 'MEASURE' }], rows: [['42']], rowCount: 1 }));
+    rendered.text();
+    expect(el.querySelector('app-kpi-card.kpi-reserve')).toBeNull();
+    expect(el.querySelector('[data-test="tile-count-pending"]')).toBeNull();
+    expect(el.querySelector('.dash-count')?.textContent).toContain('ran');
   });
 
   it('draws an em dash for a null cell rather than an empty one', () => {
@@ -1933,6 +1999,20 @@ describe('narrowing the board by clicking a mark', () => {
     expect(view.marks[1].operands).toBeUndefined();
   });
 
+  it('ZT-A7: marks the roll-up row as the rest of a Top-N, so a ranked chart lists it last', () => {
+    const view = analysisView(analysisResult({
+      columns: [
+        { name: 'department', type: 'VARCHAR', role: 'DIMENSION' },
+        { name: 'row_count', type: 'BIGINT', role: 'MEASURE' },
+      ],
+      rows: [['Radiology', '100000'], ['Surgery', '100000'], ['Other', '200000']],
+      dimensions: ['department'],
+      other: { label: 'Other', values: ['Oncology', 'Pediatrics'], valueCount: 2, valuesTruncated: false },
+      rollupRows: [2],
+    }), 'COUNT_ROWS');
+    expect(view.marks.map(mark => [mark.name, !!mark.rollup])).toEqual([['Radiology', false], ['Surgery', false], ['Other', true]]);
+  });
+
   it('clicks a real row that the label match alone would have refused', () => {
     // The half the fallback gets wrong, and the reason the field is worth sending: a real
     // sub-category spelled "Other", in a result where the roll-up is a DIFFERENT row.
@@ -2597,7 +2677,7 @@ describe('choosing how a tile is drawn, from its menu', () => {
  */
 describe('the cards on the landing page', () => {
   const BOARDS: Dashboard[] = [
-    { ...BOARD, createdByName: 'Claude Demo Admin', dateCreated: '2026-09-24 22:43:00' },
+    { ...BOARD, createdByName: 'Claude Demo Admin', dateCreated: '2026-09-24 22:43:00', widgetCount: 3, fileCount: 1 },
     { analyticsDashboardId: 8, dashboardName: 'Quarter end', createdByName: 'Ann', dateUpdated: '2026-09-25T03:43:02.920+00:00' },
   ];
 
@@ -2635,10 +2715,11 @@ describe('the cards on the landing page', () => {
     expect(text()).toContain('What it is for (optional)');
   });
 
-  it('reads each board once, for its counts, and runs nothing', () => {
+  /** ZT-M7: the counts are the listing's; no board is opened to draw a card (a managed session's open is audited). */
+  it('opens no board for the cards, and runs nothing', () => {
     const { fetchDashboardById, analyze, query, text } = landing();
     text();
-    expect(fetchDashboardById).toHaveBeenCalledTimes(2);
+    expect(fetchDashboardById).not.toHaveBeenCalled();
     expect(analyze).not.toHaveBeenCalled();
     expect(query).not.toHaveBeenCalled();
   });
@@ -2982,5 +3063,64 @@ describe('the rebuild\'s dashboard fixes (MIG-367)', () => {
     const queried = queryView(queryResult({ columns: ['smoker', 'policyholders'], rows: [['true', '23'], ['false', '101']], rowCount: 2 }));
     expect(queried.marks.map(mark => mark.name)).toEqual(['Yes', 'No']);
     expect(queried.rows.map(row => row[0])).toEqual(['Yes', 'No']);
+  });
+});
+
+describe('the board\'s header holds still while it runs (e2e board-layout: a click that narrows moved it)', () => {
+
+  it('puts the load time last on the facts line, after the filter pill, so its coming and going moves nothing', async () => {
+    const rendered = renderedBoard({ widgets: [widgetOn()] });
+    rendered.finishAnalysis();
+    rendered.fixture.detectChanges();
+    await rendered.fixture.whenStable();
+    rendered.fixture.detectChanges();
+    const facts = (rendered.fixture.nativeElement as HTMLElement).querySelector('.dash-facts')!;
+    expect(facts.lastElementChild?.getAttribute('data-test')).toBe('load-time');
+
+    // And in the template: whatever else the line gains (the filter pill), the load time is written after it.
+    const fs = (await import(/* @vite-ignore */ ['node', 'fs'].join(':'))) as { readFileSync(p: string, e: 'utf8'): string };
+    const root = (globalThis as unknown as { process: { cwd(): string } }).process.cwd();
+    const html = fs.readFileSync(`${root}/src/app/features/analytics/dashboard.html`, 'utf8');
+    const line = html.slice(html.indexOf('class="dash-facts'), html.indexOf('</p>', html.indexOf('class="dash-facts')));
+    expect(line.indexOf('data-test="load-time"')).toBeGreaterThan(line.indexOf('dash-filter-facts'));
+  });
+
+  it('puts Stop where Run every widget was: the page header orders a .btn-primary last, and Stop is not one', async () => {
+    const rendered = renderedBoard({ widgets: [widgetOn()] });
+    const stop = [...(rendered.fixture.nativeElement as HTMLElement).querySelectorAll('button')].find(b => b.textContent?.trim() === 'Stop');
+    expect(stop?.classList.contains('dash-run-button')).toBe(true);
+    const fs = (await import(/* @vite-ignore */ ['node', 'fs'].join(':'))) as { readFileSync(p: string, e: 'utf8'): string };
+    const root = (globalThis as unknown as { process: { cwd(): string } }).process.cwd();
+    const orderOf = (css: string, selector: RegExp) => css.match(selector)?.[1];
+    const header = fs.readFileSync(`${root}/src/app/shared/ui/page-header.ts`, 'utf8');
+    const board = fs.readFileSync(`${root}/src/app/features/analytics/dashboard.css`, 'utf8');
+    const primary = orderOf(header, /> \.btn-primary \{ order: (\d+); \}/);
+    expect(primary).toBeTruthy();
+    expect(orderOf(board, /\.dash-run-button \{[^}]*order: (\d+);/)).toBe(primary);
+  });
+});
+
+/** MIG-416 (CLS 0.27 at 1024): a running chart tile holds its drawing's height; figures and tables hold none. */
+describe('what a running tile holds for its drawing', () => {
+  const tile = (visualizationType: string, widgetConfig = '{}') =>
+    ({ analyticsDashboardWidgetId: 1, widgetTitle: 't', visualizationType, widgetConfig }) as any;
+
+  it('holds a chart\'s own drawing height, the author\'s when set, and nothing for a figure, a table or a ranked list', () => {
+    const board = bareBoard();
+    expect(board.reserveOf(tile('bar'))).toBe(board.heightOf(tile('bar')));
+    expect(board.reserveOf(tile('barH'))).toBe(board.heightOf(tile('barH')));
+    expect(board.reserveOf(tile('line', JSON.stringify({ height: 320 })))).toBe(320);
+    for (const kind of ['kpi', 'kpiTrend', 'table', 'pivot', 'comparison', 'ranked', 'rankedShare', 'no-such-kind']) {
+      expect(board.reserveOf(tile(kind)), kind).toBeNull();
+    }
+  });
+
+  it('holds a figure card for a figure tile: the large one at a quarter width, and none for any other kind (ZT §3.11)', () => {
+    const board = bareBoard();
+    const quarter = JSON.stringify({ span: 3 });
+    expect(board.reserveKpiOf(tile('kpi', quarter)), 'quarter').toBe('lg');
+    expect(board.reserveKpiOf(tile('kpi', JSON.stringify({ span: 6 }))), 'half').toBe('md');
+    expect(board.reserveKpiOf(tile('kpi'))).toBe(board.spanOf(tile('kpi')) === 3 ? 'lg' : 'md');
+    for (const kind of ['kpiTrend', 'bar', 'table', 'no-such-kind']) expect(board.reserveKpiOf(tile(kind)), kind).toBeNull();
   });
 });

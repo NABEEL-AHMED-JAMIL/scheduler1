@@ -1,6 +1,16 @@
 import { test, expect } from '@playwright/test';
 import { APIRequestContext } from '@playwright/test';
 import { api, authOf, canSignIn, NEEDS, pageAs, Session, sessionFor } from './support/session';
+import { localIsoDay } from '../src/app/shared/ui/local-day';
+
+/**
+ * ZT-B1: the days this suite works with, on this computer's calendar as the editor has them (RateCardEditor.firstOfNextMonth,
+ * localIsoDate). They were toISOString()'s UTC days: run after 19:00 in Chicago on 20 Oct, "the 1st of next month" was 1 Nov
+ * at that hour, 2 Nov in UTC -- the editor saved the test's version from 1 Nov and the suite put Standard 2026 back from 2 Nov,
+ * so 1 Nov would have been billed with the test's prices.
+ */
+export function firstOfNextMonth(now: Date = new Date()): string { return localIsoDay(new Date(now.getFullYear(), now.getMonth() + 1, 1)); }
+export function today(now: Date = new Date()): string { return localIsoDay(now); }
 
 /**
  * Rate cards, end to end: the platform administrator saves a new version of the calculation through the
@@ -32,6 +42,19 @@ async function restoreDefault(request: APIRequestContext, s: Session, base: Card
 }
 
 
+test('ZT-B1: the default is put back from the day the editor saved the new version from, on this calendar', () => {
+  const zone = process.env['TZ'];
+  process.env['TZ'] = 'America/Chicago';
+  try {
+    const evening = new Date('2026-10-20T23:06:00Z');           // 18:06 in Chicago, when the 20 Oct run put v60 back
+    expect(firstOfNextMonth(evening)).toBe('2026-11-01');
+    expect(today(evening)).toBe('2026-10-20');
+    expect(firstOfNextMonth(new Date('2026-12-31T23:30:00Z'))).toBe('2027-01-01');
+  } finally {
+    if (zone === undefined) delete process.env['TZ']; else process.env['TZ'] = zone;
+  }
+});
+
 test.describe('rate cards', () => {
   /** Next month's default before the test, the day it starts, and the name of the version the test saves. */
   let undo: { s: Session; base: Card; day: string; name: string } | null = null;
@@ -54,22 +77,22 @@ test.describe('rate cards', () => {
     const versionsBefore: number[] = before.data.cards.map((c: { version: number }) => c.version);
     // The editor starts from the default card in effect, which an earlier run may have set to these very prices: pick
     // a price and an allowance that differ from it, or "1 changed" never appears.
-    const today0 = new Date().toISOString().slice(0, 10);
+    const today0 = today();
     const base = (await (await request.get(`${api}/billing.json/rateCard?day=${today0}`, { headers: auth })).json()).data;
     const baseImages = (base?.items ?? []).find((i: { meter: string }) => i.meter === 'ai.vision.images');
     const price = Number(baseImages?.unit_price) === 0.02 ? '0.03' : '0.02';
     const included = Number(baseImages?.included_quantity) === 10 ? '11' : '10';
     const stamp = Date.now().toString(36);
     const name = `E2E ${stamp}: images at ${price}`;
-    const first = new Date(); first.setDate(1); first.setMonth(first.getMonth() + 1);
-    const day = first.toISOString().slice(0, 10);
+    const day = firstOfNextMonth();
     const nextBase: Card = (await (await request.get(`${api}/billing.json/rateCard?day=${day}`, { headers: auth })).json()).data;
     expect(nextBase?.items?.length, `the default card in effect on ${day}`).toBeGreaterThan(0);
     undo = { s: session, base: nextBase, day, name };
 
     const page = await pageAs(browser, session);
-    await page.goto('/platform/rate-cards');
-    await expect(page.getByRole('heading', { name: 'Rate cards' })).toBeVisible();
+    // Owner #23 (2026-10-19): the rate cards are Billing › Settings, the platform's alone.
+    await page.goto('/billing/settings');
+    await expect(page.getByRole('heading', { name: 'Billing settings' })).toBeVisible();
     await expect(page.getByText('Default card today')).toBeVisible();
 
     // The editor: a name, one price, one allowance, saved as a new default version from the 1st of next month.
@@ -106,11 +129,9 @@ test.describe('rate cards', () => {
       expect(detail.data.rateCardVersion).toBe(issued.rateCardVersion);
       expect(detail.data.rateCardVersion).not.toBe(saved.version);
     }
-    const today = new Date().toISOString().slice(0, 10);
-    const inEffect = await (await request.get(`${api}/billing.json/rateCard?day=${today}`, { headers: auth })).json();
+    const inEffect = await (await request.get(`${api}/billing.json/rateCard?day=${today()}`, { headers: auth })).json();
     expect(inEffect.data.version).not.toBe(saved.version);
-    const nextMonth = new Date(); nextMonth.setDate(1); nextMonth.setMonth(nextMonth.getMonth() + 1);
-    const later = await (await request.get(`${api}/billing.json/rateCard?day=${nextMonth.toISOString().slice(0, 10)}`, { headers: auth })).json();
+    const later = await (await request.get(`${api}/billing.json/rateCard?day=${day}`, { headers: auth })).json();
     expect(later.data.version).toBe(saved.version);
     await page.context().close();
   });
@@ -124,8 +145,8 @@ test.describe('rate cards', () => {
     const list = await (await request.get(`${api}/billing.json/rateCards`, { headers: auth })).json();
     expect(list.status).toBe('ERROR');
     const page = await pageAs(browser, session);
-    await page.goto('/platform/rate-cards');
-    await expect(page.getByRole('heading', { name: 'Rate cards' })).toHaveCount(0);
+    await page.goto('/billing/settings');
+    await expect(page.getByRole('heading', { name: 'Billing settings' })).toHaveCount(0);
     await page.goto('/billing/usage');
     await expect(page.getByText(/Priced with/)).toBeVisible();
     await expect(page.getByRole('link', { name: 'rate cards' })).toHaveCount(0);

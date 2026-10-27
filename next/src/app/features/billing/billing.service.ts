@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, of } from 'rxjs';
+import { catchError, map } from 'rxjs/operators';
 import { API_BASE, ApiResponse } from '../../core/api/api.config';
 
 export interface BillingAccount {
@@ -32,6 +33,8 @@ export interface InvoiceLine {
   breakdown?: string | null;
   /** Rate card fallback: the default card that priced the line, when the workspace's own card does not name its meter. */
   pricedFromVersion?: number | null; pricedFromName?: string | null;
+  /** Owner #23: the pricing rule of the invoice's rate card version that priced this line (its meter's usage that matched). */
+  ruleNo?: number | null;
 }
 /** One subject of a line's breakdown (MIG-337). */
 export interface LineSubject { subjectType: string; subjectId: string | null; quantity: number }
@@ -50,6 +53,17 @@ export interface RateItem {
 export interface RateCard {
   version: number; name: string; tenant_id: number | null; tenantName?: string | null; effective_from: string; currency: string;
   based_on_version?: number | null; note?: string | null; created_at?: string; items: RateItem[];
+  /** Owner #23: the version's pricing rules, most specific first (absent: none). */
+  rules?: RateRule[];
+}
+/** What a pricing rule matches (owner #23): one pipeline, the pipelines with a tag, or a data class. */
+export type RuleKind = 'PIPELINE' | 'TAG' | 'CLASS';
+/**
+ * A pricing rule (owner #23): one meter's unit price for the usage of a pipeline (its id), of the pipelines with a tag,
+ * or of a data class. The most specific wins -- pipeline, then tag (the lowest number), then class -- then the card's item.
+ */
+export interface RateRule {
+  rule_no: number; meter: string; match_kind: RuleKind; match_value: string; unit_price: number | string; note?: string | null; label?: string;
 }
 /** What a card is saved as: everything but the version, which the meter assigns. */
 export interface RateCardDraft {
@@ -57,6 +71,30 @@ export interface RateCardDraft {
   items: { meter: string; unit: string; per: number; unit_price: number; included_quantity: number; tiers: RateTier[] }[];
   /** Per-model items of the card it is drafted from to leave out (MIG-308). */
   removed?: string[];
+  /** Owner #23: every pricing rule the version carries; absent carries the based-on version's over. */
+  rules?: RateRule[];
+}
+/** A version being prepared (owner #23): saved, previewed, then published; it prices nothing until then. */
+export interface RateCardDraftRow {
+  draft_id: number; tenant_id: number | null; tenantName?: string | null; based_on_version: number | null; name: string; effective_from: string;
+  card: RateCardDraft; created_at?: string; updated_at?: string; created_by?: number | null; updated_by?: number | null;
+}
+/** One rule's share of a meter's period (owner #23), as Cost &amp; usage and the preview list it. */
+export interface RulePart {
+  ruleNo: number; matchKind: RuleKind; matchValue: string; label: string; quantity: number; includedQuantity: number; billableQuantity: number;
+  unitPrice: number; amount: number;
+}
+/** What a month would have cost with a draft (owner #23), per workspace. */
+export interface RatePreview {
+  period: string; tenantId: number | null; draftId?: number | null; current: number; draft: number; difference: number; onOwnCard: number;
+  rules: RateRule[];
+  workspaces: {
+    tenantId: number; tenantName?: string | null; zone: string; currentVersion: number | null; currentName: string | null;
+    current: number; draft: number; difference: number;
+    invoice?: { number: string; status: string; total: number; currency: string; rateCardVersion: number | null } | null;
+    changes: { meter: string; label: string; service: string; quantity: number; current: number; draft: number; difference: number;
+      currentUnitPrice: number | null; draftUnitPrice: number | null; rules: RulePart[] }[];
+  }[];
 }
 export interface PaymentRow {
   paymentId: number; amount: number; method: string; reference?: string; note?: string; status: 'submitted' | 'verified' | 'rejected';
@@ -68,6 +106,8 @@ export interface PaymentRow {
   /** MIG-359: a card payment's provider and ids -- never card data, which Billing never sees. */
   currency?: string | null; provider?: string | null; providerPaymentId?: string | null; providerChargeId?: string | null;
   providerSessionId?: string | null; refundedAmount?: number | null;
+  /** Owner #10 (MIG-393): who verified it and in what role, as the receipt names them (frozen at verification). */
+  approverName?: string | null; approverRole?: string | null;
 }
 /** billing.json/payments: the latest payments, a workspace's or (the platform's) every workspace's (MIG-359). */
 export interface PaymentListRow extends PaymentRow {
@@ -83,6 +123,30 @@ export interface DocumentRow {
   tenantId: number; tenantName?: string; createdByName?: string;
   /** The currency `amount` is in: its invoice's, or the workspace's for a statement. */
   currency?: string;
+  /** Owner #9/#10: what it is about -- its invoice's period and status, its payment's state -- and a receipt's signature. */
+  invoiceStatus?: InvoiceRow['status'] | null; periodLabel?: string | null;
+  paymentStatus?: PaymentRow['status'] | null; paymentMethod?: string | null; paymentProvider?: string | null;
+  paymentAmount?: number | null; refundedAmount?: number | null;
+  signed?: boolean; sha256?: string | null;
+}
+/** Owner #10 (MIG-393): one check of "Verify this receipt". */
+export interface ReceiptCheck { key: 'signed' | 'intact' | 'certified' | 'issued' | 'certificate'; label: string; ok: boolean; detail: string; }
+/** billing.json/receipt/verify: the verdict, each check, the receipt it matched and what its signature says. */
+export interface ReceiptVerdict {
+  verified: boolean; source: 'stored' | 'upload'; summary: string; checks: ReceiptCheck[]; trustNote: string;
+  receipt?: { documentId: number; number: string; tenantId: number; invoiceId?: number; paymentId?: number; amount?: number; issuedAt?: string; sha256?: string };
+  signature: { signed: boolean; signerName?: string | null; signerSubject?: string | null; certificateSha256?: string | null;
+    certificateNotAfter?: string | null; reason?: string | null; location?: string | null; signedAt?: string | null; sha256: string; problems: string[] };
+}
+/** billing.json/receipt/signing: whether receipts are signed, and with which certificate -- never the key. */
+export interface ReceiptSigning {
+  configured: boolean; subject?: string; signerName?: string; certificateSha256?: string; notAfter?: string; selfIssued?: boolean;
+  reason: string; trustNote?: string;
+}
+/** billing.json/stamp: the receipt stamp the platform's (and one workspace's) receipts use. */
+export interface StampInfo { fileName: string; contentType: string; sizeBytes: number; updatedBy?: number | null; dateUpdated?: string | null; }
+export interface ReceiptStamp {
+  platformName: string; platform: StampInfo | null; workspace?: StampInfo | null; uses: 'generated' | 'platform' | 'workspace'; signing: ReceiptSigning;
 }
 export interface InvoiceDetail extends InvoiceRow {
   lines: InvoiceLine[]; payments: PaymentRow[]; documents: DocumentRow[]; account: BillingAccount; referencesNumber?: string; createdByName?: string;
@@ -97,6 +161,12 @@ export interface MeterLine {
   unpriced?: boolean;
   /** Not on the workspace's own card: priced from the default card in effect (rate card fallback). */
   pricedFrom?: { version: number; name: string } | null;
+  /**
+   * Owner #23: usage pricing rules priced, each rule's part (the line's quantity and amount include them), and the card's
+   * own part: its quantity and amount. Absent when no rule priced this meter.
+   */
+  rules?: RulePart[];
+  cardQuantity?: number; cardAmount?: number; cardIncludedQuantity?: number; cardBillableQuantity?: number;
 }
 /** The card a period is priced with, as the meter names it. */
 export interface PricedWith {
@@ -134,20 +204,46 @@ export interface RunRow {
   run: string; subject_type: string | null; subject_id: string | null; model: string; job_queue_id: number | null;
   actor_user_id: number | null; actor_name?: string | null; source: string | null; first: string; last: string;
   tokens_in: number; tokens_out: number; amount: number; lines: RunLine[];
+  /** The pipeline run's schedule (for its link) and pipeline, as Core names them; absent when Core did not answer. */
+  job_id?: number | null; task_detail_id?: number | null; pipeline?: string | null;
+}
+/** The figures billing.json/runs/summary adds up, for the range, a source or a model. */
+export interface ModelCallFigures { calls: number; runs: number; tokens_in: number; tokens_out: number; amount: number; last: string | null; }
+/** One thing that called a model: a saved prompt (subject_id), or every tool run, document extraction, question or console call. */
+export interface ModelCallSource extends ModelCallFigures { subject_type: string | null; subject_id: string | null; label: string; model: string | null; models: number; }
+export interface ModelCallModel extends ModelCallFigures { model: string | null; }
+/** A rate the calls were priced at: a model's own item (model named) or the meter's. */
+export interface ModelCallRate { meter: string; side: 'in' | 'out'; model: string | null; unit: string; per: number; unit_price: number; }
+/**
+ * Cost & usage redesign (2026-10-19): billing.json/runs/summary -- every page of /runs added up by what called the model
+ * and by model, at the same prices (before the month's allowances and tiers).
+ */
+export interface ModelCallSummary {
+  from: string; to: string; zone: string | null; currency: string | null;
+  totals: ModelCallFigures; bySource: ModelCallSource[]; byModel: ModelCallModel[]; rates: ModelCallRate[];
 }
 /** What every usage read names: a range, a workspace for a platform administrator, and how to group. */
 export interface UsageQuery { from: string; to: string; tenantId?: string | null; }
 
 /** UX review B9 (BL1): one run's share of the priced lines (billing.json/pipelineCosts, runCost). */
-export interface RunCostMeter { meter: string; label: string; quantity: number; unit: string; cost: number; }
+/** Owner #23: `line` and `ruleNo` name a pricing rule's part of a meter (its label says the rule). */
+export interface RunCostMeter { meter: string; label: string; quantity: number; unit: string; cost: number; line?: string; ruleNo?: number | null; }
 export interface RunCostRow {
   jobQueueId: number; jobId: number | null; schedule: string | null; taskDetailId: number | null; pipeline: string | null;
   status?: string | null; startedAt: string | null; lastUsageAt?: string | null; cost: number; meters: RunCostMeter[];
 }
-export interface PipelineCostRow { taskDetailId: number | null; pipeline: string | null; runs: number; cost: number; lastRunAt: string | null; }
+export interface PipelineCostRow {
+  taskDetailId: number | null; pipeline: string | null; runs: number; cost: number; lastRunAt: string | null;
+  /** What the pipeline's runs cost by meter, the dearest first (By pipeline's "mostly model tokens"). */
+  meters?: { meter: string; label: string; cost: number }[];
+}
+/** Which runs By run lists: one pipeline's, a search, a status (billing.json/pipelineCosts' taskDetailId, q, status). */
+export interface RunFilter { taskDetailId?: number | null; q?: string | null; status?: string | null; }
 export interface PipelineCosts {
   from: string; to: string; zone: string | null; currency: string | null; total: number; attributed: number; notTiedToRun: number;
-  namesResolved?: boolean; pipelines: PipelineCostRow[]; runs: { total: number; page: number; limit: number; rows: RunCostRow[]; days?: DayTotal[] };
+  namesResolved?: boolean; pipelines: PipelineCostRow[];
+  runs: { total: number; page: number; limit: number; rows: RunCostRow[]; days?: DayTotal[]; cost?: number;
+    statuses?: { status: string | null; runs: number }[]; filter?: RunFilter };
 }
 export interface RunCost extends RunCostRow { from: string | null; to: string | null; currency: string | null; namesResolved?: boolean; }
 
@@ -165,6 +261,33 @@ export interface BillingAnalytics {
   tenants: { tenantId: number; tenantName: string; invoiced: number; collected: number; open: number; overdue: number; status: string }[];
   /** unpricedMeters: meters the workspace used that no card prices -- neither its own nor the default (billed at 0). */
   usageByTenant?: { tenantId: number; amount: number; quantityByMeter: Record<string, number>; unpricedMeters?: string[] }[] | null;
+}
+
+/**
+ * Owner #22 (2026-10-19): billing.json/costTrends -- what was used, priced day by day (before the month's allowances and
+ * tiers), by month, by service and by pipeline; across every workspace (the platform's, with no tenantId) by workspace
+ * instead of by pipeline.
+ */
+export interface CostTrends {
+  tenantId: number | null;
+  from: string;
+  to: string;
+  total: number;
+  months: { month: string; amount: number; byService: Record<string, number> }[];
+  byService: { service: string; amount: number }[];
+  byPipeline?: PipelineCostRow[] | null;
+  byWorkspace?: { tenantId: number; amount: number }[];
+}
+
+/** Owner #19: Platform › Workspaces' cost figures (billing.json/workspaceFigures, platform administrators). */
+export interface WorkspaceFigure {
+  tenantId: number;
+  costThisMonth: number;
+  /** Bytes written less bytes deleted, as metered since the start. */
+  storageBytes: number | null;
+  plan: string | null;
+  planVersion?: number | null;
+  planOwn?: boolean;
 }
 
 /** The billing.json calls: invoices, payments, documents, the account, the platform's view. */
@@ -217,6 +340,33 @@ export class BillingApi {
   documents(tenantId?: string | null): Observable<ApiResponse<DocumentRow[]>> { return this.http.get<ApiResponse<DocumentRow[]>>(`${this.base}/documents`, { params: this.tenantParam(tenantId) }); }
   /** The invoice number as a QR code (PNG); the PDF carries the same one. */
   qrBlob(number: string, size = 160): Observable<Blob> { return this.http.get(`${this.base}/invoice/qr`, { params: { number, size: String(size) }, responseType: 'blob' }); }
+  // ---- owner #10 (MIG-393): signed receipts and the receipt stamp ----
+  verifyReceipt(number: string): Observable<ApiResponse<ReceiptVerdict>> { return this.http.get<ApiResponse<ReceiptVerdict>>(`${this.base}/receipt/verify`, { params: { number } }); }
+  verifyReceiptFile(file: File): Observable<ApiResponse<ReceiptVerdict>> {
+    const form = new FormData(); form.append('file', file, file.name);
+    return this.http.post<ApiResponse<ReceiptVerdict>>(`${this.base}/receipt/verify`, form);
+  }
+  receiptSigning(): Observable<ApiResponse<ReceiptSigning>> { return this.http.get<ApiResponse<ReceiptSigning>>(`${this.base}/receipt/signing`); }
+  receiptCertificate(): Observable<Blob> { return this.http.get(`${this.base}/receipt/certificate`, { responseType: 'blob' }); }
+  stamp(tenantId?: number | null): Observable<ApiResponse<ReceiptStamp>> { return this.http.get<ApiResponse<ReceiptStamp>>(`${this.base}/stamp`, { params: this.tenantParam(tenantId == null ? null : String(tenantId)) }); }
+  saveStamp(file: File, tenantId?: number | null): Observable<ApiResponse<ReceiptStamp>> {
+    const form = new FormData(); form.append('file', file, file.name);
+    return this.http.post<ApiResponse<ReceiptStamp>>(`${this.base}/stamp`, form, { params: this.tenantParam(tenantId == null ? null : String(tenantId)) });
+  }
+  removeStamp(tenantId?: number | null): Observable<ApiResponse<ReceiptStamp>> { return this.http.post<ApiResponse<ReceiptStamp>>(`${this.base}/stamp/remove`, null, { params: this.tenantParam(tenantId == null ? null : String(tenantId)) }); }
+  stampSpecimen(tenantId?: number | null): Observable<Blob> { return this.http.get(`${this.base}/stamp/specimen`, { params: this.tenantParam(tenantId == null ? null : String(tenantId)), responseType: 'blob' }); }
+  // ---- Report Studio phase 7, the comparison month (RS-Q11): platform administrators ----
+  /** Compares an issued invoice, credit note or receipt with Report Studio's copy of it, now. */
+  studioCompare(documentId: number): Observable<ApiResponse<StudioComparison>> {
+    return this.http.post<ApiResponse<StudioComparison>>(`${this.base}/studioComparison/run`, null, { params: { documentId: String(documentId) } });
+  }
+  /** The verdicts kept, newest first (one workspace's, or every one's), and how many documents have none yet. */
+  studioComparisons(tenantId?: string | null): Observable<ApiResponse<{ comparisons: StudioComparisonRow[]; byVerdict: Record<string, number>; notYetCompared: number }>> {
+    return this.http.get<ApiResponse<{ comparisons: StudioComparisonRow[]; byVerdict: Record<string, number>; notYetCompared: number }>>(`${this.base}/studioComparisons`,
+      { params: { ...this.tenantParam(tenantId), limit: '500' } });
+  }
+  /** Report Studio's copy of a document as a PDF (drawn again, never stored). */
+  studioCopy(documentId: number): Observable<Blob> { return this.http.get(`${this.base}/studioComparison/copy`, { params: { documentId: String(documentId) }, responseType: 'blob' }); }
   documentBlob(documentId: number): Observable<Blob> { return this.http.get(`${this.base}/document`, { params: { documentId: String(documentId) }, responseType: 'blob' }); }
   statement(from: string, to: string, tenantId?: string | null): Observable<ApiResponse<DocumentRow>> {
     return this.http.post<ApiResponse<DocumentRow>>(`${this.base}/statement`, null, { params: { from, to, ...this.tenantParam(tenantId) } });
@@ -249,9 +399,27 @@ export class BillingApi {
   }
   /** Rolls every workspace's last two days again: the platform administrator's refresh. */
   /** UX review B9: what each pipeline and run cost, shared out of the same priced lines (adds up to the range's total). */
-  pipelineCosts(q: UsageQuery, page = 1, limit = 25): Observable<ApiResponse<PipelineCosts>> {
+  pipelineCosts(q: UsageQuery, page = 1, limit = 25, filter: RunFilter = {}): Observable<ApiResponse<PipelineCosts>> {
+    const narrow: Record<string, string> = {};
+    if (filter.taskDetailId) narrow['taskDetailId'] = String(filter.taskDetailId);
+    if (filter.q?.trim()) narrow['q'] = filter.q.trim();
+    if (filter.status) narrow['status'] = filter.status;
     return this.http.get<ApiResponse<PipelineCosts>>(`${this.base}/pipelineCosts`, {
-      params: { from: q.from, to: q.to, page: String(page), limit: String(limit), ...this.tenantParam(q.tenantId) } });
+      params: { from: q.from, to: q.to, page: String(page), limit: String(limit), ...narrow, ...this.tenantParam(q.tenantId) } });
+  }
+  /** AI model calls (Cost & usage redesign): the range's calls added up by source and by model, priced as /runs prices them. */
+  /**
+   * ZT-B8: the workspace's saved prompts by id, so AI model calls names "Visit note summary" rather than "Prompt 1000"
+   * (aiPrompt.json/list, the reader's own workspace's). Empty when they cannot be read: the rows keep the id.
+   */
+  promptNames(): Observable<Map<number, string>> {
+    return this.http.get<ApiResponse<{ promptId?: number; name?: string }[]>>(`${API_BASE}/aiPrompt.json/list`).pipe(
+      map(r => new Map((r?.data ?? []).filter(p => p.promptId != null && p.name).map(p => [Number(p.promptId), String(p.name)] as [number, string]))),
+      catchError(() => of(new Map<number, string>())));
+  }
+
+  runSummary(q: UsageQuery): Observable<ApiResponse<ModelCallSummary>> {
+    return this.http.get<ApiResponse<ModelCallSummary>>(`${this.base}/runs/summary`, { params: { from: q.from, to: q.to, ...this.tenantParam(q.tenantId) } });
   }
   runCost(jobQueueId: number, tenantId?: string | null): Observable<ApiResponse<RunCost>> {
     return this.http.get<ApiResponse<RunCost>>(`${this.base}/runCost`, { params: { jobQueueId: String(jobQueueId), ...this.tenantParam(tenantId) } });
@@ -268,6 +436,31 @@ export class BillingApi {
     return this.http.get<ApiResponse<RateCard>>(`${this.base}/rateCard`, { params: { ...this.tenantParam(tenantId), ...(day ? { day } : {}) } });
   }
   saveRateCard(card: RateCardDraft): Observable<ApiResponse<RateCard>> { return this.http.put<ApiResponse<RateCard>>(`${this.base}/rateCard`, card); }
+  // Owner #23: drafts, publishing and the preview (Billing › Settings, platform administrators).
+  rateCardDrafts(): Observable<ApiResponse<{ drafts: RateCardDraftRow[] }>> {
+    return this.http.get<ApiResponse<{ drafts: RateCardDraftRow[] }>>(`${this.base}/rateCardDrafts`);
+  }
+  /** A draft saved: a new one, or `draftId` changed. A refusal carries one sentence per problem in data.problems. */
+  saveRateCardDraft(card: RateCardDraft, draftId?: number | null): Observable<ApiResponse<RateCardDraftRow>> {
+    return this.http.put<ApiResponse<RateCardDraftRow>>(`${this.base}/rateCardDraft`, card, { params: draftId ? { draftId: String(draftId) } : {} });
+  }
+  deleteRateCardDraft(draftId: number): Observable<ApiResponse<unknown>> {
+    return this.http.delete<ApiResponse<unknown>>(`${this.base}/rateCardDraft`, { params: { draftId: String(draftId) } });
+  }
+  publishRateCardDraft(draftId: number): Observable<ApiResponse<RateCard>> {
+    return this.http.post<ApiResponse<RateCard>>(`${this.base}/rateCardDraft/publish`, null, { params: { draftId: String(draftId) } });
+  }
+  /** What last month (or `period`, YYYY-MM) would have cost with a saved draft, or with the card given. Read only. */
+  previewRateCard(what: { draftId: number } | { card: RateCardDraft }, period?: string): Observable<ApiResponse<RatePreview>> {
+    const params: Record<string, string> = { ...('draftId' in what ? { draftId: String(what.draftId) } : {}), ...(period ? { period } : {}) };
+    return this.http.post<ApiResponse<RatePreview>>(`${this.base}/rateCard/preview`, 'card' in what ? what.card : null, { params });
+  }
+  costTrends(from: string, to: string, tenantId?: number | null): Observable<ApiResponse<CostTrends>> {
+    return this.http.get<ApiResponse<CostTrends>>(`${this.base}/costTrends`, { params: { from, to, ...(tenantId ? { tenantId: String(tenantId) } : {}) } });
+  }
+  workspaceFigures(): Observable<ApiResponse<{ month: string; storageDay: string; workspaces: WorkspaceFigure[] }>> {
+    return this.http.get<ApiResponse<{ month: string; storageDay: string; workspaces: WorkspaceFigure[] }>>(`${this.base}/workspaceFigures`);
+  }
   analytics(from: string, to: string): Observable<ApiResponse<BillingAnalytics>> { return this.http.get<ApiResponse<BillingAnalytics>>(`${this.base}/analytics`, { params: { from, to } }); }
 
   /** Opens a fetched document in a new tab (a PDF renders there; an image too). */
@@ -310,10 +503,10 @@ export function modelOfMeter(meter: string): string | null {
  */
 export function cardPaymentChip(i: Pick<InvoiceRow, 'status' | 'paidVia' | 'paymentError' | 'payLinkOpen' | 'cardPayable'>):
   { label: string; tone: string; title: string } | null {
-  if (i.status === 'paid' && i.paidVia === 'card') return { label: 'Paid by card', tone: 'pill-ok', title: 'Paid online by card through Stripe' };
+  if (i.status === 'paid' && i.paidVia === 'card') return { label: 'Paid by card', tone: 'pill-pay pill-pay-card', title: 'Paid online by card through Stripe' };
   const open = i.status === 'issued' || i.status === 'partially_paid' || i.status === 'overdue';
   if (!open) return null;
-  if (i.paymentError) return { label: 'Card declined', tone: 'pill-crit', title: i.paymentError };
+  if (i.paymentError) return { label: 'Card declined', tone: 'pill-pay pill-pay-failed', title: i.paymentError };
   if (i.payLinkOpen) return { label: 'Pay link open', tone: 'pill-neutral', title: 'A Stripe checkout is open for this invoice' };
   return null;
 }
@@ -321,9 +514,24 @@ export function cardPaymentChip(i: Pick<InvoiceRow, 'status' | 'paidVia' | 'paym
 export const INVOICE_STATUS_LABEL: Record<string, string> = {
   draft: 'Draft', issued: 'Issued', partially_paid: 'Partially paid', paid: 'Paid', overdue: 'Overdue', void: 'Void',
 };
+/**
+ * Owner #8 (2026-10-19): each invoice state its own chip -- a draft outlined (still changing), issued blue (open, nothing
+ * wrong), partly paid amber, paid green, overdue red, void grey -- where issued and partly paid were one amber, and a
+ * draft and a void one grey.
+ */
 export const INVOICE_STATUS_TONE: Record<string, string> = {
-  draft: 'pill-neutral', issued: 'pill-warn', partially_paid: 'pill-warn', paid: 'pill-ok', overdue: 'pill-crit', void: 'pill-neutral',
+  draft: 'pill-brand', issued: 'pill-info', partially_paid: 'pill-warn', paid: 'pill-ok', overdue: 'pill-crit', void: 'pill-neutral',
 };
 export const DOCUMENT_KIND_LABEL: Record<string, string> = {
   invoice: 'Invoice', credit_note: 'Credit note', receipt: 'Receipt', statement: 'Statement', payment_slip: 'Payment slip',
 };
+
+/** Report Studio phase 7 (RS-Q11): an issued document compared with Report Studio's copy of it. */
+export interface StudioComparison {
+  documentId: number; number?: string | null; kind: string; verdict: 'MATCH' | 'DIFFER' | 'FAILED'; checked?: number; missing?: string[];
+  notInIssued?: string[]; copyPages?: number; error?: string;
+}
+export interface StudioComparisonRow {
+  id: number; tenantId: number; documentId: number; kind: string; number?: string | null; verdict: 'MATCH' | 'DIFFER' | 'FAILED'; checked: number;
+  differences: { missing?: string[]; notInIssued?: string[] }; copyPages?: number | null; error?: string | null; comparedAt: string;
+}

@@ -117,7 +117,7 @@
                   <td class="whitespace-nowrap text-[color:var(--text-secondary)]">{{ s.lastActiveAt | serverTime: 'dateTime' }}</td>
                   <td class="whitespace-nowrap">{{ methodText(s.method) }}</td>
                   <td class="text-right whitespace-nowrap">
-                    <button type="button" class="btn btn-ghost btn-sm btn-intent-crit" (click)="endSession(s)"
+                    <button type="button" class="btn btn-default btn-sm btn-intent-crit" (click)="endSession(s)"
                             [disabled]="ending() !== null">
                       <app-icon name="logout" [busy]="ending() === s.sessionId" />{{ s.current ? 'Sign out' : 'End session' }}
                     </button>

@@ -10,6 +10,7 @@ import { DOCS, DOWNLOADS, scrollToFragments } from './developer-docs';
 import { GuideBody } from './guide-body';
 import { PORTAL, parseGuide } from './guide-markdown';
 import { PageHeader } from '../../shared/ui/page-header';
+import { WorkspaceDirectory } from '../../core/workspaces/workspace-directory';
 
 /**
  * MIG-336: the developer portal's first page -- what the API is for (the contract's own description), its address, where
@@ -51,6 +52,14 @@ import { PageHeader } from '../../shared/ui/page-header';
                 <span class="font-medium">API reference</span>
                 <span class="block text-sm text-[color:var(--text-secondary)] mt-1">Every call, its scopes, parameters, answers and errors, with a curl call to copy.</span>
               </a>
+              <a class="card p-4 block hover:border-[color:var(--border-strong)]" [routerLink]="portal + '/clients'" data-start-clients>
+                <span class="font-medium">Your API clients</span>
+                <span class="block text-sm text-[color:var(--text-secondary)] mt-1">What each of this workspace's clients may call, with a quick start.</span>
+              </a>
+              <a class="card p-4 block hover:border-[color:var(--border-strong)]" [routerLink]="portal + '/connected'">
+                <span class="font-medium">APIs this workspace calls</span>
+                <span class="block text-sm text-[color:var(--text-secondary)] mt-1">The saved requests pipelines send, and what each last answered.</span>
+              </a>
               <a class="card p-4 block hover:border-[color:var(--border-strong)]" [routerLink]="portal + '/changelog'">
                 <span class="font-medium">Changelog</span>
                 <span class="block text-sm text-[color:var(--text-secondary)] mt-1">What changed in the API, newest first.</span>
@@ -76,6 +85,10 @@ import { PageHeader } from '../../shared/ui/page-header';
             <h2 class="section-title mb-2">Sandbox</h2>
             @if (!isAdmin) {
               <p class="text-sm text-[color:var(--text-secondary)]">Ask your workspace administrator for sandbox test keys.</p>
+            } @else if (pickFirst) {
+              <p class="text-sm text-[color:var(--text-secondary)]" data-sandbox-pick>
+                Pick a workspace in <a class="md-link" routerLink="/developers/api-clients">API Clients</a> to see its sandbox.
+              </p>
             } @else if (sandboxLoading()) {
               <p class="text-sm text-[color:var(--text-muted)]">Looking for your sandbox…</p>
             } @else if (sandboxError()) {
@@ -126,14 +139,19 @@ export class DeveloperOverview {
   readonly sandboxLoading = signal(false);
   readonly sandboxError = signal('');
 
+  /** A platform administrator sees the sandbox of the workspace picked last this session; with none picked, where to pick one. */
+  private readonly directory = inject(WorkspaceDirectory);
+  private readonly tenantId = this.directory.remembered();
+  readonly pickFirst = this.isAdmin && this.directory.picks() && this.tenantId === null;
+
   constructor() {
     scrollToFragments();
-    if (this.isAdmin) this.loadSandbox();
+    if (this.isAdmin && !this.pickFirst) this.loadSandbox();
   }
 
   private loadSandbox(): void {
     this.sandboxLoading.set(true);
-    this.api.sandbox().subscribe({
+    this.api.sandbox(this.tenantId).subscribe({
       next: r => {
         this.sandboxLoading.set(false);
         if (r.status === API_SUCCESS) this.sandbox.set(r.data ?? null);

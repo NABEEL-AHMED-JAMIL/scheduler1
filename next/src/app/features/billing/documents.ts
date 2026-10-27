@@ -1,4 +1,5 @@
 import { DestroyRef, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { refusalOf } from '../../shared/ui/blob-refusal';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { ActivatedRoute, RouterLink } from '@angular/router';
@@ -9,9 +10,13 @@ import { Icon } from '../../shared/ui/icon';
 import { StatTile } from '../../shared/ui/stat-tile';
 import { PdfViewer } from '../objects/preview/pdf-viewer';
 import { formatSize } from '../../shared/ui/format-size';
-import { BillingApi, DOCUMENT_KINDS, DOCUMENT_KIND_LABEL, DocumentRow } from './billing.service';
+import { BillingApi, DOCUMENT_KINDS, DOCUMENT_KIND_LABEL, DocumentRow, INVOICE_STATUS_LABEL, INVOICE_STATUS_TONE, StudioComparisonRow } from './billing.service';
+import { Dialog } from '@angular/cdk/dialog';
+import { PaymentChip, paymentStateChip } from './payment-chips';
+import { RECEIPT_VERIFY_TITLE_ID, ReceiptVerifyDialog, ReceiptVerifyData } from './receipt-verify';
 import { MoneyTotals, addMoney, formatMoney, formatTotals } from './billing-format';
 import { WorkspacePicker } from './workspace-picker';
+import { WorkspaceSelect } from '../../shared/ui/workspace-select';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { PageHeader } from '../../shared/ui/page-header';
 import { RefreshButton } from '../../shared/ui/refresh-button';
@@ -23,7 +28,7 @@ import { RefreshButton } from '../../shared/ui/refresh-button';
  */
 @Component({
   selector: 'app-billing-documents',
-  imports: [RefreshButton, PageHeader, Icon, StatTile, RouterLink, ServerTimePipe, PdfViewer, CdkMenu, CdkMenuItem, CdkMenuTrigger],
+  imports: [WorkspaceSelect, RefreshButton, PageHeader, Icon, StatTile, RouterLink, ServerTimePipe, PdfViewer, CdkMenu, CdkMenuItem, CdkMenuTrigger],
   templateUrl: './documents.html',
 })
 export class BillingDocuments implements OnInit, OnDestroy {
@@ -32,6 +37,7 @@ export class BillingDocuments implements OnInit, OnDestroy {
   private readonly api = inject(BillingApi);
   private readonly toast = inject(ToastService);
   private readonly route = inject(ActivatedRoute);
+  private readonly dialog = inject(Dialog);
   readonly workspaces = inject(WorkspacePicker);
   readonly isPlatformAdmin = this.workspaces.isPlatformAdmin;
 
@@ -51,6 +57,12 @@ export class BillingDocuments implements OnInit, OnDestroy {
   readonly kinds = DOCUMENT_KINDS;
   readonly humanSize = formatSize;
   private wanted: number | null = null;
+  /** Report Studio phase 7, the comparison month (platform administrators): each document's newest verdict, and the copy shown beside it. */
+  readonly verdicts = signal<Map<number, StudioComparisonRow>>(new Map());
+  readonly comparing = signal(false);
+  readonly sideBySide = signal(false);
+  readonly copyUrl = signal<string | null>(null);
+  readonly copyError = signal('');
 
   readonly years = computed(() => { const ys = new Set(this.rows().map(r => r.issuedAt.slice(0, 4))); ys.add(String(new Date().getFullYear())); return [...ys].sort().reverse(); });
   readonly inYear = computed(() => this.rows().filter(r => r.issuedAt.startsWith(this.year())));
@@ -79,10 +91,56 @@ export class BillingDocuments implements OnInit, OnDestroy {
     this.route.queryParamMap.subscribe(q => { const id = Number(q.get('document')); this.wanted = id > 0 ? id : null; if (this.wanted && this.rows().length) this.pick(this.wanted); });
     this.workspaces.ready(() => this.load());
   }
-  ngOnDestroy(): void { this.revoke(); }
+  ngOnDestroy(): void { this.revoke(); this.revokeCopy(); }
+
+  /** Invoices, credit notes and receipts are compared with Report Studio's copies this month (RS-Q11). */
+  comparable(d: DocumentRow): boolean { return this.isPlatformAdmin() && ['invoice', 'credit_note', 'receipt'].includes(d.kind); }
+  verdictOf(d: DocumentRow): StudioComparisonRow | null { return this.verdicts().get(d.documentId) ?? null; }
+
+  private loadVerdicts(): void {
+    if (!this.isPlatformAdmin()) return;
+    this.api.studioComparisons(this.workspaces.tenantId()).subscribe({
+      next: r => {
+        const by = new Map<number, StudioComparisonRow>();
+        for (const c of r.data?.comparisons ?? []) if (!by.has(c.documentId)) by.set(c.documentId, c);
+        this.verdicts.set(by);
+      },
+      error: () => this.verdicts.set(new Map()),
+    });
+  }
+
+  compare(d: DocumentRow): void {
+    this.comparing.set(true);
+    this.api.studioCompare(d.documentId).subscribe({
+      next: r => {
+        this.comparing.set(false);
+        const c = r.data;
+        if (r.status !== API_SUCCESS || !c) { this.toast.error(r.message); return; }
+        this.toast[c.verdict === 'MATCH' ? 'success' : 'error'](c.verdict === 'MATCH' ? `Report Studio's copy says the same (${c.checked} items checked).`
+          : c.verdict === 'DIFFER' ? `Report Studio's copy lacks ${c.missing?.length ?? 0} item(s): ${(c.missing ?? []).slice(0, 3).join('; ')}`
+          : `The comparison failed: ${c.error}`);
+        this.loadVerdicts();
+      },
+      error: err => { this.comparing.set(false); this.toast.error(err?.error?.message || 'The comparison could not be made.'); },
+    });
+  }
+
+  toggleSideBySide(d: DocumentRow): void {
+    const on = !this.sideBySide();
+    this.sideBySide.set(on);
+    this.revokeCopy();
+    if (!on) return;
+    this.copyError.set('');
+    this.api.studioCopy(d.documentId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: b => { if (this.selectedId() === d.documentId) this.copyUrl.set(URL.createObjectURL(b)); },
+      error: () => this.copyError.set('Report Studio\'s copy could not be drawn just now.'),
+    });
+  }
+  private revokeCopy(): void { const u = this.copyUrl(); if (u) URL.revokeObjectURL(u); this.copyUrl.set(null); }
 
   load(): void {
     this.loading.set(true); this.error.set('');
+    this.loadVerdicts();
     this.api.documents(this.workspaces.tenantId()).subscribe({
       next: r => {
         this.loading.set(false);
@@ -99,10 +157,12 @@ export class BillingDocuments implements OnInit, OnDestroy {
   pick(documentId: number): void {
     if (this.selectedId() === documentId && this.previewUrl()) return;
     this.selectedId.set(documentId);
+    this.sideBySide.set(false); this.revokeCopy();
     this.revoke(); this.previewLoading.set(true); this.previewError.set('');
     this.api.documentBlob(documentId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: b => { this.previewLoading.set(false); if (this.selectedId() !== documentId) return; this.previewUrl.set(URL.createObjectURL(b)); },
-      error: () => { this.previewLoading.set(false); this.previewError.set('The document could not be read.'); },
+      // ZT-B6: Billing's reason (a file gone from storage says so and what to do) arrives as a blob body; read it.
+      error: async err => { const why = await refusalOf(err); this.previewLoading.set(false); this.previewError.set(why || 'The document could not be read.'); },
     });
   }
   private revoke(): void { const u = this.previewUrl(); if (u) URL.revokeObjectURL(u); this.previewUrl.set(null); }
@@ -112,6 +172,18 @@ export class BillingDocuments implements OnInit, OnDestroy {
   clearFilters(): void { this.search.set(''); this.kind.set(''); }
   money(v: number, currency?: string): string { return formatMoney(v, currency || 'USD'); }
   totals(t: MoneyTotals): string { return formatTotals(t); }
+  /** A document's name in the list: its number -- a statement's shortened to its range ("Statement 1 Jan – 31 Dec 2026 #2") -- or its file. */
+  title(d: DocumentRow): string { return documentTitle(d); }
+  /** What it is about: its billing period, else the invoice it belongs to. */
+  about(d: DocumentRow): string { return d.periodLabel ? d.periodLabel.replace(/,\s*[A-Za-z_]+\/[A-Za-z_]+$|,\s*UTC$/, '') + (d.kind !== 'invoice' && d.invoiceNumber ? ' · ' + d.invoiceNumber : '') : (d.invoiceNumber ?? ''); }
+  /** Its state, as the chip every billing screen uses (owner #9, #11). */
+  state(d: DocumentRow): PaymentChip | null { return documentState(d); }
+  verify(d: DocumentRow): void {
+    this.dialog.open<void, ReceiptVerifyData>(ReceiptVerifyDialog, { data: { number: d.number }, hasBackdrop: true, ariaLabelledBy: RECEIPT_VERIFY_TITLE_ID });
+  }
+  verifyFile(): void {
+    this.dialog.open<void, ReceiptVerifyData>(ReceiptVerifyDialog, { data: {}, hasBackdrop: true, ariaLabelledBy: RECEIPT_VERIFY_TITLE_ID });
+  }
   glyph(d: DocumentRow): string { const t = d.contentType || ''; return t.includes('pdf') ? 'PDF' : t.startsWith('image/') ? 'IMG' : 'FILE'; }
   open(d: DocumentRow): void { this.api.documentBlob(d.documentId).subscribe({ next: b => BillingApi.open(b), error: () => this.toast.error('Could not open the document.') }); }
   download(d: DocumentRow): void { this.api.documentBlob(d.documentId).subscribe({ next: b => BillingApi.save(b, d.fileName), error: () => this.toast.error('Could not download the document.') }); }
@@ -124,4 +196,33 @@ export class BillingDocuments implements OnInit, OnDestroy {
       error: err => { this.statementBusy.set(false); this.toast.error(err?.error?.message || 'The statement could not be prepared.'); },
     });
   }
+}
+
+/** "STM-2961-2026-01-01-2026-12-31-2" as "Statement 1 Jan – 31 Dec 2026 #2"; any other document by its number or file name. */
+export function documentTitle(d: Pick<DocumentRow, 'kind' | 'number' | 'fileName'>): string {
+  const m = /^STM-\d+-(\d{4})-(\d{2})-(\d{2})-(\d{4})-(\d{2})-(\d{2})-(\d+)$/.exec(d.number ?? '');
+  if (d.kind === 'statement' && m) {
+    const month = (n: string) => ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][Number(n) - 1];
+    const from = `${Number(m[3])} ${month(m[2])}${m[1] === m[4] ? '' : ' ' + m[1]}`;
+    return `Statement ${from} – ${Number(m[6])} ${month(m[5])} ${m[4]} #${m[7]}`;
+  }
+  return d.number || d.fileName;
+}
+
+/**
+ * A document's state as the chip every billing screen uses: an invoice's or credit note's status, a slip's payment
+ * state, a receipt signed or not (owner #9, #10, #11); a statement has none.
+ */
+export function documentState(d: DocumentRow): PaymentChip | null {
+  if (d.kind === 'receipt') {
+    return d.signed ? { kind: 'signed', label: 'Signed', cls: 'pill pill-pay pill-pay-verified', icon: 'shield', title: 'Digitally signed with the platform\'s certificate' }
+      : { kind: 'unsigned', label: 'Not signed', cls: 'pill pill-pay pill-neutral', icon: 'file', title: 'Issued before receipts were signed' };
+  }
+  if (d.kind === 'payment_slip' && d.paymentStatus) {
+    return paymentStateChip({ status: d.paymentStatus, method: d.paymentMethod, provider: d.paymentProvider, amount: d.paymentAmount, refundedAmount: d.refundedAmount });
+  }
+  if ((d.kind === 'invoice' || d.kind === 'credit_note') && d.invoiceStatus) {
+    return { kind: d.invoiceStatus, label: INVOICE_STATUS_LABEL[d.invoiceStatus] ?? d.invoiceStatus, cls: 'pill ' + (INVOICE_STATUS_TONE[d.invoiceStatus] ?? 'pill-neutral'), icon: 'file' };
+  }
+  return null;
 }

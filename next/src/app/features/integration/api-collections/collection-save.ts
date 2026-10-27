@@ -17,7 +17,8 @@ export interface CollectionChanges {
  * A collection's save replaces its head; a save that leaves defaultAuth out keeps the auth the collection has
  * (MIG-310), so a change that is not about auth (a rename, Activate) sends none, and needs no read first.
  */
-export function saveCollectionKeepingAuth(api: ApiCollectionsApi, row: CollectionRow, changes: CollectionChanges): Observable<ApiResponse<Saved>> {
+export function saveCollectionKeepingAuth(api: ApiCollectionsApi, row: CollectionRow, changes: CollectionChanges,
+  tenantId?: number | null): Observable<ApiResponse<Saved>> {
   const body: Record<string, unknown> = {
     collectionId: row.collectionId,
     name: changes.name ?? row.name,
@@ -26,5 +27,5 @@ export function saveCollectionKeepingAuth(api: ApiCollectionsApi, row: Collectio
     status: changes.status ?? row.status ?? 'Active',
   };
   if ('defaultAuth' in changes) body['defaultAuth'] = changes.defaultAuth ?? null;
-  return api.saveCollection(body);
+  return api.saveCollection(body, tenantId);
 }

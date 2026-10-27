@@ -1,13 +1,15 @@
 <div class="page">
   <!-- UX review 2026-10-12 (A2, R1, R3, run page fix): the run as a detail page. One header -- the run and its schedule as
        the title, ONE status pill ("Completed · waiting for review"), a link row -- then a strip of the facts the header
-       does not say beside the Next steps (equal height), then tabs: Steps (a table), Map, AI answers, Outputs, Log. -->
+       does not say beside the Next steps (equal height), then tabs: Steps (a table), Map, AI answers, Items (MIG-420: a
+       pipeline that works item by item), Outputs, Log. -->
   <app-page-header [title]="heading()" [trail]="trail()" [crumb]="'Run #' + jobQueueId()">
     @if (statusLook(); as s) {
       <span pills class="pill pill-{{ s.tone }} run-status-pill" data-test="run-status"><app-icon [name]="s.icon" size="0.85em" />{{ s.label }}</span>
     }
     <app-refresh-button [loading]="loading() || refreshing()" (refresh)="refresh()" />
-    @if (related().length || pipelineText() || feeds().length) {
+    <!-- ZT §3.11: drawn with the page's body, at its final height (the boards it feeds wrap it at 1024). -->
+    @if (topReady() && (related().length || pipelineText() || feeds().length)) {
       <p meta class="run-related flex flex-wrap items-center gap-x-4 gap-y-1 text-xs" data-test="run-related">
         @for (r of related(); track r.label) {
           <a class="link-inline inline-flex items-center gap-1" [routerLink]="r.link" [queryParams]="r.query ?? null" [attr.data-link]="r.test"><app-icon [name]="r.icon" size="0.95em" />{{ r.label }}</a>
@@ -26,8 +28,13 @@
     }
   </app-page-header>
 
+  <!-- MIG-416 (CLS 0.16 at 1024): the run, its review and its steps arrive apart; the review box stacked above the tabs
+       and then moved beside the summary. The page's body is drawn once all three have answered, and stays drawn. -->
+  @if (!topReady()) {
+    <div class="card p-4 text-sm text-[color:var(--text-muted)] run-pending" aria-busy="true" data-test="run-pending">Loading the run…</div>
+  }
   @if (run(); as r) {
-    <div class="run-top" [class.has-next]="hasNext()">
+    <div class="run-top" [class.has-next]="hasNext()" [class.run-waiting]="!topReady()">
       <section class="card overflow-clip min-w-0 flex flex-col" aria-label="This run" data-test="run-summary">
         <dl class="run-facts flex-1" [class.is-wide]="facts().length > 6">
           @for (f of facts(); track f.label) {
@@ -40,7 +47,7 @@
         }
       </section>
       <app-run-approval [now]="now()" (decided)="decided()" />
-      <app-run-decision [jobQueueId]="jobQueueId()" (decided)="refresh()" (reviewChange)="review.set($event)" />
+      <app-run-decision [jobQueueId]="jobQueueId()" (decided)="refresh()" (reviewChange)="reviewRead($event)" />
     </div>
   }
 
@@ -56,6 +63,7 @@
       <button type="button" class="btn btn-default btn-sm" (click)="load()">Try again</button>
     </div>
   }
+  <div class="contents" [class.run-waiting]="!topReady()">
   <div class="tabs" role="tablist" aria-label="Run" data-test="run-tabs">
     @for (t of tabs(); track t.id) {
       <button type="button" role="tab" class="tab" [class.tab-active]="tab() === t.id" [attr.aria-selected]="tab() === t.id"
@@ -79,6 +87,15 @@
         <app-run-ai-trace />
         <app-run-ai-answers [answers]="aiSteps()" />
       </div>
+    }
+    @case ('items') {
+      @if (items()?.itemRun) {
+        <app-run-items [jobQueueId]="jobQueueId()" [first]="itemsFirst()" [initialStatus]="itemStatus()" [runDuration]="duration()"
+                       [canRetry]="canOpenSchedule()" [refreshKey]="loads()" (statusChange)="itemStatusChanged($event)" (retried)="refresh()"
+                       [jobId]="canOpenSchedule() ? jobId() : null" [refs]="itemRefs()" />
+      } @else {
+        <p class="card p-4 text-sm text-[color:var(--text-muted)]" aria-busy="true">Reading the run's items…</p>
+      }
     }
     @case ('outputs') {
       <app-run-outputs />
@@ -134,5 +151,6 @@
       </app-run-log>
     }
   }
+  </div>
   }
 </div>

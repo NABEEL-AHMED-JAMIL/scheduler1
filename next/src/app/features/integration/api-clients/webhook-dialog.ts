@@ -9,6 +9,8 @@ import { ApiClientsApi, EventTypeRow, WebhookRow, WebhookWithSecret } from './ap
 export interface WebhookDialogData {
   eventTypes: EventTypeRow[];
   webhook?: WebhookRow | null;
+  /** The workspace a platform administrator picked; none for a workspace administrator (their own). */
+  tenantId?: number | null;
 }
 
 /** What the dialog closes with: the new webhook (its secret, once), a change, or nothing. */
@@ -66,8 +68,8 @@ export class WebhookDialog {
     const types = this.data.eventTypes.map(t => t.type).filter(t => this.chosen().includes(t));
     const webhook = this.data.webhook;
     const call = webhook
-      ? this.api.updateWebhook({ webhookId: webhook.id, url: this.url().trim(), eventTypes: types })
-      : this.api.createWebhook({ url: this.url().trim(), eventTypes: types });
+      ? this.api.updateWebhook({ webhookId: webhook.id, url: this.url().trim(), eventTypes: types }, this.data.tenantId)
+      : this.api.createWebhook({ url: this.url().trim(), eventTypes: types }, this.data.tenantId);
     call.subscribe({
       next: r => {
         this.saving.set(false);

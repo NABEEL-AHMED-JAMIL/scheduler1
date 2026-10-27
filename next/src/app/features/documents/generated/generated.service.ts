@@ -33,6 +33,12 @@ export function pipelineOf(job: { taskDetail?: TaskDetail | TaskDetail[] | null 
   return detail?.taskName ?? null;
 }
 
+/** The run that wrote an object, as Core answers sourceJob.json/objectWriter. */
+interface ObjectWriter {
+  jobQueueId: number; jobId: number; jobName?: string | null; pipelineName?: string | null; owner?: string | null;
+  recordedAt?: string | null; bucket?: string; key?: string;
+}
+
 /** The outputs of recent runs, and how far the read got. */
 export interface RecentOutputs { reports: GeneratedReport[]; runsRead: number; jobsRead: number; failed: number; }
 
@@ -81,6 +87,24 @@ export class GeneratedService {
       map(r => { if (r.status !== API_SUCCESS) throw new Error(r.message || 'Could not read the schedules.'); return r.data ?? []; }));
   }
 
+  /**
+   * Which run wrote an object in a bucket (Core's sourceJob.json/objectWriter, 2026-10-20): the newest upload of it in a
+   * run the caller reads, as a Reports row; null when no run of theirs wrote it. Errors when Core cannot be asked (an
+   * older Core without the lookup answers 404), so the caller can fall back to the recent runs' outputs.
+   */
+  objectWriter(bucket: string, key: string): Observable<GeneratedReport | null> {
+    return this.http.get<ApiResponse<ObjectWriter | null>>(`${this.jobs}/objectWriter`, { params: { bucket, key } }).pipe(
+      map(r => {
+        if (r.status !== API_SUCCESS) throw new Error(r.message || 'Could not ask which run wrote this file.');
+        const w = r.data;
+        return w ? {
+          id: `writer-${w.jobQueueId}`, name: key.slice(key.lastIndexOf('/') + 1), type: (key.split('.').pop() ?? '').toUpperCase(),
+          origin: 'run-bucket', created: w.recordedAt ?? null, status: 'In storage', owner: w.owner ?? null, bucket: w.bucket ?? bucket,
+          key: w.key ?? key, jobQueueId: w.jobQueueId, jobId: w.jobId, jobName: w.jobName ?? null, pipeline: w.pipelineName ?? null,
+        } : null;
+      }));
+  }
+
   /** What one run put out; null when the answer is not an output list. */
   runOutputs(jobQueueId: number): Observable<RunOutput[] | null> {
     return this.http.get<ApiResponse<unknown>>(`${this.jobs}/runOutputs`, { params: { jobQueueId } })
@@ -94,30 +118,47 @@ export class GeneratedService {
   recentOutputs(fresh = false): Observable<RecentOutputs> {
     if (!fresh && this.cached && Date.now() - this.cached.at < CACHE_MS) return this.cached.outputs;
     const outputs = this.schedules().pipe(
-      mergeMap(all => {
-        const jobs = recentJobs(all, FAN_OUT.jobs);
-        if (!jobs.length) return of({ reports: [], runsRead: 0, jobsRead: 0, failed: 0 });
-        return from(jobs).pipe(
-          mergeMap(job => this.runs(job.jobId, FAN_OUT.runsPerJob).pipe(
-            catchError(() => of([] as RunRow[])),
-            map(runs => runs.slice(0, FAN_OUT.runsPerJob).map(run => ({ job, run })))), FAN_OUT.concurrency),
-          mergeMap(pairs => from(pairs)),
-          mergeMap(({ job, run }) => this.runOutputs(run.jobQueueId).pipe(
-            catchError(() => of(null)),
-            map(list => list === null ? null : reportsFromRun({
-              jobQueueId: run.jobQueueId, jobId: job.jobId, jobName: job.jobName ?? null,
-              pipelineName: pipelineOf(job), owner: job.createdByName ?? null,
-            }, list))), FAN_OUT.concurrency),
-          toArray(),
-          map(lists => ({
-            reports: lists.flatMap(l => l ?? []), runsRead: lists.length, jobsRead: jobs.length,
-            failed: lists.filter(l => l === null).length,
-          })));
-      }),
+      mergeMap(all => this.outputsOfJobs(recentJobs(all, FAN_OUT.jobs))),
       tap({ error: () => this.cached = null }),
       shareReplay(1));
     this.cached = { at: Date.now(), outputs };
     return outputs;
+  }
+
+  /**
+   * What Find reaches beyond the recent fan-out (final-regression 2026-10-20: a workspace's eleventh most recently run
+   * schedule had no outputs on Reports, and finding it by name found nothing): the schedules that ran but are not among
+   * the FAN_OUT.jobs most recent, whose name or pipeline contains `query`, read the same way -- each one's newest runs --
+   * up to FAN_OUT.jobs of them, most recently run first. Not cached: a query is asked once.
+   */
+  matchingOutputs(query: string): Observable<RecentOutputs> {
+    const q = query.trim().toLowerCase();
+    return this.schedules().pipe(mergeMap(all => {
+      const recent = new Set(recentJobs(all, FAN_OUT.jobs).map(j => j.jobId));
+      const matching = all.filter(j => !recent.has(j.jobId) && [j.jobName, pipelineOf(j)].some(v => (v ?? '').toLowerCase().includes(q)));
+      return this.outputsOfJobs(recentJobs(matching, FAN_OUT.jobs));
+    }));
+  }
+
+  /** Each schedule's newest FAN_OUT.runsPerJob runs, and what each put out: a capped fan-out, FAN_OUT.concurrency at a time. */
+  private outputsOfJobs(jobs: JobRow[]): Observable<RecentOutputs> {
+    if (!jobs.length) return of({ reports: [], runsRead: 0, jobsRead: 0, failed: 0 });
+    return from(jobs).pipe(
+      mergeMap(job => this.runs(job.jobId, FAN_OUT.runsPerJob).pipe(
+        catchError(() => of([] as RunRow[])),
+        map(runs => runs.slice(0, FAN_OUT.runsPerJob).map(run => ({ job, run })))), FAN_OUT.concurrency),
+      mergeMap(pairs => from(pairs)),
+      mergeMap(({ job, run }) => this.runOutputs(run.jobQueueId).pipe(
+        catchError(() => of(null)),
+        map(list => list === null ? null : reportsFromRun({
+          jobQueueId: run.jobQueueId, jobId: job.jobId, jobName: job.jobName ?? null,
+          pipelineName: pipelineOf(job), owner: job.createdByName ?? null,
+        }, list))), FAN_OUT.concurrency),
+      toArray(),
+      map(lists => ({
+        reports: lists.flatMap(l => l ?? []), runsRead: lists.length, jobsRead: jobs.length,
+        failed: lists.filter(l => l === null).length,
+      })));
   }
 
   /** A dataset a run kept, as a file to save (csv, json or jsonl) -- or a report it rendered, as its PDF (MIG-255). */

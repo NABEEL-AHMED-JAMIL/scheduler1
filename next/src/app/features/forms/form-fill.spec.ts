@@ -13,9 +13,9 @@ import { FormField, FormSummary } from './forms.model';
  * Core's own refusal lands at each field; a sent form says whether it started its run.
  */
 const FIELDS: FormField[] = [
-  { key: 'patient_id', label: 'Patient ID', type: 'text', required: true },
-  { key: 'wound_location', label: 'Wound location', type: 'choice', required: true, options: ['Sacrum', 'Heel'] },
-  { key: 'length_cm', label: 'Length (cm)', type: 'number', required: false },
+  { key: 'patient_id', label: 'Patient ID', type: 'text', required: true, placeholder: 'e.g. P-00017', help: 'As on the wristband' },
+  { key: 'wound_location', label: 'Wound location', type: 'choice', required: true, options: ['Sacrum', 'Heel'], placeholder: 'Choose a site' },
+  { key: 'length_cm', label: 'Length (cm)', type: 'number', required: false, placeholder: 'e.g. 2.5' },
   { key: 'infection_signs', label: 'Signs of infection', type: 'yesNo', required: true },
 ];
 const FORM: FormSummary = { formId: 1000, name: 'Wound intake', description: 'Bedside assessment', status: 'Active', version: 2,
@@ -44,6 +44,18 @@ function render(opts: { form?: FormSummary; submit?: unknown; fetchFails?: boole
 }
 
 describe('Form fill', () => {
+  it('UX2: shows each field\'s placeholder and help, the help linked to its control, every label kept', () => {
+    const { el } = render();
+    const id = el.querySelector<HTMLInputElement>('[data-field="patient_id"]')!;
+    expect(id.getAttribute('placeholder')).toBe('e.g. P-00017');
+    expect(el.querySelector('[data-field="length_cm"]')?.getAttribute('placeholder')).toBe('e.g. 2.5');
+    expect(el.querySelector('[data-field="wound_location"] option[value=""]')?.textContent?.trim()).toBe('Choose a site');
+    const note = id.closest('.field')!.querySelector('.field-note')!;
+    expect(note.textContent?.trim()).toBe('As on the wristband');
+    expect(id.getAttribute('aria-describedby')?.split(' ')).toContain(note.id);
+    expect(el.querySelector(`label[for="${id.id}"]`)?.textContent).toContain('Patient ID');
+  });
+
   it('opens the form by its id and draws every field in order', () => {
     const { api, el } = render();
     expect(api.fetch).toHaveBeenCalledWith(1000);

@@ -6,6 +6,7 @@ import {
   ControlContainer, FormGroup, FormGroupDirective, ReactiveFormsModule, Validators,
 } from '@angular/forms';
 import { API_SUCCESS } from '../../../core/api/api.config';
+import { AuthService } from '../../../core/auth/auth.service';
 import { Field } from '../../../shared/ui/field';
 import { Icon } from '../../../shared/ui/icon';
 import { ToastService } from '../../../shared/ui/toast.service';
@@ -101,7 +102,7 @@ const STORE_FIELDS: Record<'truststore' | 'keystore', StoreFields> = {
     <div class="form-section">
       <div class="form-section-title flex items-center">
         TLS material
-        <button type="button" class="btn btn-ghost btn-sm ml-auto"
+        <button type="button" class="btn btn-default btn-sm ml-auto"
                 [attr.aria-expanded]="showGuide()" (click)="showGuide.set(!showGuide())">
           <app-icon name="info" class="icon-info" />
           {{ showGuide() ? 'Hide' : 'Where do these files come from?' }}
@@ -355,9 +356,18 @@ const STORE_FIELDS: Record<'truststore' | 'keystore', StoreFields> = {
               <select id="sslEndpointIdentificationAlgorithm" class="input"
                       formControlName="sslEndpointIdentificationAlgorithm">
                 <option [value]="verifyHostname">Verify the hostname (recommended)</option>
-                <option [value]="skipHostnameCheck">Skip the check</option>
+                @if (canSkipHostnameCheck()) {
+                  <option [value]="skipHostnameCheck">Skip the check</option>
+                }
               </select>
             </app-field>
+
+            @if (!canSkipHostnameCheck()) {
+              <p class="field-note flex items-start gap-1.5 sm:col-span-2">
+                <app-icon name="info" size="0.9em" class="mt-px shrink-0" />
+                <span>Only a platform administrator can switch the hostname check off.</span>
+              </p>
+            }
 
             @if (form().get('sslEndpointIdentificationAlgorithm')?.value === skipHostnameCheck) {
               <p class="field-note text-warn-500 flex items-start gap-1.5 sm:col-span-2">
@@ -416,7 +426,7 @@ const STORE_FIELDS: Record<'truststore' | 'keystore', StoreFields> = {
               <app-icon name="checkCircle" size="0.9em" class="icon-ok shrink-0" />
               <span class="mono truncate">{{ stored.fileName }}</span>
               <span class="text-[color:var(--text-muted)] shrink-0">{{ size(stored.sizeBytes) }}</span>
-              <button type="button" class="btn btn-ghost btn-xs ml-auto shrink-0"
+              <button type="button" class="btn btn-default btn-intent-crit btn-xs ml-auto shrink-0"
                       (click)="remove(need.id, stored)">Remove</button>
             </div>
             @if (stored.subject) {
@@ -451,7 +461,7 @@ const STORE_FIELDS: Record<'truststore' | 'keystore', StoreFields> = {
         }
 
         @if (need.multiple && slot(need.id).files.length) {
-          <button type="button" class="btn btn-ghost btn-xs mt-2" (click)="adder.click()">
+          <button type="button" class="btn btn-default btn-xs mt-2" (click)="adder.click()">
             <app-icon name="plus" size="0.9em" />
             Add another file to the chain
           </button>
@@ -507,6 +517,14 @@ export class KafkaTlsSection implements OnInit {
 
   private readonly secrets = inject(KafkaSecretService);
   private readonly toast = inject(ToastService);
+  private readonly auth = inject(AuthService);
+
+  /**
+   * Switching the hostname check off is a platform administrator's call (vulnerabilities review 2026-10-13, C5; Core
+   * refuses it from anyone else). A profile already saved that way still shows its setting.
+   */
+  readonly canSkipHostnameCheck = computed(() => this.auth.isPlatformAdmin()
+    || this.profile()?.sslEndpointIdentificationAlgorithm === SKIP_HOSTNAME_CHECK);
 
   readonly verifyHostname = VERIFY_HOSTNAME;
   readonly skipHostnameCheck = SKIP_HOSTNAME_CHECK;

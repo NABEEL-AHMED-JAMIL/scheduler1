@@ -2,121 +2,143 @@ import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { Dialog } from '@angular/cdk/dialog';
+import { of } from 'rxjs';
 import { API_BASE, API_SUCCESS } from '../../../core/api/api.config';
+import { AuthService } from '../../../core/auth/auth.service';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { EngineSettings } from './engine-settings';
-import { EngineSetting, fetchLimitError } from './configuration.models';
+import { EngineDial, EngineSettingsAnswer, dialValueError } from './configuration.models';
 
 /**
- * MIG-167: Engine settings, the platform's own knobs. One of them is configuration
- * (QUEUE_FETCH_LIMIT); the other two are watermarks their crons write on every pass, and editing
- * one by hand is not configuration at all -- so the screen shows them and offers nothing more.
+ * Owner #24 (2026-10-19): Engine settings, the engine's allow-listed limits. Each shows its value, default, range and when a
+ * change takes effect; a value outside the range is refused before it is sent (and by the server); Reset asks first and puts
+ * the default back; a workspace gets its own value only where the setting allows one; every change is in the history. The
+ * two cron watermarks are shown and never edited.
  */
 
 const ENDPOINT = `${API_BASE}/setting.json/engineSettings`;
 
-const SETTINGS: EngineSetting[] = [
-  { key: 'QUEUE_FETCH_LIMIT', value: '100', description: 'Runs claimed per scheduler pass', editable: true,
-    updatedAt: '2026-09-20T15:00:00Z', updatedByName: 'Pat Platform' },
-  { key: 'SCHEDULER_LAST_RUN_TIME', value: '2026-09-24T17:00:00Z', editable: false },
-  { key: 'AUDIT_LOG_SYNC_LAST_RUN_TIME', value: '2026-09-24T16:55:00Z', editable: false },
-];
+const dial = (over: Partial<EngineDial>): EngineDial => ({
+  key: 'QUEUE_FETCH_LIMIT', label: 'Runs claimed per dispatch pass', description: 'How many queued runs one pass claims.',
+  unit: 'runs', min: 1, max: 1_000_000, defaultValue: 1000, defaultFrom: 'built-in', value: 5000, atDefault: false,
+  perWorkspace: false, takesEffect: 'At the next dispatch pass (within seconds).', updatedAt: '2026-10-19T15:00:00Z',
+  updatedByName: 'QA platform administrator', overrides: [], ...over,
+});
 
-function screen() {
+const ANSWER: EngineSettingsAnswer = {
+  settings: [
+    dial({}),
+    dial({ key: 'RUN_MEMORY_MB', label: 'Memory budget per run', unit: 'MB', min: 16, max: 4096, defaultValue: 128, value: 128,
+      defaultFrom: 'process.pipeline.run-memory-mb', atDefault: true, perWorkspace: true, takesEffect: 'At the next run.',
+      updatedAt: null, updatedByName: null, overrides: [{ tenantId: 2960, value: 512 }] }),
+  ],
+  watermarks: [
+    { key: 'SCHEDULER_LAST_RUN_TIME', value: '2026-09-24T17:00:00Z', editable: false },
+    { key: 'AUDIT_LOG_SYNC_LAST_RUN_TIME', value: '2026-09-24T16:55:00Z', editable: false },
+  ],
+  cacheSeconds: 30,
+};
+
+function screen(answers: boolean[] = []) {
   const toast = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
+  const opened: unknown[] = [];
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
     imports: [EngineSettings],
-    providers: [provideHttpClient(), provideHttpClientTesting(), { provide: ToastService, useValue: toast }],
+    providers: [provideHttpClient(), provideHttpClientTesting(), { provide: ToastService, useValue: toast },
+      { provide: AuthService, useValue: { isPlatformAdmin: () => false, isManagedSession: () => false } },
+      { provide: Dialog, useValue: { open: (_c: unknown, config: unknown) => { opened.push(config); return { closed: of(answers.shift()) }; } } }],
   });
   const fixture = TestBed.createComponent(EngineSettings);
   fixture.detectChanges();
   const http = TestBed.inject(HttpTestingController);
-  http.expectOne(r => r.url === ENDPOINT && r.method === 'GET').flush({ status: API_SUCCESS, message: '', data: SETTINGS });
+  http.expectOne(r => r.url === ENDPOINT && r.method === 'GET').flush({ status: API_SUCCESS, message: '', data: ANSWER });
+  http.expectOne(r => r.url === `${ENDPOINT}/history`).flush({ status: API_SUCCESS, message: '', data: [
+    { id: 1001, key: 'QUEUE_FETCH_LIMIT', label: 'Runs claimed per dispatch pass', tenantId: null, action: 'SET', oldValue: null,
+      newValue: '5000', changedByName: 'QA platform administrator', changedAt: '2026-10-19T15:00:00Z' }] });
   fixture.detectChanges();
-  return { fixture, component: fixture.componentInstance, el: fixture.nativeElement as HTMLElement, http, toast };
+  return { fixture, component: fixture.componentInstance, el: fixture.nativeElement as HTMLElement, http, toast, opened };
 }
 
 const row = (el: HTMLElement, key: string) => el.querySelector(`[data-key="${key}"]`) as HTMLElement;
 
-describe('Engine settings', () => {
-  it('lists the fetch limit and both watermarks', () => {
+describe('Engine settings (owner #24)', () => {
+  it('lists each limit with its value, default, range and when it takes effect, and the watermarks read-only', () => {
     const { el } = screen();
-    expect(row(el, 'QUEUE_FETCH_LIMIT').textContent).toContain('100');
-    // UI review U6: a watermark reads as a date and time, the stored text only on its tooltip.
+    const fetch = row(el, 'QUEUE_FETCH_LIMIT');
+    expect(fetch.textContent).toContain('5,000');
+    expect(fetch.textContent).toContain('1,000');
+    expect(fetch.textContent).toContain('1–1,000,000');
+    expect(fetch.textContent).toContain('At the next dispatch pass');
+    expect(fetch.textContent).toContain('Platform only');
+    expect(row(el, 'RUN_MEMORY_MB').textContent).toContain('At default');
+    expect(row(el, 'RUN_MEMORY_MB').textContent).toContain('1 with their own');
     const watermark = row(el, 'SCHEDULER_LAST_RUN_TIME');
     expect(watermark.textContent).toContain('24 Sep 2026');
-    expect(watermark.textContent).not.toContain('2026-09-24T17:00:00Z');
-    expect(watermark.querySelector('[title="2026-09-24T17:00:00Z"]')).not.toBeNull();
-    expect(row(el, 'AUDIT_LOG_SYNC_LAST_RUN_TIME')).not.toBeNull();
+    expect(watermark.querySelector('button, input')).toBeNull();
+    expect(el.querySelector('[data-change="1001"]')!.textContent).toContain('QA platform administrator');
   });
 
-  it('offers an edit for the fetch limit and never for a watermark', () => {
-    const { el } = screen();
-    expect(row(el, 'QUEUE_FETCH_LIMIT').querySelector('button[aria-label^="Edit"]')).not.toBeNull();
-    for (const key of ['SCHEDULER_LAST_RUN_TIME', 'AUDIT_LOG_SYNC_LAST_RUN_TIME']) {
-      expect(row(el, key).querySelectorAll('button, input').length, key).toBe(0);
-      expect(row(el, key).textContent).toMatch(/written only by its cron/i);
-    }
-  });
-
-  it('will not open a watermark for editing even when asked directly', () => {
-    const { component } = screen();
-    component.startEdit(SETTINGS[1]);
-    expect(component.editing()).toBeNull();
-    // Even a server that wrongly calls a watermark editable does not get one offered.
-    component.startEdit({ ...SETTINGS[2], editable: true });
-    expect(component.editing()).toBeNull();
-  });
-
-  it('refuses anything but a whole number from 1 to 1,000,000, without asking the server', () => {
-    const { fixture, component, el, http } = screen();
-    component.startEdit(SETTINGS[0]);
+  it('refuses a value outside the range before anything is sent', () => {
+    const { component, http, fixture } = screen();
+    const fetch = component.settings()[0];
+    component.toggle(fetch);
+    component.draft.set('5,000');
     fixture.detectChanges();
-    for (const bad of ['abc', '0', '5,000', '1000001', '', ' 50', '-5', '12.5', '1e3']) {
-      component.draft.set(bad);
-      component.save();
-      fixture.detectChanges();
-      expect(component.draftError(), bad).not.toBe('');
-      expect(el.querySelector('[role="alert"]')?.textContent, bad).toBeTruthy();
-    }
+    expect(component.draftError()).toContain('Digits only');
+    component.save(fetch);
+    component.draft.set('0');
+    expect(component.draftError()).toContain('1 to 1,000,000 runs');
+    component.save(fetch);
     http.expectNone(r => r.method === 'PUT');
   });
 
-  it('saves a valid limit and shows what the server stored', () => {
-    const { fixture, component, el, http, toast } = screen();
-    component.startEdit(SETTINGS[0]);
-    component.draft.set('250');
-    component.save();
-    const req = http.expectOne(r => r.url === ENDPOINT && r.method === 'PUT');
-    expect(req.request.body).toEqual({ key: 'QUEUE_FETCH_LIMIT', value: '250' });
-    req.flush({ status: API_SUCCESS, message: 'Saved.', data: { ...SETTINGS[0], value: '250' } });
-    fixture.detectChanges();
-    expect(component.editing()).toBeNull();
-    expect(row(el, 'QUEUE_FETCH_LIMIT').textContent).toContain('250');
-    expect(toast.success).toHaveBeenCalled();
-  });
-
-  it('shows the server\'s sentence when it refuses', () => {
+  it('saves a value inside the range and takes the server\'s answer', () => {
     const { component, http, toast } = screen();
-    component.startEdit(SETTINGS[0]);
-    component.draft.set('500');
-    component.save();
-    http.expectOne(r => r.method === 'PUT').flush({ status: 'ERROR', message: 'QUEUE_FETCH_LIMIT must be 1 to 1000000.' });
-    expect(toast.error).toHaveBeenCalledWith('QUEUE_FETCH_LIMIT must be 1 to 1000000.');
-    expect(component.editing()).toBe('QUEUE_FETCH_LIMIT');
-  });
-});
-
-describe('fetchLimitError', () => {
-  it('accepts the bounds and refuses just past them', () => {
-    expect(fetchLimitError('1')).toBeNull();
-    expect(fetchLimitError('1000000')).toBeNull();
-    expect(fetchLimitError('0')).not.toBeNull();
-    expect(fetchLimitError('1000001')).not.toBeNull();
+    const fetch = component.settings()[0];
+    component.toggle(fetch);
+    component.draft.set('250');
+    component.save(fetch);
+    const put = http.expectOne(r => r.url === ENDPOINT && r.method === 'PUT');
+    expect(put.request.body).toEqual({ key: 'QUEUE_FETCH_LIMIT', value: '250' });
+    put.flush({ status: API_SUCCESS, message: 'Runs claimed per dispatch pass is now 250 runs.', data: dial({ value: 250 }) });
+    http.expectOne(r => r.url === `${ENDPOINT}/history`).flush({ status: API_SUCCESS, data: [] });
+    expect(component.settings()[0].value).toBe(250);
+    expect(toast.success).toHaveBeenCalledWith('Runs claimed per dispatch pass is now 250 runs.');
   });
 
-  it('says why a formatted number is refused', () => {
-    expect(fetchLimitError('5,000')).toMatch(/Digits only/);
+  it('gives a workspace its own value only where the setting allows one', () => {
+    const { component, http, el, fixture } = screen();
+    component.toggle(component.settings()[0]);
+    fixture.detectChanges();
+    expect(el.querySelector('[data-test="engine-overrides"]')).toBeNull();
+    const memory = component.settings()[1];
+    component.toggle(memory);
+    fixture.detectChanges();
+    expect(el.querySelector('[data-override="2960"]')).not.toBeNull();
+    component.ownWorkspace.set('2961');
+    component.ownDraft.set('256');
+    component.saveOwn(memory);
+    expect(http.expectOne(r => r.method === 'PUT').request.body).toEqual({ key: 'RUN_MEMORY_MB', value: '256', tenantId: 2961 });
+  });
+
+  it('asks before a reset, and resets nothing when the question is declined', async () => {
+    const declined = screen([false]);
+    await declined.component.reset(declined.component.settings()[0]);
+    declined.http.expectNone(r => r.url === `${ENDPOINT}/reset`);
+
+    const { component, http, opened } = screen([true]);
+    await component.reset(component.settings()[1], 2960);
+    expect(opened.length).toBe(1);
+    expect(http.expectOne(r => r.url === `${ENDPOINT}/reset`).request.body).toEqual({ key: 'RUN_MEMORY_MB', tenantId: 2960 });
+  });
+
+  it('words every range problem with the setting\'s own unit', () => {
+    const memory = { min: 16, max: 4096, unit: 'MB' };
+    expect(dialValueError(memory, '')).toBe('Enter a whole number from 16 to 4,096 MB.');
+    expect(dialValueError(memory, '12.5')).toBe('Digits only: no commas, spaces, signs or decimals.');
+    expect(dialValueError(memory, '8')).toBe('Enter a whole number from 16 to 4,096 MB.');
+    expect(dialValueError(memory, '512')).toBeNull();
   });
 });

@@ -57,7 +57,7 @@ interface OverviewTile { chart: OverviewChart; view: WidgetView | null; kind: st
                                 emptyMessage="No rows fell into this chart.">
             <ng-container actions>
               @if (tile.chart.request) {
-                <button type="button" class="btn btn-ghost btn-xs" (click)="openInCanvas.emit(tile.chart.request!)" [attr.aria-label]="'Open ' + tile.chart.title + ' in the Canvas'" title="Open in the Canvas">
+                <button type="button" class="btn btn-default btn-xs" (click)="openInCanvas.emit(tile.chart.request!)" [attr.aria-label]="'Open ' + tile.chart.title + ' in the Canvas'" title="Open in the Canvas">
                   <app-icon name="external" size="0.9em" />Canvas
                 </button>
               }

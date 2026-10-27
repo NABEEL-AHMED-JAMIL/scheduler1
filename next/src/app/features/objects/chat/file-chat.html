@@ -5,7 +5,7 @@
   <div class="flex items-center gap-2 px-3.5 py-2.5 border-b shrink-0 border-subtle"
       >
     <span class="text-sm font-medium mr-auto truncate" [title]="fileName()">{{ fileName() }}</span>
-    <button type="button" class="btn btn-ghost btn-sm" (click)="viewRequested.emit()"><app-icon name="eye" />View</button>
+    <button type="button" class="btn btn-default btn-sm" (click)="viewRequested.emit()"><app-icon name="eye" />View</button>
     <button type="button" class="btn btn-ghost btn-icon"
             (click)="minimized.set(!minimized())" [attr.aria-expanded]="!minimized()"
             [attr.aria-label]="minimized() ? 'Expand' : 'Minimise'">
@@ -108,7 +108,7 @@
             <!-- Also disabled while there is nothing to send to: retry() drops the failed
                  exchange before asking again, so a Retry that cannot go anywhere is a button
                  offering to delete the question. -->
-            <button type="button" class="btn btn-ghost btn-sm ml-auto shrink-0"
+            <button type="button" class="btn btn-default btn-sm ml-auto shrink-0"
                     [disabled]="sending() || preparing() || agentId() === null"
                     [title]="agentId() === null ? 'Choose an agent first' : 'Ask again'"
                     (click)="retry()">
@@ -135,7 +135,7 @@
                 @for (file of message.files; track file.filename) {
                   <!-- Busy state is keyed by reply + file name: every reply's first CSV is called
                        <base>-export.csv, so a name alone marked the chip in every earlier reply. -->
-                  <button type="button" class="btn btn-ghost btn-sm"
+                  <button type="button" class="btn btn-default btn-sm"
                           [disabled]="converting() === busyKey(mi, file)"
                           (click)="download(file, mi)"
                           [title]="file.pendingExport
@@ -148,7 +148,7 @@
                   </button>
                   <!-- The second way out. A download is no use to a reader on a machine that
                        blocks them, or on a phone; the server converts identically either way. -->
-                  <button type="button" class="btn btn-ghost btn-sm"
+                  <button type="button" class="btn btn-default btn-sm"
                           [disabled]="!!emailing() || !!converting()"
                           (click)="emailExport(file, mi)"
                           [title]="'Email ' + file.filename + ' as an attachment'">
@@ -201,7 +201,7 @@
         <div class="flex items-center gap-2 text-sm text-[color:var(--text-muted)]">
           <span class="typing"><span></span><span></span><span></span></span>
           <span>Thinking…</span>
-          <button type="button" class="btn btn-ghost btn-sm ml-1" (click)="stop()">
+          <button type="button" class="btn btn-default btn-sm ml-1" (click)="stop()">
             <app-icon name="close" size="0.85em" />Stop
           </button>
         </div>

@@ -1,7 +1,7 @@
 // Recorded by scripts/characterisation/record.mjs -- see ../harness.ts. Review the diff: it is the baseline.
 export const PINNED: Record<string, unknown> = {
   "the AI step panel, for a pipeline with an AI step": {
-    "dialogFields": [
+    "pageFields": [
       "Default value",
       "Description",
       "Help text",
@@ -18,7 +18,7 @@ export const PINNED: Record<string, unknown> = {
       "Status",
       "Topic *(required)",
       "Type",
-      "What a task on this pipeline collects",
+      "What a pipeline on this registry task collects",
       "XML tag *(required)",
       "region"
     ],
@@ -26,58 +26,38 @@ export const PINNED: Record<string, unknown> = {
       "GET /aiPrompt.json/list"
     ],
     "headings": [
-      "Edit registry task",
-      "Fields",
-      "Payload preview",
       "AI step · <summary>"
     ],
     "buttons": [
-      "Add field",
       "Apply",
       "Cancel",
-      "Change",
       "Clear",
-      "Close",
-      "Move down",
-      "Move up",
-      "Remove field",
-      "Save changes"
+      "Close"
     ],
     "columns": [],
     "fields": [
-      "Default value",
-      "Description",
-      "Help text",
-      "Label *(required)",
-      "Name *(required)",
-      "Nested under",
-      "ORDERS_IMPORT",
-      "Orders import",
-      "Pipeline ID *(required)",
       "Prompt",
-      "Region",
-      "Required",
-      "Search active prompts…",
-      "Search topics…",
-      "Shown under the field",
-      "Status",
-      "Topic *(required)",
-      "Type",
-      "What a task on this pipeline collects",
-      "XML tag *(required)",
-      "region"
+      "Search active prompts…"
     ],
     "links": [],
     "items": []
   },
-  "the dialog, editing a pipeline": {
+  "the Edit registry task page": {
+    "url": "/settings/task-registry/100167",
     "requests": [
-      "GET /pipeline.json/fields?pipelineKey=100167"
+      "GET /taskInbox.json/count",
+      "GET /notification.json/unreadCount",
+      "GET /notification.json/list?limit=20&page=1",
+      "GET /pipeline.json/get?pipelineKey=100167",
+      "GET /pipeline.json/steps/tasks/pipelines?pipelineKey=100167"
     ],
     "headings": [
-      "Edit registry task",
-      "Fields",
-      "Payload preview"
+      "Reference: CSV check and summarise",
+      "1 Registry task",
+      "2 Payload fields",
+      "Payload preview",
+      "Used by",
+      "About these settings"
     ],
     "buttons": [
       "Add field",
@@ -86,7 +66,8 @@ export const PINNED: Record<string, unknown> = {
       "Move down",
       "Move up",
       "Remove field",
-      "Save changes"
+      "Save changes",
+      "Task Registry"
     ],
     "columns": [],
     "fields": [
@@ -106,25 +87,38 @@ export const PINNED: Record<string, unknown> = {
       "Status",
       "Topic *(required)",
       "Type",
-      "What a task on this pipeline collects",
+      "What a pipeline on this registry task collects",
       "XML tag *(required)",
       "region"
     ],
-    "links": [],
-    "items": []
+    "links": [
+      "/settings",
+      "/settings/task-registry"
+    ]
   },
-  "the dialog, for a new pipeline": {
+  "the New registry task page": {
+    "fromTheList": [
+      "GET /setting.json/topics?limit=1&q="
+    ],
+    "url": "/settings/task-registry/new",
     "requests": [
+      "GET /taskInbox.json/count",
+      "GET /notification.json/unreadCount",
+      "GET /notification.json/list?limit=20&page=1",
       "GET /setting.json/topics?limit=1&q="
     ],
     "headings": [
       "New registry task",
-      "Fields"
+      "1 Registry task",
+      "2 Payload fields",
+      "Payload preview",
+      "About these settings"
     ],
     "buttons": [
       "Add field",
       "Cancel",
-      "Create pipeline"
+      "Create registry task",
+      "Task Registry"
     ],
     "columns": [],
     "fields": [
@@ -136,10 +130,12 @@ export const PINNED: Record<string, unknown> = {
       "Search topics…",
       "Status",
       "Topic *(required)",
-      "What a task on this pipeline collects"
+      "What a pipeline on this registry task collects"
     ],
-    "links": [],
-    "items": []
+    "links": [
+      "/settings",
+      "/settings/task-registry"
+    ]
   },
   "the list, as a platform administrator": {
     "url": "/settings/task-registry",
@@ -148,38 +144,25 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/list?limit=20&page=1",
       "GET /tenant.json/listTenants",
       "GET /pipeline.json/steps/tasks",
-      "GET /pipeline.json/list?limit=1000&page=1"
+      "GET /pipeline.json/steps/tasks/usage"
     ],
     "headings": [
       "Task Registry",
-      "Tasks (1 of 1)"
+      "Tasks (0 of 0)"
     ],
     "buttons": [
-      "Actions for Reference: CSV check and summarise",
-      "Columns",
-      "New registry task",
       "Only mine",
-      "Open Reference: CSV check and summarise",
       "Refresh"
     ],
-    "columns": [
-      [
-        "Task",
-        "Kind",
-        "Service",
-        "Input → output",
-        "In this workspace",
-        "Actions"
-      ]
-    ],
+    "columns": [],
     "fields": [
       "All topics",
       "All workspaces",
-      "Filter by workspace",
       "Kind",
       "Search name, code, service or topic",
       "Search tasks",
-      "State"
+      "State",
+      "Workspace"
     ],
     "links": [
       "/settings",
@@ -218,6 +201,8 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /pipeline.json/steps/tasks",
+      "GET /pipeline.json/steps/tasks/usage",
+      "GET /pipeline.json/steps/tasks/history",
       "GET /pipeline.json/list?limit=1000&page=1"
     ],
     "headings": [
@@ -238,6 +223,8 @@ export const PINNED: Record<string, unknown> = {
         "Kind",
         "Service",
         "Input → output",
+        "Pipelines",
+        "Runs this month",
         "In this workspace",
         "Actions"
       ]
@@ -271,6 +258,8 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /pipeline.json/steps/tasks",
+      "GET /pipeline.json/steps/tasks/usage",
+      "GET /pipeline.json/steps/tasks/history",
       "GET /pipeline.json/list?limit=1000&page=1"
     ],
     "headings": [
@@ -291,6 +280,8 @@ export const PINNED: Record<string, unknown> = {
         "Kind",
         "Service",
         "Input → output",
+        "Pipelines",
+        "Runs this month",
         "In this workspace",
         "Actions"
       ]

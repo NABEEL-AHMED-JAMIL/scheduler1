@@ -150,6 +150,23 @@ export const PINNED: Record<string, unknown> = {
       "/review/documents"
     ]
   },
+  "add from starters": {
+    "headings": [
+      "Add from starters",
+      "Healthcare"
+    ],
+    "buttons": [
+      "Add",
+      "Cancel",
+      "Choose all 1"
+    ],
+    "columns": [],
+    "fields": [
+      "ReferralA letter asking another provider to see a patient."
+    ],
+    "links": [],
+    "items": []
+  },
   "an approved document, read-only": {
     "url": "/review/documents/1000",
     "requests": [
@@ -212,7 +229,7 @@ export const PINNED: Record<string, unknown> = {
     "items": []
   },
   "the dataset, as a workspace administrator": {
-    "url": "/documents/datasets",
+    "url": "/documents/approved-data",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -222,8 +239,8 @@ export const PINNED: Record<string, unknown> = {
       "GET /documentExtraction.json/dataset?documentTypeId=1001&page=0&size=50"
     ],
     "headings": [
-      "Datasets",
-      "Dataset (1 of 1)"
+      "Approved data",
+      "Approved data (1 of 1)"
     ],
     "buttons": [
       "CSV",
@@ -249,10 +266,9 @@ export const PINNED: Record<string, unknown> = {
     ],
     "links": [
       "/documents",
-      "/documents/datasets",
-      "/documents/email-in",
-      "/documents/file-drop",
+      "/documents/approved-data",
       "/documents/in",
+      "/documents/intake",
       "/documents/types",
       "/review/documents/1000"
     ]
@@ -264,16 +280,19 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /documentExtraction.json/stats?days=30",
-      "GET /documentType.json/fetchAll"
+      "GET /documentType.json/fetchAll",
+      "GET /sourceJob.json/documentTrigger"
     ],
     "headings": [
       "Document types",
       "Document types"
     ],
     "buttons": [
+      "Add from starters",
       "Columns",
       "Invoice",
       "More actions",
+      "New document type",
       "Purchase order",
       "Refresh",
       "Upload documents"
@@ -287,17 +306,63 @@ export const PINNED: Record<string, unknown> = {
         "Auto-approve at",
         "Version",
         "Kind",
+        "When approved, starts…",
         "State"
       ]
     ],
     "fields": [],
     "links": [
       "/documents",
-      "/documents/datasets",
-      "/documents/email-in",
-      "/documents/file-drop",
+      "/documents/approved-data",
       "/documents/in",
-      "/documents/types"
+      "/documents/intake",
+      "/documents/types",
+      "/pipelines/schedules/new?whenApproved=1000",
+      "/pipelines/schedules/new?whenApproved=1001"
+    ]
+  },
+  "the email-in section of Intake, as a tenant user with the page": {
+    "url": "/documents/intake/email-in",
+    "requests": [
+      "GET /notification.json/unreadCount",
+      "GET /notification.json/list?limit=20&page=1",
+      "GET /documentType.json/fetchAll",
+      "GET /documentOcr.json/intakes?channel=email&limit=100",
+      "GET /documentOcr.json/mailbox"
+    ],
+    "headings": [
+      "Intake",
+      "Email-in",
+      "What arrived"
+    ],
+    "buttons": [
+      "Columns",
+      "Copy the address",
+      "Refresh"
+    ],
+    "columns": [
+      [
+        "File",
+        "Channel",
+        "From",
+        "Outcome",
+        "Document",
+        "Arrived"
+      ]
+    ],
+    "fields": [
+      "Channel"
+    ],
+    "links": [
+      "/documents",
+      "/documents/approved-data",
+      "/documents/in",
+      "/documents/intake",
+      "/documents/intake/email-in",
+      "/documents/intake/file-drop",
+      "/documents/intake/upload",
+      "/documents/types",
+      "/review/documents/1005"
     ]
   },
   "the overview, as a tenant user with the page": {
@@ -308,20 +373,16 @@ export const PINNED: Record<string, unknown> = {
       "GET /documentExtraction.json/stats?days=30",
       "GET /documentType.json/fetchAll",
       "GET /documentOcr.json/fetchAll",
-      "GET /sourceJob.json/documentTrigger",
       "GET /documentExtraction.json/fetchAll"
     ],
     "headings": [
       "Documents in",
-      "What approved documents start",
       "Recent documents (2 of 2)"
     ],
     "buttons": [
       "Actions for ocr-live-check.png",
       "Columns",
-      "Invoice",
       "More actions",
-      "Purchase order",
       "Refresh",
       "Upload documents"
     ],
@@ -343,10 +404,9 @@ export const PINNED: Record<string, unknown> = {
     ],
     "links": [
       "/documents",
-      "/documents/datasets",
-      "/documents/email-in",
-      "/documents/file-drop",
+      "/documents/approved-data",
       "/documents/in",
+      "/documents/intake",
       "/documents/types",
       "/review/documents",
       "/review/documents/1000",
@@ -380,21 +440,16 @@ export const PINNED: Record<string, unknown> = {
       "GET /documentExtraction.json/stats?days=30",
       "GET /documentType.json/fetchAll",
       "GET /documentOcr.json/fetchAll",
-      "GET /sourceJob.json/documentTrigger",
       "GET /documentExtraction.json/fetchAll"
     ],
     "headings": [
       "Documents in",
-      "What approved documents start",
       "Recent documents (2 of 2)"
     ],
     "buttons": [
       "Actions for ocr-live-check.png",
       "Columns",
-      "Custom type",
-      "Invoice",
       "More actions",
-      "Purchase order",
       "Refresh",
       "Upload documents"
     ],
@@ -416,10 +471,9 @@ export const PINNED: Record<string, unknown> = {
     ],
     "links": [
       "/documents",
-      "/documents/datasets",
-      "/documents/email-in",
-      "/documents/file-drop",
+      "/documents/approved-data",
       "/documents/in",
+      "/documents/intake",
       "/documents/types",
       "/review/documents",
       "/review/documents/1000",
@@ -491,6 +545,52 @@ export const PINNED: Record<string, unknown> = {
       "/review/documents",
       "/review/documents/1005",
       "/review/runs"
+    ]
+  },
+  "the upload section of Intake, as a workspace administrator": {
+    "url": "/documents/intake/upload",
+    "requests": [
+      "GET /taskInbox.json/count",
+      "GET /notification.json/unreadCount",
+      "GET /notification.json/list?limit=20&page=1",
+      "GET /documentType.json/fetchAll",
+      "GET /documentOcr.json/intakes?channel=upload&limit=100",
+      "GET /documentOcr.json/mailbox"
+    ],
+    "headings": [
+      "Intake",
+      "Upload documents",
+      "What arrived"
+    ],
+    "buttons": [
+      "Columns",
+      "Read a stored file",
+      "Refresh",
+      "Upload documents"
+    ],
+    "columns": [
+      [
+        "File",
+        "Channel",
+        "From",
+        "Outcome",
+        "Document",
+        "Arrived"
+      ]
+    ],
+    "fields": [
+      "Channel"
+    ],
+    "links": [
+      "/documents",
+      "/documents/approved-data",
+      "/documents/in",
+      "/documents/intake",
+      "/documents/intake/email-in",
+      "/documents/intake/file-drop",
+      "/documents/intake/upload",
+      "/documents/types",
+      "/review/documents/1005"
     ]
   }
 };

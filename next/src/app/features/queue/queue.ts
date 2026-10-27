@@ -467,7 +467,7 @@ export class Queue implements OnInit {
   }
 
   /**
-   * How long a run took, written as the run history writes it ("25.3s", "2m"); this had a copy
+   * How long a run took, written as the run history writes it ("25 sec", "2 min"); this had a copy
    * of its own that said "25.3 s" and "1m 60s". Null while there is no end to measure to.
    */
   duration(row: QueueRow): string | null {

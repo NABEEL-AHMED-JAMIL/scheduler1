@@ -1,4 +1,5 @@
 import { DestroyRef, Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { refusalOf } from '../../shared/ui/blob-refusal';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
@@ -32,7 +33,7 @@ export const DOC_VIEW_TITLE_ID = 'doc-view-title';
             @if (data.createdByName) { <span>·</span><span>{{ data.createdByName }}</span> }
           </div>
         </div>
-        <button type="button" class="btn btn-ghost btn-sm" (click)="download()" [disabled]="!blob()"><app-icon name="download" />Download</button>
+        <button type="button" class="btn btn-default btn-sm" (click)="download()" [disabled]="!blob()"><app-icon name="download" />Download</button>
         <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="openTab()" [disabled]="!blob()" title="Open in a new tab" aria-label="Open in a new tab"><app-icon name="external" /></button>
         <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="ref.close()" aria-label="Close"><app-icon name="close" /></button>
       </div>
@@ -77,7 +78,7 @@ export class DocumentViewDialog implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.api.documentBlob(this.data.documentId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: b => { this.blob.set(b); this.url.set(URL.createObjectURL(b)); },
-      error: () => this.error.set('The document could not be read.'),
+      error: async err => this.error.set((await refusalOf(err)) || 'The document could not be read.'),
     });
   }
   ngOnDestroy(): void { const u = this.url(); if (u) URL.revokeObjectURL(u); }

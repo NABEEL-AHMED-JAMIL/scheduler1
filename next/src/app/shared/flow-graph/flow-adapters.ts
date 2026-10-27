@@ -1,4 +1,5 @@
 import { FlowEdge, FlowMetric, FlowNode, FlowNodeKind, FlowTone } from './flow-graph.model';
+import { formatDuration } from '../ui/time-format';
 
 /**
  * Every screen that draws a flow reads its own source -- a pipeline's steps, a workflow's steps, the AI Assistant's
@@ -78,7 +79,7 @@ export function stepKind(task: string, entry?: PipelineTaskLike | null): FlowNod
   }
   if (task.startsWith('read_') || task === 'sample') return 'read';
   if (task === 'ai_prompt' || task === 'measure_image') return 'ai';
-  if (['save_file', 'upload_bucket', 'render_pdf', 'send_notification', 'write_database', 'send_webhook'].includes(task)) return 'output';
+  if (['save_file', 'upload_bucket', 'render_pdf', 'generate_report', 'send_notification', 'write_database', 'send_webhook', 'call_api'].includes(task)) return 'output';
   return 'process';
 }
 
@@ -88,7 +89,23 @@ const TASK_ICONS: Record<string, string> = {
   filter: 'filter', select: 'table', transform: 'code', compute: 'code', aggregate: 'chart', join: 'link', append: 'layers',
   sort: 'sort', limit: 'filter', validate: 'check', enrich: 'plug', ai_prompt: 'sparkle', measure_image: 'image', approval: 'user',
   save_file: 'download', upload_bucket: 'upload', render_pdf: 'file', send_notification: 'mail', send_webhook: 'send',
+  // Report Studio phase 5: a report from the step's rows, made with the step's own design or a template.
+  generate_report: 'file',
+  // Owner #25: Call API sends to a saved request and keeps the answer.
+  call_api: 'send',
   write_database: 'database', legacy: 'history',
+  // Owner #16 (2026-10-19): the common tasks added to the registry.
+  dedupe: 'layers', split_column: 'code', pivot: 'table', unpivot: 'list', fill_missing: 'check',
+  // Files a run reads, turned into rows (media-service; kind Process, so stepKind's fallback leaves them 'process'): a
+  // recording's text under the microphone, and a file in another format under the turning arrows -- 'file' already
+  // stands for Read file, Render PDF and Generate report, so a conversion beside them would not read as one.
+  transcribe_audio: 'mic', convert_file: 'refresh',
+  // MIG-420: a PDF into its pages, each a sub-item of its document.
+  split_pages: 'layers',
+  // MIG-421: page images read as text (OCR).
+  ocr_pages: 'text',
+  // MIG-424: another pipeline of the workspace, called with parameters, its answer as rows.
+  run_pipeline: 'play',
 };
 
 const strings = (v: unknown): string[] => (Array.isArray(v) ? v : [v]).filter((x): x is string => typeof x === 'string' && !!x);
@@ -312,10 +329,12 @@ export function aiFlowGraph(artifact: AiFlowLike, tasks?: readonly PipelineTaskL
     const problems = n.problems ?? [];
     const errors = problems.filter(p => p.kind === 'error').length;
     const settings = problems.filter(p => p.kind === 'setting').length;
-    const tone: FlowTone | null = errors ? 'crit' : settings ? 'warn' : null;
+    const warnings = problems.filter(p => p.kind === 'warning').length;
+    const tone: FlowTone | null = errors ? 'crit' : settings || warnings ? 'warn' : null;
     const badges: string[] = [];
     if (errors) badges.push(errors === 1 ? '1 error' : `${errors} errors`);
     if (settings) badges.push(settings === 1 ? 'needs 1 setting' : `needs ${settings} settings`);
+    if (warnings) badges.push(warnings === 1 ? '1 warning' : `${warnings} warnings`);
     const kind = (KINDS as string[]).includes(n.kind) ? n.kind as FlowNodeKind : 'other';
     return { id: n.id, label: n.label, sub: n.task ?? n.sub ?? null, kind, icon: n.task ? TASK_ICONS[n.task] ?? null : null, tone, badges };
   });
@@ -345,16 +364,15 @@ export interface RunStepLike {
   recordsOut?: number | null;
   tries?: number | null;
   reusedFromAttempt?: number | null;
+  /** ZT-P9: the steps whose rows it took in (Core, from the definition the run followed); absent on older answers. */
+  reads?: string[] | null;
 }
 
 export type MapBasis = 'time' | 'rows';
 
-/** A duration in the run's own words: ms under a second, then seconds, then minutes. */
+/** A duration from milliseconds, in the console's words (formatDuration): "420 ms", "1.4 sec", "2 min 5 sec". */
 export function durationText(ms: number | null | undefined): string {
-  if (ms == null) return '—';
-  if (ms < 1000) return `${ms} ms`;
-  if (ms < 60_000) return `${(ms / 1000).toFixed(1)} s`;
-  return `${Math.floor(ms / 60_000)} min ${Math.round((ms % 60_000) / 1000)} s`;
+  return ms == null ? '—' : formatDuration(ms / 1000);
 }
 
 export function countText(n: number | null | undefined): string {
@@ -385,14 +403,22 @@ export function runGraph<S extends RunStepLike>(steps: readonly S[], basis: MapB
       metrics: [
         { label: 'time', value: durationText(s.durationMs) },
         { label: 'share', value: share == null ? '—' : `${Math.round(share * 1000) / 10}%` },
-        { label: 'rows in', value: countText(s.recordsIn) },
-        { label: 'rows out', value: countText(s.recordsOut) },
+        // ZT-P10: "rows in" / "rows out" did not fit a metric cell and were drawn "rows…"; the node says rows already.
+        { label: 'in', value: countText(s.recordsIn) },
+        { label: 'out', value: countText(s.recordsOut) },
       ],
       share, hot: s === hot,
     };
   });
-  const edges: FlowEdge[] = steps.slice(1).map((s, i) => ({ from: steps[i].key, to: s.key,
-    label: steps[i].recordsOut != null ? `${countText(steps[i].recordsOut)} ${steps[i].recordsOut === 1 ? 'row' : 'rows'}` : null, tone: steps[i].status === 'Failed' ? 'crit' : null }));
+  const byKey = new Map(steps.map(s => [s.key, s] as const));
+  const edge = (from: S, to: S): FlowEdge => ({ from: from.key, to: to.key,
+    label: from.recordsOut != null ? `${countText(from.recordsOut)} ${from.recordsOut === 1 ? 'row' : 'rows'}` : null, tone: from.status === 'Failed' ? 'crit' : null });
+  // ZT-P9: from the steps each one reads when Core says so (a read after a read stands alone; a join and an append draw
+  // every source); an older answer without them is drawn as before, each step from the one before it.
+  const known = steps.some(s => Array.isArray(s.reads));
+  const edges: FlowEdge[] = known
+    ? steps.flatMap(s => (s.reads ?? []).map(k => byKey.get(k)).filter((f): f is S => !!f).map(f => edge(f, s)))
+    : steps.slice(1).map((s, i) => edge(steps[i], s));
   return { nodes, edges, hot };
 }
 

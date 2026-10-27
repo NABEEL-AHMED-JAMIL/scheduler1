@@ -43,4 +43,47 @@ describe('RequestWorkspace', () => {
     expect(el.querySelector('#contactName')!.getAttribute('maxlength')).toBe('255');
     expect(el.querySelector('#contactEmail')!.getAttribute('maxlength')).toBe('255');
   });
+
+  it('UX2: sits on the front door\'s hero, the form raised on a card beside a short value line, with a proper footer', () => {
+    const { el } = mount();
+    const hero = el.querySelector('.hero.request-hero')!;
+    expect(hero).not.toBeNull();
+    expect(hero.querySelector('app-brand-mark')).not.toBeNull();
+    expect(hero.querySelector('h1')!.textContent!.trim()).toBe('Request a workspace');
+    const card = hero.querySelector('.card.request-card')!;
+    expect([...card.querySelectorAll('input, textarea')].map(c => c.id)).toEqual(['organisationName', 'contactName', 'contactEmail', 'purpose']);
+    expect(card.querySelector('button[type="submit"]')!.textContent).toContain('Send request');
+    expect(hero.querySelectorAll('ul li').length).toBe(3);
+    const footer = [...el.querySelectorAll('footer a')].map(a => a.getAttribute('href'));
+    expect(footer).toEqual(['/', '/docs', '/login']);
+  });
+
+  it('UX2: keeps the rules as they were -- required fields marked and nothing sent while one is empty', () => {
+    const { fixture, component, el, post } = mount();
+    component.submit();
+    fixture.detectChanges();
+    expect(post).not.toHaveBeenCalled();
+    expect(el.textContent).toContain('Check the highlighted fields.');
+    expect(el.textContent).toContain('Organisation is required');
+    expect(el.textContent).toContain('Your email is required');
+  });
+
+  it('UX2: gives every box an example placeholder, keeping its label and the note it is described by', () => {
+    const { el } = mount();
+    const shown = Object.fromEntries([...el.querySelectorAll<HTMLInputElement>('input, textarea')].map(c => [c.id, c.getAttribute('placeholder')]));
+    expect(shown).toEqual({
+      organisationName: 'e.g. Summit Valley Health System',
+      contactName: 'e.g. Jordan Lee',
+      contactEmail: 'name@yourcompany.com',
+      purpose: 'e.g. Read referral faxes and send summaries to our EHR',
+    });
+    expect(el.querySelector('label[for="organisationName"]')!.textContent).toContain('Organisation');
+    expect(el.querySelector('label[for="contactName"]')!.textContent).toContain('Your name');
+    expect(el.querySelector('label[for="contactEmail"]')!.textContent).toContain('Your email');
+    expect(el.querySelector('label[for="purpose"]')!.textContent).toContain('What do you need it for?');
+    for (const id of ['organisationName', 'contactEmail', 'purpose']) {
+      const note = el.querySelector('#' + el.querySelector('#' + id)!.getAttribute('aria-describedby'))!;
+      expect(note.classList.contains('field-note')).toBe(true);
+    }
+  });
 });

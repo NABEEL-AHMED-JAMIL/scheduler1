@@ -37,4 +37,14 @@ describe('Task count', () => {
     expect(api.count).not.toHaveBeenCalled();
     expect(service.count()).toBe(0);
   });
+
+  it('drops the review count that arrives after the injector is gone (NG0205 as an unhandled rejection)', async () => {
+    const { service } = make({ appUserId: 4537, tenantId: 2924 });
+    const review = service.review();
+    const loaded = import('../review/review-sources');
+    TestBed.resetTestingModule();
+    await loaded;
+    await new Promise(resolve => setTimeout(resolve));
+    expect(service.review()).toBe(review);
+  });
 });

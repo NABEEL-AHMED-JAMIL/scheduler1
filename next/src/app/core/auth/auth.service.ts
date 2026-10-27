@@ -4,7 +4,7 @@ import { Router } from '@angular/router';
 import { Observable, tap } from 'rxjs';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../api/api.config';
 import { AuthUser, ManagementMode, ROLE_RANK, UserRole, isUserRole } from './auth.models';
-import { PageKey } from './page-keys';
+import { PageKey, TabKey } from './page-keys';
 import { ThemeService } from '../theme.service';
 
 const STORAGE_KEY = 'etl_auth_user';
@@ -80,8 +80,8 @@ function readStorage(key: string): string | null {
   }
 }
 
-/** Where Exit returns a staff member: the picker they opened the managed session from. */
-export const WORK_IN_WORKSPACE_PATH = '/platform/work-in-workspace';
+/** Where Exit returns a staff member: Platform › Workspaces, where "Work in this workspace" opened it (owner #20). */
+export const WORK_IN_WORKSPACE_PATH = '/platform/workspaces';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -214,6 +214,19 @@ export class AuthService {
     const keys = this.currentUser()?.pageKeys;
     if (!keys) return !EXPLICIT_PAGES.includes(page);
     return keys.includes(page);
+  }
+
+  /**
+   * F3 (MIG-400): whether a tab of a page opens -- the page, and either none of its tab keys in the list (every tab) or this
+   * one. Identity sends a restricted page's tab keys after the page keys; the gateway refuses a closed tab's own calls.
+   */
+  canOpenTab(page: PageKey, tab: TabKey): boolean {
+    if (!this.canOpen(page)) return false;
+    if (this.hasAtLeast('TENANT_ADMIN')) return true;
+    const keys = (this.currentUser()?.pageKeys ?? null) as string[] | null;
+    if (!keys) return true;
+    const mine = keys.filter(k => k.startsWith(page + ':'));
+    return mine.length === 0 || mine.includes(tab);
   }
 
   /** The same answer as a signal, for templates that want to react to a refresh. */
@@ -362,6 +375,32 @@ export class AuthService {
     }
     this.persist(held);
     void this.router.navigate([WORK_IN_WORKSPACE_PATH]);
+  }
+
+  /** ZT-M18: a name asked for this managed session's workspace already (one ask a session). */
+  private namedWorkspace: number | null = null;
+
+  /**
+   * ZT-M18: the banner names the managed session's workspace. A session held without its name -- one restored from
+   * elsewhere, an older sign-in answer -- read "workspace 1009"; Identity knows the name of the session's own workspace
+   * (managedService.json/thisSession), asked once and kept with the session. Nothing to do outside a managed session or
+   * when the name is there.
+   */
+  nameManagedWorkspace(): void {
+    const user = this.currentUser();
+    if (!user || !this.isManagedSession() || (user.tenantName ?? '').trim() || user.tenantId == null
+      || this.namedWorkspace === user.tenantId) return;
+    this.namedWorkspace = user.tenantId;
+    this.http.get<ApiResponse<{ tenantId: number; tenantName: string }>>(`${API_BASE}/managedService.json/thisSession`).subscribe({
+      next: r => {
+        const now = this.currentUser();
+        const name = (r?.data?.tenantName ?? '').trim();
+        if (r?.status === API_SUCCESS && name && now && now.tenantId === r.data!.tenantId && this.isManagedSession()) {
+          this.persist({ ...now, tenantName: name });
+        }
+      },
+      error: () => { /* the banner says "this workspace" */ },
+    });
   }
 
   private readHeldPlatformSession(): AuthUser | null {

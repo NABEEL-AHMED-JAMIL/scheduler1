@@ -42,7 +42,7 @@ import { FIELD_TYPES, TypeField, blankField, listText, textList } from './docume
         <p class="text-xs text-[color:var(--text-muted)]">None.</p>
       }
       @if (!readonly()) {
-        <button type="button" class="btn btn-ghost btn-sm self-start" (click)="add()"><app-icon name="plus" />Add {{ noun().toLowerCase() }}</button>
+        <button type="button" class="btn btn-default btn-sm self-start" (click)="add()"><app-icon name="plus" />Add {{ noun().toLowerCase() }}</button>
       }
     </div>
   `,

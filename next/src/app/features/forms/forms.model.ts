@@ -37,7 +37,13 @@ export interface FormField {
   label: string;
   type: FieldType;
   required: boolean;
+  /** A short hint under the field (at most 500 characters), linked to its control by aria-describedby. */
   help?: string | null;
+  /**
+   * Example text inside the empty control (at most 120, one line; FormFields.PLACEHOLDER_TYPES): text, long text, number,
+   * date, e-mail, choice and lookup. Display text only -- never the field's only label, and shown as text, not markup.
+   */
+  placeholder?: string | null;
   options?: string[] | null;
   /** MIG-277: shown only when this holds; required (as well as when `required`) when that holds. */
   showWhen?: FieldRule | null;
@@ -75,6 +81,16 @@ export interface FormSummary {
   /** MIG-279: the workflow a submission starts, and where its rows are as an Analytics dataset. */
   workflowKey?: string | null;
   dataset?: { analyticsDatasetId?: number | null; name: string; connection: string; path: string } | null;
+}
+
+/** What rebuilding a dataset form's files did: the submissions taken (its newest 1000 at most) and the files written. */
+export interface DatasetRebuild {
+  formId: number;
+  bucket: string;
+  path: string;
+  submissions: number;
+  taken: number;
+  written: number;
 }
 
 export interface LinkableJob {
@@ -222,6 +238,91 @@ export const FORM_STATUSES: FormStatus[] = ['Draft', 'Active', 'Archived'];
 export const RESERVED_KEYS = ['submission_id', 'form_id', 'form_name', 'form_version', 'submitted_by', 'submitted_at'];
 
 export const MAX_FIELDS = 50;
+/** FormFields.MAX_PLACEHOLDER and MAX_HELP. */
+export const MAX_PLACEHOLDER = 120;
+export const MAX_HELP = 500;
+/** The types whose empty control shows a placeholder (FormFields.PLACEHOLDER_TYPES). */
+export const PLACEHOLDER_TYPES: FieldType[] = ['text', 'longText', 'number', 'date', 'choice', 'email', 'lookup'];
+
+export function takesPlaceholder(type: FieldType | string): boolean {
+  return (PLACEHOLDER_TYPES as string[]).includes(type);
+}
+
+/** A bracketed part of a label: "(synthetic, SYN-nnn)", "[YYYY-MM-DD]". */
+const BRACKETED = /\(([^()]*)\)|\[([^[\]]*)\]/g;
+/** A number field's range written in its label: "(1-10)", "(0 to 100)". */
+const RANGE = /^(-?\d+(?:\.\d+)?)\s*(?:-|–|—|to)\s*(-?\d+(?:\.\d+)?)$/i;
+/** "e.g.", "eg", "example:", "like", "format:" in front of a hint -- as words, so "eggs" is not one. */
+const EXAMPLE_PREFIX = /^(?:e\.\s?g\.?|eg|example|like|format)(?=[\s.:]|$)[.:]?\s*/i;
+/** Words that read as a phone number field (a text field; forms have no phone type of their own). */
+const PHONE_WORDS = /\b(?:phone|telephone|tel|mobile|cell)\b/i;
+
+/**
+ * UX2 (owner 2026-10-26, "need a placeholder"): what an empty control shows when its field has no placeholder of its
+ * own. Text, e-mail and a phone number take the format hint in the label's brackets as an example ("Patient ID (synthetic,
+ * SYN-nnn)" gives "e.g. SYN-nnn"); without one, an e-mail "name@example.com", a phone "e.g. +1 555 0100" and other text
+ * "Enter <label>". Long text "Write <label>…"; a number "0", or its range ("1–10") from min and max or the label;
+ * a choice or lookup "Choose…" and a date "Pick a date", as before. (Core keeps no number bounds on a field yet, so
+ * a form's range comes from its label today; min and max are read when a field carries them.) The label stays the field's name: this is an example,
+ * never instead of it. Null for the types with no empty box (yes/no, table, file, signature).
+ */
+export function defaultPlaceholder(f: Pick<FormField, 'label' | 'type' | 'key'> & { min?: number | null; max?: number | null }): string | null {
+  switch (f.type) {
+    case 'choice': case 'lookup': return 'Choose…';
+    case 'date': return 'Pick a date';
+    case 'number': return numberRange(f) ?? '0';
+    case 'longText': return `Write ${spokenLabel(f.label) || 'your answer'}…`;
+    case 'text': case 'email': {
+      const hint = formatHint(f.label);
+      if (hint) return `e.g. ${hint}`;
+      if (f.type === 'email') return 'name@example.com';
+      if (PHONE_WORDS.test(f.label) || PHONE_WORDS.test(f.key.replace(/_/g, ' '))) return 'e.g. +1 555 0100';
+      return `Enter ${spokenLabel(f.label) || 'your answer'}`;
+    }
+    default: return null;
+  }
+}
+
+/** What an empty control shows: the field's own placeholder when it has one, else the default for its type. */
+export function placeholderOf(f: FormField): string | null {
+  return f.placeholder?.trim() || defaultPlaceholder(f);
+}
+
+/**
+ * The format in a label's brackets, if it has one: the part that looks like a format ("SYN-nnn", "YYYY-MM-DD", "#123")
+ * or that the author marked as an example ("e.g. AB 12 34"). A unit ("cm") or a remark ("synthetic", "optional") is not.
+ */
+export function formatHint(label: string): string | null {
+  for (const m of (label ?? '').matchAll(BRACKETED)) {
+    for (const raw of (m[1] ?? m[2] ?? '').split(/[,;]/)) {
+      const part = raw.trim();
+      const marked = EXAMPLE_PREFIX.test(part) && part.replace(EXAMPLE_PREFIX, '').trim().length > 0;
+      const text = part.replace(EXAMPLE_PREFIX, '').trim();
+      if (!text || text.length > 40) continue;
+      if (marked || (!/\s/.test(text) && /[-/.:#]|\d/.test(text) && !RANGE.test(text))) return text;
+    }
+  }
+  return null;
+}
+
+function numberRange(f: { label: string; min?: number | null; max?: number | null }): string | null {
+  if (f.min != null && f.max != null) return `${f.min}–${f.max}`;
+  for (const m of (f.label ?? '').matchAll(BRACKETED)) {
+    const range = RANGE.exec((m[1] ?? m[2] ?? '').trim());
+    if (range) return `${range[1]}–${range[2]}`;
+  }
+  return null;
+}
+
+/**
+ * A label as it reads inside a sentence: brackets and a trailing colon, question mark or asterisk dropped, in lower case;
+ * in a label written in mixed case, an acronym keeps its capitals ("Patient ID" reads "patient ID", "PATIENT ID" "patient id").
+ */
+function spokenLabel(label: string): string {
+  const plain = (label ?? '').replace(BRACKETED, ' ').replace(/[\s:?*.]+$/, '').replace(/\s+/g, ' ').trim();
+  const mixed = /[a-z]/.test(plain);
+  return plain.split(' ').map(w => mixed && /^[A-Z0-9]{2,}$/.test(w) && /[A-Z]/.test(w) ? w : w.toLowerCase()).join(' ');
+}
 const KEY = /^[a-z][a-z0-9_]{0,39}$/;
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -367,7 +468,12 @@ export function definitionProblems(draft: FormDraft): Record<string, string> {
     else if (!KEY.test(key)) problem = 'Its key must start with a lower-case letter and use only a-z, 0-9 and _ (at most 40).';
     else if (RESERVED_KEYS.includes(key)) problem = `The key '${key}' is used by the submission itself.`;
     else if (seen.has(key)) problem = `Another field already has the key '${key}'.`;
-    else if (f.type === 'choice' && !(f.options ?? []).filter(o => o.trim()).length) problem = 'A choice needs at least one option.';
+    else if ((f.help ?? '').trim().length > MAX_HELP) problem = `Its help text is longer than ${MAX_HELP} characters.`;
+    else if (takesPlaceholder(f.type) && (f.placeholder ?? '').trim().length > MAX_PLACEHOLDER) {
+      problem = `Its placeholder is longer than ${MAX_PLACEHOLDER} characters.`;
+    } else if (takesPlaceholder(f.type) && /[\u0000-\u001f\u007f]/.test((f.placeholder ?? '').trim())) {
+      problem = 'Its placeholder is one line of text, with no line breaks or tabs.';
+    } else if (f.type === 'choice' && !(f.options ?? []).filter(o => o.trim()).length) problem = 'A choice needs at least one option.';
     else if (f.type === 'choice' && new Set((f.options ?? []).map(o => o.trim().toLowerCase())).size !== (f.options ?? []).length) {
       problem = 'An option is listed twice.';
     } else problem = extendedProblem(f, draft.fields.slice(0, i));
@@ -424,7 +530,8 @@ function ruleForSave(rule: FieldRule | null | undefined, fields: FormField[]): F
   return { field: rule.field, op: rule.op, value };
 }
 
-/** What POST form.json/save sends: trimmed, a non-choice without options, blank help dropped. */
+/** What POST form.json/save sends: trimmed, a non-choice without options, blank help and placeholder dropped (and a placeholder
+ * where no control shows one). */
 export function draftForSave(draft: FormDraft): FormDraft {
   return {
     ...draft,
@@ -433,7 +540,9 @@ export function draftForSave(draft: FormDraft): FormDraft {
     workflowKey: draft.workflowKey?.trim() || null,
     fields: draft.fields.map(f => ({
       key: f.key.trim(), label: f.label.trim(), type: f.type, required: !!f.required,
-      help: f.help?.trim() || null, options: f.type === 'choice' ? (f.options ?? []).map(o => o.trim()).filter(o => !!o) : null,
+      help: f.help?.trim() || null,
+      ...(takesPlaceholder(f.type) && f.placeholder?.trim() ? { placeholder: f.placeholder.trim() } : {}),
+      options: f.type === 'choice' ? (f.options ?? []).map(o => o.trim()).filter(o => !!o) : null,
       ...(ruleForSave(f.showWhen, draft.fields) ? { showWhen: ruleForSave(f.showWhen, draft.fields) } : {}),
       ...(ruleForSave(f.requiredWhen, draft.fields) ? { requiredWhen: ruleForSave(f.requiredWhen, draft.fields) } : {}),
       ...(f.type === 'table' ? {

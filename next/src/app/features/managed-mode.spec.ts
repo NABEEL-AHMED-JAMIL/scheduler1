@@ -130,7 +130,7 @@ describe('MIG-254: build screens in a MANAGED workspace', () => {
   });
 
   it('the inbox keeps its uploads and loses its settings', async () => {
-    const v = await visit('/documents/file-drop', 'TENANT_ADMIN', null, {}, MANAGED);
+    const v = await visit('/documents/intake/file-drop', 'TENANT_ADMIN', null, {}, MANAGED);
     expect(hasBanner(v)).toBe(true);
     expect(offered(v, 'Set up the inbox')).toBe(false);
     expect(offered(v, 'Inbox settings')).toBe(false);

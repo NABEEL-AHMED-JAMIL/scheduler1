@@ -106,7 +106,7 @@
                                  (toggle)="toggleStatus(item.status)" />
       }
       @if (hasInsights()) {
-        <button type="button" class="btn btn-ghost btn-sm" data-test="runs-charts"
+        <button type="button" class="btn btn-default btn-sm" data-test="runs-charts"
                 [class.text-accent]="showInsights()" [attr.aria-pressed]="showInsights()"
                 (click)="showInsights.set(!showInsights())">
           <app-icon name="chart" />{{ showInsights() ? 'Hide charts' : 'Charts' }}

@@ -9,7 +9,7 @@ import { FileDropzone } from '../../shared/ui/file-dropzone';
 import { SegmentOption, Segmented } from '../../shared/ui/segmented';
 import { ObjectPicker, PickedObject, objectPickerConfig } from '../../shared/ui/object-picker';
 import { BucketSummary, StorageService } from '../objects/storage.service';
-import { DocumentType, Extraction, OCR_EXTENSIONS, OcrDocument, fileName, isWorking, refusalText, statusLabel } from './documents.model';
+import { DocumentType, Extraction, OCR_EXTENSIONS, OcrDocument, documentName, isWorking, refusalText, statusLabel } from './documents.model';
 import { DocumentsApi } from './documents.service';
 
 export interface ReadDocumentData {
@@ -141,7 +141,7 @@ export class ReadDocumentDialog implements OnInit {
     { id: 'stored', label: 'A stored file', icon: 'folder', disabled: this.locked() },
   ]);
   readonly activeTypes = computed(() => this.data.types.filter(t => t.status === 'Active'));
-  readonly readName = computed(() => this.data.read ? `${fileName(this.data.read.sourceKey)} · OCR document ${this.data.read.ocrDocumentId}` : '');
+  readonly readName = computed(() => this.data.read ? `${documentName(this.data.read)} · OCR document ${this.data.read.ocrDocumentId}` : '');
   readonly working = computed(() => ['upload', 'read', 'extract'].includes(this.stage()));
   readonly locked = computed(() => this.stage() !== 'form' && this.stage() !== 'failed');
   readonly ready = computed(() => {
@@ -179,7 +179,7 @@ export class ReadDocumentDialog implements OnInit {
         if (r.status !== API_SUCCESS) { this.bucketsError.set(r.message); return; }
         this.buckets.set(r.data ?? []);
         if (r.data?.length) this.bucket.set(r.data[0].bucket);
-        else this.bucketsError.set('This workspace has no storage connection yet. An administrator adds one under Integration › Storage Connections.');
+        else this.bucketsError.set('This workspace has no storage connection yet. An administrator adds one under Connections › Storage.');
       },
       error: err => { this.bucketsLoading.set(false); this.bucketsError.set(refusalText(err, 'The storage connections could not be listed.')); },
     });
@@ -188,6 +188,7 @@ export class ReadDocumentDialog implements OnInit {
   async pickStored(): Promise<void> {
     const picked = await firstValueFrom(this.dialog.open<PickedObject | undefined>(ObjectPicker, objectPickerConfig({
       heading: 'A document to read', bucket: this.bucket(), extensions: OCR_EXTENSIONS,
+      selectedKey: this.picked()?.bucket === this.bucket() ? this.picked()?.key : undefined,
     })).closed);
     if (picked) { this.picked.set(picked); if (picked.bucket) this.bucket.set(picked.bucket); }
   }

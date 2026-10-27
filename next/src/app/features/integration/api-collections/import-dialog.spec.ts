@@ -49,7 +49,7 @@ describe('ImportDialog -- Postman', () => {
     dialog.name.set(' UI-CHECK Clinic ');
     await dialog.run();
     expect(stub.import).toHaveBeenCalledWith({ format: 'POSTMAN', collection: { info: { name: 'Clinic' }, item: [] },
-      environments: [{ name: 'Prod', values: [] }], name: 'UI-CHECK Clinic' });
+      environments: [{ name: 'Prod', values: [] }], name: 'UI-CHECK Clinic' }, undefined);
   });
 
   it('says which file is not JSON, and sends nothing', async () => {
@@ -79,7 +79,7 @@ describe('ImportDialog -- Bruno', () => {
     await dialog.run();
     expect(stub.import).toHaveBeenCalledWith({ format: 'BRUNO', files: [
       { path: 'bruno.json', content: '{"name":"Clinic"}' }, { path: 'patients/list.bru', content: 'meta { name: List }' },
-    ] });
+    ] }, undefined);
   });
 
   it('refuses a pick with no Bruno files in it', async () => {
@@ -120,13 +120,11 @@ describe('ImportDialog -- the report', () => {
     expect(dialog.error()).toBe('The file is not a Postman v2.1 collection.');
   });
 
-  it('asks a platform administrator which workspace to import into', async () => {
-    const { dialog, stub } = dialogWith({ tenants: [{ value: '2924', label: 'Claude Demo' }] });
+  it('imports a platform administrator\'s files into the workspace the page picked, named on the call', async () => {
+    const { dialog, stub } = dialogWith({ tenantId: 2960 });
     dialog.postmanFile.set(json('c.json', { item: [] }));
     await dialog.run();
-    expect(dialog.error()).toBe('Choose the workspace to import into.');
-    dialog.tenantId.set('2924');
-    await dialog.run();
-    expect(stub.import).toHaveBeenCalledWith(expect.objectContaining({ tenantId: 2924 }));
+    expect(dialog.error()).toBe('');
+    expect(stub.import).toHaveBeenCalledWith(expect.not.objectContaining({ tenantId: expect.anything() }), 2960);
   });
 });

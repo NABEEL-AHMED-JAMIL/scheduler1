@@ -236,16 +236,16 @@ export const SCHEDULES: { minutes: number | null; label: string }[] = [
   { minutes: 60, label: 'Hourly' }, { minutes: 360, label: 'Every 6 h' }, { minutes: 1440, label: 'Daily' },
 ];
 
-/** A lag as people read it: "4 s", "12 min", "3 h", "2 days"; "—" when never caught up. */
+/** A lag as people read it: "4 sec", "12 min", "3 h", "2 days"; "—" when never caught up. */
 export function lagText(seconds: number | null | undefined): string {
   if (seconds == null) return '—';
-  if (seconds < 60) return `${seconds} s`;
+  if (seconds < 60) return `${seconds} sec`;
   if (seconds < 3600) return `${Math.round(seconds / 60)} min`;
   if (seconds < 172800) return `${Math.round(seconds / 3600)} h`;
   return `${Math.round(seconds / 86400)} days`;
 }
 
-/** "12 s ago", "5 min ago", "3 h ago", "2 days ago", against now; "—" for never. Times via instantOf (naive = Chicago). */
+/** "12 sec ago", "5 min ago", "3 h ago", "2 days ago", against now; "—" for never. Times via instantOf (naive = Chicago). */
 export function agoText(at: string | null | undefined, now = Date.now()): string {
   const when = instantOf(at);
   if (!when) return '—';

@@ -54,6 +54,16 @@ describe('parseMarkdown', () => {
     expect(blocks[0].items).toHaveLength(3);
   });
 
+  it('keeps a nested list\'s depth, by its distinct indents (2 or 4 spaces alike), and none for a flat list', () => {
+    const nested = parse('- **AI prompts**:\n  - `Drug safety` (promptId 1077)\n  - `Patient 360`\n- **API requests**:\n    - `FHIR: patients`');
+    expect(nested).toHaveLength(1);
+    expect(nested[0].kind).toBe('ul');
+    expect(nested[0].depth).toEqual([0, 1, 1, 0, 2]);
+    expect(nested[0].items[1]).toEqual([{ text: 'Drug safety', code: true }, { text: ' (promptId 1077)' }]);
+    expect(parse('  - one\n  - two')[0].depth).toBeUndefined();
+    expect(parse('- one\n- two')[0].depth).toBeUndefined();
+  });
+
   it('reads ordered lists separately from bullets', () => {
     const blocks = parse('1. first\n2. second\n\n- bullet');
     expect(blocks.map(b => b.kind)).toEqual(['ol', 'ul']);

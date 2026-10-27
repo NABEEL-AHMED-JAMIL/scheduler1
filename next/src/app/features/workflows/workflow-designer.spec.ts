@@ -10,7 +10,7 @@ import { ToastService } from '../../shared/ui/toast.service';
 import { AccessProfilesService } from '../admin/access-profiles/access-profiles.service';
 import { WorkflowDesigner } from './workflow-designer';
 import { WorkflowDetail, WorkflowsApi } from './workflows.api';
-import { fromJson, newStep, problemStep, toJson } from './designer.model';
+import { fromJson, newStep, problemStep, runSaveAs, toJson } from './designer.model';
 
 /**
  * The Workflow designer (MIG-276): the chain of steps an administrator edits and publishes as the next version, the
@@ -35,7 +35,8 @@ const WORKFLOW: WorkflowDetail = {
 function screenWith(opts: { admin?: boolean; problems?: string[]; tenantId?: number | null } = {}) {
   const admin = opts.admin ?? true;
   const api = {
-    colleagues: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [{ userId: 4597, fullName: 'Alex', username: 'alex@x.io' }] })),
+    colleagues: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [{ userId: 4597, fullName: 'Alex', username: 'alex@x.io' },
+      { userId: 4598, fullName: 'Vic Viewer', username: 'vic@x.io', canAct: false }] })),
     list: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [WORKFLOW] })),
     fetch: vi.fn(() => of({ status: 'SUCCESS', message: '', data: WORKFLOW })),
     publish: vi.fn(() => of(opts.problems
@@ -71,6 +72,19 @@ function screenWith(opts: { admin?: boolean; problems?: string[]; tenantId?: num
 }
 
 describe('Workflow designer -- the step model', () => {
+  it('says how the request ends only on a step that can end it', () => {
+    const problem = { ...newStep('task', []), key: 'problem', next: 'end', endsAs: 'failed' as const };
+    const goesOn = { ...newStep('notify', []), key: 'tell', endsAs: 'failed' as const };
+    const last = { ...newStep('notify', []), key: 'done', endsAs: 'completed' as const };
+    const json = toJson([goesOn, problem, last]);
+    expect(json.steps[0]['endsAs']).toBeUndefined();
+    expect(json.steps[1]['endsAs']).toBe('failed');
+    expect(json.steps[2]['endsAs']).toBe('completed');
+    const branch = { ...newStep('condition', []), whenTrue: 'tell', whenFalse: 'problem', endsAs: 'failed' as const };
+    expect(toJson([branch, goesOn, problem]).steps[0]['endsAs']).toBeUndefined();
+    expect(toJson([{ ...branch, whenFalse: 'end' }, goesOn]).steps[0]['endsAs']).toBe('failed');
+  });
+
   it('sends each step with its type\'s fields only, and reads a version back', () => {
     const approval = newStep('approval', []);
     const condition = newStep('condition', ['approval']);
@@ -235,12 +249,12 @@ describe('Workflow designer -- a link to a workflow that is not here', () => {
 
 /** Review 2026-10-07: a platform administrator's own sign-in has no workspace; workflows are a workspace's. */
 describe('Workflow designer -- a sign-in with no workspace', () => {
-  it('reads nothing and points to Work in a workspace instead of an error', () => {
+  it('reads nothing and points to Platform › Workspaces instead of an error', () => {
     const { api, el, screen } = screenWith({ tenantId: null });
     expect(api.list).not.toHaveBeenCalled();
     expect(api.fetch).not.toHaveBeenCalled();
     expect(el.querySelector('[data-test="needs-workspace"]')!.textContent).toContain('Workflows belong to a workspace');
-    expect(el.querySelector('[data-test="needs-workspace"] a')!.getAttribute('href')).toBe('/platform/work-in-workspace');
+    expect(el.querySelector('[data-test="needs-workspace"] a')!.getAttribute('href')).toBe('/platform/workspaces');
     expect(el.querySelector('[data-test="workflow-list"]')).toBeNull();
     expect(screen.canEdit()).toBe(false);
     expect(el.querySelector('[data-test="new-workflow"]')).toBeNull();
@@ -261,5 +275,45 @@ describe('Workflow designer -- pipeline workflows link back (W2)', () => {
     screen.current.set({ ...WORKFLOW, key: 'pipeline-step-approval', name: 'Pipeline step approval', subjectType: 'pipeline_step' });
     fixture.detectChanges();
     expect(el.querySelector('[data-test="pipeline-link"]')!.textContent).toContain('Approval step');
+  });
+});
+
+describe('Call API in a workflow (owner #25)', () => {
+  it('starts as a step that carries on to branch on its answer, and is sent with only its own fields', async () => {
+    const { newStep, toJson } = await import('./designer.model');
+    const step = newStep('call_api', []);
+    expect(step).toMatchObject({ key: 'call-api', type: 'call_api', requestId: null, saveAs: 'call_api', onError: 'continue' });
+    step.requestId = 12;
+    step.variables = { patient: '{{patient.id}}' };
+    expect(toJson([step]).steps[0]).toEqual({ key: 'call-api', type: 'call_api', name: 'Call API', requestId: 12,
+      variables: { patient: '{{patient.id}}' }, saveAs: 'call_api', onError: 'continue' });
+    expect(toJson([{ ...step, variables: {}, onError: 'fail', environmentId: 4 }]).steps[0]).toEqual({ key: 'call-api', type: 'call_api',
+      name: 'Call API', requestId: 12, environmentId: 4, saveAs: 'call_api' });
+  });
+
+  it('names a step\'s approver or escalation only among people who can open Approvals; anyone may be told', () => {
+    const { screen } = screenWith();
+    expect(screen.actorOptions().find(o => o.value === '4598')).toEqual({ value: '4598', label: 'Vic Viewer', hint: 'Cannot open Approvals', disabled: true });
+    expect(screen.actorOptions().find(o => o.value === '4597')!.disabled).toBeUndefined();
+    expect(screen.colleagueOptions().find(o => o.value === '4598')!.disabled).toBeUndefined();
+  });
+
+  it('writes a Run pipeline step that waits with where its outcome goes and how long it waits, and branches on it', () => {
+    const run = newStep('run_pipeline', []);
+    run.jobId = 1006;
+    expect(toJson([run]).steps[0]).toEqual({ key: run.key, type: 'run_pipeline', name: run.name, jobId: 1006 });
+    run.waitFor = true;
+    expect(toJson([run]).steps[0]).toEqual({ key: run.key, type: 'run_pipeline', name: run.name, jobId: 1006, waitFor: true,
+      saveAs: runSaveAs(run.key), waitHours: 24 });
+    expect(runSaveAs('lab-check')).toBe('run_lab_check');
+
+    const { screen } = screenWith();
+    screen.steps.set([run]);
+    screen.selected.set(0);
+    screen.branchOnRun(run);
+    const condition = screen.steps()[1];
+    expect(condition.type).toBe('condition');
+    expect(condition.name).toBe('Completed?');
+    expect(condition.condition).toEqual({ field: `${runSaveAs(run.key)}.ok`, op: 'eq', value: true });
   });
 });

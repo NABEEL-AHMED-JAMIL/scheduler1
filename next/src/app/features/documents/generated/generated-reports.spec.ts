@@ -3,7 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { Dialog } from '@angular/cdk/dialog';
 import { of, throwError } from 'rxjs';
-import { GeneratedReports } from './generated-reports';
+import { FIND_DELAY_MS, GeneratedReports } from './generated-reports';
 import { GeneratedService } from './generated.service';
 import { reportsFromRun } from './generated.model';
 import { StorageService } from '../../objects/storage.service';
@@ -42,6 +42,7 @@ function page(opts: { runsFail?: boolean; listObjects?: (b: string, prefix: stri
     recentOutputs: vi.fn(() => opts.runsFail ? throwError(() => new Error('down'))
       : of({ reports: RUN_REPORTS, runsRead: 2, jobsRead: 1, failed: 0 })),
     runDatasetFile: vi.fn(() => of(new Blob(['[]']))),
+    matchingOutputs: vi.fn((_q: string) => of({ reports: [] as ReturnType<typeof reportsFromRun>, runsRead: 0, jobsRead: 0, failed: 0 })),
   };
   const open = vi.fn(() => ({ closed: of(undefined) }));
   TestBed.resetTestingModule();
@@ -146,6 +147,49 @@ describe('Documents › Reports', () => {
     expect(open).toHaveBeenLastCalledWith(ShareDialog, expect.objectContaining({ data: expect.objectContaining({ count: 1 }) }));
     expect(p.storageParams(upload)).toEqual({ bucket: 'ui-review-s3', prefix: 'registry-live-check/' });
     expect(p.storageParams(kept)).toBeNull();
+  });
+
+  // 2026-10-20: the eleventh most recently run schedule's outputs were on no page of Reports, and Find found nothing.
+  it('Find also reads the schedules beyond the recent runs that the query names, after a pause, and says how far', () => {
+    vi.useFakeTimers();
+    try {
+      const { p, service } = page();
+      const FOUND = reportsFromRun({ jobQueueId: 8380, jobId: 2905, jobName: 'Hospital readmission risk (daily)',
+        pipelineName: 'Hospital readmission risk', owner: 'Riverside Health admin' }, [
+        { runOutputId: 2650, kind: 'file', name: 'readmission-statistics.csv', format: 'csv', byteCount: 2087,
+          recordedAt: '2026-10-19T05:47:06', runDatasetId: 6948, expiresAt: '2026-11-18T04:47:06', expired: false }]);
+      service.matchingOutputs.mockReturnValue(of({ reports: FOUND, runsRead: 3, jobsRead: 1, failed: 0 }));
+      p.search('readmission');
+      expect(p.filtered()).toEqual([]);
+      expect(service.matchingOutputs).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(FIND_DELAY_MS);
+      expect(service.matchingOutputs).toHaveBeenCalledWith('readmission');
+      expect(p.filtered().map(r => r.name)).toEqual(['readmission-statistics.csv']);
+      expect(p.filtered()[0]).toMatchObject({ jobQueueId: 8380, jobName: 'Hospital readmission risk (daily)' });
+      expect(p.reach()).toContain('the outputs of 3 runs of the 1 other schedules whose name or pipeline has "readmission"');
+      // A query too short to name a schedule reads nothing more, and what the last one reached goes.
+      p.search('re');
+      vi.advanceTimersByTime(FIND_DELAY_MS);
+      expect(service.matchingOutputs).toHaveBeenCalledTimes(1);
+      expect(p.found()).toBeNull();
+      expect(p.reports().some(r => r.jobQueueId === 8380)).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('Find keeps only the newest query\'s answer, and says when no other schedule has it', () => {
+    vi.useFakeTimers();
+    try {
+      const { p, service } = page();
+      p.search('readm');
+      p.search('nothing like it');
+      vi.advanceTimersByTime(FIND_DELAY_MS);
+      expect(service.matchingOutputs.mock.calls.map(c => c[0])).toEqual(['nothing like it']);
+      expect(p.reach()).toContain('no other schedule whose name or pipeline has "nothing like it"');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('narrows the list by name, type or pipeline', () => {

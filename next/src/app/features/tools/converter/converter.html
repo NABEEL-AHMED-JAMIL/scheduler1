@@ -1,22 +1,67 @@
 <div class="page-tool">
-  <app-page-header>
-    <div class="page-head">
-      <div>
-        <h1 class="page-title">Document Converter</h1>
-        <p class="page-subtitle">
-          Convert between Office, OpenDocument, PDF, Markdown and image formats, or make a PDF from a dataset.
-        </p>
-      </div>
-      <!-- UX final CV1: the standard header's actions; what a PDF from a dataset (or a run) makes is listed in
-           Generated reports, whose "PDF from a dataset" opens this page on that source. -->
-      <div class="flex items-center gap-2">
-        <a class="btn btn-default btn-sm" routerLink="/data/reports" data-test="to-generated-reports"><app-icon name="file" />Generated reports</a>
-      </div>
-    </div>
+  <!-- UX final CV1: the standard header's actions; what a PDF from a dataset (or a run) makes is listed in Generated
+       reports, whose "PDF from a dataset" opens this page on that source. -->
+  <app-page-header title="Document Converter"
+                   subtitle="Convert between Office, OpenDocument, PDF, Markdown and image formats, or make a PDF from a dataset.">
+    <a class="btn btn-default btn-sm" routerLink="/data/reports" data-test="to-generated-reports"><app-icon name="file" />Generated reports</a>
   </app-page-header>
 
-  <div class="card p-4 space-y-4">
-    <app-segmented class="seg-wrap" [(value)]="mode" [options]="modeOptions" ariaLabel="Choose a source" />
+  <!-- Owner #26 (2026-10-19, after "you destroyed the screen"): one full-width card again. The limits are one compact
+       line inside it, the queue a chip in its head, the formats a fold-out; nothing in a tall side column. -->
+  <app-section [card]="true" title="Convert" data-test="converter-main">
+    <div section-actions>
+      @if (limits(); as l) {
+        @if (l.running != null) {
+          <span class="pill" [class.pill-neutral]="!l.running && !l.waiting" [class.pill-warn]="!!l.waiting" [class.pill-info]="!!l.running && !l.waiting"
+                data-test="converter-now" title="The converter's queue right now">
+            <app-icon name="clock" size="0.9em" />{{ l.running }} converting, {{ l.waiting ?? 0 }} waiting
+          </span>
+        }
+      }
+      <button type="button" class="btn btn-default btn-icon btn-sm" aria-label="Read the limits and queue again" title="Read the limits and queue again" (click)="loadLimits()"><app-icon name="refresh" /></button>
+      <button type="button" class="btn btn-default btn-sm" data-test="converter-formats-toggle"
+              [attr.aria-expanded]="showFormats()" aria-controls="conv-formats" (click)="showFormats.set(!showFormats())">
+        <app-icon name="list" />Supported formats <span class="text-[color:var(--text-muted)]">{{ families().length }}</span>
+        <app-icon [name]="showFormats() ? 'chevronDown' : 'chevronRight'" size="0.9em" />
+      </button>
+    </div>
+
+    <div class="limits-strip" data-test="converter-limits" aria-label="Limits">
+      @if (limits(); as l) {
+        <span><b>File</b> up to {{ l.maxFileSizeMb }} MB</span>
+        <span><b>CSV or TSV to PDF</b> up to {{ l.tableMaxFileSizeMb }} MB, first {{ l.pdfMaxRows.toLocaleString('en-US') }} rows printed</span>
+        <span><b>XLSX to PDF</b> up to {{ l.xlsxMaxFileSizeMb }} MB</span>
+        <span><b>Output</b> up to {{ l.maxOutputMb }} MB, {{ l.pdfMaxPages.toLocaleString('en-US') }} pages</span>
+        <span><b>Time</b> {{ l.timeoutSeconds }} sec a file</span>
+        <span><b>Queue</b> {{ l.slots }} at once, {{ l.maxWaiting }} more waiting</span>
+        <span class="limits-note">If it's busy you're told so; nothing is lost, try again in about 30 seconds.</span>
+      } @else {
+        <span class="limits-note">The limits could not be read; the converter still checks every file.</span>
+      }
+    </div>
+
+    @if (showFormats()) {
+      <div id="conv-formats" class="formats-grid" data-test="converter-formats">
+        @for (family of families(); track family.key) {
+          <div class="format-family">
+            <div class="text-sm font-medium">{{ family.label }}</div>
+            <div class="flex flex-wrap items-center gap-1 text-xs"><span class="text-[color:var(--text-muted)] w-9">From</span>
+              @for (f of family.inputFormats; track f) { <span class="pill pill-neutral">{{ f }}</span> }
+            </div>
+            <div class="flex flex-wrap items-center gap-1 text-xs"><span class="text-[color:var(--text-muted)] w-9">To</span>
+              @for (f of family.outputFormats; track f) { <span class="pill pill-brand">{{ f }}</span> }
+            </div>
+          </div>
+        }
+      </div>
+    }
+
+  <div class="space-y-4">
+    @if (ownSignIn) {
+      <p class="text-sm text-[color:var(--text-muted)]" data-test="sources-in-workspace">A file in a workspace's bucket, a PDF from a dataset and a PDF from a run are made in "Work in this workspace", opened from Platform › Workspaces.</p>
+    } @else {
+      <app-segmented class="seg-wrap" [(value)]="mode" [options]="modeOptions" ariaLabel="Choose a source" />
+    }
 
     <!-- MIG-253: a dataset, or one a run kept, rendered through a template; each mode its own panel. -->
     @if (mode() === 'dataset') {
@@ -28,21 +73,24 @@
       <app-file-dropzone [file]="file()" (fileChange)="onFile($event)"
                          prompt="Drop a document here" [hint]="limitsHint()" />
     } @else {
-      <!-- The console's one file picker: buckets, folders, a filter, paging, and a read that
-           fails says so with Try again. -->
-      <div class="flex flex-wrap items-center gap-3">
-        <button type="button" class="btn btn-default btn-sm" (click)="chooseFile()">
-          <app-icon name="folder" />{{ selectedKey() ? 'Choose another file…' : 'Choose a file…' }}
-        </button>
-        @if (selectedKey()) {
-          <span class="text-sm min-w-0 truncate" [title]="bucket() + '/' + selectedKey()">
-            <span class="font-medium">{{ sourceName() }}</span>
-            <span class="mono text-xs text-[color:var(--text-muted)]"> · {{ bucket() }}/{{ selectedKey() }}</span>
-          </span>
-        } @else {
-          <span class="text-sm text-[color:var(--text-muted)]">No file chosen yet.</span>
-        }
-      </div>
+      <!-- The console's one file picker: buckets, folders, search, type filter, paging, the selection kept. -->
+      @if (selectedKey()) {
+        <div class="picked-file" data-test="picked-file">
+          <app-icon name="file" size="1.5rem" class="icon-info shrink-0" />
+          <div class="min-w-0 flex-1">
+            <div class="text-sm font-medium truncate" [title]="selectedKey()">{{ sourceName() }}</div>
+            <div class="mono text-xs text-[color:var(--text-muted)] truncate" [title]="bucket() + '/' + selectedKey()">{{ bucket() }}/{{ folderOf(selectedKey()) }}</div>
+            @if (pickedMeta(); as meta) { <div class="text-xs text-[color:var(--text-secondary)] tabular">{{ meta }}</div> }
+          </div>
+          <button type="button" class="btn btn-default btn-sm" (click)="chooseFile()"><app-icon name="folder" />Change…</button>
+        </div>
+      } @else {
+        <div class="picked-file picked-empty">
+          <app-icon name="folder" size="1.5rem" class="icon-muted shrink-0" />
+          <div class="min-w-0 flex-1 text-sm text-[color:var(--text-muted)]">No file chosen yet. Search, filter by type and page through any bucket you can see.</div>
+          <button type="button" class="btn btn-default btn-sm" (click)="chooseFile()"><app-icon name="folder" />Choose a file…</button>
+        </div>
+      }
     }
 
     @if (sourceName() && formatsError()) {
@@ -160,51 +208,20 @@
     }
     }
   </div>
+  </app-section>
 
-  <div class="card overflow-hidden">
-    <button type="button" class="w-full flex items-center gap-2 px-4 py-3 text-sm font-semibold"
-            [attr.aria-expanded]="showFormats()" (click)="showFormats.set(!showFormats())">
-      <span class="mr-auto">Supported formats</span>
-      <app-icon [name]="showFormats() ? 'chevronDown' : 'chevronRight'"
-                class="text-[color:var(--text-muted)]" />
-    </button>
-    @if (showFormats()) {
-      <div class="overflow-x-auto border-t border-subtle">
-        <table class="table-modern">
-          <thead>
-            <tr><th>Family</th><th>From</th><th>To</th></tr>
-          </thead>
-          <tbody>
-            @for (family of families(); track family.key) {
-              <tr>
-                <td class="font-medium whitespace-nowrap">{{ family.label }}</td>
-                <td>
-                  <div class="flex flex-wrap gap-1">
-                    @for (f of family.inputFormats; track f) {
-                      <span class="pill pill-neutral">{{ f }}</span>
-                    }
-                  </div>
-                </td>
-                <td>
-                  <div class="flex flex-wrap gap-1">
-                    @for (f of family.outputFormats; track f) {
-                      <span class="pill pill-brand">{{ f }}</span>
-                    }
-                  </div>
-                </td>
-              </tr>
-            }
-          </tbody>
-        </table>
-      </div>
-    }
-  </div>
-
-  <app-table-shell heading="Recent conversions" [shown]="pagedTasks().length" [total]="tasks().length"
+  <app-table-shell heading="Recent conversions" [shown]="pagedTasks().length" [total]="shownTasks().length"
                    [loading]="tasksLoading()" [error]="tasksError()" (retry)="loadTasks()"
-                   [isEmpty]="!tasks().length" emptyIcon="file"
-                   emptyMessage="Nothing converted yet. Finished conversions are listed here with a link to the bucket.">
+                   [isEmpty]="!shownTasks().length" emptyIcon="file"
+                   [emptyMessage]="tasks().length ? 'No conversion in this range matches.' : 'Nothing converted yet. Conversions saved to a bucket are listed here with a link to it.'">
     <ng-container toolbar>
+      <div class="search-field">
+        <app-icon name="search" size="0.95em" />
+        <input class="input" placeholder="Search name, file or format" [value]="taskQuery()"
+               (input)="setTaskQuery($any($event.target).value)" aria-label="Search recent conversions" />
+      </div>
+      <app-date-range [value]="range()" [storageKey]="rangeStore" [presets]="['7d', '30d', '90d', 'all']"
+                      label="Date range for recent conversions" (rangeChange)="applyRange($event)" />
       <button type="button" class="btn btn-default btn-sm" (click)="loadTasks()" [disabled]="tasksLoading()">
         <app-icon name="refresh" [class.spin]="tasksLoading()" />Refresh
       </button>
@@ -222,7 +239,7 @@
           </thead>
           <tbody>
             @for (task of pagedTasks(); track task.documentConverterTaskId) {
-              <tr>
+              <tr class="conv-row" (click)="openTask(task)" [attr.data-task]="task.documentConverterTaskId">
                 <td class="max-w-64">
                   <div class="font-medium truncate" [title]="task.taskName">{{ task.taskName }}</div>
                   <div class="mono text-[color:var(--text-muted)] truncate" [title]="task.inputFileName">
@@ -239,7 +256,7 @@
                 </td>
                 <td class="max-w-56">
                   @if (task.bucketName) {
-                    <a class="link-inline truncate" routerLink="/data/files"
+                    <a class="link-inline truncate" routerLink="/data/files" (click)="$event.stopPropagation()"
                        [queryParams]="{ bucket: task.bucketName, prefix: outputFolderOf(task) }"
                        [title]="task.bucketName + '/' + outputFolderOf(task)">
                       <app-icon name="folder" size="0.85em" class="icon-info" />{{ task.bucketName }}
@@ -249,7 +266,7 @@
                 <td class="whitespace-nowrap text-[color:var(--text-secondary)]">
                   {{ task.dateCreated ? (task.dateCreated | serverTime: 'dateTime') : '—' }}
                 </td>
-                <td>
+                <td (click)="$event.stopPropagation()">
                   <div class="flex items-center justify-end gap-1.5">
                     <button type="button" class="btn-circle btn-circle-info"
                             [disabled]="!task.inputStorageKey"
@@ -276,7 +293,7 @@
             }
           </tbody>
         </table>
-    <app-pagination pager [total]="tasks().length" [page]="taskPager.page()" [size]="taskPager.size()"
-                    (goTo)="taskPager.goTo($event, tasks().length)" (setSize)="taskPager.setSize($event)" />
+    <app-pagination pager [total]="shownTasks().length" [page]="taskPager.page()" [size]="taskPager.size()"
+                    (goTo)="taskPager.goTo($event, shownTasks().length)" (setSize)="taskPager.setSize($event)" />
   </app-table-shell>
 </div>

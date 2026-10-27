@@ -8,6 +8,7 @@
         </p>
       </div>
       <div class="flex items-center gap-2">
+        <app-workspace-select [allowAll]="true" [value]="workspaceFilter() ? +workspaceFilter() : null" (valueChange)="workspaceFilter.set($event === null ? '' : '' + $event); onFilterChange()" />
         <app-refresh-button [live]="live()" [loading]="loading()" (refresh)="load()" />
         <!-- MIG-254: every schedule write is a builder action, a member's own included. -->
         @if (!locked()) {
@@ -46,15 +47,6 @@
                    [showSubbar]="selected().size > 0"
                    (retry)="load()">
     <ng-container toolbar>
-      <!-- A platform administrator's list holds every workspace; the options are the workspaces
-           in it, so nothing offered narrows to an empty table. -->
-      @if (seesWorkspaces()) {
-        <div class="w-48">
-          <app-combobox id="jobs-tenant" ariaLabel="Filter by workspace" [selected]="workspaceFilter()"
-                        (selectedChange)="workspaceFilter.set($event); onFilterChange()"
-                        placeholder="All workspaces" clearLabel="All workspaces" [options]="workspaceOptions()" />
-        </div>
-      }
       <select class="input max-w-32" aria-label="Filter by execution type" [value]="executionFilter()"
               (change)="executionFilter.set($any($event.target).value); onFilterChange()">
         <option value="">All types</option>

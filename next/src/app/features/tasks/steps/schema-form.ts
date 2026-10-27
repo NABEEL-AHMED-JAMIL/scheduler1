@@ -2,7 +2,7 @@ import { Component, computed, input, linkedSignal, output, signal } from '@angul
 import { Field } from '../../../shared/ui/field';
 import { Icon } from '../../../shared/ui/icon';
 import {
-  BucketChoice, DocumentTypeChoice, FieldKind, FieldSpec, JsonSchema, PromptChoice, StepProblem, WebhookChoice, coerce, fieldsOf, isMapSchema, mapValueKind, parseJson, withValue,
+  ApiRequestChoice, BucketChoice, DocumentTypeChoice, FieldKind, FieldSpec, JsonSchema, PromptChoice, ScheduleChoice, StepProblem, WebhookChoice, coerce, fieldsOf, isMapSchema, mapValueKind, parseJson, withValue,
 } from './steps.model';
 
 interface MapRow { key: string; value: unknown; }
@@ -59,7 +59,7 @@ interface MapRow { key: string; value: unknown; }
           <p class="text-xs text-[color:var(--text-muted)]">No entries.</p>
         }
         @if (!disabled()) {
-          <div><button type="button" class="btn btn-ghost btn-sm" [attr.aria-label]="'Add an entry to ' + (label() || 'the map')" (click)="addMapRow()">
+          <div><button type="button" class="btn btn-default btn-sm" [attr.aria-label]="'Add an entry to ' + (label() || 'the map')" (click)="addMapRow()">
             <app-icon name="plus" />Add
           </button></div>
         }
@@ -139,6 +139,54 @@ interface MapRow { key: string; value: unknown; }
               </select>
             </app-field>
           }
+          @case ('api-request') {
+            <!-- Owner #25: one of the workspace's saved API requests, grouped by collection, with its method. -->
+            <app-field [label]="f.label" [for]="idOf(f)" [required]="f.required" [error]="errorOf(f)"
+                       [hint]="f.description || apiRequestHint">
+              <select [id]="idOf(f)" class="input" [value]="textOf(f)" [disabled]="disabled()" data-test="api-request-select"
+                      (change)="set(f.name, $any($event.target).value === '' ? undefined : +$any($event.target).value)">
+                <option value="">{{ f.required ? 'Choose an API request…' : 'None' }}</option>
+                @for (group of apiRequestGroups(); track group.collection) {
+                  <optgroup [label]="group.collection">
+                    @for (r of group.requests; track r.id) {
+                      <option [value]="'' + r.id" [selected]="textOf(f) === '' + r.id" [disabled]="!r.enabled && textOf(f) !== '' + r.id">
+                        {{ r.method }} · {{ r.label.slice(group.collection.length + 3) }}{{ r.enabled ? '' : ' (disabled)' }}</option>
+                    }
+                  </optgroup>
+                }
+                @if (textOf(f) && !apiRequestListed(f)) {
+                  <option [value]="textOf(f)" selected>Request {{ textOf(f) }} (not one of this workspace's saved requests)</option>
+                }
+              </select>
+            </app-field>
+          }
+          @case ('api-environment') {
+            <!-- Owner #25: an environment of the chosen request's collection; none is the collection's default. -->
+            <app-field [label]="f.label" [for]="idOf(f)" [required]="f.required" [error]="errorOf(f)" [hint]="f.description || ''">
+              <select [id]="idOf(f)" class="input" [value]="textOf(f)" [disabled]="disabled()"
+                      (change)="set(f.name, $any($event.target).value === '' ? undefined : +$any($event.target).value)">
+                <option value="">The collection's default</option>
+                @for (e of environmentChoices(); track e.id) { <option [value]="'' + e.id" [selected]="textOf(f) === '' + e.id">{{ e.label }}</option> }
+                @if (textOf(f) && !environmentListed(f)) {
+                  <option [value]="textOf(f)" selected>Environment {{ textOf(f) }}</option>
+                }
+              </select>
+            </app-field>
+          }
+          @case ('schedule') {
+            <!-- MIG-424: one of the workspace's schedules (a pipeline to call), stored as its id. -->
+            <app-field [label]="f.label" [for]="idOf(f)" [required]="f.required" [error]="errorOf(f)"
+                       [hint]="f.description || scheduleHint">
+              <select [id]="idOf(f)" class="input" [value]="textOf(f)" [disabled]="disabled()" data-test="schedule-select"
+                      (change)="set(f.name, $any($event.target).value === '' ? undefined : +$any($event.target).value)">
+                <option value="">{{ f.required ? 'Choose a pipeline…' : 'None' }}</option>
+                @for (j of schedules(); track j.id) { <option [value]="'' + j.id" [selected]="textOf(f) === '' + j.id">{{ j.label }}</option> }
+                @if (textOf(f) && !scheduleListed(f)) {
+                  <option [value]="textOf(f)" selected>Schedule {{ textOf(f) }} (not one of this workspace's)</option>
+                }
+              </select>
+            </app-field>
+          }
           @case ('document-type') {
             <!-- MIG-364: one of the workspace's document types, stored as its id; empty is the documents that started the run. -->
             <app-field [label]="f.label" [for]="idOf(f)" [required]="f.required" [error]="errorOf(f)"
@@ -198,7 +246,7 @@ interface MapRow { key: string; value: unknown; }
               @if (!disabled() && unusedColumns(f).length) {
                 <div class="flex flex-wrap gap-1 mt-1.5">
                   @for (c of unusedColumns(f); track c) {
-                    <button type="button" class="btn btn-ghost btn-sm mono text-xs" [attr.aria-label]="'Add column ' + c + ' to ' + f.label"
+                    <button type="button" class="btn btn-default btn-sm mono text-xs" [attr.aria-label]="'Add column ' + c + ' to ' + f.label"
                             (click)="addColumn(f, c)"><app-icon name="plus" />{{ c }}</button>
                   }
                 </div>
@@ -210,7 +258,7 @@ interface MapRow { key: string; value: unknown; }
               <p class="label">{{ f.label }}@if (f.required) { <span class="text-crit-500 ml-0.5" aria-hidden="true">*</span> }</p>
               @if (f.description) { <p class="field-note text-[color:var(--text-muted)] -mt-1 mb-2">{{ f.description }}</p> }
               <app-schema-form [schema]="f.schema" [value]="objectOf(f)" [problems]="problemsUnder(f.name)" [idPrefix]="idOf(f)"
-                               [label]="f.label" [columns]="columns()" [steps]="steps()" [prompts]="prompts()" [buckets]="buckets()" [webhooks]="webhooks()" [documentTypes]="documentTypes()" [disabled]="disabled()" (valueChange)="set(f.name, $event)" />
+                               [label]="f.label" [columns]="columns()" [steps]="steps()" [prompts]="prompts()" [buckets]="buckets()" [webhooks]="webhooks()" [documentTypes]="documentTypes()" [apiRequests]="apiRequests()" [disabled]="disabled()" (valueChange)="set(f.name, $event)" />
             </fieldset>
           }
           @case ('objects') {
@@ -218,7 +266,7 @@ interface MapRow { key: string; value: unknown; }
               <div class="flex items-center gap-2">
                 <p class="label mb-0">{{ f.label }}@if (f.required) { <span class="text-crit-500 ml-0.5" aria-hidden="true">*</span> }</p>
                 @if (!disabled()) {
-                  <button type="button" class="btn btn-ghost btn-sm ml-auto" [attr.aria-label]="'Add a row to ' + f.label" (click)="addRow(f)">
+                  <button type="button" class="btn btn-default btn-sm ml-auto" [attr.aria-label]="'Add a row to ' + f.label" (click)="addRow(f)">
                     <app-icon name="plus" />Add
                   </button>
                 }
@@ -234,7 +282,7 @@ interface MapRow { key: string; value: unknown; }
                     }
                   </div>
                   <app-schema-form [schema]="f.schema.items!" [value]="row" [problems]="problemsUnder(f.name + '[' + i + ']')"
-                                   [idPrefix]="idOf(f) + '-' + i" [label]="f.label + ' row ' + (i + 1)" [columns]="columns()" [steps]="steps()" [prompts]="prompts()" [buckets]="buckets()" [webhooks]="webhooks()" [documentTypes]="documentTypes()"
+                                   [idPrefix]="idOf(f) + '-' + i" [label]="f.label + ' row ' + (i + 1)" [columns]="columns()" [steps]="steps()" [prompts]="prompts()" [buckets]="buckets()" [webhooks]="webhooks()" [documentTypes]="documentTypes()" [apiRequests]="apiRequests()"
                                    [disabled]="disabled()" (valueChange)="setRow(f, i, $event)" />
                 </div>
               } @empty {
@@ -291,15 +339,33 @@ export class SchemaForm {
   /** MIG-245: the workspace's active prompts, what a prompt setting offers. */
   readonly prompts = input<PromptChoice[]>([]);
   /** MIG-346: what a webhook setting says when its schema says nothing. */
-  readonly webhookHint = 'One of this workspace’s webhooks (Integration › API Clients).';
+  readonly webhookHint = 'One of this workspace’s webhooks (Developers › API Clients).';
   /** MIG-346: the workspace's webhooks, what a webhook setting offers (those that cannot take a step's delivery disabled). */
   readonly webhooks = input<WebhookChoice[]>([]);
   /** MIG-321: the workspace's buckets, what a bucket setting offers. */
   readonly buckets = input<BucketChoice[]>([]);
   /** MIG-364: the workspace's document types, what a document-type setting offers. */
   readonly documentTypes = input<DocumentTypeChoice[]>([]);
+  /** Owner #25: the workspace's saved API requests, what an api-request setting offers. */
+  readonly apiRequests = input<ApiRequestChoice[]>([]);
+  readonly apiRequestHint = 'One of this workspace’s saved API requests (Connections › API collections).';
+  /** The requests by collection, in the order they came. */
+  readonly apiRequestGroups = computed(() => {
+    const groups: { collection: string; requests: ApiRequestChoice[] }[] = [];
+    for (const r of this.apiRequests()) {
+      const group = groups.find(g => g.collection === r.collection);
+      if (group) group.requests.push(r); else groups.push({ collection: r.collection, requests: [r] });
+    }
+    return groups;
+  });
+  /** The environments of the request this form's requestId names: what an api-environment setting offers. */
+  readonly environmentChoices = computed(() =>
+    this.apiRequests().find(r => '' + r.id === '' + (this.current()['requestId'] ?? ''))?.environments ?? []);
+  /** MIG-424: the workspace's schedules, what a schedule setting (Run pipeline's pipeline) offers. */
+  readonly schedules = input<ScheduleChoice[]>([]);
+  readonly scheduleHint = 'One of this workspace’s pipelines, by its schedule (Pipelines › Schedules).';
   /** MIG-364: what a document-type setting says when its schema says nothing. */
-  readonly documentTypeHint = 'One of this workspace’s document types (Documents › Document Intelligence).';
+  readonly documentTypeHint = 'One of this workspace’s document types (Documents › Document types).';
   readonly disabled = input(false);
   readonly valueChange = output<Record<string, unknown>>();
 
@@ -342,6 +408,18 @@ export class SchemaForm {
     if (on) held.add(option); else held.delete(option);
     const next = f.options.filter(o => held.has(o));
     this.set(f.name, next.length ? next : undefined);
+  }
+
+  apiRequestListed(f: FieldSpec): boolean {
+    return this.apiRequests().some(r => '' + r.id === this.textOf(f));
+  }
+
+  environmentListed(f: FieldSpec): boolean {
+    return this.environmentChoices().some(e => '' + e.id === this.textOf(f));
+  }
+
+  scheduleListed(f: FieldSpec): boolean {
+    return this.schedules().some(j => '' + j.id === this.textOf(f));
   }
 
   webhookListed(f: FieldSpec): boolean {

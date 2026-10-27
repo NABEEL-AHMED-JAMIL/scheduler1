@@ -4,6 +4,7 @@ import { formatSize } from '../../shared/ui/format-size';
 import { Icon } from '../../shared/ui/icon';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { StatusPill } from '../../shared/ui/status-pill';
+import { formatDuration } from '../../shared/ui/time-format';
 
 /** One step of the run, as the customer API's Step. */
 export interface EmbedStep {
@@ -97,14 +98,10 @@ export function refusalOf(status: number, type?: string | null): EmbedRefusal {
   return { title: 'The run cannot be shown right now', text: 'Try again in a moment.', retry: true };
 }
 
-/** "1.2 s", "3 min 4 s": a step's time, short. */
+/** "1.2 sec", "3 min 4 sec": a step's time, in formatDuration's words. */
 export function durationLabel(ms: number | null | undefined): string {
   if (ms === null || ms === undefined || ms < 0) return '';
-  if (ms < 1000) return `${ms} ms`;
-  const seconds = Math.round(ms / 100) / 10;
-  if (seconds < 60) return `${seconds} s`;
-  const whole = Math.round(seconds);
-  return `${Math.floor(whole / 60)} min ${whole % 60} s`;
+  return formatDuration(ms / 1000);
 }
 
 /**

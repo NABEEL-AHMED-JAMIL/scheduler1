@@ -28,10 +28,10 @@ const DETAIL = {
   ],
 } as unknown as TaskDetail;
 
-function screenWith(detail: TaskDetail = DETAIL, tenantId: number | null = 2924) {
+function screenWith(detail: TaskDetail = DETAIL, tenantId: number | null = 2924, requestsTab = true) {
   const api = {
     mine: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [TASK] })),
-    groups: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [] })),
+    teams: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [] })),
     done: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [] })),
     requests: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [] })),
     task: vi.fn(() => of({ status: 'SUCCESS', message: '', data: detail })),
@@ -48,8 +48,8 @@ function screenWith(detail: TaskDetail = DETAIL, tenantId: number | null = 2924)
       provideRouter([]),
       { provide: WorkflowsApi, useValue: api },
       { provide: ToastService, useValue: toast },
-      { provide: TaskCountService, useValue: { refresh: vi.fn(), count: signal(1), overdue: signal(0), mine: signal(0), groups: signal(0), done: signal(0), requests: signal(0) } },
-      { provide: AuthService, useValue: { canOpen: () => true, user: signal({ appUserId: 4537, tenantId }) } },
+      { provide: TaskCountService, useValue: { refresh: vi.fn(), count: signal(1), overdue: signal(0), mine: signal(0), teams: signal(0), done: signal(0), requests: signal(0) } },
+      { provide: AuthService, useValue: { canOpen: () => true, canOpenTab: () => requestsTab, user: signal({ appUserId: 4537, tenantId }) } },
     ],
   });
   const fixture = TestBed.createComponent(TaskInbox);
@@ -58,6 +58,16 @@ function screenWith(detail: TaskDetail = DETAIL, tenantId: number | null = 2924)
 }
 
 describe('Task inbox', () => {
+  it('F3: neither shows nor reads My requests for a person granted the inbox\'s other tabs only', () => {
+    const { api, el } = screenWith(DETAIL, 2924, false);
+    expect(api.requests).not.toHaveBeenCalled();
+    expect(el.querySelector('[data-test="tab-requests"]')).toBeNull();
+    expect(api.mine).toHaveBeenCalled();
+    const full = screenWith();
+    expect(full.api.requests).toHaveBeenCalled();
+    expect(full.el.querySelector('[data-test="tab-requests"]')).not.toBeNull();
+  });
+
   it('opens the first task with its request, in words, and the decisions', () => {
     const { api, el } = screenWith();
     expect(api.task).toHaveBeenCalledWith(501);
@@ -95,6 +105,14 @@ describe('Task inbox', () => {
     screen.passOn();
     expect(api.reassign).toHaveBeenCalledWith(501, 4600, null, expect.stringMatching(/^501:pass:/));
     expect(toast.success).toHaveBeenCalledWith('Passed to Sam.');
+  });
+
+  it('names the signed-in person in a history by name with "(you)", and as "you" elsewhere', () => {
+    const { screen } = screenWith();
+    (screen.auth.user as unknown as { set: (u: unknown) => void }).set({ appUserId: 4537, tenantId: 2924, fullName: 'Nabeel Ahmed' });
+    expect(screen.historyName(4537)).toBe('Nabeel Ahmed (you)');
+    expect(screen.name(4537)).toBe('you');
+    expect(screen.historyName(4597)).toBe('Alex');
   });
 
   it('does not offer the requester a decision on their own request', () => {
@@ -175,7 +193,7 @@ describe('P2 #31 and #36: the inbox at the edges', () => {
 
 /** Review 2026-10-07: a platform administrator's own sign-in has no workspace; the inbox said "could not be read". */
 describe('Task inbox -- a sign-in with no workspace', () => {
-  it('reads nothing and points to Work in a workspace', () => {
+  it('reads nothing and points to Platform › Workspaces', () => {
     const { api, el, screen } = screenWith(DETAIL, null);
     expect(api.mine).not.toHaveBeenCalled();
     expect(screen.error()).toBe('');

@@ -16,7 +16,7 @@ const SOURCES = [
   { taskDetailId: 1500, taskName: 'Old XML task', pipelineId: null, taskStatus: 'Active' },
 ];
 
-function screen() {
+function screen(tenantId: number | null = 2960) {
   const posts: { url: string; body: any }[] = [];
   const get = vi.fn((url: string, opts?: { params?: Record<string, unknown> }) => {
     if (url.endsWith('/setting.json/topics')) return of({ status: 'SUCCESS', data: [{ sourceTaskTypeId: 11858, serviceName: 'etl.reference', status: 'Active' }] });
@@ -40,7 +40,7 @@ function screen() {
     providers: [
       provideZonelessChangeDetection(), provideRouter([]),
       { provide: HttpClient, useValue: { get, post } },
-      { provide: AuthService, useValue: { canOpen: () => true, user: signal({ appUserId: 4640, tenantId: 2960 }) } },
+      { provide: AuthService, useValue: { canOpen: () => true, user: signal({ appUserId: 4640, tenantId }) } },
     ],
   });
   const fixture = TestBed.createComponent(NewPipeline);
@@ -59,11 +59,15 @@ describe('New pipeline', () => {
     expect(el.querySelector('[data-test="full-form"]')?.getAttribute('href')).toBe('/pipelines/new/form');
   });
 
-  it('hands a description to the AI Assistant', () => {
+  it('hands a description to the AI Assistant as a pipeline to design (ZT-P12)', () => {
     const { component, navigate } = screen();
+    // "Read the visits file, ..." was taken as a question: the assistant read the file and answered, drawing no pipeline.
     component.ask.set('Flag readmissions within 30 days');
     component.toAssistant();
-    expect(navigate).toHaveBeenCalledWith(['/ai/assistant'], { queryParams: { prompt: 'Flag readmissions within 30 days' } });
+    expect(navigate).toHaveBeenCalledWith(['/ai/assistant'], { queryParams: { prompt: 'Design a pipeline: Flag readmissions within 30 days' } });
+    component.ask.set('design a pipeline: keep the paid orders');
+    component.toAssistant();
+    expect(navigate).toHaveBeenLastCalledWith(['/ai/assistant'], { queryParams: { prompt: 'design a pipeline: keep the paid orders' } });
   });
 
   it('makes a pipeline to add steps to and opens its step builder', async () => {
@@ -89,5 +93,13 @@ describe('New pipeline', () => {
     expect(steps.body.pipelineKey).not.toBe(100480);
     expect(posts.find(p => p.url.endsWith('/sourceTask.json/addSourceTask'))!.body).toMatchObject({ taskStatus: 'Inactive' });
     expect(navigate).toHaveBeenCalledWith(['/pipelines', 1950, 'edit'], { queryParams: { tab: 'steps' } });
+  });
+
+  it('sends a sign-in with no workspace (a platform administrator) to open one first, and reads no topics', () => {
+    const { el, posts } = screen(null);
+    expect(el.querySelector('[data-test="needs-workspace"]')).not.toBeNull();
+    expect(el.querySelector('[data-test="start-with"]')).toBeNull();
+    expect(el.querySelector('[data-test="needs-workspace"] a')?.getAttribute('href')).toBe('/platform/workspaces');
+    expect(posts.length).toBe(0);
   });
 });

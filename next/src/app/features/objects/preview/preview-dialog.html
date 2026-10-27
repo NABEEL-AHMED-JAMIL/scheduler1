@@ -18,12 +18,13 @@
     </button>
 
     @if (kind() === 'image' && !loading() && !error()) {
-      <div class="flex items-center gap-1 mr-1">
-        <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="zoomBy(-0.25)"
+      <!-- ZT-U2: the zoom is one bordered group (.seg), its value between − and +, as the PDF viewer's. -->
+      <div class="seg mr-1" role="group" aria-label="Zoom">
+        <button type="button" class="seg-btn seg-icon" (click)="zoomBy(-0.25)"
                 [disabled]="zoom() <= 0.25" title="Zoom out" aria-label="Zoom out"><app-icon name="minus" /></button>
-        <button type="button" class="btn btn-ghost btn-sm min-w-14 tabular" (click)="resetZoom()"
-                title="Reset to fit">{{ zoomLabel() }}</button>
-        <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="zoomBy(0.25)"
+        <button type="button" class="seg-btn seg-value min-w-14" (click)="resetZoom()"
+                title="Reset to fit" [attr.aria-label]="'Zoom ' + zoomLabel() + ': reset to fit'">{{ zoomLabel() }}</button>
+        <button type="button" class="seg-btn seg-icon" (click)="zoomBy(0.25)"
                 [disabled]="zoom() >= 4" title="Zoom in" aria-label="Zoom in"><app-icon name="plus" /></button>
       </div>
     }
@@ -56,14 +57,14 @@
           <app-icon [name]="copied() ? 'check' : 'copy'" [class.icon-ok]="copied()" />
           {{ copied() ? 'Copied' : 'Copy' }}
         </button>
-        <button type="button" class="btn btn-ghost btn-sm" (click)="startEdit()"
+        <button type="button" class="btn btn-default btn-sm" (click)="startEdit()"
                 title="Edit this file and save it back">
           <app-icon name="edit" />Edit
         </button>
       }
     }
 
-    <button type="button" class="btn btn-ghost btn-sm" (click)="openInTab()" title="Open in a new tab">
+    <button type="button" class="btn btn-default btn-sm" (click)="openInTab()" title="Open in a new tab">
       <app-icon name="external" />Open
     </button>
     <button type="button" class="btn btn-default btn-sm" (click)="download()">
@@ -120,9 +121,9 @@
               @if (t.note) { <span>· {{ t.note }}</span> }
               @if (tableSearch() && tableRows().length !== t.rows.length) { <span>· {{ tableRows().length }} of {{ t.rows.length }} on this page match</span> }
               <span class="ml-auto flex items-center gap-1">
-                <button type="button" class="btn btn-ghost btn-sm" [disabled]="t.offset === 0 || tableLoading()" (click)="tablePage(-1)"><app-icon name="chevronLeft" />Prev</button>
+                <button type="button" class="btn btn-default btn-sm" [disabled]="t.offset === 0 || tableLoading()" (click)="tablePage(-1)"><app-icon name="chevronLeft" />Prev</button>
                 <span class="tabular px-1">rows {{ t.rows.length ? t.offset + 1 : 0 }}–{{ tableLast() }}</span>
-                <button type="button" class="btn btn-ghost btn-sm" [disabled]="!tableHasMore() || tableLoading()" (click)="tablePage(1)">Next<app-icon name="chevronRight" /></button>
+                <button type="button" class="btn btn-default btn-sm" [disabled]="!tableHasMore() || tableLoading()" (click)="tablePage(1)">Next<app-icon name="chevronRight" /></button>
               </span>
             </div>
             <app-blur-loader [active]="tableLoading()" label="Loading rows…">

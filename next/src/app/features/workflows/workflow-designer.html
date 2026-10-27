@@ -23,8 +23,8 @@
     <div class="card p-10 flex flex-col items-center text-center gap-2" data-test="needs-workspace">
       <app-icon name="layers" size="1.5rem" class="icon-muted" />
       <p class="text-sm text-[color:var(--text-primary)]">Workflows belong to a workspace, and this sign-in has none.</p>
-      <p class="text-sm text-[color:var(--text-secondary)]">Open the workspace from Work in a workspace to design its workflows or decide its tasks.</p>
-      <a routerLink="/platform/work-in-workspace" class="btn btn-default btn-sm mt-2"><app-icon name="external" />Work in a workspace</a>
+      <p class="text-sm text-[color:var(--text-secondary)]">Open the workspace with "Work in this workspace" on Platform › Workspaces to design its workflows or decide its tasks.</p>
+      <a routerLink="/platform/workspaces" class="btn btn-default btn-sm mt-2"><app-icon name="external" />Choose a workspace</a>
     </div>
   } @else {
   @if (error()) {
@@ -87,7 +87,7 @@
       @if (view() === 'new') {
         <div class="designer-scroll">
           <div class="inbox-detail-head">
-            <button type="button" class="btn btn-ghost btn-sm inbox-back" (click)="backToList()" data-test="back-to-list"><app-icon name="arrowLeft" />Back to list</button>
+            <button type="button" class="btn btn-default btn-sm inbox-back" (click)="backToList()" data-test="back-to-list"><app-icon name="arrowLeft" />Back to list</button>
             <h2 class="inbox-detail-title">New workflow</h2>
             <p class="inbox-detail-sub">Name it and say what it approves; you lay out its steps next.</p>
           </div>
@@ -121,7 +121,7 @@
       } @else if (current(); as wf) {
         <!-- The header strip: what it is, its state, its actions, and the tabs along its foot. -->
         <header class="designer-head" data-test="workflow-head">
-          <button type="button" class="btn btn-ghost btn-sm inbox-back" (click)="backToList()" data-test="back-to-list"><app-icon name="arrowLeft" />Back to list</button>
+          <button type="button" class="btn btn-default btn-sm inbox-back" (click)="backToList()" data-test="back-to-list"><app-icon name="arrowLeft" />Back to list</button>
           <div class="designer-head-top">
             <div class="min-w-0 flex-1">
               <h2 class="inbox-detail-title">@let title = nameParts(wf.name);{{ title.ref ? title.name + ' ' : wf.name }}@if (title.ref) {<span class="inbox-title-ref">{{ title.ref }}</span>}</h2>
@@ -193,7 +193,7 @@
                     <p class="text-xs text-[color:var(--text-muted)]">Step {{ selected()! + 1 }} of {{ steps().length }}</p>
                   </div>
                   @if (canEdit()) {
-                    <button type="button" class="btn btn-ghost btn-xs btn-intent-crit" (click)="remove(selected()!)" data-test="remove-step"><app-icon name="trash" />Remove</button>
+                    <button type="button" class="btn btn-default btn-xs btn-intent-crit" (click)="remove(selected()!)" data-test="remove-step"><app-icon name="trash" />Remove</button>
                   }
                   <button type="button" class="btn btn-ghost btn-icon designer-props-close" (click)="closeSheet()" aria-label="Close the step's properties" data-test="close-props"><app-icon name="close" /></button>
                 </div>
@@ -270,7 +270,8 @@
                     @if (s.type === 'condition') {
                       <div>
                         <label class="label" for="st-field">Field of the request</label>
-                        <input id="st-field" class="input font-mono" placeholder="amount, or customer.tier" [ngModel]="s.condition?.field" (ngModelChange)="setCondition('field', $event)" />
+                        <input id="st-field" class="input font-mono" placeholder="amount, or customer.tier" list="wf-known-fields" [ngModel]="s.condition?.field" (ngModelChange)="setCondition('field', $event)" />
+                        <datalist id="wf-known-fields">@for (f of knownFields(); track f) { <option [value]="f"></option> }</datalist>
                       </div>
                       <div class="grid grid-cols-2 gap-3">
                         <div>
@@ -318,11 +319,182 @@
                         <app-combobox id="st-job" [numeric]="true" placeholder="Search schedules…" [allowClear]="false" [disabled]="!canEdit()"
                                       [options]="jobOptions()" [ngModel]="s.jobId == null ? null : s.jobId" (ngModelChange)="set('jobId', numberOrNull($event))" />
                       </div>
+                      <!-- MIG-424: the run's parameters, from the request and earlier steps' kept values; checked against what the
+                           pipeline declares when the workflow is published and again when the run starts. -->
+                      @if (s.jobId != null) {
+                        <div data-test="wf-run-parameters">
+                          <span class="label">Parameters</span>
+                          @if (parameterRows(s).length) {
+                            <div class="space-y-2">
+                              @for (p of parameterRows(s); track p.name) {
+                                <div class="flex items-center gap-2">
+                                  <span class="mono text-xs w-32 shrink-0 truncate" [title]="p.declared?.label || p.name">{{ p.name }}@if (p.declared?.required) {<span class="text-[color:var(--crit-text)]" aria-label="required">*</span>}</span>
+                                  <input class="input font-mono text-xs flex-1 min-w-0" [value]="p.value" [disabled]="!canEdit()"
+                                         [placeholder]="parameterPlaceholder(p.name, p.declared)"
+                                         [attr.aria-label]="'Value of ' + p.name" [attr.data-test]="'wf-run-param-' + p.name"
+                                         (change)="setParameter(p.name, $any($event.target).value)" />
+                                  @if (!p.declared) {
+                                    <span class="pill pill-warn text-xs" title="The pipeline does not declare it: publishing refuses it">Not declared</span>
+                                  }
+                                </div>
+                              }
+                            </div>
+                            <p class="field-note text-[color:var(--text-muted)]">From the request by name (<span class="mono">{{ '{{' }}subject.mrn{{ '}}' }}</span>)
+                              or an earlier step's kept value (<span class="mono">{{ '{{' }}registration.patient_id{{ '}}' }}</span>). Empty: the pipeline's default.</p>
+                          } @else {
+                            <p class="field-note text-[color:var(--text-muted)]" data-test="wf-run-parameters-note">{{ selectedPipeline() ? 'This pipeline declares no parameters.'
+                              : pipelineMissing() ? 'This pipeline could not be read: its parameters are checked when you publish.' : 'Reading the pipeline…' }}</p>
+                          }
+                        </div>
+                      }
+                      <!-- 2026-10-21: wait for the run (its approvals included) and keep how it ended for a Condition. -->
                       <div>
-                        <label class="label" for="st-err">If it cannot start</label>
+                        <label class="flex items-center gap-2 text-sm">
+                          <input type="checkbox" [ngModel]="!!s.waitFor" (ngModelChange)="setWaitFor(s, $event)" [disabled]="!canEdit()" data-test="wf-run-wait" />
+                          Wait until the run ends, its approvals included
+                        </label>
+                        <p class="field-note text-[color:var(--text-muted)]">Off: the next step starts as soon as the run is queued.</p>
+                      </div>
+                      @if (s.waitFor) {
+                        <div>
+                          <label class="label" for="st-run-save">Keep how it ended as</label>
+                          <input id="st-run-save" class="input mono" [ngModel]="s.saveAs || ''" (ngModelChange)="set('saveAs', $event)" [disabled]="!canEdit()" data-test="wf-run-save" />
+                          <p class="field-note text-[color:var(--text-muted)]">
+                            A Condition after this step reads {{ s.saveAs }}.ok, .status (Completed, Failed, TimedOut) or .message.
+                            <button type="button" class="link-inline" (click)="branchOnRun(s)" data-test="wf-run-branch">Add a condition on it</button>
+                          </p>
+                        </div>
+                        <!-- MIG-424: values from the run's answer, kept beside how it ended, for later conditions and assignees. -->
+                        <div data-test="wf-run-results">
+                          <label class="flex items-center gap-2 text-sm">
+                            <input type="checkbox" [ngModel]="!!s.results" (ngModelChange)="setKeepResults($event)" [disabled]="!canEdit()" data-test="wf-run-keep" />
+                            Keep values from its answer
+                          </label>
+                          @if (s.results) {
+                            <div class="grid grid-cols-2 gap-2 mt-2">
+                              <div>
+                                <label class="label" for="st-run-from">From</label>
+                                <select id="st-run-from" class="input" [ngModel]="s.results.from || 'final'" (ngModelChange)="setResults('from', $event)" [disabled]="!canEdit()" data-test="wf-run-from">
+                                  <option value="final">Its final output</option>
+                                  @for (st of selectedPipeline()?.steps ?? []; track st.key) { <option [value]="st.key">Step: {{ st.name || st.key }}</option> }
+                                </select>
+                              </div>
+                              <div>
+                                <label class="label" for="st-run-take">Keep</label>
+                                <select id="st-run-take" class="input" [ngModel]="s.results.take || 'first'" (ngModelChange)="setResults('take', $event)" [disabled]="!canEdit()" data-test="wf-run-take">
+                                  @for (t of resultTakes; track t.take) { <option [value]="t.take">{{ t.label }}</option> }
+                                </select>
+                              </div>
+                            </div>
+                            @if ((s.results.take || 'first') !== 'count') {
+                              <span class="label mt-2">Fields</span>
+                              @if (resultColumns(s).length) {
+                                <div class="flex flex-wrap gap-1" data-test="wf-run-columns">
+                                  @for (c of resultColumns(s); track c) {
+                                    <button type="button" class="btn btn-sm" [class.btn-primary]="hasResultField(s, c)" [class.btn-default]="!hasResultField(s, c)"
+                                            [attr.aria-pressed]="hasResultField(s, c)" [disabled]="!canEdit()" (click)="toggleResultField(s, c)">{{ c }}</button>
+                                  }
+                                </div>
+                              } @else {
+                                <p class="field-note text-[color:var(--text-muted)]">No completed run shows its columns yet: name them below.</p>
+                              }
+                              <div class="space-y-1 mt-2">
+                                @for (f of resultFieldRows(s); track f.path) {
+                                  <div class="flex items-center gap-2">
+                                    <span class="mono text-xs flex-1 min-w-0 truncate">{{ f.path }}</span>
+                                    <input class="input font-mono text-xs w-32" [value]="f.name" [attr.aria-label]="'Keep ' + f.path + ' as'" [disabled]="!canEdit()"
+                                           (change)="renameResultField(s, f.path, $any($event.target).value)" />
+                                    @if (f.clash) { <span class="pill pill-crit text-xs">Name taken</span> }
+                                    <button type="button" class="btn btn-ghost btn-icon btn-sm" [attr.aria-label]="'Remove ' + f.path" [disabled]="!canEdit()" (click)="toggleResultField(s, f.path)">
+                                      <app-icon name="trash" class="icon-crit" />
+                                    </button>
+                                  </div>
+                                }
+                                <input class="input font-mono text-xs" placeholder="Add a field: risk, or summary.age" [disabled]="!canEdit()" data-test="wf-run-add-field"
+                                       (change)="toggleResultField(s, $any($event.target).value); $any($event.target).value = ''" />
+                              </div>
+                              <p class="field-note text-[color:var(--text-muted)]">Fields of a JSON column by a dot (summary.age). Masked columns stay masked; the values are kept up to 16 KB.</p>
+                            }
+                          }
+                        </div>
+                        @if (runFieldNames().length) {
+                          <p class="field-note text-[color:var(--text-muted)]" data-test="wf-run-fields">Later steps read
+                            @for (f of runFieldNames(); track f; let last = $last) { <span class="mono">{{ f }}</span>{{ last ? '.' : ', ' }} }
+                          </p>
+                          @if (s.results && (s.results.fields ?? []).length && (s.results.take || 'first') !== 'all' && (s.results.take || 'first') !== 'count') {
+                            <p class="field-note">
+                              @for (f of resultFieldRows(s); track f.path) {
+                                <button type="button" class="link-inline mr-2" (click)="branchOnResult(s, f.name)" [attr.data-test]="'wf-run-branch-' + f.name">Branch on {{ f.name }}</button>
+                              }
+                            </p>
+                          }
+                        }
+                        <div>
+                          <label class="label" for="st-run-hours">Give up after (hours)</label>
+                          <input id="st-run-hours" type="number" min="1" max="2160" class="input" [ngModel]="s.waitHours ?? 24"
+                                 (ngModelChange)="set('waitHours', numberOrNull($event))" [disabled]="!canEdit()" data-test="wf-run-hours" />
+                        </div>
+                      }
+                      <div>
+                        <label class="label" for="st-err">{{ s.waitFor ? 'If it cannot start or does not complete' : 'If it cannot start' }}</label>
                         <select id="st-err" class="input" [ngModel]="s.onError || 'fail'" (ngModelChange)="set('onError', $event)">
                           <option value="fail">Stop the request</option>
                           <option value="continue">Carry on</option>
+                        </select>
+                      </div>
+                    }
+
+                    @if (s.type === 'call_api') {
+                      <!-- Owner #25: one of the workspace's saved API requests (POST, PUT), its answer kept on the request for a
+                           Condition to branch on. -->
+                      <div>
+                        <label class="label" for="st-req">API request</label>
+                        <app-combobox id="st-req" [numeric]="true" placeholder="Search saved requests…" [allowClear]="false" [disabled]="!canEdit()"
+                                      [options]="requestOptions()" [ngModel]="s.requestId == null ? null : s.requestId"
+                                      (ngModelChange)="set('requestId', numberOrNull($event)); set('environmentId', null)" data-test="wf-api-request" />
+                        <p class="field-note text-[color:var(--text-muted)]">Saved in Connections › API collections; its secrets stay there.</p>
+                      </div>
+                      @if (requestOf(s)?.environments?.length) {
+                        <div>
+                          <label class="label" for="st-env">Environment</label>
+                          <select id="st-env" class="input" [ngModel]="s.environmentId ?? ''" (ngModelChange)="set('environmentId', numberOrNull($event))">
+                            <option value="">The collection's default</option>
+                            @for (e of requestOf(s)!.environments; track e.id) { <option [value]="e.id">{{ e.label }}</option> }
+                          </select>
+                        </div>
+                      }
+                      <div>
+                        <span class="label">Variables</span>
+                        <div class="space-y-2" data-test="wf-api-variables">
+                          @for (v of variableRows(s); track $index; let i = $index) {
+                            <div class="flex items-center gap-2">
+                              <input class="input font-mono text-xs w-36" [value]="v.name" [attr.aria-label]="'Variable ' + (i + 1) + ' name'"
+                                     (change)="setVariable(s, i, 'name', $any($event.target).value)" />
+                              <input class="input font-mono text-xs flex-1 min-w-0" [value]="v.value" [placeholder]="variablePlaceholder"
+                                     [attr.aria-label]="'Value of ' + v.name" (change)="setVariable(s, i, 'value', $any($event.target).value)" />
+                              <button type="button" class="btn btn-ghost btn-icon btn-sm" [attr.aria-label]="'Remove ' + v.name" (click)="removeVariable(s, i)">
+                                <app-icon name="trash" class="icon-crit" />
+                              </button>
+                            </div>
+                          }
+                          <button type="button" class="btn btn-default btn-sm" (click)="addVariable(s)"><app-icon name="plus" />Add a variable</button>
+                        </div>
+                        <p class="field-note text-[color:var(--text-muted)]" data-test="wf-api-variables-note">From the request's fields by name (patient.id), and subject_id, instance and call_key.
+                          A variable that is only <span class="mono">{{ '{{' }}subject{{ '}}' }}</span>, or only an object or list of it (<span class="mono">{{ '{{' }}patient{{ '}}' }}</span>), is sent as JSON.</p>
+                      </div>
+                      <div>
+                        <label class="label" for="st-save">Keep the answer as</label>
+                        <input id="st-save" class="input font-mono" maxlength="64" [ngModel]="s.saveAs" (ngModelChange)="set('saveAs', $event)" />
+                        <p class="field-note text-[color:var(--text-muted)]">
+                          A Condition after this step reads {{ s.saveAs || 'api' }}.status, .ok, .error or .body.<i>field</i>.
+                          <button type="button" class="link-inline" (click)="branchOnAnswer(s)" data-test="wf-api-branch">Add a condition on it</button>
+                        </p>
+                      </div>
+                      <div>
+                        <label class="label" for="st-api-err">If the call is not ok</label>
+                        <select id="st-api-err" class="input" [ngModel]="s.onError || 'fail'" (ngModelChange)="set('onError', $event)">
+                          <option value="continue">Carry on (branch on the answer)</option>
+                          <option value="fail">Stop the request</option>
                         </select>
                       </div>
                     }
@@ -348,6 +520,19 @@
                           <option value="">The step below</option>
                           <option value="end">End the request</option>
                           @for (t of targets(); track t.key) { @if (t.key !== s.key) { <option [value]="t.key">Go to {{ t.label }}</option> } }
+                        </select>
+                      </div>
+                    }
+
+                    @if (endsHere(s)) {
+                      <div>
+                        <label class="label" for="st-ends">If the request ends here, it ends as</label>
+                        <select id="st-ends" class="input" [ngModel]="s.endsAs || ''" (ngModelChange)="set('endsAs', $event || null)" data-test="wf-ends-as">
+                          <option value="">{{ hasApprovals() ? 'As its latest approval went' : 'Completed' }}</option>
+                          <option value="approved">Approved</option>
+                          <option value="rejected">Rejected</option>
+                          <option value="completed">Completed</option>
+                          <option value="failed">Failed</option>
                         </select>
                       </div>
                     }
@@ -430,7 +615,7 @@
                 <label class="sr-only" for="wf-note">What changed</label>
                 <input id="wf-note" class="input input-sm" maxlength="500" placeholder="What changed (optional, for the version history)" [ngModel]="note()" (ngModelChange)="note.set($event)" data-test="publish-note" />
               </div>
-              <button type="button" class="btn btn-ghost btn-sm" (click)="discard()" data-test="discard">Discard changes</button>
+              <button type="button" class="btn btn-default btn-intent-crit btn-sm" (click)="discard()" data-test="discard">Discard changes</button>
             } @else {
               <p class="designer-foot-quiet" data-test="publish-clean">
                 @if (wf.currentVersion) { Version {{ wf.currentVersion }} is live. A change here stays a draft until you publish it. }
@@ -477,7 +662,7 @@
   </div>
 </ng-template>
 
-<!-- Who a step is for: a person, a role, a group, the requester's manager, or the requester -->
+<!-- Who a step is for: a person, a role, a team, the requester's manager, or the requester -->
 <ng-template #whoPicker let-field="field" let-who="who" let-label="label" let-noRequester="noRequester">
   <div class="flex flex-col gap-2">
     <div>
@@ -487,7 +672,7 @@
         @if (!noRequester) { <option value="requester">The requester</option> }
         <option value="user">A person</option>
         <option value="role">Everyone with a role</option>
-        <option value="group">Everyone in a group</option>
+        <option value="team">Everyone in a team</option>
         <!-- UX review 2026-10-12: a built-in workflow's approver is named on each request (the pipeline's reviewers). -->
         @if (who?.kind === 'subject') { <option value="subject">{{ subjectWho(who.value) }}</option> }
       </select>
@@ -498,7 +683,7 @@
     </div>
     @if (who?.kind === 'user') {
       <app-combobox [numeric]="true" placeholder="Search people…" [allowClear]="false" [disabled]="!canEdit()" [ariaLabel]="label + ': person'"
-                    [options]="colleagueOptions()" [ngModel]="numberOrNull(who.value)" (ngModelChange)="setWho(field, 'user', $event == null ? null : '' + $event)" />
+                    [options]="field === 'to' ? colleagueOptions() : actorOptions()" [ngModel]="numberOrNull(who.value)" (ngModelChange)="setWho(field, 'user', $event == null ? null : '' + $event)" />
     }
     @if (who?.kind === 'role') {
       <select class="input" [ngModel]="who.value || ''" (ngModelChange)="setWho(field, 'role', $event)" [disabled]="!canEdit()" [attr.aria-label]="label + ': role'">
@@ -507,11 +692,14 @@
         <option value="TENANT_USER">Any member</option>
       </select>
     }
-    @if (who?.kind === 'group') {
-      <select class="input" [ngModel]="who.value || ''" (ngModelChange)="setWho(field, 'group', $event)" [disabled]="!canEdit()" [attr.aria-label]="label + ': group'">
-        <option value="" disabled>Pick a group</option>
-        @for (g of groups(); track g.id) { <option [value]="'' + g.id">{{ g.name }}</option> }
+    @if (who?.kind === 'team') {
+      <select class="input" [ngModel]="who.value || ''" (ngModelChange)="setWho(field, 'team', $event)" [disabled]="!canEdit()" [attr.aria-label]="label + ': team'">
+        <option value="" disabled>Pick a team</option>
+        @for (g of teams(); track g.id) { <option [value]="'' + g.id">{{ g.name }}</option> }
       </select>
+      @if (!teams().length) {
+        <p class="field-note text-[color:var(--text-muted)]" data-test="no-teams">No teams yet: make one in Administration › Teams.</p>
+      }
     }
   </div>
 </ng-template>

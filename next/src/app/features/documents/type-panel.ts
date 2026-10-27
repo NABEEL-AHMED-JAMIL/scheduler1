@@ -64,7 +64,7 @@ type Mode = 'view' | 'edit' | 'copy' | 'new' | 'version';
             @case ('version') {
               <p class="text-sm text-[color:var(--text-secondary)] flex items-center gap-2" role="note">
                 <app-icon name="history" size="0.95em" />Version {{ viewing() }}, as it was saved. Documents read with it keep it.
-                <button type="button" class="btn btn-ghost btn-xs" (click)="backToCurrent()">Back to the current version</button>
+                <button type="button" class="btn btn-default btn-xs" (click)="backToCurrent()">Back to the current version</button>
               </p>
             }
           }
@@ -112,7 +112,7 @@ type Mode = 'view' | 'edit' | 'copy' | 'new' | 'version';
           <section class="flex flex-col gap-2" aria-label="Tables">
             <div class="flex items-center gap-2">
               <h3 class="text-sm font-semibold flex-1">Line-item tables ({{ def().tables.length }})</h3>
-              @if (editing()) { <button type="button" class="btn btn-ghost btn-sm" (click)="addTable()"><app-icon name="plus" />Add table</button> }
+              @if (editing()) { <button type="button" class="btn btn-default btn-sm" (click)="addTable()"><app-icon name="plus" />Add table</button> }
             </div>
             @for (t of def().tables; track $index; let i = $index) {
               <div class="card p-4 flex flex-col gap-2" role="group" [attr.aria-label]="'Table ' + (i + 1)">
@@ -130,7 +130,7 @@ type Mode = 'view' | 'edit' | 'copy' | 'new' | 'version';
           <section class="flex flex-col gap-2" aria-label="Rules">
             <div class="flex items-center gap-2">
               <h3 class="text-sm font-semibold flex-1">Rules ({{ def().rules.length }})</h3>
-              @if (editing()) { <button type="button" class="btn btn-ghost btn-sm" (click)="addRule()"><app-icon name="plus" />Add rule</button> }
+              @if (editing()) { <button type="button" class="btn btn-default btn-sm" (click)="addRule()"><app-icon name="plus" />Add rule</button> }
             </div>
             @for (r of def().rules; track $index; let i = $index) {
               <div class="card p-4 flex flex-col gap-2" role="group" [attr.aria-label]="'Rule ' + (i + 1)">

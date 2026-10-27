@@ -42,22 +42,20 @@ test.describe('Forms (lite), the result review, and the Friday menu (live)', () 
     s = await sessionFor(request, 'admin');
   });
 
-  test('the menu offers every Wave 5 module: forms, the Task inbox, Data Catalog and Connector Hub', async ({ browser }) => {
+  test('the menu offers every Wave 5 module: forms, Review, Analysis and Connections', async ({ browser }) => {
     const page = await pageAs(browser, s, 390);
     await page.goto('/');
     await page.getByRole('button', { name: 'Menu', exact: true }).click();
     const menu = page.locator('nav.mobile-nav');
     await expect(menu).toBeVisible();
-    // Sections open on a click; open every one so their pages are in the page.
-    for (const section of await menu.locator('button[aria-expanded="false"]').all()) await section.click();
-    await expect(menu.getByRole('link', { name: 'All forms' })).toBeVisible();
-    await expect(menu.getByRole('link', { name: 'Submissions' })).toBeVisible();
-    await expect(menu.getByRole('link', { name: 'Ask your data' })).toBeVisible();
-    // Since the demo moved to 12 October every Wave 5 module is built and on the menu; nothing is "Coming soon".
-    await expect(menu.getByRole('link', { name: 'Task inbox' })).toBeVisible();
-    await expect(menu.getByRole('link', { name: 'Data Catalog' })).toBeVisible();
-    await expect(menu.getByRole('link', { name: 'Connector Hub' })).toBeVisible();
-    await expect(menu.getByText('Coming soon', { exact: true })).toHaveCount(0);
+    // The menu tree (2026-10-12) lists hubs, each named with what is in it; the modules are their tabs: Forms holds the
+    // builder and Submissions, Review the Task inbox (Approvals), Analysis Ask your data and the Data Catalog,
+    // Connections the Connector Hub. Every Wave 5 module is built: nothing is "Soon".
+    await expect(menu.getByRole('link', { name: /^Forms\b.*everything they collected/ })).toBeVisible();
+    await expect(menu.getByRole('link', { name: /^Review\b.*Approvals/ })).toBeVisible();
+    await expect(menu.getByRole('link', { name: /^Analysis\b.*Ask your data/ })).toBeVisible();
+    await expect(menu.getByRole('link', { name: /^Connections\b.*Connectors/ })).toBeVisible();
+    await expect(menu.getByText('Soon', { exact: true })).toHaveCount(0);
   });
 
   test('All forms lists the trial finder\'s form, and its fill-in page asks for its fields', async ({ browser, request }) => {
@@ -85,11 +83,15 @@ test.describe('Forms (lite), the result review, and the Friday menu (live)', () 
     test.skip(!run, 'No rebuilt schedule has a completed run pending review (the rebuild left the partner-lab sign-off open).');
     const page = await pageAs(browser, s);
     await page.goto(`/pipelines/schedules/${REVIEW_JOB}/runs/${run}/logs`);
-    const review = page.locator('[data-review]');
+    // Since the run page's UX review (2026-10-12) the review is its Next steps card, beside the run's facts.
+    const review = page.locator('[data-test="next-steps"]');
     await expect(review).toBeVisible();
-    await expect(review.getByRole('heading', { name: 'Result review' })).toBeVisible();
-    await expect(review.getByText('Waiting for review')).toBeVisible();
-    await expect(review.getByText('Needs: Our team')).toBeVisible();
+    await expect(review.getByRole('heading', { name: 'Next steps' })).toBeVisible();
+    await expect(review.locator('[data-test="review-status"]')).toHaveText('Waiting for review');
+    // Who must review: our team (the internal review), as a group or the workspace's people, and the administrator
+    // reading it may decide here.
+    await expect(review.locator('[data-test="waiting-on"]')).toContainText(/Waiting on .*(group|administrators|users)/);
+    await expect(review.locator('[data-test="waiting-on"]')).toContainText('you can decide here');
     await expect(review.getByRole('button', { name: 'Approve' })).toBeEnabled();
     await expect(review.getByRole('button', { name: 'Reject' })).toBeEnabled();
   });

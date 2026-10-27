@@ -23,7 +23,7 @@ class Host {
 
 const steps = (n: number): FlowNode[] => Array.from({ length: n }, (_, i) => ({
   id: 's' + i, label: 'Step ' + i, sub: 'task_' + i, kind: i === 0 ? 'trigger' : 'process',
-  badges: i === 1 ? ['needs promptId'] : [], metrics: i === 2 ? [{ label: 'time', value: '1.2 s' }] : [], share: i === 2 ? 0.5 : null,
+  badges: i === 1 ? ['needs promptId'] : [], metrics: i === 2 ? [{ label: 'time', value: '1.2 sec' }] : [], share: i === 2 ? 0.5 : null,
 }));
 const line = (n: number): FlowEdge[] => Array.from({ length: n - 1 }, (_, i) => ({ from: 's' + i, to: 's' + (i + 1), label: i ? null : 'rows' }));
 
@@ -142,7 +142,7 @@ describe('<app-flow-graph>', () => {
   it('draws badges, metrics and the share bar', () => {
     const { el } = render(3);
     expect(el.querySelector('g[data-id="s1"] .fg-badge')!.textContent).toBe('needs promptId');
-    expect(el.querySelector('g[data-id="s2"] .fg-mvalue')!.textContent).toBe('1.2 s');
+    expect(el.querySelector('g[data-id="s2"] .fg-mvalue')!.textContent).toBe('1.2 sec');
     const bar = el.querySelector('g[data-id="s2"] .fg-bar')!;
     const track = el.querySelector('g[data-id="s2"] .fg-track')!;
     expect(Number(bar.getAttribute('width'))).toBe(Number(track.getAttribute('width')) / 2);

@@ -299,8 +299,8 @@ export function buildPivot(data: RunData, rowDim: Dimension, colDim: Dimension,
  *
  * formatDuration keeps the two answers this page depends on apart: NO_DURATION, and any other
  * negative, is the dash for "no duration recorded", while a real zero -- a run that finished
- * inside a second, which the query rounds to 0 -- is "0s". The execution measures live below a
- * second, and "230ms" is the whole answer there where "0s" would be none of it. This page had its
+ * inside a second, which the query rounds to 0 -- is "0 sec". The execution measures live below a
+ * second, and "230 ms" is the whole answer there where "0 sec" would be none of it. This page had its
  * own humanSeconds, which wrote that "0.23s" and rounded differently from the jobs pages; it now
  * shares their formatter.
  */

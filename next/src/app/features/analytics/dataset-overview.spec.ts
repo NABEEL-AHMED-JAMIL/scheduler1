@@ -68,7 +68,7 @@ describe('DatasetOverview', () => {
     expect(tiles[4].view?.marks).toEqual([{ name: 'amount', value: 12.5 }]);
     const screen = text();
     expect(screen).toContain('Rows over time');
-    expect(screen).toContain('read in 946ms');
+    expect(screen).toContain('read in 946 ms');
     expect(screen).toContain('Refused for the test.');
     expect(screen).not.toContain('Most common');                                    // one row is not a mode
     expect(screen).toContain('5 charts chosen from the columns');

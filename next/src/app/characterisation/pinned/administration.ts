@@ -25,8 +25,8 @@ export const PINNED: Record<string, unknown> = {
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
-      "GET /tenant.json/listTenants",
-      "GET /pageAccess.json/pages"
+      "GET /pageAccess.json/pages",
+      "GET /tenant.json/listTenants"
     ],
     "headings": [
       "Page access",
@@ -38,7 +38,7 @@ export const PINNED: Record<string, unknown> = {
     ],
     "columns": [],
     "fields": [
-      "Choose a workspace…",
+      "Pick a workspace",
       "Workspace"
     ],
     "links": [
@@ -47,7 +47,9 @@ export const PINNED: Record<string, unknown> = {
       "/administration/appearance",
       "/administration/data-policies",
       "/administration/security",
-      "/administration/users"
+      "/administration/teams",
+      "/administration/users",
+      "/platform/workspaces"
     ]
   },
   "access profiles, as a workspace administrator": {
@@ -64,12 +66,16 @@ export const PINNED: Record<string, unknown> = {
       "Page access",
       "Who can open what",
       "UI-REVIEW Analysts — Zürich – 東京 ✓ finance analytics and AI prompt authors (long name)",
-      "UI-REVIEW No pages"
+      "UI-REVIEW No pages",
+      "Grant pages and tabs"
     ],
     "buttons": [
+      "A person",
       "Actions for UI-REVIEW Analysts — Zürich – 東京 ✓ finance analytics and AI prompt authors (long name)",
       "Actions for UI-REVIEW No pages",
+      "Changes",
       "Check a person",
+      "Delegates",
       "New profile",
       "People × pages",
       "Profiles",
@@ -83,13 +89,19 @@ export const PINNED: Record<string, unknown> = {
         "Can change"
       ]
     ],
-    "fields": [],
+    "fields": [
+      "Covering month-end close",
+      "ForUntil removed7 days30 days90 days",
+      "PersonNo member to choose",
+      "Reason (kept in the change log)"
+    ],
     "links": [
       "/administration",
       "/administration/access-profiles",
       "/administration/appearance",
       "/administration/data-policies",
       "/administration/security",
+      "/administration/teams",
       "/administration/users"
     ]
   },
@@ -99,10 +111,14 @@ export const PINNED: Record<string, unknown> = {
     ],
     "headings": [
       "Page access",
-      "Who can open what"
+      "Who can open what",
+      "Grant pages and tabs"
     ],
     "buttons": [
+      "A person",
+      "Changes",
       "Check a person",
+      "Delegates",
       "New profile",
       "People × pages",
       "Profiles",
@@ -125,9 +141,13 @@ export const PINNED: Record<string, unknown> = {
       ]
     ],
     "fields": [
+      "Covering month-end close",
       "Find a person",
       "Find a person…",
+      "ForUntil removed7 days30 days90 days",
+      "PersonChoose a memberCasey Baseline",
       "Profile for Casey Baseline",
+      "Reason (kept in the change log)",
       "Source Jobs for Casey Baseline",
       "Source Tasks for Casey Baseline"
     ],
@@ -137,6 +157,7 @@ export const PINNED: Record<string, unknown> = {
       "/administration/appearance",
       "/administration/data-policies",
       "/administration/security",
+      "/administration/teams",
       "/administration/users"
     ]
   },
@@ -162,7 +183,8 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /tenant.json/listTenants",
-      "GET /managedService.json/myWorkspaces"
+      "GET /managedService.json/myWorkspaces",
+      "GET /billing.json/workspaceFigures"
     ],
     "headings": [
       "Workspaces",
@@ -171,38 +193,34 @@ export const PINNED: Record<string, unknown> = {
     "buttons": [
       "Actions for Claude Demo 75a611b4",
       "Actions for Default",
-      "Buckets",
+      "Alerts",
       "Cards",
       "Columns",
       "Copy claude-demo-75a611b4",
       "Copy default",
-      "Created",
-      "Kafka",
+      "Cost",
       "New workspace",
       "Only mine",
       "Pipelines",
       "Refresh",
-      "Schedules",
+      "Runs",
+      "Storage",
       "Table",
-      "Topics",
       "Users",
       "Workspace"
     ],
     "columns": [
       [
         "Workspace",
-        "Admin",
-        "Users",
-        "Schedules",
-        "Pipelines",
-        "Topics",
-        "Buckets",
-        "Kafka",
-        "Created",
-        "Created by",
-        "Updated by",
-        "Mode",
         "State",
+        "Plan",
+        "Users",
+        "Pipelines",
+        "Runs",
+        "Storage",
+        "Cost",
+        "Alerts",
+        "Admin",
         "Actions"
       ]
     ],
@@ -213,14 +231,11 @@ export const PINNED: Record<string, unknown> = {
     ],
     "links": [
       "/platform",
-      "/platform/billing-analytics",
       "/platform/engine",
       "/platform/managed-service",
-      "/platform/rate-cards",
-      "/platform/reliability",
       "/platform/requests",
+      "/platform/service-health",
       "/platform/staff-activity",
-      "/platform/work-in-workspace",
       "/platform/workspaces"
     ]
   },

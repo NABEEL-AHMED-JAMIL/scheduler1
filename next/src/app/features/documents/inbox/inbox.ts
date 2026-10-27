@@ -1,7 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpEventType } from '@angular/common/http';
 import { Dialog } from '@angular/cdk/dialog';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { AuthService } from '../../../core/auth/auth.service';
 import { Icon } from '../../../shared/ui/icon';
@@ -93,6 +93,11 @@ export class Inbox implements OnInit {
 
   /** A sign-in with no workspace (a platform administrator's own): the inbox is a workspace's, so nothing is read (review L6). */
   readonly noWorkspace = computed(() => !this.auth.user()?.tenantId);
+  /**
+   * A section of Documents › Intake (owner 2026-10-20, §0.1): the Intake page draws the header and says what the file drop
+   * does, so the page draws its own refresh beside the upload instead.
+   */
+  readonly embedded = !!inject(ActivatedRoute, { optional: true })?.snapshot?.data?.['embedded'];
 
   ngOnInit(): void {
     if (this.noWorkspace()) return;

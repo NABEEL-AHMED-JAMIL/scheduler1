@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   Definition, StepTaskEntry, addStep, canonical, coerce, inputColumns, isMapSchema, mapValueKind, outputColumns, refusalOf, definitionJson, fieldsOf, isLegacyDefinition, moveStep, nextKey, problemsByStep,
   removeStep, replaceStep, runFinished, sampleRowsOf, schemaSupported, seedConfig, taskEntry, taskOptions, toYaml, updateSettings,
-  withSample, parseSampleRows, usesWebhook, usesDocumentType,
+  withSample, parseSampleRows, usesWebhook, usesDocumentType, usesSchedule,
 } from './steps.model';
 
 /**
@@ -261,6 +261,52 @@ describe('steps model -- the columns a step can pick from', () => {
     const tasks: StepTaskEntry[] = [{ code: 'read_api', outputSchema: { type: 'array', items: { type: 'object', properties: { a: { type: 'string' }, b: { type: 'string' } } } } }];
     expect(inputColumns(chain, 7, tasks)).toEqual(['a', 'b']);
   });
+
+  it('passes the rows through Upload to bucket, as through Save File', () => {
+    const upload: Definition = { version: 1, steps: [chain.steps[0], { key: 'up', task: 'upload_bucket', config: { key: 'out/{{row}}.json' } }] };
+    expect(outputColumns(upload, 1)).toEqual(['id', 'name', 'city']);
+  });
+
+  describe('a step that reads files: Transcribe audio, Convert file', () => {
+    const one = (task: string, config: Record<string, unknown> = {}): Definition => ({ version: 1, steps: [{ key: 'files', task, config }] });
+    const after = (rows: Record<string, unknown>[], task: string, config: Record<string, unknown> = {}): Definition => ({ version: 1, steps: [
+      { key: 'list', task: 'sample', config: { rows } }, { key: 'files', task, config },
+    ] });
+    const heard = ['file_name', 'file_stem', 'transcript', 'language', 'duration_seconds'];
+    const turned = ['file_name', 'file_stem', 'converted_key', 'converted_pages', 'converted_bytes', 'convert_status'];
+
+    it('makes a row per file of the run (bucket, key) when it names no key column and nothing before it has one', () => {
+      expect(outputColumns(one('transcribe_audio'), 0)).toEqual(['bucket', 'key', ...heard]);
+      expect(outputColumns(one('convert_file', { targetFormat: 'pdf' }), 0)).toEqual(['bucket', 'key', ...turned]);
+      expect(outputColumns(after([{ id: 1, name: 'a' }], 'transcribe_audio'), 1)).toEqual(['bucket', 'key', ...heard]);
+    });
+
+    it('keeps the input\'s rows when they have a key column, or the step names one', () => {
+      expect(outputColumns(after([{ bucket: 'b', key: 'calls/1.mp3', size: 9 }], 'transcribe_audio'), 1))
+        .toEqual(['bucket', 'key', 'size', ...heard]);
+      expect(outputColumns(after([{ id: 1, path: 'in/a.docx' }], 'convert_file', { keyColumn: 'path' }), 1))
+        .toEqual(['id', 'path', ...turned]);
+    });
+
+    it('MIG-421: Read text from pages keeps each page\'s row and adds what it read', () => {
+      expect(outputColumns(after([{ key: 'r.pdf', page: 1, page_text: '', page_image: 'r-page-01.png' }], 'ocr_pages', { fromStep: 'read' }), 1))
+        .toEqual(['key', 'page', 'page_text', 'page_image', 'ocr_text', 'ocr_sureness', 'ocr_source', 'ocr_words', 'ocr_status', 'ocr_note', 'ocr_rotation']);
+    });
+
+    it('adds segments with Timestamps, and the status and error columns when a failed file is skipped or kept', () => {
+      expect(outputColumns(one('transcribe_audio', { timestamps: true, onError: 'skip' }), 0))
+        .toEqual(['bucket', 'key', ...heard, 'segments', 'transcribe_status', 'transcribe_error']);
+      expect(outputColumns(one('transcribe_audio', { onError: 'fail' }), 0)).toEqual(['bucket', 'key', ...heard]);
+      expect(outputColumns(one('convert_file', { onError: 'null' }), 0)).toEqual(['bucket', 'key', ...turned, 'convert_error']);
+    });
+
+    it('cannot tell when the input\'s columns are not known and a key column is named, or a step before may have one', () => {
+      const unknown = (config: Record<string, unknown>): Definition => ({ version: 1, steps: [{ key: 'api', task: 'read_api' }, { key: 'files', task: 'convert_file', config }] });
+      expect(outputColumns(unknown({ keyColumn: 'path' }), 1)).toBeNull();
+      expect(outputColumns(unknown({}), 1)).toBeNull();
+      expect(outputColumns(one('transcribe_audio', { keyColumn: 'path' }), 0)).toBeNull();
+    });
+  });
 });
 
 describe('steps model -- a config form from the task\'s JSON Schema', () => {
@@ -383,6 +429,15 @@ describe('fieldsOf -- MIG-364', () => {
     expect(usesDocumentType(schema)).toBe(true);
     expect(usesDocumentType({ type: 'object', properties: { source: schema } })).toBe(true);
     expect(usesDocumentType({ type: 'object', properties: { promptId: { type: 'integer', format: 'prompt' } } })).toBe(false);
+  });
+});
+
+describe('fieldsOf -- MIG-424', () => {
+  it('reads an integer with the schedule hint as a schedule choice, and knows a task that names one', () => {
+    const schema = { type: 'object', properties: { jobId: { type: 'integer', format: 'schedule', title: 'Pipeline' } } };
+    expect(fieldsOf(schema)[0].kind).toBe('schedule');
+    expect(usesSchedule(schema)).toBe(true);
+    expect(usesSchedule({ type: 'object', properties: { promptId: { type: 'integer', format: 'prompt' } } })).toBe(false);
   });
 });
 

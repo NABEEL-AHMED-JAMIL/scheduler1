@@ -125,12 +125,12 @@ export const WIDGET_HEIGHT_MAX = 600;
         @case ('comparison') { <app-comparison [first]="sides(v).first" [second]="sides(v).second" /> }
         @case ('ranked') {
           <div class="chart-scroll" [style.max-height.px]="scrollCap">
-            <app-ranked-bar [data]="v.marks" [max]="v.marks.length" [showPercent]="false" [formatValue]="figure" [clickable]="clickable()" (picked)="picked.emit($any($event))" />
+            <app-ranked-bar [data]="v.marks" [max]="v.marks.length" [showPercent]="false" [formatValue]="figure" [single]="true" [clickable]="clickable()" (picked)="picked.emit($any($event))" />
           </div>
         }
         @case ('rankedShare') {
           <div class="chart-scroll" [style.max-height.px]="scrollCap">
-            <app-ranked-bar [data]="v.marks" [max]="v.marks.length" [showPercent]="true" [formatValue]="figure" [clickable]="clickable()" (picked)="picked.emit($any($event))" />
+            <app-ranked-bar [data]="v.marks" [max]="v.marks.length" [showPercent]="true" [formatValue]="figure" [single]="true" [clickable]="clickable()" (picked)="picked.emit($any($event))" />
           </div>
         }
         @case ('bar') {

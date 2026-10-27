@@ -15,6 +15,7 @@ import {
   stateIcon, stateTone,
 } from './connectors.model';
 import { ConnectPanel, ConnectPanelData } from './connect-panel';
+import { formatDuration } from '../../../shared/ui/time-format';
 
 /** What the page hands the panel: the connection to open, the gallery (for Add tables), and a way to say the list changed. */
 export interface ConnectionPanelData {
@@ -86,7 +87,7 @@ export interface ConnectionPanelData {
             <div class="flex flex-wrap items-center gap-2">
               <h3 class="text-sm font-semibold flex-1">Streams</h3>
               @if (canBuild() && card()) {
-                <button type="button" class="btn btn-ghost btn-sm" (click)="addTables()" [disabled]="busy()" data-add-tables><app-icon name="plus" />Add {{ addWord() }}</button>
+                <button type="button" class="btn btn-default btn-sm" (click)="addTables()" [disabled]="busy()" data-add-tables><app-icon name="plus" />Add {{ addWord() }}</button>
               }
             </div>
             @for (s of d.streams; track s.id) {
@@ -119,9 +120,9 @@ export interface ConnectionPanelData {
                         </td>
                         @if (isAdmin()) {
                           <td class="whitespace-nowrap text-right">
-                            <button type="button" class="btn btn-ghost btn-xs" (click)="runNow(s)" [disabled]="busy()" [attr.aria-label]="'Sync ' + s.name + ' now'">Sync</button>
+                            <button type="button" class="btn btn-default btn-xs" (click)="runNow(s)" [disabled]="busy()" [attr.aria-label]="'Sync ' + s.name + ' now'">Sync</button>
                             @if (canBuild() && s.mode !== 'FULL' && !s.sourceId) {
-                              <button type="button" class="btn btn-ghost btn-xs" (click)="asSource(s)" [disabled]="busy()" title="Use its data in a pipeline (Sources)">Make a source</button>
+                              <button type="button" class="btn btn-default btn-xs" (click)="asSource(s)" [disabled]="busy()" title="Use its data in a pipeline (Sources)">Make a source</button>
                             }
                             @if (canBuild()) {
                               <button type="button" class="btn btn-ghost btn-xs" (click)="removeStream(s)" [disabled]="busy()" [attr.aria-label]="'Stop syncing ' + s.name">
@@ -178,7 +179,7 @@ export interface ConnectionPanelData {
       <div foot class="flex items-center gap-2 w-full">
         @if (canBuild() && detail(); as d) {
           @if (d.connection.authKind === 'OAUTH' && d.connection.oauthStatus === 'CONNECTED') {
-            <button type="button" class="btn btn-ghost btn-sm" (click)="disconnect()" [disabled]="busy()">Disconnect</button>
+            <button type="button" class="btn btn-default btn-intent-crit btn-sm" (click)="disconnect()" [disabled]="busy()">Disconnect</button>
           }
           <button type="button" class="btn btn-danger btn-sm" (click)="remove()" [disabled]="busy()" data-delete><app-icon name="trash" />Delete</button>
         }
@@ -254,8 +255,7 @@ export class ConnectionPanel implements OnInit {
     const start = instantOf(run.startedAt);
     const end = instantOf(run.finishedAt);
     if (!start || !end) return '—';
-    const seconds = Math.max(0, Math.round((end.getTime() - start.getTime()) / 1000));
-    return seconds < 60 ? `${seconds} s` : `${Math.round(seconds / 60)} min`;
+    return formatDuration(Math.max(0, (end.getTime() - start.getTime()) / 1000));
   }
 
   test(): void {
@@ -331,7 +331,7 @@ export class ConnectionPanel implements OnInit {
   asSource(stream: Stream): void {
     this.api.asSource(stream.id).subscribe(res => {
       if (res.status === API_SUCCESS) {
-        this.toast.success(`${stream.name} is a source now (Integration › Sources).`);
+        this.toast.success(`${stream.name} is a source now (Connections › Sources).`);
         this.load();
       } else {
         this.toast.error(res.message);

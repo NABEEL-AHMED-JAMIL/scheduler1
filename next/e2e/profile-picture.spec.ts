@@ -112,11 +112,13 @@ test.describe('profile pictures', () => {
     for (const width of [1920, 1187]) {
       const page = await pageAs(browser, admin, { viewport: { width, height: width === 1920 ? 1080 : 900 } });
       await page.goto('/administration/users');
-      const row = page.locator('tr, article').filter({ hasText: 'Riverside Health admin' }).first();
+      // A person's row by their own address: "by Riverside Health admin" is in other rows too, under Added.
+      const personRow = (username: string) => page.locator('tr, article')
+        .filter({ has: page.getByRole('button', { name: `Copy ${username}`, exact: true }) }).first();
+      const row = personRow(riverside().adminUsername);
       await expect(row.locator('img.avatar-img')).toBeVisible();
       // A colleague without a picture: initials on their colour, nothing fetched for them.
-      await expect(page.locator('tr, article').filter({ hasText: 'Riverside Health reviewer' }).first()
-        .locator('.avatar-initials[data-initials]')).toBeVisible();
+      await expect(personRow(riverside().reviewerUsername).locator('.avatar-initials[data-initials]')).toBeVisible();
       await expect(page.locator('[data-nav-menu="__user"] > button img.avatar-img')).toBeVisible();
       await shoot(page, 'users');
 
@@ -126,7 +128,7 @@ test.describe('profile pictures', () => {
       await page.keyboard.press('Escape');
 
       // The inbox: the tasks Riverside's administrator acted on, and their history's byline.
-      await page.goto('/workflows/inbox');
+      await page.goto('/review/approvals');
       await page.locator('[data-test="tab-done"]').click();
       await page.locator('.inbox-row').first().click();
       await expect(page.locator('.inbox-timeline img.avatar-img').first()).toBeVisible();
@@ -140,8 +142,11 @@ test.describe('profile pictures', () => {
     const other = await sessionAsPerson(request, meridian().admin);
     for (const url of [`${api}/appUser.json/avatar?appUserId=${admin.appUserId}`,
       `${api}/appUser.json/avatar?appUserId=${admin.appUserId}&size=64&v=${version}`]) {
+      // 204 and no bytes: Identity's one answer for "no picture", "not yours to see" and an unknown id (identity-service
+      // ce428ee: a 404 was a console error on every screen of people without pictures), so it leaks nothing.
       const answer = await request.get(url, { headers: authOf(other) });
-      expect(answer.status(), `${url} as Meridian's administrator`).toBe(404);
+      expect(answer.status(), `${url} as Meridian's administrator`).toBe(204);
+      expect((await answer.body()).length, 'no picture bytes').toBe(0);
     }
     const removal = await request.delete(`${api}/appUser.json/avatar?appUserId=${admin.appUserId}`, { headers: authOf(other) });
     expect(removal.status(), 'nor remove it').toBe(404);

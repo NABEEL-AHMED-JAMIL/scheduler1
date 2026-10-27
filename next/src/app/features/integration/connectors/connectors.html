@@ -72,7 +72,7 @@
       <ng-container empty-action>
         @if (!connections().length) {
           @if (canBuild()) { <button type="button" class="btn btn-primary btn-sm" (click)="connect(null)"><app-icon name="plus" />New connection</button> }
-          <a routerLink="/connections/sources" class="btn btn-ghost btn-sm">See Sources</a>
+          <a routerLink="/connections/sources" class="btn btn-default btn-sm">See Sources</a>
         }
       </ng-container>
       <table class="table-modern">

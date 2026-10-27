@@ -105,6 +105,16 @@ describe('AI Assistant -- a conversation', () => {
     expect(screen.conversations().length).toBe(1);
   });
 
+  it('ZT-I5: a conversation the address names that is not here (another workspace\'s link) is said neutrally', () => {
+    const { screen, api } = screenWith();
+    api.conversation.mockReturnValueOnce(of({ status: 'ERROR', message: 'Conversation not found with 1077.' }) as never);
+    screen.open(1077);
+    expect(screen.threadMissing()).toBe(true);
+    expect(screen.threadError()).toBe('');
+    screen.newChat();
+    expect(screen.threadMissing()).toBe(false);
+  });
+
   it('sends a question, follows its run, and takes the answer from the conversation when the run is done', () => {
     const { screen, api } = screenWith({ query: { c: '1000' } });
     screen.draft.set('  Which jobs?  ');

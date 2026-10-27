@@ -25,26 +25,30 @@ import { ReadDocumentData, ReadDocumentDialog, ReadDocumentResult } from './read
 import { TypePanel, TypePanelData } from './type-panel';
 import { UploadDocumentsDialog, UploadDocumentsResult } from './upload-documents-dialog';
 import { ManagedBanner } from '../../shared/ui/managed-banner';
+import { NeedsWorkspace } from '../../shared/ui/needs-workspace';
+import { NgTemplateOutlet } from '@angular/common';
+import { StartersDialog, StartersDialogResult } from './starters-dialog';
 import { PageHeader } from '../../shared/ui/page-header';
 import { RefreshButton } from '../../shared/ui/refresh-button';
 
-export type IntelligenceTab = 'overview' | 'types' | 'dataset' | 'intake';
-const TABS: IntelligenceTab[] = ['overview', 'types', 'dataset', 'intake'];
-/** Tab hubs (2026-10-12): each view is a tab of Documents, at its own address. */
+/**
+ * The page's views. overview, types and dataset are tabs of Documents (Documents in, Document types, Approved data);
+ * upload and email are sections of Documents › Intake (owner 2026-10-20, §0.1), drawn inside the Intake page's frame.
+ */
+export type IntelligenceTab = 'overview' | 'types' | 'dataset' | 'upload' | 'email';
+const TABS: IntelligenceTab[] = ['overview', 'types', 'dataset', 'upload', 'email'];
+/** Tab hubs (2026-10-12): each view is a tab of Documents, or a section of its Intake tab, at its own address. */
 export const INTELLIGENCE_VIEW_PATHS: Record<IntelligenceTab, string> = {
-  overview: '/documents/in', types: '/documents/types', dataset: '/documents/datasets', intake: '/documents/email-in',
+  overview: '/documents/in', types: '/documents/types', dataset: '/documents/approved-data', upload: '/documents/intake/upload',
+  email: '/documents/intake/email-in',
 };
+/** The views drawn inside Documents › Intake, which has the page's header: they draw none of their own. */
+const INTAKE_VIEWS: IntelligenceTab[] = ['upload', 'email'];
+/** Older ?tab= names, as links still carry them. */
+const TAB_ALIASES: Record<string, IntelligenceTab> = { intake: 'email', 'email-in': 'email', datasets: 'dataset' };
 
-/** A type's glyph on its card, from what it is for. */
-const TYPE_ICONS: Record<string, string> = {
-  invoice: 'file', purchase_order: 'briefcase', contract: 'edit', id_document: 'user', application_form: 'list',
-  // The kinds a healthcare workspace adds most (UX review B4, DI2): matched by key, so any workspace's type of that kind gets them.
-  lab_report: 'chart', referral: 'mail', referral_letter: 'mail', claim: 'shield', claim_form: 'shield',
-  discharge_summary: 'list', prescription: 'edit', consent_form: 'checkCircle',
-};
-
-/** Document types a healthcare workspace typically reads, named in the empty states (generic examples, no workspace's data). */
-export const EXAMPLE_DOCUMENT_TYPES = 'a lab report, a referral letter, a claim form or a discharge summary';
+/** Document types a workspace typically reads, named in the empty states (generic examples, no workspace's data). */
+export const EXAMPLE_DOCUMENT_TYPES = 'an invoice, a referral letter, a lab result or a contract';
 
 /** How the recent documents can be narrowed by state: what the row shows. */
 const RECENT_STATES = ['In review', 'Approved', 'Auto-approved', 'Rejected', 'Failed', 'Unclassified', 'Queued', 'Running', 'Read'];
@@ -64,15 +68,8 @@ const RECENT_STATES = ['In review', 'Approved', 'Auto-approved', 'Rejected', 'Fa
  */
 @Component({
   selector: 'app-document-intelligence',
-  imports: [RefreshButton, PageHeader, RouterLink, Icon, TableShell, StatusPill, StatStrip, Pagination, DataText, ServerTimePipe, ConfidenceBar, CdkMenu, CdkMenuItem, CdkMenuTrigger, ManagedBanner],
+  imports: [RefreshButton, PageHeader, RouterLink, Icon, TableShell, StatusPill, StatStrip, Pagination, DataText, ServerTimePipe, ConfidenceBar, CdkMenu, CdkMenuItem, CdkMenuTrigger, ManagedBanner, NeedsWorkspace, NgTemplateOutlet],
   templateUrl: './intelligence.html',
-  styles: [`
-    /* UX review DI1: one line per active type -- its name, its numbers, and the schedules its approved documents start. */
-    .type-starts { list-style: none; margin: 0; padding: 0; }
-    .type-start { display: grid; grid-template-columns: 1.25rem minmax(10rem, 16rem) 9rem minmax(0, 1fr); gap: 0.75rem; align-items: center;
-      padding: 0.5rem 1rem; border-top: 1px solid var(--border-subtle); font-size: 0.8125rem; }
-    @media (max-width: 767px) { .type-start { grid-template-columns: 1.25rem minmax(0, 1fr); } .type-start > :nth-child(n+3) { grid-column: 2; } }
-  `],
 })
 export class DocumentIntelligence implements OnInit {
   private readonly api = inject(DocumentsApi);
@@ -84,17 +81,23 @@ export class DocumentIntelligence implements OnInit {
   private readonly route = inject(ActivatedRoute);
 
   readonly tabs: { id: IntelligenceTab; label: string }[] = [
-    { id: 'overview', label: 'Overview' }, { id: 'types', label: 'Document types' }, { id: 'dataset', label: 'Dataset' },
-    { id: 'intake', label: 'Intake' },
+    { id: 'overview', label: 'Overview' }, { id: 'types', label: 'Document types' }, { id: 'dataset', label: 'Approved data' },
+    { id: 'upload', label: 'Upload' }, { id: 'email', label: 'Email-in' },
   ];
   /**
-   * Tab hubs (2026-10-12): the address names the view -- Documents › Documents in, Document types, Datasets or Email-in --
-   * and the hub's strip is the way between them, so the page's own tab strip is not shown. Without a view in the route
-   * (a unit test mounting the page alone) the page keeps its own tabs, read from ?tab=.
+   * Tab hubs (2026-10-12): the address names the view -- Documents › Documents in, Document types, Approved data, or a
+   * section of Intake -- and the hub's strip is the way between them, so the page's own tab strip is not shown. Without a
+   * view in the route (a unit test mounting the page alone) the page keeps its own tabs, read from ?tab=.
    */
   readonly hubView = (this.route.snapshot?.data?.['view'] as IntelligenceTab | undefined) ?? null;
   readonly tab = signal<IntelligenceTab>(this.hubView ?? this.tabOf(this.route.snapshot?.queryParamMap?.get('tab')));
-  readonly heading = computed(() => ({ overview: 'Documents in', types: 'Document types', dataset: 'Datasets', intake: 'Email-in' })[this.tab()]);
+  /** A section of Documents › Intake: the Intake page draws the header and the section strip around it. */
+  readonly embedded = !!this.hubView && INTAKE_VIEWS.includes(this.hubView);
+  readonly heading = computed(() => ({
+    overview: 'Documents in', types: 'Document types', dataset: 'Approved data', upload: 'Upload documents', email: 'Email-in',
+  })[this.tab()]);
+  /** A sign-in with no workspace (a platform administrator's own): every call here would answer "Pick a workspace". */
+  readonly noWorkspace = computed(() => !this.auth.user()?.tenantId);
   readonly canManage = computed(() => this.auth.canBuild());
   /** The email-in address is the workspace's: an administrator's to turn on, renew or turn off (MIG-271). */
   readonly canManageMailbox = computed(() => this.auth.isTenantAdmin());
@@ -131,19 +134,21 @@ export class DocumentIntelligence implements OnInit {
 
   /** Documents per type over the stats' days, for the type cards. */
   private readonly docsByType = computed(() => new Map(this.stats().map(s => [s.documentTypeId, s.documents])));
-  readonly activeTypes = computed(() => this.types().filter(t => t.status === 'Active'));
-  /** UX review DI1: the schedules an approved document starts -- Schedules' read, so only for a reader who holds it. */
+  /**
+   * UX review DI1, moved to Document types' "When approved, starts…" column (owner 2026-10-20, §0.1): the schedules an
+   * approved document starts -- Schedules' read, so only for a reader who holds it.
+   */
   readonly canSeeSchedules = computed(() => typeof this.auth.canOpen === 'function' && this.auth.canOpen('jobs'));
   readonly triggers = signal<DocumentTriggerRow[] | null>(null);
-  /** Each active type with the schedules its approved documents start (switched-off triggers say so). */
-  readonly typeStarts = computed(() => {
-    const triggers = this.triggers() ?? [];
-    return this.activeTypes().map(type => ({
-      type,
-      starts: triggers.filter(t => Number(t.documentTypeId) === Number(type.documentTypeId))
-        .map(t => ({ jobId: t.jobId, name: t.jobName || `Schedule #${t.jobId}`, on: t.enabled && t.jobStatus === 'Active',
-          why: !t.enabled ? 'trigger off' : t.jobStatus !== 'Active' ? 'schedule not active' : '' })),
-    }));
+  /** Each type's schedules its approved documents start (switched-off triggers say so), by type id. */
+  readonly startsByType = computed(() => {
+    const byType = new Map<number, { jobId: number; name: string; on: boolean; why: string }[]>();
+    for (const t of this.triggers() ?? []) {
+      const id = Number(t.documentTypeId);
+      byType.set(id, [...(byType.get(id) ?? []), { jobId: t.jobId, name: t.jobName || `Schedule #${t.jobId}`, on: t.enabled && t.jobStatus === 'Active',
+        why: !t.enabled ? 'trigger off' : t.jobStatus !== 'Active' ? 'schedule not active' : '' }]);
+    }
+    return byType;
   });
   readonly recent = computed(() => recentRows(this.reads(), this.extractions()));
   readonly filtered = computed(() => {
@@ -173,12 +178,19 @@ export class DocumentIntelligence implements OnInit {
   private datasetRead = false;
 
   ngOnInit(): void {
+    if (this.noWorkspace()) { this.loading.set(false); return; }
     // An old link to a view by ?tab= (Document types) opens that view's own tab.
-    const asked = this.route.snapshot?.queryParamMap?.get('tab');
+    const raw = this.route.snapshot?.queryParamMap?.get('tab');
+    const asked = raw ? (TAB_ALIASES[raw] ?? raw) : null;
     if (this.hubView && asked && (TABS as string[]).includes(asked) && asked !== this.hubView) {
       void this.router.navigate([INTELLIGENCE_VIEW_PATHS[asked as IntelligenceTab]], { replaceUrl: true });
       return;
     }
+    // Each Intake section lists what arrived by its own channel first.
+    if (this.tab() === 'upload') this.channelFilter.set('upload');
+    if (this.tab() === 'email') this.channelFilter.set('email');
+    // An Intake section needs no numbers: the types (for Read a stored file) and what arrived.
+    if (this.embedded) { this.loadTypes(); this.readTab(this.tab()); return; }
     // The stats first: the dataset opens on the type most documents were approved as.
     this.loadStats(() => { this.loadTypes(); this.readTab(this.tab()); });
   }
@@ -191,7 +203,8 @@ export class DocumentIntelligence implements OnInit {
   }
 
   private tabOf(value: string | null | undefined): IntelligenceTab {
-    return (TABS as string[]).includes(value ?? '') ? value as IntelligenceTab : 'overview';
+    const v = value ? (TAB_ALIASES[value] ?? value) : '';
+    return (TABS as string[]).includes(v) ? v as IntelligenceTab : 'overview';
   }
 
   setTab(tab: IntelligenceTab): void {
@@ -203,15 +216,30 @@ export class DocumentIntelligence implements OnInit {
 
   private readTab(tab: IntelligenceTab): void {
     if (tab === 'overview' && !this.overviewRead) this.load();
+    if (tab === 'types' && this.triggers() === null) this.loadTriggers();
     if (tab === 'dataset' && !this.datasetRead && this.datasetType()) this.loadDataset();
-    if (tab === 'intake' && !this.intakeRead) this.loadIntake();
+    if ((tab === 'upload' || tab === 'email') && !this.intakeRead) this.loadIntake();
   }
 
   refresh(): void {
     this.loadTypes();
     if (this.tab() === 'dataset') this.loadDataset();
-    else if (this.tab() === 'intake') this.loadIntake();
+    else if (this.tab() === 'upload' || this.tab() === 'email') this.loadIntake();
+    else if (this.tab() === 'types') this.loadTriggers();
     else this.load();
+  }
+
+  /** The schedules each type's approved documents start, for Document types' "When approved, starts…" column. */
+  loadTriggers(): void {
+    if (!this.canSeeSchedules()) return;
+    this.api.documentTriggers?.()?.subscribe({
+      next: r => this.triggers.set(r.status === API_SUCCESS && Array.isArray(r.data) ? r.data : []),
+      error: () => this.triggers.set([]),
+    });
+  }
+
+  startsOf(t: DocumentType): { jobId: number; name: string; on: boolean; why: string }[] {
+    return this.startsByType().get(Number(t.documentTypeId)) ?? [];
   }
 
   /** The overview's three lists; the stats and the reads are optional to it, the extractions are not. */
@@ -221,12 +249,6 @@ export class DocumentIntelligence implements OnInit {
     if (this.overviewRead) this.loadStats();
     this.overviewRead = true;
     this.api.reads().subscribe({ next: r => { if (r.status === API_SUCCESS) this.reads.set(r.data ?? []); }, error: () => this.reads.set([]) });
-    if (this.canSeeSchedules()) {
-      this.api.documentTriggers?.()?.subscribe({
-        next: r => this.triggers.set(r.status === API_SUCCESS && Array.isArray(r.data) ? r.data : []),
-        error: () => this.triggers.set([]),
-      });
-    }
     this.api.extractions().subscribe({
       next: r => {
         this.loading.set(false);
@@ -257,7 +279,6 @@ export class DocumentIntelligence implements OnInit {
 
   clearFilters(): void { this.typeFilter.set(''); this.stateFilter.set(''); this.search.set(''); }
 
-  typeIcon(t: DocumentType): string { return TYPE_ICONS[t.typeKey] ?? 'file'; }
   documentsOf(t: DocumentType): number { return this.docsByType().get(t.documentTypeId) ?? 0; }
   low(r: RecentRow): boolean { return !!r.extraction && (r.extraction.minConfidence ?? 0) < lowLine(r.extraction.autoApproveThreshold); }
   thresholdOf(t: DocumentType): string { return t.autoApproveThreshold == null ? 'Never' : `${Math.round(t.autoApproveThreshold * 100)}%`; }
@@ -287,6 +308,17 @@ export class DocumentIntelligence implements OnInit {
   readonly channelLabels = CHANNEL_LABELS;
   readonly channels = Object.keys(CHANNEL_LABELS);
   readonly intakes = signal<IntakeRow[]>([]);
+  /**
+   * ZT-D4: the document a file was taken as, by its OCR read -- so a duplicate links to the earlier document by the number
+   * every screen shows (#1159), not the OCR read's own number ("OCR 1054"), which no screen names.
+   */
+  readonly takenAs = computed(() => {
+    const byRead = new Map<number, number>();
+    for (const i of this.intakes()) {
+      if (i.ocrDocumentId && i.extractionId && !byRead.has(i.ocrDocumentId)) byRead.set(i.ocrDocumentId, i.extractionId);
+    }
+    return byRead;
+  });
   readonly intakeLoading = signal(false);
   readonly intakeError = signal('');
   readonly channelFilter = signal('');
@@ -311,6 +343,15 @@ export class DocumentIntelligence implements OnInit {
 
   pickChannel(channel: string): void { this.channelFilter.set(channel); this.loadIntake(); }
 
+  /** What "What arrived" says when the channel picked has brought nothing yet. */
+  arrivalsEmpty(): string {
+    const c = this.channelFilter();
+    if (c === 'upload') return 'Nothing uploaded yet. Upload documents, or read a stored file.';
+    if (c === 'email') return 'Nothing has been mailed in yet. Turn on the address and mail attachments to it.';
+    if (c) return `Nothing has arrived by ${this.channelLabels[c] ?? c} yet.`;
+    return 'Nothing has arrived yet: upload documents, mail them to the email-in address, or send a form with a file field set to Document Intelligence.';
+  }
+
   mailboxAction(action: 'enable' | 'rotate' | 'disable'): void {
     this.mailboxBusy.set(true);
     this.api.mailboxAction(action).subscribe({
@@ -332,6 +373,13 @@ export class DocumentIntelligence implements OnInit {
 
   extractAgain(row: RecentRow): void {
     if (row.ocr) this.readDocument(row.ocr, row.extraction?.documentTypeId ?? null);
+  }
+
+  /** Add from starters (owner 2026-10-20, §0.2): the catalog's types by market, added as the workspace's own. */
+  addStarters(): void {
+    this.dialog.open<StartersDialogResult>(StartersDialog, { hasBackdrop: true }).closed.subscribe(result => {
+      if (result?.changed) this.loadTypes();
+    });
   }
 
   openType(t: DocumentType | null): void {

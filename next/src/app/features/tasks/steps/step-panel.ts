@@ -6,10 +6,11 @@ import { SidePanel } from '../../../shared/ui/side-panel';
 import { Icon } from '../../../shared/ui/icon';
 import { Field } from '../../../shared/ui/field';
 import { SchemaForm } from './schema-form';
+import { CallApiPreview } from './call-api-preview';
+import { REPORT_DESIGN_KEYS, ReportDesignSettings, ReportStepDesign } from './report-step-design';
 import {
-  LIMITS, ON_ERRORS, BucketChoice, DocumentTypeChoice, PromptChoice, WebhookChoice, Step, StepProblem, StepTaskEntry, canonicalStep, fieldsOf, onErrorLabel, parseJson, problemsAt, taskLabel,
-  validKey,
-} from './steps.model';
+  LIMITS, ON_ERRORS, ApiRequestChoice, BucketChoice, DocumentTypeChoice, JsonSchema, PromptChoice, WebhookChoice, Step, StepProblem, StepTaskEntry, canonicalStep, fieldsOf, onErrorLabel, parseJson, problemsAt, taskLabel,
+  validKey, ScheduleChoice } from './steps.model';
 
 export interface StepPanelData {
   step: Step;
@@ -28,8 +29,18 @@ export interface StepPanelData {
   webhooks?: WebhookChoice[];
   /** MIG-364: the workspace's document types, for a task whose settings name one. */
   documentTypes?: DocumentTypeChoice[];
+  /** Owner #25: the workspace's saved API requests, for a task whose settings name one. */
+  apiRequests?: ApiRequestChoice[];
+  /** MIG-424: the workspace's schedules, for a task whose settings name one (Run pipeline). */
+  schedules?: ScheduleChoice[];
+  /** MIG-419: the pipeline's sample rows, for a Call API step's "What the first call sends". */
+  sampleRows?: Record<string, unknown>[] | null;
   /** The server's problems with this step, at paths relative to it ("retry.maxAttempts", "config.columns"). */
   problems: StepProblem[];
+  /** Report Studio phase 5: the pipeline the step is in (key null while never saved), its name and its schedules. */
+  pipeline?: { key: number | null; name: string; jobIds: number[] };
+  /** ZT-S4: Validate's warnings for this step, at the same relative paths. */
+  warnings?: StepProblem[];
   /** The settings' on-error, for what "Default" means here. */
   defaultOnError?: string;
   canManage: boolean;
@@ -45,7 +56,7 @@ type ConfigMode = 'form' | 'json';
  */
 @Component({
   selector: 'app-step-panel',
-  imports: [SidePanel, Icon, Field, SchemaForm, FormRow, Section],
+  imports: [SidePanel, Icon, Field, SchemaForm, FormRow, Section, ReportStepDesign, CallApiPreview],
   templateUrl: './step-panel.html',
 })
 export class StepPanel {
@@ -59,7 +70,22 @@ export class StepPanel {
 
   readonly edit = signal<Step>(structuredClone(this.data.step));
   /** Whether the task's schema can draw a form at all: an object with at least one setting. */
-  readonly hasForm = !!this.data.task?.configSchema && fieldsOf(this.data.task.configSchema).length > 0;
+  /** Report Studio phase 5: a generate_report step's design settings are edited by ReportStepDesign, the rest by the form. */
+  /**
+   * ZT-P13: "Reads" only for a task that takes the step before it in -- a read makes its own rows and an append reads the
+   * steps it names (the registry: no input schema, or one that says "Not read"); a step that already names one keeps it.
+   */
+  readonly showsReads = computed(() => {
+    const task = this.data.task as { inputSchema?: { description?: string } | null } | undefined;
+    if (this.edit().input || !task || task.inputSchema === undefined) return true;
+    return !!task.inputSchema && !/^not read/i.test(String(task.inputSchema.description ?? ''));
+  });
+  readonly reportStep = this.data.task?.code === 'generate_report';
+  readonly formSchema = this.reportStep && this.data.task?.configSchema ? withoutProperties(this.data.task.configSchema, REPORT_DESIGN_KEYS)
+    : this.data.task?.configSchema;
+  readonly hasForm = !!this.formSchema && fieldsOf(this.formSchema).length > 0;
+  /** The step the report reads: the one its input names, else the one before it. */
+  readonly upstreamKey = this.data.step.input ?? (this.data.earlierKeys.length ? this.data.earlierKeys[this.data.earlierKeys.length - 1] : null);
   readonly configMode = signal<ConfigMode>(this.hasForm ? 'form' : 'json');
   readonly configText = signal(this.jsonOf(this.data.step.config));
   readonly configError = signal('');
@@ -72,6 +98,8 @@ export class StepPanel {
     return validKey(this.edit().key) ? '' : 'Lower case letters, digits and _, starting with a letter.';
   });
   readonly configProblems = computed(() => problemsAt(this.data.problems, 'config'));
+  /** ZT-R40: a report step's design settings are its design editor's, not the form's: their problems are shown there. */
+  readonly designProblems = computed(() => REPORT_DESIGN_KEYS.flatMap(k => problemsAt(this.data.problems, `config.${k}`)).join(' · '));
   /** The config's problems re-pathed for the form, which sits at the config itself. */
   readonly formProblems = computed(() => this.data.problems
     .filter(p => p.field.startsWith('config.') || p.field.startsWith('config['))
@@ -79,12 +107,14 @@ export class StepPanel {
   /** The step's problems no field shows: the step as a whole, or its task. */
   readonly generalProblems = computed(() => this.data.problems.filter(p => p.field === '' || p.field === 'task')
     .map(p => (p.field ? `Task: ${p.message}` : p.message)));
+  /** ZT-S4: Validate's warnings for the step: valid, but it will not do what it seems. */
+  readonly warnings = (this.data.warnings ?? []).map(p => p.message);
   readonly columns = this.data.columns ?? [];
   /** Blank tries and timeout are the task's own defaults (the registry's retry and timeoutSeconds), else the pipeline's. */
   readonly triesHint = `1 to 10. Blank: ${this.plural(this.data.task?.retry?.maxAttempts ?? 1, 'try', 'tries')}, the task's default.`;
-  readonly delayHint = `0 to 3600. Blank: ${this.data.task?.retry?.delaySeconds ? this.data.task.retry.delaySeconds + ' s' : 'none'}.`;
+  readonly delayHint = `0 to 3600. Blank: ${this.data.task?.retry?.delaySeconds ? this.data.task.retry.delaySeconds + ' sec' : 'none'}.`;
   readonly timeoutHint = this.data.task?.timeoutSeconds
-    ? `Each try, 1 to 86400. Blank: ${this.data.task.timeoutSeconds} s, the task's default.`
+    ? `Each try, 1 to 86400. Blank: ${this.data.task.timeoutSeconds} sec, the task's default.`
     : 'Each try, 1 to 86400. Blank: the pipeline\'s default.';
   readonly defaultOnErrorText = computed(() => `Default (the pipeline's: ${onErrorLabel(this.data.defaultOnError || 'fail').toLowerCase()})`);
 
@@ -108,7 +138,17 @@ export class StepPanel {
   }
 
   setConfig(config: Record<string, unknown>): void {
+    // The form knows only its own keys: the design's are kept as they are.
+    const design = this.reportStep ? Object.fromEntries(REPORT_DESIGN_KEYS.filter(k => this.edit().config?.[k] !== undefined)
+      .map(k => [k, this.edit().config![k]])) : {};
+    this.patch({ config: { ...config, ...design } });
+  }
+
+  setDesign(d: ReportDesignSettings): void {
+    const config: Record<string, unknown> = { ...(this.edit().config ?? {}), design: d.design, templateVersion: d.templateVersion ?? 'latest' };
+    if (d.templateId) config['templateId'] = d.templateId; else delete config['templateId'];
     this.patch({ config });
+    this.configText.set(this.jsonOf(config));
   }
 
   typeConfig(text: string): void {
@@ -147,4 +187,12 @@ export class StepPanel {
   private jsonOf(config: unknown): string {
     return config === undefined || config === null ? '' : JSON.stringify(config, null, 2);
   }
+}
+
+/** The schema without some of its properties (and out of its required list). */
+export function withoutProperties(schema: JsonSchema, keys: string[]): JsonSchema {
+  const props = { ...((schema as { properties?: Record<string, unknown> }).properties ?? {}) };
+  for (const k of keys) delete props[k];
+  const required = ((schema as { required?: string[] }).required ?? []).filter(r => !keys.includes(r));
+  return { ...schema, properties: props, required } as JsonSchema;
 }

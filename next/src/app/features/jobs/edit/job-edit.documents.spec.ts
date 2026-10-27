@@ -21,7 +21,7 @@ const ON = { status: 'SUCCESS', data: { jobId: 2848, configured: true, enabled: 
 
 interface Call { method: string; path: string; params?: Record<string, string>; body?: any }
 
-function editor(answers: Record<string, unknown>, id = '2848', saveAnswer: unknown = { status: 'SUCCESS', message: 'SourceJob saved.' }) {
+function editor(answers: Record<string, unknown>, id = '2848', saveAnswer: unknown = { status: 'SUCCESS', message: 'SourceJob saved.' }, whenApproved = '') {
   const calls: Call[] = [];
   const errors: unknown[] = [];
   const navigations: unknown[] = [];
@@ -45,6 +45,7 @@ function editor(answers: Record<string, unknown>, id = '2848', saveAnswer: unkno
   ] });
   const component = TestBed.runInInjectionContext(() => new JobEdit());
   (component as any).jobId = () => id;
+  (component as any).whenApproved = () => whenApproved;
   component.ngOnInit();
   return { component, calls, errors, navigations };
 }
@@ -66,6 +67,17 @@ describe('JobEdit: the document start (MIG-364)', () => {
     expect(component.documentTypeOptions()).toEqual([
       { id: 1007, label: 'Intake form' }, { id: 1008, label: 'Referral letter (inactive)' }]);
     expect(component.documentTypeLabel()).toBe('Intake form');
+  });
+
+  /** Owner 2026-10-20 (§0.1): Document types' "Set it on a schedule" opens a new schedule with the type's start on. */
+  it('starts a new schedule on a document type\'s approval when the link names the type', () => {
+    const { component, calls } = editor({ '/documentType.json/fetchAll': TYPES }, '', undefined, '1007');
+    expect(component.onApproval()).toBe(true);
+    expect(component.documentTypeId()).toBe(1007);
+    expect(typeReads(calls)).toBe(1);
+    expect(component.documentTypeLabel()).toBe('Intake form');
+    const plain = editor({ '/documentType.json/fetchAll': TYPES }, '', undefined, 'not-a-number');
+    expect(plain.component.onApproval()).toBe(false);
   });
 
   it('reads the types once, and only when the document start is shown', () => {

@@ -1,5 +1,6 @@
 import { APIRequestContext, expect } from '@playwright/test';
 import { api, authOf, Session } from './session';
+import { OwnerInput, waitOnOwnerData } from './owner-data';
 
 /**
  * Finding a spec's live fixtures by a stable name instead of a pinned id (MIG-330).
@@ -62,9 +63,11 @@ export interface Kept { run: number; dataset: number }
 /**
  * A recent Completed run of the job that still keeps a file named `file` (a kept file expires after its pipeline's
  * datasetRetentionHours). When none does any more, the job is run once -- which is what the spec's own header used to
- * ask a person to do by hand -- and its run is used.
+ * ask a person to do by hand -- and its run is used; unless an input it `needs` is waiting on the owner (the test skips,
+ * saying so).
  */
-export async function keptRun(request: APIRequestContext, s: Session, jobId: number, file: string): Promise<Kept> {
+export async function keptRun(request: APIRequestContext, s: Session, jobId: number, file: string,
+  needs: OwnerInput[] = []): Promise<Kept> {
   const look = async (): Promise<Kept | null> => {
     for (const run of (await runsOf(request, s, jobId)).filter(r => r.jobStatus === 'Completed').slice(0, 3)) {
       const outputs = (await getJson(request, s, `/sourceJob.json/runOutputs?jobQueueId=${run.jobQueueId}`)).data?.outputs ?? [];
@@ -75,6 +78,8 @@ export async function keptRun(request: APIRequestContext, s: Session, jobId: num
   };
   const found = await look();
   if (found) return found;
+  // A fresh run reads the job's inputs: one only the owner may upload again is waited for, not run into (owner-data.ts).
+  await waitOnOwnerData(request, s, ...needs);
   const run = await runNow(request, s, jobId);
   expect(run.jobStatus, `job ${jobId}'s fresh run`).toBe('Completed');
   const fresh = await look();

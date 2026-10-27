@@ -9,12 +9,7 @@
         </p>
       </div>
       <div class="flex items-center gap-2">
-        @if (canPickTenant()) {
-          <div class="w-56" data-testid="tool-tenant-picker">
-            <app-combobox id="tools-tenant" ariaLabel="Workspace" [selected]="tenantId() ? '' + tenantId() : ''" (selectedChange)="pickTenant($event)"
-                          placeholder="Choose a workspace…" clearLabel="Choose a workspace…" [options]="tenantOptions()" />
-          </div>
-        }
+        <app-workspace-select data-testid="tool-tenant-picker" [value]="tenantId()" (valueChange)="pickTenant($event === null ? '' : '' + $event)" />
         <app-refresh-button [loading]="loading()" [disableWhileLoading]="false" (refresh)="load()" />
         <a class="btn btn-primary btn-sm" routerLink="/ai/assistant"><app-icon name="chat" />Open the assistant</a>
       </div>
@@ -28,7 +23,7 @@
       { label: 'Tools', value: summary().total, foot: 'in the registry', icon: 'plug', tone: 'info' },
       { label: 'Allowed for you', value: summary().allowed, foot: 'the assistant may call', icon: 'check', tone: 'ok' },
       { label: 'Ask first', value: summary().askFirst, foot: 'wait for your confirmation', icon: 'shield', tone: 'warn' },
-      { label: 'Blocked', value: summary().blocked, foot: summary().blocked ? 'not available to you here' : 'none', icon: 'lock', tone: summary().blocked ? 'crit' : 'muted' }
+      { label: 'Blocked', value: summary().blocked, foot: summary().platformBlocked ? summary().platformBlocked + ' by the platform' : summary().blocked ? 'not available to you here' : 'none', icon: 'lock', tone: summary().blocked ? 'crit' : 'muted' }
     ]; track tile.label) {
       <app-stat-tile [label]="tile.label" [value]="tile.value" [icon]="tile.icon" [tone]="$any(tile.tone)" [foot]="tile.foot" />
     }
@@ -101,21 +96,35 @@
               @if (t.requiresConfirmation) { <span class="pill pill-warn">Asks first</span> } @else { <span class="text-[color:var(--text-muted)]">—</span> }
             </td>
             <td class="max-w-72">
-              <div class="flex items-center gap-2">
-                @if (canSwitch()) {
+              <div class="flex items-center gap-2 flex-wrap">
+                @if (canPickTenant() && tenantId()) {
+                  <!-- Owner item #15: the platform's control over this tool for the chosen workspace. -->
+                  <select #ctl class="input input-sm max-w-32" data-test="platform-control" [attr.aria-label]="'Platform control of ' + t.name"
+                          [value]="platformValue(t)" [disabled]="busy() === t.name || !t.available" (change)="setPlatform(t, ctl)">
+                    <option value="default">Default</option>
+                    <option value="enabled">Enabled</option>
+                    <option value="disabled">Disabled</option>
+                    <option value="blocked">Blocked</option>
+                  </select>
+                } @else if (canSwitch()) {
                   <input #box type="checkbox" class="checkbox" role="switch" [checked]="t.enabledInWorkspace"
                          [attr.aria-label]="'Switch ' + t.name + ' on in this workspace'"
-                         [disabled]="busy() === t.name || !t.available" (change)="toggle(t, box)" />
+                         [title]="t.blocked ? 'Blocked by a platform administrator: only they can unblock it' : ''"
+                         [disabled]="busy() === t.name || !t.available || !!t.blocked" (change)="toggle(t, box)" />
                 }
-                <span class="pill" [class]="'pill pill-' + s.tone">{{ s.label }}</span>
-                @if (t.switchedInWorkspace && s.label !== 'Blocked') {
-                  <span class="text-xs text-[color:var(--text-muted)]">switched here</span>
+                <span class="pill" [class]="'pill pill-' + s.tone" data-test="tool-state">{{ s.label }}</span>
+                @if (t.switchedInWorkspace && s.label !== 'Blocked' && !canPickTenant()) {
                   @if (canSwitch()) {
                     <button type="button" class="btn btn-ghost btn-xs" [attr.aria-label]="'Put ' + t.name + ' back to its default'"
                             [disabled]="busy() === t.name" (click)="reset(t)">Reset</button>
                   }
                 }
               </div>
+              @if (setBy(t); as by) {
+                <p class="text-[11px] mt-0.5 text-[color:var(--text-muted)]" data-test="tool-set-by">
+                  Set by {{ by.who }}@if (by.at) { · {{ by.at | serverTime: 'recent' }} }
+                </p>
+              }
               @if (s.reason) {
                 <!-- UX final TL1: why, in full and muted (it is an explanation, not an alarm: the pill says Blocked). -->
                 <p class="text-xs mt-1 text-[color:var(--text-muted)] flex items-start gap-1 [overflow-wrap:anywhere]" data-test="tool-reason">
@@ -132,6 +141,22 @@
       </tbody>
     </table>
   </app-table-shell>
+
+  @if (canSwitch() && changes().length) {
+    <!-- Owner item #15: who switched, blocked or unblocked a tool here, newest first (the audit). -->
+    <section class="card p-4" aria-labelledby="tool-changes-heading" data-test="tool-changes">
+      <h2 id="tool-changes-heading" class="section-title mb-2">Recent changes</h2>
+      <ul class="side-panel-list">
+        @for (c of changes(); track $index) {
+          <li class="text-sm flex flex-wrap items-baseline gap-x-2">
+            <span class="font-medium">{{ changeWords(c) }}</span>
+            <span class="text-xs text-[color:var(--text-muted)]">by {{ changeBy(c) }}@if (c.at) { · {{ c.at | serverTime: 'recent' }} }</span>
+            @if (c.reason) { <span class="text-xs text-[color:var(--text-secondary)] [overflow-wrap:anywhere]">"{{ c.reason }}"</span> }
+          </li>
+        }
+      </ul>
+    </section>
+  }
 
   <p class="text-xs text-[color:var(--text-muted)] flex items-start gap-1.5">
     <app-icon name="info" size="0.95em" class="mt-px shrink-0" />

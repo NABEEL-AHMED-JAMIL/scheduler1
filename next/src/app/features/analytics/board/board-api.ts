@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { API_BASE, ApiResponse } from '../../../core/api/api.config';
-import type { ExportFile, FilterClause } from '../analytics.service';
+import { tileParams, type ExportFile, type FilterClause } from '../analytics.service';
 import type { BoardFilterOutcome, BoardFilterWire, FilterFamily } from './board-filters';
 
 /** A column of a table page, with DuckDB's own type name. */
@@ -45,6 +45,9 @@ export interface TableRequest {
   filters?: FilterClause[];
   facets?: boolean;
   queryId?: string;
+  /** ZT-A13: the board and the table tile (a Saved Analyses reader is run the tile's own statement). */
+  boardId?: number | null;
+  widgetId?: number | null;
 }
 
 /** A column's values for a filter's picker (analytics-service ColumnValuesDto). */
@@ -69,12 +72,14 @@ export class BoardApi {
   private readonly exports = `${API_BASE}/analyticsExport.json`;
 
   rows(request: TableRequest): Observable<ApiResponse<TablePage>> {
-    return this.http.post<ApiResponse<TablePage>>(`${this.base}/rows`, tableBody(request));
+    return this.http.post<ApiResponse<TablePage>>(`${this.base}/rows`, tableBody(request), { params: tileParams(request) });
   }
 
-  values(connection: string, path: string, column: string, search = '', limit = 200): Observable<ApiResponse<ColumnValues>> {
+  /** ZT-A13: `boardId` -- a Saved Analyses reader may list only the values a filter of that board lists. */
+  values(connection: string, path: string, column: string, search = '', limit = 200, boardId?: number | null): Observable<ApiResponse<ColumnValues>> {
     let params = new HttpParams().set('connection', connection).set('path', path).set('column', column).set('limit', limit);
     if (search.trim()) params = params.set('search', search.trim());
+    if (boardId != null) params = params.set('boardId', boardId);
     return this.http.get<ApiResponse<ColumnValues>>(`${this.base}/values`, { params });
   }
 
@@ -108,5 +113,9 @@ export function tableBody(request: TableRequest): Record<string, unknown> {
   if (request.filters?.length) body['filters'] = JSON.stringify(request.filters);
   if (request.facets) body['facets'] = true;
   if (request.queryId) body['queryId'] = request.queryId;
+  if (request.boardId != null && request.widgetId != null) {
+    body['boardId'] = request.boardId;
+    body['widgetId'] = request.widgetId;
+  }
   return body;
 }

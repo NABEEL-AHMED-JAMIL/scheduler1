@@ -61,7 +61,7 @@ const FETCH_ROWS = 20;
               >
             <span class="text-sm font-semibold mr-auto">Notifications</span>
             @if (unread()) {
-              <button type="button" class="btn btn-ghost btn-sm" (click)="markAllRead()">
+              <button type="button" class="btn btn-default btn-sm" (click)="markAllRead()">
                 <app-icon name="check" size="0.85em" />Mark all read
               </button>
             }
@@ -300,12 +300,12 @@ export class NotificationBell implements OnInit, OnDestroy {
     if (then === null) return '';
     const mins = Math.round((Date.now() - then) / 60000);
     if (mins < 1) return 'just now';
-    if (mins < 60) return `${mins}m ago`;
+    if (mins < 60) return `${mins} min ago`;
     const hours = Math.round(mins / 60);
-    if (hours < 24) return `${hours}h ago`;
+    if (hours < 24) return `${hours} h ago`;
     const days = Math.round(hours / 24);
     // Past a month, the day itself: "24 Sep 2026", as every date in the console is written. It was
     // toLocaleDateString(), which wrote "9/24/2026" in the US and "24/09/2026" elsewhere (MIG-295).
-    return days < 30 ? `${days}d ago` : this.clock.transform(then, 'date') ?? '';
+    return days < 30 ? `${days} d ago` : this.clock.transform(then, 'date') ?? '';
   }
 }

@@ -16,7 +16,8 @@ import {
   Definition, DefinitionView, LIMITS, ON_ERRORS, Problem, SOURCE_TYPES, Settings, Step, StepProblem, StepTaskEntry, ValidateResult,
   addStep, canonical, definitionJson, inputColumns, isLegacyDefinition, refusalOf, moveStep, onErrorLabel, problemsByStep, removeStep, replaceStep,
   sameDefinition, sampleRowsOf, sourceLabel, taskEntry, taskLabel, taskOptions, toYaml, updateSettings, updateSource, usesBucket, usesPrompt,
-  withSample, BucketChoice, PromptChoice, usesWebhook, WebhookChoice, DocumentTypeChoice, usesDocumentType, updateParameters,
+  withSample, BucketChoice, PromptChoice, usesWebhook, WebhookChoice, usesApiRequest, ApiRequestChoice, DocumentTypeChoice, usesDocumentType, updateParameters,
+  ScheduleChoice, usesSchedule,
 } from './steps.model';
 import { ParameterEditor } from './parameter-editor';
 import type { RunParameter } from '../../jobs/run-parameters/run-parameters';
@@ -85,6 +86,14 @@ export class StepBuilder implements OnInit {
   readonly canManage = input(true);
   /** A workspace administrator: may add a task that needs one. The workspace's task switches are Task Registry's. */
   readonly isAdmin = input(true);
+  /** Report Studio phase 5: the pipeline's name and its schedules, for a generate_report step's own design. */
+  readonly pipelineName = input('');
+  readonly jobIds = input<number[]>([]);
+  /** The pipeline's workspace: a platform administrator's reads of its API requests name it. Null: the reader's own. */
+  readonly tenantId = input<number | null>(null);
+  /** Owner 2026-10-21: a step to open first, by key -- a report over its page limit links to its Generate report step. */
+  readonly openStep = input<string>('');
+  private openedFirst = false;
   /** A save made a new version (or found none to make): the page's copy is stale. */
   readonly saved = output<DefinitionView>();
 
@@ -106,6 +115,8 @@ export class StepBuilder implements OnInit {
   readonly draft = linkedSignal<Definition>(() => structuredClone(this.meta().definition));
   readonly tasks = signal<StepTaskEntry[]>([]);
   readonly problems = signal<Problem[]>([]);
+  /** ZT-S4: the last Validate's warnings, shown on their steps (a move, an edit's save or Discard clears them with the problems). */
+  readonly warnings = signal<Problem[]>([]);
   readonly result = signal<{ tone: Tone; text: string } | null>(null);
   readonly busy = signal<'' | 'validate' | 'save' | 'yaml'>('');
   /** The step last opened, by key: it stays marked wherever it moves. */
@@ -137,6 +148,11 @@ export class StepBuilder implements OnInit {
   readonly legacy = computed(() => isLegacyDefinition(this.draft()));
   /** The saved pipeline still runs as its legacy step: the first save moves every task on it to the steps. */
   readonly savedLegacy = computed(() => !this.meta().stored || this.meta().legacy);
+  /**
+   * ZT-P5: no schedule runs this pipeline -- a new one made from Add steps yourself. Nothing runs as its legacy step, so
+   * nothing says it does, and its first save asks nothing.
+   */
+  readonly unscheduled = computed(() => !this.jobIds().length);
   readonly dirty = computed(() => this.yamlTyped() || this.jsonTyped() || !sameDefinition(this.draft(), this.meta().definition));
   readonly taskOptions = computed(() => taskOptions(this.tasks(), this.isAdmin()));
   /** UX review 2026-10-12 (B2, P5): the steps as runs of one stage -- read, check, transform, AI, review, write. */
@@ -151,7 +167,7 @@ export class StepBuilder implements OnInit {
   }
   readonly versionText = computed(() => {
     const m = this.meta();
-    return m.stored && !m.legacy ? `Version ${m.version}` : 'Runs as its legacy step: no steps saved';
+    return m.stored && !m.legacy ? `Version ${m.version}` : this.unscheduled() ? 'No steps saved yet' : 'Runs as its legacy step: no steps saved';
   });
   readonly latestVersion = computed(() => this.meta().versions?.[0] ?? null);
 
@@ -166,6 +182,18 @@ export class StepBuilder implements OnInit {
 
   constructor() {
     this.reloadTasks();
+    // The step the address names (?step=), opened once the tasks (its settings' form) are read.
+    effect(() => {
+      const key = this.openStep();
+      const ready = this.tasks().length > 0;
+      untracked(() => {
+        if (!key || !ready || this.openedFirst) return;
+        const index = this.draft().steps.findIndex(s => s.key === key);
+        if (index < 0) return;
+        this.openedFirst = true;
+        this.open(index);
+      });
+    });
     // A draft handed over for this pipeline (the AI Assistant's, MIG-252) shows on its text tab as typed text, unsaved.
     effect(() => {
       const key = this.meta().pipelineKey;
@@ -189,6 +217,7 @@ export class StepBuilder implements OnInit {
       view.setInput('tasks', this.tasks());
       view.setInput('problems', this.grouped().steps);
       view.setInput('selected', this.selected());
+      view.setInput('tenantId', this.tenantId());
     });
     // Leaving a text tab applies what was typed to the draft; entering one shows the draft as that text.
     effect(() => {
@@ -269,7 +298,7 @@ export class StepBuilder implements OnInit {
     const parts: string[] = [];
     if (step.input) parts.push(`reads ${step.input}`);
     if ((step.retry?.maxAttempts ?? 1) > 1) parts.push(`${step.retry!.maxAttempts} tries`);
-    if (step.timeoutSeconds) parts.push(`${step.timeoutSeconds} s timeout`);
+    if (step.timeoutSeconds) parts.push(`${step.timeoutSeconds} sec timeout`);
     if (step.onError) parts.push(onErrorLabel(step.onError).toLowerCase() + ' on failure');
     return parts.join(' · ');
   }
@@ -319,9 +348,13 @@ export class StepBuilder implements OnInit {
 
   /** MIG-346: the workspace's webhooks, read the first time a step that names one is opened. */
   private readonly webhookChoices = signal<WebhookChoice[] | null>(null);
+  /** Owner #25: the workspace's saved API requests, read the first time a step that names one is opened. */
+  private readonly apiRequestChoices = signal<ApiRequestChoice[] | null>(null);
 
   /** MIG-364: the workspace's document types, read the first time a step that names one is opened. */
   private readonly documentTypeChoices = signal<DocumentTypeChoice[] | null>(null);
+  /** MIG-424: the workspace's schedules, read the first time a step that calls one (Run pipeline) is opened. */
+  private readonly scheduleChoices = signal<ScheduleChoice[] | null>(null);
 
   open(index: number): void {
     const step = this.draft().steps[index];
@@ -352,6 +385,22 @@ export class StepBuilder implements OnInit {
       });
       return;
     }
+    if (this.apiRequestChoices() === null && usesApiRequest(schema)) {
+      // Likewise: without the list a saved request still shows by its id.
+      this.api.apiRequests(this.tenantId()).subscribe({
+        next: requests => { this.apiRequestChoices.set(requests); this.open(index); },
+        error: () => { this.apiRequestChoices.set([]); this.open(index); },
+      });
+      return;
+    }
+    if (this.scheduleChoices() === null && usesSchedule(schema)) {
+      // Likewise: without the list a saved schedule still shows by its id.
+      this.api.schedules().subscribe({
+        next: schedules => { this.scheduleChoices.set(schedules); this.open(index); },
+        error: () => { this.scheduleChoices.set([]); this.open(index); },
+      });
+      return;
+    }
     if (this.documentTypeChoices() === null && usesDocumentType(schema)) {
       // Likewise: without the list a saved type still shows by its id.
       this.api.documentTypes().subscribe({
@@ -369,12 +418,18 @@ export class StepBuilder implements OnInit {
     const data: StepPanelData = {
       step, index, task: this.taskOf(step), earlierKeys: this.earlierKeys(index),
       columns: inputColumns(this.draft(), index, this.tasks()),
-      problems: this.stepProblems(index), defaultOnError: this.draft().settings?.defaultOnError,
+      problems: this.stepProblems(index), warnings: problemsByStep(this.warnings()).steps[index] ?? [], defaultOnError: this.draft().settings?.defaultOnError,
       canManage: this.canManage() && step.task !== 'legacy',
       prompts: this.promptChoices() ?? [],
       buckets: this.bucketChoices() ?? [],
       webhooks: this.webhookChoices() ?? [],
       documentTypes: this.documentTypeChoices() ?? [],
+      apiRequests: this.apiRequestChoices() ?? [],
+      schedules: this.scheduleChoices() ?? [],
+      sampleRows: sampleRowsOf(this.draft()),
+      // ZT-R40: the pipeline exists from its first screen (New pipeline makes it), so a report step is designed before its
+      // first save -- a save refuses a report step with no design, and "Save the pipeline first" left no way out.
+      pipeline: { key: this.view().pipelineKey ?? null, name: this.pipelineName(), jobIds: this.jobIds() },
     };
     // Focus goes back to the step's own card, not to whatever opened the panel: from Add step that was the box, whose
     // list then opened over the cards.
@@ -391,6 +446,7 @@ export class StepBuilder implements OnInit {
   private shiftProblems(): void {
     if (Object.keys(this.grouped().steps).length) {
       this.problems.set(this.problems().filter(p => !p.path.startsWith('steps[')));
+      this.warnings.set([]);
       this.say('warn', 'The steps moved: Validate again to see what is still wrong.');
     }
   }
@@ -443,6 +499,15 @@ export class StepBuilder implements OnInit {
   /** The braces a step names a parameter with, said in the section's line (Angular would read them as its own). */
   readonly parameterHint = 'What a run is given (by Run with…, a backfill or the API); a scheduled run takes the defaults. A step reads one as {{param.name}}, and any run its day as {{run.date}}.';
 
+  /** Owner #23: the pipeline's tags as the field shows them. */
+  tagsText(): string { return (this.draft().settings?.tags ?? []).join(', '); }
+
+  /** The tags typed, comma-separated: trimmed, blanks and repeats dropped; none left drops the setting. */
+  setTags(raw: string): void {
+    const tags = [...new Set(raw.split(',').map(t => t.trim()).filter(t => t.length > 0))];
+    this.draft.update(d => updateSettings(d, { tags: tags.length ? tags : null }));
+  }
+
   setSetting(field: keyof Settings, raw: string): void {
     let value: string | number | null = raw;
     if (field !== 'defaultOnError' && field !== 'sensitivity') {
@@ -486,6 +551,11 @@ export class StepBuilder implements OnInit {
     return this.grouped().other.filter(p => p.path === path).map(p => p.message).join(' · ');
   }
 
+  /** Owner #23: the tags' problems -- the list's and each tag's (settings.tags[1]). */
+  tagProblems(): string {
+    return this.grouped().other.filter(p => p.path === 'settings.tags' || p.path.startsWith('settings.tags[')).map(p => p.message).join(' · ');
+  }
+
   private reloadTasks(): void {
     this.api.tasks().subscribe({ next: r => { if (r.status === API_SUCCESS) this.tasks.set(r.data ?? []); }, error: () => {} });
   }
@@ -514,13 +584,17 @@ export class StepBuilder implements OnInit {
   private took(r: ApiResponse<ValidateResult>, adopt: boolean): void {
     const data = r.data ?? {};
     this.problems.set(data.problems ?? []);
+    this.warnings.set(data.warnings ?? []);
     if (adopt && data.definition) {
       this.draft.set(data.definition);
       this.yamlTyped.set(false);
       this.jsonTyped.set(false);
       this.enter(this.tab());
     }
-    if (r.status === API_SUCCESS) this.say('ok', r.message || 'The definition is valid.');
+    const warned = data.warnings?.length ?? 0;
+    if (r.status === API_SUCCESS && warned) {
+      this.say('warn', `The definition is valid, with ${warned} warning${warned === 1 ? '' : 's'}: ${warned === 1 ? 'it is' : 'each is'} shown on its step.`);
+    } else if (r.status === API_SUCCESS) this.say('ok', r.message || 'The definition is valid.');
     else {
       const count = data.problems?.length ?? 0;
       this.say('crit', count ? `${count} problem${count === 1 ? '' : 's'}: each is shown on its step.` : r.message || 'The definition is not valid.');
@@ -540,7 +614,7 @@ export class StepBuilder implements OnInit {
 
   /** Saves, asking first when the pipeline still runs as its legacy step; `then` hears whether it saved. */
   private persist(then: (ok: boolean) => void): void {
-    if (this.savedLegacy() && !this.legacy()) {
+    if (this.savedLegacy() && !this.legacy() && !this.unscheduled()) {
       confirmWith(this.dialog, {
         title: 'Run this pipeline as steps',
         body: `${this.meta().pipelineId} runs as its legacy step today: the task payload, sent to its worker. Once these steps are saved, every task on this pipeline runs them in the step engine from its next run.`,
@@ -560,9 +634,7 @@ export class StepBuilder implements OnInit {
     this.api.save(pipelineKey, format, text).subscribe({
       next: r => {
         if (r.status !== API_SUCCESS) {
-          this.busy.set('');
-          this.took(r, false);
-          this.toast.error(r.message || 'The steps could not be saved.');
+          this.notSaved(r);
           then(false);
           return;
         }
@@ -576,6 +648,7 @@ export class StepBuilder implements OnInit {
               this.saved.emit(d.data);
             }
             this.problems.set([]);
+            this.warnings.set([]);
             this.yamlTyped.set(false);
             this.jsonTyped.set(false);
             this.enter(this.tab());
@@ -585,12 +658,21 @@ export class StepBuilder implements OnInit {
           error: () => { this.busy.set(''); this.say('warn', `${r.message || 'Saved.'} Reading it back failed: open the page again.`); then(true); },
         });
       },
+      // ZT-R40: Core refuses a save that saves nothing with a 4xx in the envelope (422 with the problems at their paths).
       error: err => {
-        this.busy.set('');
-        this.toast.error(err?.error?.message || 'The steps could not be saved.');
+        this.notSaved(err?.error && typeof err.error === 'object' ? err.error as ApiResponse<ValidateResult> : null);
         then(false);
       },
     });
+  }
+
+  /** A refused save: each problem shown on its step, and the answer's own words ("Not saved: step 'report' ..."). */
+  private notSaved(r: ApiResponse<ValidateResult> | null): void {
+    this.busy.set('');
+    this.problems.set(r?.data?.problems ?? []);
+    const message = r?.message || 'The steps could not be saved.';
+    this.say('crit', message);
+    this.toast.error(message);
   }
 
   discard(): void {
@@ -598,6 +680,7 @@ export class StepBuilder implements OnInit {
     this.yamlTyped.set(false);
     this.jsonTyped.set(false);
     this.problems.set([]);
+    this.warnings.set([]);
     this.result.set(null);
     this.enter(this.tab());
   }

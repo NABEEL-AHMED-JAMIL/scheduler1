@@ -1,5 +1,5 @@
 import { test, expect, Browser, CDPSession, Page } from '@playwright/test';
-import { hasToken, NEEDS, Session, sessionFor } from './support/session';
+import { hasToken, NEEDS, Session, sessionFor, pageWith } from './support/session';
 
 /**
  * MIG-214, the console's half: cycle the main screens as Riverside Health's administrator and check that what a
@@ -15,7 +15,7 @@ const CYCLES = Number(process.env['E2E_MEMORY_CYCLES'] ?? 5);
 // The screens a workspace administrator opens most; each one loads its data and draws its tables or charts.
 const SCREENS = [
   '/dashboard', '/pipelines/list', '/pipelines/schedules', '/runs/latest', '/runs/by-date', '/runs/analytics',
-  '/data/files', '/data/reports', '/documents/file-drop', '/documents/in', '/data/analytics', '/data/ask',
+  '/data/files', '/data/reports', '/documents/intake/file-drop', '/documents/in', '/data/analytics', '/data/ask',
   '/forms/builder', '/forms/submissions', '/connections/api-collections', '/connections/sources', '/pipelines/prompts',
   '/settings/model-connections', '/billing/usage', '/billing/invoices', '/settings/task-registry', '/administration/users',
   '/administration/access-profiles', '/notifications',
@@ -24,11 +24,8 @@ const SCREENS = [
 interface Counters { heapMb: number; nodes: number; listeners: number; documents: number; }
 
 async function pageAs(browser: Browser, s: Session): Promise<Page> {
-  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
-  const page = await context.newPage();
-  await page.goto('/');
-  await page.evaluate(user => window.localStorage.setItem('etl_auth_user', JSON.stringify(user)), s.data);
-  return page;
+  // Seeded before the app loads (support/session.ts pageWith): a dead stored session can no longer sign it out.
+  return pageWith(browser, s.data, { viewport: { width: 1440, height: 900 } });
 }
 
 async function counters(cdp: CDPSession): Promise<Counters> {

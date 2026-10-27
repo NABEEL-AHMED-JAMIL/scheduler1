@@ -20,7 +20,7 @@ const RAW_MAX = 100_000;
         <p class="text-xs text-[color:var(--text-muted)] flex-1 min-w-0">
           {{ rows().length }} field{{ rows().length === 1 ? '' : 's' }} · {{ requiredCount() }} required
         </p>
-        <button type="button" class="btn btn-ghost btn-xs" [attr.aria-pressed]="raw()" (click)="raw.set(!raw())">
+        <button type="button" class="btn btn-default btn-xs" [attr.aria-pressed]="raw()" (click)="raw.set(!raw())">
           <app-icon name="code" size="0.85em" />{{ raw() ? 'Fields' : 'Raw JSON' }}
         </button>
       </div>

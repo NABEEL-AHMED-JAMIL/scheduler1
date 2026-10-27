@@ -5,6 +5,7 @@ import { RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { AuthService } from '../../../core/auth/auth.service';
+import { TeamsApi } from '../../../core/teams/teams.api';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { Icon } from '../../../shared/ui/icon';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
@@ -40,7 +41,7 @@ export type DecisionRoute =
   host: { class: 'contents' },
   template: `
     @if (review(); as r) {
-      @if (r.reviewStatus !== 'NOT_REQUIRED') {
+      @if (r.reviewStatus !== 'NOT_REQUIRED' && r.reviewStatus !== 'NOT_APPLICABLE') {
         <section class="card p-4 flex flex-col gap-3 h-full run-next" data-test="next-steps" aria-labelledby="next-steps-heading">
           <div class="flex flex-wrap items-center gap-2">
             <h2 id="next-steps-heading" class="text-sm font-semibold mr-auto">{{ r.reviewStatus === 'PENDING' ? 'Next steps' : 'Review' }}</h2>
@@ -122,6 +123,7 @@ export class RunDecision {
   readonly reviewChange = output<RunReviewView | null>();
 
   private readonly http = inject(HttpClient);
+  private readonly teamsApi = inject(TeamsApi);
   private readonly inbox = inject(WorkflowsApi);
   private readonly auth = inject(AuthService);
   private readonly toast = inject(ToastService);
@@ -173,7 +175,7 @@ export class RunDecision {
           const review = r.status === API_SUCCESS ? r.data ?? null : null;
           this.review.set(review);
           this.reviewChange.emit(review);
-          if (review?.reviewStatus === 'PENDING' && review.reviewers?.kind === 'group') this.nameGroup(review.reviewers.value ?? null);
+          if (review?.reviewStatus === 'PENDING' && review.reviewers?.kind === 'team') this.nameTeam(review.reviewers.value ?? null);
           if (review?.reviewStatus === 'PENDING' && !review.you?.canDecide) this.findTask();
           else this.task.set(null);
         },
@@ -182,15 +184,14 @@ export class RunDecision {
       });
   }
 
-  /** A reviewer group's name (an access profile), which a workspace administrator may read; others see "the reviewer group". */
-  readonly groupName = signal<string | null>(null);
-  private nameGroup(id: string | null): void {
-    if (!id || !this.auth.isTenantAdmin?.()) return;
-    this.http.get<ApiResponse<{ pageAccessProfileId: number; profileName: string }[]>>(`${API_BASE}/pageAccess.json/listProfiles`)
-      .pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-        next: r => this.groupName.set((r.data ?? []).find(p => String(p.pageAccessProfileId) === id)?.profileName ?? null),
-        error: () => {},
-      });
+  /** A reviewer team's name, which every member reads (F4); "the pipeline's reviewer team" until it is known. */
+  readonly teamName = signal<string | null>(null);
+  private nameTeam(id: string | null): void {
+    if (!id) return;
+    this.teamsApi.list().pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: r => this.teamName.set((r.data ?? []).find(t => String(t.teamId) === id)?.name ?? null),
+      error: () => {},
+    });
   }
 
   /** Who the review waits on: the reader when they may decide it, else the pipeline's reviewers in words. */
@@ -198,11 +199,10 @@ export class RunDecision {
     const r = this.review();
     const route = this.route();
     const who = r?.reviewers;
-    // A reviewer reads their own group's name from their session; an administrator from the access profiles.
-    const group = this.groupName() ?? (this.route().by === 'task' ? this.auth.user?.()?.pageAccessProfileName ?? null : null);
+    const team = this.teamName();
     const named = !who?.kind || (who.kind === 'role' && who.value !== 'TENANT_USER') ? 'the workspace administrators'
       : who.kind === 'role' ? 'the workspace users'
-      : group ? `the ${group} group` : 'the pipeline\'s reviewer group';
+      : team ? `the ${team} team` : 'the pipeline\'s reviewer team';
     const decided = new Set((r?.decisions ?? []).map(d => d.party));
     const open = (r?.required ?? []).filter(p => !decided.has(p));
     if (open.length && !open.includes('internal')) return 'the customer';

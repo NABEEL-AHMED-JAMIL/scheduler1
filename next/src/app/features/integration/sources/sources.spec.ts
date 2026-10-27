@@ -91,7 +91,7 @@ describe('Sources -- the sources tab', () => {
     const { api } = screenWith();
     const screen = TestBed.runInInjectionContext(() => new Sources());
     screen.ngOnInit();
-    expect(api.list).toHaveBeenCalledWith('', 1, 50);
+    expect(api.list).toHaveBeenCalledWith('', 1, 50, null);
     expect(screen.rows().map(r => r.id)).toEqual([1001, 1000, 1002]);
     const tiles = Object.fromEntries(screen.kpis().map(k => [k.label, k.value]));
     expect(tiles).toEqual({ Sources: 3, Answered: 1, Failing: 1, 'Not tested': 1 });
@@ -106,7 +106,7 @@ describe('Sources -- the sources tab', () => {
     screen.onSearch('live');
     screen.onSearch('live-check');
     vi.advanceTimersByTime(400);
-    expect(api.list).toHaveBeenLastCalledWith('live-check', 1, 50);
+    expect(api.list).toHaveBeenLastCalledWith('live-check', 1, 50, null);
     expect(api.list).toHaveBeenCalledTimes(3);
   });
 
@@ -351,5 +351,37 @@ describe('Sources -- what the pipelines read (I1)', () => {
     // A place with nowhere to open is plain text, and its kind says where the rows come from.
     expect(rows[2].querySelector('td:first-child a')).toBeNull();
     expect(rows[2].textContent).toContain('In the step');
+  });
+});
+
+describe('Sources -- the one workspace selector (owner #5)', () => {
+  it('reads every tab for the workspace a platform administrator picks, and a new row defaults to it', () => {
+    const { api, opened } = screenWith({ platform: true });
+    const screen = TestBed.runInInjectionContext(() => new Sources());
+    screen.ngOnInit();
+    expect(api.list).toHaveBeenLastCalledWith('', 1, 50, null);
+    screen.pickWorkspace(2961);
+    expect(api.list).toHaveBeenLastCalledWith('', 1, 50, 2961);
+    screen.tab.set('connections');
+    screen.refresh();
+    expect(api.connections).toHaveBeenLastCalledWith(2961);
+    screen.tab.set('contracts');
+    screen.refresh();
+    expect(api.contracts).toHaveBeenLastCalledWith('', 2961);
+    screen.newConnection();
+    expect(opened.at(-1)!.data).toMatchObject({ connection: null, tenantId: 2961 });
+    screen.newContract();
+    expect(opened.at(-1)!.data).toMatchObject({ tenantId: 2961 });
+    screen.pickWorkspace(null);
+    expect(api.contracts).toHaveBeenLastCalledWith('', null);
+  });
+
+  it('never sends a workspace for a workspace\'s own people', () => {
+    const { api } = screenWith({ platform: false });
+    const screen = TestBed.runInInjectionContext(() => new Sources());
+    screen.ngOnInit();
+    screen.workspaceFilter.set(2961);
+    screen.refresh();
+    expect(api.list).toHaveBeenLastCalledWith('', 1, 50, null);
   });
 });

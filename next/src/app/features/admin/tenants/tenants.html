@@ -6,15 +6,18 @@
     <button type="button" class="btn btn-primary btn-sm" (click)="addTenant()"><app-icon name="plus" />New workspace</button>
   </app-page-header>
 
-  <div class="grid grid-cols-2 md:grid-cols-4 stat-strip stat-row is-md is-start" role="list">
-    @for (tile of [
-      { label: 'Workspaces', value: stats().tenants, foot: stats().active + ' active', icon: 'globe', tone: 'info' },
-      { label: 'Users',    value: stats().users,    foot: 'across all workspaces', icon: 'users', tone: 'info' },
-      { label: 'Schedules', value: stats().jobs,    foot: stats().tasks + ' pipelines', icon: 'calendar', tone: 'info' },
-      { label: 'Unused',   value: stats().empty,    foot: 'no resources yet', icon: 'alert', tone: 'warn' }
-    ]; track tile.label) {
-      <app-stat-tile [label]="tile.label" [value]="tile.value" [icon]="tile.icon" [tone]="$any(tile.tone)" [foot]="tile.foot" />
-    }
+  <!-- Owner #19 (2026-10-19): the platform at a glance, from the server's counts -- Identity's, Core's and billing's. -->
+  <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 stat-strip stat-row is-md is-start" role="list" data-test="workspace-tiles">
+    <app-stat-tile label="Workspaces" [value]="stats().tenants" icon="building" tone="info"
+                   [foot]="stats().active + ' active · ' + stats().suspended + ' suspended · ' + stats().managed + ' managed'" />
+    <app-stat-tile label="Users" [value]="stats().users" icon="users" tone="info" foot="across every workspace" />
+    <app-stat-tile label="Pipelines" [value]="stats().tasks" icon="list" tone="info" [foot]="stats().jobs + ' schedules'" />
+    <app-stat-tile label="Runs this month" [value]="stats().runs" icon="play" [tone]="stats().failed ? 'warn' : 'ok'"
+                   [foot]="stats().failed + ' failed'" />
+    <app-stat-tile label="Cost this month" [value]="money(stats().cost)" icon="chart" tone="info"
+                   [foot]="figuresError() ? 'billing did not answer' : 'so far, as billed'" />
+    <app-stat-tile label="Alerts open" [value]="stats().alerts" icon="bell" [tone]="stats().alerts ? 'crit' : 'ok'"
+                   [foot]="stats().alerting ? 'in ' + stats().alerting + ' workspaces' : 'none open'" />
   </div>
 
   <app-table-shell heading="Workspaces" [loading]="loading()" [error]="error()"
@@ -30,6 +33,7 @@
         <option value="Active">Active</option>
         <option value="Suspended">Suspended</option>
         <option value="Inactive">Inactive</option>
+        <option value="MANAGED">Managed by our team</option>
       </select>
       <!-- Cards have no header to click, so they keep a sort control; the table sorts from its
            column headers like every other list. -->
@@ -39,6 +43,9 @@
           <option value="tenantName">Sort by name</option>
           <option value="userCount">Sort by users</option>
           <option value="sourceJobCount">Sort by schedules</option>
+          <option value="runsThisMonth">Sort by runs this month</option>
+          <option value="costThisMonth">Sort by cost this month</option>
+          <option value="openAlerts">Sort by alerts open</option>
           <option value="dateCreated">Sort by created</option>
         </select>
         <button type="button" class="btn btn-ghost btn-icon btn-sm"
@@ -62,10 +69,9 @@
     </ng-container>
 
     @if (view() === 'table') {
-      <!-- The same tenants as a table: six resource counts read better in columns when the
-           question is "which tenant has the most", and as cards when it is "tell me about
-           this one". -->
-      <table class="table-modern">
+      <!-- Owner #19: one row a workspace -- who it is and its state, then what it holds, what it did this month, what it
+           costs and whether anything is wrong; every action in its ⋮. -->
+      <table class="table-modern" data-test="workspaces-table">
         <thead>
           <tr>
             <th>
@@ -74,31 +80,23 @@
                 <app-icon [name]="sort.iconFor('tenantName')" size="0.875rem" [class]="sort.key() === 'tenantName' ? 'icon-info' : 'icon-muted'" />
               </button>
             </th>
-            <th>Admin</th>
-            @for (res of resources; track res.key) {
+            <th>State</th>
+            <th>Plan</th>
+            @for (col of figureColumns; track col.key) {
               <th class="text-right">
-                <button type="button" class="th-sort" [class.th-sort-active]="sort.key() === res.key" (click)="sort.toggle(res.key)">
-                  {{ res.label }}
-                  <app-icon [name]="sort.iconFor(res.key)" size="0.875rem" [class]="sort.key() === res.key ? 'icon-info' : 'icon-muted'" />
+                <button type="button" class="th-sort" [class.th-sort-active]="sort.key() === col.key" (click)="sort.toggle(col.key)" [title]="col.title">
+                  {{ col.label }}
+                  <app-icon [name]="sort.iconFor(col.key)" size="0.875rem" [class]="sort.key() === col.key ? 'icon-info' : 'icon-muted'" />
                 </button>
               </th>
             }
-            <th>
-              <button type="button" class="th-sort" [class.th-sort-active]="sort.key() === 'dateCreated'" (click)="sort.toggle('dateCreated')">
-                Created
-                <app-icon [name]="sort.iconFor('dateCreated')" size="0.875rem" [class]="sort.key() === 'dateCreated' ? 'icon-info' : 'icon-muted'" />
-              </button>
-            </th>
-            <th>Created by</th>
-            <th>Updated by</th>
-            <th>Mode</th>
-            <th class="text-right">State</th>
+            <th>Admin</th>
             <th class="w-12 th-actions">Actions</th>
           </tr>
         </thead>
         <tbody>
           @for (tenant of paged(); track tenant.tenantId) {
-            <tr [class.opacity-70]="tenant.status !== 'Active'">
+            <tr [class.opacity-70]="tenant.status !== 'Active'" [attr.data-workspace]="tenant.tenantId">
               <td class="max-w-72">
                 <div class="font-medium truncate" [title]="tenant.tenantName">{{ tenant.tenantName }}</div>
                 @if (tenant.sandboxOf) {
@@ -110,13 +108,40 @@
                   <span class="mono truncate">{{ tenant.tenantCode }}</span>
                   <app-copy-button [value]="tenant.tenantCode" [copied]="copiedId() === tenant.tenantId"
                                    copiedLabel="Workspace code copied" (copy)="copyCode(tenant)" />
+                  @if (tenant.dateCreated) { <span class="whitespace-nowrap">· since {{ tenant.dateCreated | serverTime: 'date' }}</span> }
                 </div>
+              </td>
+              <td class="whitespace-nowrap" data-test="workspace-state">
+                <span class="pill" [class]="'pill ' + stateTone(tenant)">{{ tenant.status }}</span>
+                <div class="mt-1"><span class="pill" [class]="tenant.managementMode === 'MANAGED' ? 'pill pill-brand' : 'pill pill-neutral'">{{ modeLabel(tenant) }}</span></div>
+              </td>
+              <td class="max-w-40" data-test="workspace-plan">
+                @if (tenant.plan) {
+                  <div class="truncate text-sm" [title]="tenant.plan">{{ tenant.plan }}</div>
+                  <div class="text-[11px] text-[color:var(--text-muted)]">{{ tenant.planOwn ? 'its own card' : 'the default card' }}</div>
+                } @else { <span class="text-[color:var(--text-muted)]">—</span> }
+              </td>
+              <td class="text-right tabular" [class.text-[color:var(--text-muted)]]="!tenant.userCount">{{ tenant.userCount || 0 }}</td>
+              <td class="text-right tabular" [class.text-[color:var(--text-muted)]]="!tenant.sourceTaskCount">
+                {{ tenant.sourceTaskCount || 0 }}
+                <div class="text-[11px] text-[color:var(--text-muted)] leading-tight">{{ tenant.sourceJobCount || 0 }} schedules</div>
+              </td>
+              <td class="text-right tabular" data-test="workspace-runs">
+                @if (tenant.runsThisMonth != null) {
+                  {{ tenant.runsThisMonth }}
+                  <div class="text-[11px] leading-tight" [class]="tenant.failedRunsThisMonth ? 'text-crit-500' : 'text-[color:var(--text-muted)]'">{{ tenant.failedRunsThisMonth || 0 }} failed</div>
+                } @else { <span class="text-[color:var(--text-muted)]" title="Core could not count them just now">—</span> }
+              </td>
+              <td class="text-right tabular whitespace-nowrap">{{ storage(tenant.storageBytes) }}</td>
+              <td class="text-right tabular whitespace-nowrap" data-test="workspace-cost">{{ money(tenant.costThisMonth) }}</td>
+              <td class="text-right tabular" data-test="workspace-alerts">
+                @if (tenant.openAlerts) { <span class="pill pill-crit">{{ tenant.openAlerts }} open</span> }
+                @else if (tenant.openAlerts === 0) { <span class="text-[color:var(--text-muted)]">0</span> }
+                @else { <span class="text-[color:var(--text-muted)]">—</span> }
               </td>
               <td class="max-w-56">
                 @if (tenant.adminName || tenant.adminEmail) {
-                  <div class="truncate text-[color:var(--text-secondary)]" [title]="tenant.adminEmail || ''">
-                    {{ tenant.adminName || tenant.adminEmail }}
-                  </div>
+                  <div class="truncate text-[color:var(--text-secondary)]" [title]="tenant.adminEmail || ''">{{ tenant.adminName || tenant.adminEmail }}</div>
                   @if (tenant.adminName && tenant.adminEmail) {
                     <div class="truncate text-[11px] text-[color:var(--text-muted)]">{{ tenant.adminEmail }}</div>
                   }
@@ -124,28 +149,6 @@
                   <span class="text-[color:var(--text-muted)]" title="No active workspace administrator — nobody can manage this workspace's users">—</span>
                 }
               </td>
-              @for (res of resources; track res.key) {
-                <td class="text-right tabular"
-                    [class.text-[color:var(--text-muted)]]="!$any(tenant)[res.key]">
-                  {{ $any(tenant)[res.key] || 0 }}
-                  @if (res.sub && res.sub(tenant); as sub) {
-                    <div class="text-[11px] text-[color:var(--text-muted)] leading-tight">{{ sub }}</div>
-                  }
-                </td>
-              }
-              <td class="whitespace-nowrap text-[color:var(--text-secondary)]">
-                {{ tenant.dateCreated ? (tenant.dateCreated | serverTime: 'date') : '—' }}
-              </td>
-              <td class="text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
-                {{ tenant.createdByName || '—' }}
-              </td>
-              <td class="text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
-                {{ tenant.updatedByName || '—' }}
-              </td>
-              <td class="whitespace-nowrap">
-                <span class="pill" [class]="tenant.managementMode === 'MANAGED' ? 'pill pill-brand' : 'pill pill-neutral'">{{ modeLabel(tenant) }}</span>
-              </td>
-              <td class="text-right"><app-status [label]="tenant.status" [quiet]="true" /></td>
               <td class="text-right">
                 <button type="button" class="btn btn-ghost btn-icon btn-sm" data-test="workspace-actions"
                         [disabled]="busy() === tenant.tenantId"
@@ -238,11 +241,20 @@
               <p class="mt-2 text-[11px] leading-relaxed text-[color:var(--text-muted)]">
                 {{ quietSummary(tenant) }}
               </p>
+              <!-- Owner #19: this month, as the table says it. -->
+              <dl class="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs" data-test="workspace-card-figures">
+                <dt class="text-[color:var(--text-muted)]">Runs this month</dt>
+                <dd class="m-0 text-right tabular">{{ tenant.runsThisMonth ?? '—' }}@if (tenant.failedRunsThisMonth) { <span class="text-crit-500"> · {{ tenant.failedRunsThisMonth }} failed</span> }</dd>
+                <dt class="text-[color:var(--text-muted)]">Cost this month</dt><dd class="m-0 text-right tabular">{{ money(tenant.costThisMonth) }}</dd>
+                <dt class="text-[color:var(--text-muted)]">Storage</dt><dd class="m-0 text-right tabular">{{ storage(tenant.storageBytes) }}</dd>
+                <dt class="text-[color:var(--text-muted)]">Alerts open</dt><dd class="m-0 text-right tabular" [class.text-crit-500]="!!tenant.openAlerts">{{ tenant.openAlerts ?? '—' }}</dd>
+                <dt class="text-[color:var(--text-muted)]">Plan</dt><dd class="m-0 text-right truncate" [title]="tenant.plan || ''">{{ tenant.plan || '—' }}</dd>
+              </dl>
             </div>
 
           <!-- B10 (G8): the card's nine inline actions are its ⋮ menu, as in the table. -->
           <div class="flex items-center gap-1.5 border-t pt-3 border-subtle mt-auto">
-            <button type="button" class="btn btn-ghost btn-sm" (click)="viewUsers(tenant)" [disabled]="!tenant.userCount"
+            <button type="button" class="btn btn-default btn-sm" (click)="viewUsers(tenant)" [disabled]="!tenant.userCount"
                     [title]="tenant.userCount ? 'Show the users in this workspace' : 'This workspace has no users yet'">
               <app-icon name="users" [class.icon-info]="!!tenant.userCount" />Users
             </button>
@@ -263,6 +275,13 @@
   <!-- One ⋮ menu for both views (B10): every action a workspace has, in one place. -->
   <ng-template #workspaceMenu let-tenant>
       <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+        <!-- Owner #20 (2026-10-19): where Work in a workspace went. -->
+        <button cdkMenuItem class="menu-item" data-work-in [disabled]="tenant.status !== 'Active'"
+                [title]="tenant.status === 'Active' ? 'Open a managed session: you work there as its administrator, and every change and every data read is recorded' : 'Only an active workspace can be opened'"
+                (cdkMenuItemTriggered)="workIn(tenant)">
+          <app-icon name="external" class="icon-info" />Work in this workspace
+        </button>
+        <div class="my-1 border-t border-subtle" role="separator"></div>
         <button cdkMenuItem class="menu-item" [disabled]="!tenant.userCount"
                 (cdkMenuItemTriggered)="viewUsers(tenant)">
           <app-icon name="users" class="icon-info" />Users

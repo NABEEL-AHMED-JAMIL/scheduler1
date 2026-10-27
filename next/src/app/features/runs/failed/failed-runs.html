@@ -155,9 +155,9 @@
           @if (pages() > 1) {
             <div class="flex items-center justify-end gap-2 px-4 py-3 text-sm" data-test="failed-pages">
               <span class="text-[color:var(--text-muted)]">Page {{ page() + 1 }} of {{ pages() }}</span>
-              <button type="button" class="btn btn-ghost btn-sm" [disabled]="page() === 0" (click)="goTo(page() - 1)">
+              <button type="button" class="btn btn-default btn-sm" [disabled]="page() === 0" (click)="goTo(page() - 1)">
                 <app-icon name="chevronLeft" />Newer</button>
-              <button type="button" class="btn btn-ghost btn-sm" [disabled]="page() + 1 >= pages()" (click)="goTo(page() + 1)">
+              <button type="button" class="btn btn-default btn-sm" [disabled]="page() + 1 >= pages()" (click)="goTo(page() + 1)">
                 Older<app-icon name="chevronRight" /></button>
             </div>
           }

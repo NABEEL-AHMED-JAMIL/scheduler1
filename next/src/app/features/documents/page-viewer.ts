@@ -37,13 +37,13 @@ export interface ViewerBox {
     <div class="page-viewer">
       <div class="page-viewer-bar">
         @if (pageCount() > 1) {
-          <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Previous page" [disabled]="page() <= 1" (click)="goTo(page() - 1)">
+          <button type="button" class="btn btn-default btn-icon btn-sm" aria-label="Previous page" [disabled]="page() <= 1" (click)="goTo(page() - 1)">
             <app-icon name="chevronLeft" />
           </button>
         }
         <span class="text-xs text-[color:var(--text-secondary)]" aria-live="polite">Page {{ page() }} of {{ pageCount() }}</span>
         @if (pageCount() > 1) {
-          <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Next page" [disabled]="page() >= pageCount()" (click)="goTo(page() + 1)">
+          <button type="button" class="btn btn-default btn-icon btn-sm" aria-label="Next page" [disabled]="page() >= pageCount()" (click)="goTo(page() + 1)">
             <app-icon name="chevronRight" />
           </button>
         }

@@ -7,7 +7,7 @@ import { provideRouter } from '@angular/router';
 import { ConversationList, SEARCH_DEBOUNCE_MS } from './conversation-list';
 import { useMemoryStorage } from '../../../shared/testing/memory-storage';
 import {
-  ConversationRow, badgeOf, dayGroupOf, groupRows, matchesChip, mergeRecent, readRail, relativeTime, writeRail,
+  ConversationRow, badgeOf, dayGroupOf, groupRows, matchesChip, mergeRecent, readRail, relativeTime, rowTime, writeRail,
 } from './conversation.model';
 
 /**
@@ -56,6 +56,18 @@ describe('conversation list: days', () => {
     expect(relativeTime('2026-10-11T13:10:00', new Date('2026-10-11T20:00:00Z'), CHICAGO)).toBe('13:10');
     expect(relativeTime('2026-10-08T13:10:00', NOW, CHICAGO)).toBe('Thu');
     expect(relativeTime('2026-09-03T13:10:00', NOW, CHICAGO)).toBe('3 Sep');
+  });
+});
+
+describe('conversation list: a row\'s time under its day header', () => {
+  it('says the time, not the day again: Yesterday 23:10, This week Thu 13:10; Today, Pinned and Older as before', () => {
+    expect(rowTime('2026-10-11T23:10:00', 'yesterday', NOW, CHICAGO)).toBe('23:10');
+    expect(rowTime('2026-10-11T09:05:00-05:00', 'yesterday', NOW, CHICAGO)).toBe('09:05');
+    expect(rowTime('2026-10-08T13:10:00', 'week', NOW, CHICAGO)).toBe('Thu 13:10');
+    expect(rowTime('2026-10-12T00:05:00', 'today', NOW, CHICAGO)).toBe('25 min');
+    expect(rowTime('2026-10-11T23:10:00', 'pinned', NOW, CHICAGO)).toBe('Yesterday');
+    expect(rowTime('2026-09-03T13:10:00', 'older', NOW, CHICAGO)).toBe('3 Sep');
+    expect(rowTime(null, 'yesterday', NOW, CHICAGO)).toBe('');
   });
 });
 
@@ -191,6 +203,49 @@ describe('ConversationList (the component)', () => {
     expect(fixture.nativeElement.classList.contains('cl-rail')).toBe(true);
     expect(el.querySelector('[data-conversation="1"]')!.getAttribute('aria-label')).toBe('Title 1');
     expect(localStorage.getItem('ai.conversations.rail')).toBe('1');
+  });
+
+  it('prints the time under Yesterday, never "Yesterday" again, with the full date and time as its tooltip', () => {
+    const { fixture, list, el, c } = make();
+    const now = new Date();
+    const dayAgo = new Date(now.getTime() - 24 * 3_600_000).toISOString();
+    list().flush(page([row(11, dayAgo, { outcome: 'answered' }), row(12, dayAgo, { outcome: 'answered' })]));
+    c.now.set(now);
+    fixture.detectChanges();
+    expect(el.querySelector('[data-group="yesterday"] .cl-group')!.textContent!.trim()).toBe('Yesterday');
+    const times = [...el.querySelectorAll('[data-group="yesterday"] .cl-time')];
+    expect(times.length).toBe(2);
+    for (const t of times) {
+      expect(t.textContent!.trim()).toMatch(/^\d{2}:\d{2}$/);
+      expect(t.getAttribute('title')).toMatch(/\d{2}:\d{2}/);
+    }
+  });
+
+  it('marks only the open conversation (cl-active, aria-current); keyboard focus alone draws the ring', () => {
+    const { fixture, list, el } = make();
+    list().flush(page([row(7, '2026-10-01T10:00:00'), row(8, '2026-10-01T09:00:00')]));
+    fixture.componentRef.setInput('activeId', 7);
+    fixture.detectChanges();
+    const open = el.querySelector('[data-conversation="7"]')!;
+    const other = el.querySelector('[data-conversation="8"]')!;
+    expect(open.classList.contains('cl-active')).toBe(true);
+    expect(open.querySelector('.cl-open')!.getAttribute('aria-current')).toBe('true');
+    expect(other.classList.contains('cl-active')).toBe(false);
+    expect(other.querySelector('.cl-open')!.getAttribute('aria-current')).toBeNull();
+    // The title stays on one line, its tooltip the whole title.
+    expect(open.querySelector('.cl-open')!.getAttribute('title')).toContain('Title 7');
+
+    // The states as styled: selected is a soft tint and a mark inside the row; the ring is :focus-visible only.
+    const css = ((ConversationList as unknown as { ɵcmp: { styles: string[] } }).ɵcmp.styles).join('\n')
+      .replace(/%NS%/g, '').replace(/"/g, "'").replace(/\s+/g, ' ');
+    expect(css).toContain('.cl-row.cl-active { background: var(--row-selected-bg); }');
+    expect(css).toMatch(/\.cl-row::before \{ content: ''; position: absolute; left: 0\.25rem;/);
+    expect(css).toContain('.cl-row.cl-active::before { background: var(--accent-mark-strong); }');
+    expect(css).toContain('.cl-active .cl-time { color: var(--text-secondary); }');
+    expect(css).toContain('.cl-open:focus { outline: none; }');
+    expect(css).toContain('.cl-open:focus-visible::after { outline: 2px solid var(--focus-ring);');
+    expect(css).not.toContain('focus-within');
+    expect(css).not.toMatch(/inset 2px 0 0/);
   });
 
   it('opens a conversation and hands a delete to the page', () => {

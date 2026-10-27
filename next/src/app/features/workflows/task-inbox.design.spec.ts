@@ -44,12 +44,13 @@ const REQUESTS: RequestRow[] = [
 function screen(link?: number) {
   const api = {
     mine: vi.fn(() => of({ status: 'SUCCESS', message: '', data: MINE })),
-    groups: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [] })),
+    teams: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [] })),
     done: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [task(90, 'Visit check #1069', { state: 'ChangesRequested', actedAt: '2026-10-06T11:31:00' })] })),
     requests: vi.fn(() => of({ status: 'SUCCESS', message: '', data: REQUESTS })),
     task: vi.fn((id: number) => of({ status: 'SUCCESS', message: '', data: detailOf(MINE.find(t => t.id === id) ?? MINE[0]) })),
     request: vi.fn((id: number) => of({ status: 'SUCCESS', message: '', data: { ...REQUESTS[0], id, subject: { amount: 3 }, tasks: [], history: [] } })),
-    colleagues: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [{ userId: 4597, fullName: 'Alex', username: 'alex@x.io' }] })),
+    colleagues: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [{ userId: 4597, fullName: 'Alex', username: 'alex@x.io', canAct: true },
+      { userId: 4598, fullName: 'Vic Viewer', username: 'vic@x.io', canAct: false }] })),
     act: vi.fn(() => of({ status: 'SUCCESS', message: 'Approved.', data: {} })),
     reassign: vi.fn(() => of({ status: 'SUCCESS', message: '', data: {} })),
   };
@@ -61,7 +62,7 @@ function screen(link?: number) {
       ...(link ? [{ provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({ task: String(link) }), routeConfig: { path: 'workflows/inbox' } } } }] : []),
       { provide: WorkflowsApi, useValue: api },
       { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn() } },
-      { provide: TaskCountService, useValue: { refresh: vi.fn(), count: signal(3), overdue: signal(1), mine: signal(3), groups: signal(0), done: signal(1), requests: signal(1) } },
+      { provide: TaskCountService, useValue: { refresh: vi.fn(), count: signal(3), overdue: signal(1), mine: signal(3), teams: signal(0), done: signal(1), requests: signal(1) } },
       { provide: AuthService, useValue: { canOpen: () => true, user: signal({ appUserId: 4537, tenantId: 2924 }) } },
     ],
   });
@@ -76,7 +77,7 @@ describe('Task inbox, the design', () => {
   it('names its tabs as real tabs with counts, and keeps their test hooks', () => {
     const { el, text } = screen();
     const tabs = [...el.querySelectorAll('[role="tablist"] .tab')];
-    expect(tabs.map(t => t.getAttribute('data-test'))).toEqual(['tab-mine', 'tab-groups', 'tab-done', 'tab-requests']);
+    expect(tabs.map(t => t.getAttribute('data-test'))).toEqual(['tab-mine', 'tab-teams', 'tab-done', 'tab-requests']);
     expect(text('[data-test="tab-mine"]')).toBe('Waiting for me 3');
     expect(text('[data-test="tab-requests"]')).toBe('My requests 1');
     expect(el.querySelector('[data-test="tab-mine"]')!.classList).toContain('tab-active');
@@ -121,6 +122,24 @@ describe('Task inbox, the design', () => {
     expect(detail.querySelector('.inbox-detail-head')!.textContent).toContain('With Administrators');
     expect(detail.querySelector('[data-test="decision-rule"]')!.textContent).toContain('Rejecting needs a comment');
     expect([...detail.querySelectorAll('[data-test="decisions"] button')].map(b => b.textContent!.trim())).toEqual(['Approve', 'Reject', 'Ask for changes', 'Pass on']);
+  });
+
+  it('offers to pass a task only to someone who can open Approvals; a read-only viewer is listed, marked, never picked', () => {
+    const { inbox } = screen();
+    expect(inbox.colleagueOptions()).toEqual([
+      { value: '4597', label: 'Alex', hint: 'alex@x.io' },
+      { value: '4598', label: 'Vic Viewer', hint: 'Cannot open Approvals', disabled: true }]);
+  });
+
+  it('says what passing on does while the task is being passed on, not the rule about rejecting', () => {
+    const { el, render } = screen();
+    const detail = el.querySelector('[data-test="task-detail"]')!;
+    ([...detail.querySelectorAll<HTMLButtonElement>('[data-test="decisions"] button')].find(b => b.textContent!.includes('Pass on')))!.click();
+    render();
+    expect(detail.querySelector('[data-test="pass-on"]')).not.toBeNull();
+    expect(detail.querySelector<HTMLTextAreaElement>('#task-comment')!.placeholder).toBe('Note for the person you pass it to (optional)');
+    expect(detail.querySelector('[data-test="decision-rule"]')!.textContent).toContain('moves to the person you pick');
+    expect(detail.querySelector('[data-test="decision-rule"]')!.textContent).not.toContain('Rejecting');
   });
 
   it('shows the request\'s values by their shape: a table, a file chip, a quiet id, Yes', () => {

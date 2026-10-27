@@ -344,3 +344,26 @@ describe('SchemaForm -- a document-type setting', () => {
     expect(nested.value).toBe('1007');
   });
 });
+
+describe('SchemaForm -- a schedule setting (MIG-424, Run pipeline)', () => {
+  const SCHEDULE_SCHEMA: JsonSchema = { type: 'object', required: ['jobId'],
+    properties: { jobId: { type: 'integer', format: 'schedule', title: 'Pipeline' } } };
+
+  it('offers the workspace\'s schedules by name, stores the id as a number and keeps one it no longer has', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ imports: [SchemaForm], providers: [provideZonelessChangeDetection()] });
+    const fixture = TestBed.createComponent(SchemaForm);
+    fixture.componentRef.setInput('schema', SCHEDULE_SCHEMA);
+    fixture.componentRef.setInput('value', { jobId: 2851 });
+    fixture.componentRef.setInput('schedules', [{ id: 2850, label: 'Care plan (#2850)' }]);
+    const changes: Record<string, unknown>[] = [];
+    fixture.componentInstance.valueChange.subscribe(v => changes.push(v));
+    fixture.detectChanges();
+    const select = (fixture.nativeElement as HTMLElement).querySelector<HTMLSelectElement>('#cfg-jobId')!;
+    expect(Array.from(select.options).map(o => o.textContent!.trim()))
+      .toEqual(['Choose a pipeline…', 'Care plan (#2850)', 'Schedule 2851 (not one of this workspace\'s)']);
+    select.value = '2850';
+    select.dispatchEvent(new Event('change'));
+    expect(changes.at(-1)).toEqual({ jobId: 2850 });
+  });
+});

@@ -3,6 +3,8 @@ import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { API_SUCCESS } from '../../../core/api/api.config';
 import { Icon } from '../../../shared/ui/icon';
 import { SidePanel } from '../../../shared/ui/side-panel';
+import { FormRow } from '../../../shared/ui/form-row';
+import { Section } from '../../../shared/ui/section';
 import { refusal } from '../../../shared/ui/bulk/bulk.model';
 import { RetentionApi } from './retention.api';
 import {
@@ -25,56 +27,72 @@ interface Row { c: RetentionClass; value: string; }
  */
 @Component({
   selector: 'app-retention-edit-panel',
-  imports: [SidePanel, Icon],
-  styles: `.retention-edit-table th, .retention-edit-table td { text-align: left; vertical-align: top; }
-    .retention-edit-table tbody th { text-transform: none; letter-spacing: normal; font-weight: 400; }`,
+  imports: [SidePanel, Icon, FormRow, Section],
+  // Owner #4 (2026-10-19): one row a kind of data on the shared form-row grid -- what it is, its days, what a pass would
+  // remove -- so the label, the field and its note line up in every row (the table's header cells had no padding of their
+  // own and stood off their rows), and every row is the whole width on a narrow panel.
+  styles: `
+    .retention-rows { display: flex; flex-direction: column; }
+    .retention-row { padding: 0.75rem 0; border-top: 1px solid var(--border-subtle); align-items: start; row-gap: 0.5rem; }
+    .retention-row:first-child { border-top: 0; padding-top: 0; }
+    .retention-row .form-row + * { margin-top: 0; }
+    .retention-heads { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted);
+      padding-bottom: 0.5rem; border-bottom: 1px solid var(--border-subtle); margin-bottom: 0.75rem; }
+    @media (max-width: 47.99rem) { .retention-heads { display: none; } }
+  `,
   template: `
     <app-side-panel heading="Edit retention" subtitle="Days per kind of data; empty keeps it forever" data-test="retention-edit-panel">
-      <div class="form-lock flex flex-col gap-4">
-        <label class="flex items-start gap-2 text-sm">
-          <input type="checkbox" class="checkbox shrink-0 mt-0.5" role="switch" [checked]="enabled()" (change)="enabled.set($any($event.target).checked)"
-                 data-test="retention-enabled" />
-          <span>
-            <span class="font-medium">Remove data older than its days</span>
-            <span class="block field-note text-[color:var(--text-muted)]">
-              Off: nothing is removed, whatever the days say. On: the daily pass after 02:00 removes what is older, outside every legal hold.
+      <div class="form-lock flex flex-col gap-5">
+        <app-section title="Removal" [level]="3">
+          <label class="flex items-start gap-2 text-sm">
+            <input type="checkbox" class="checkbox shrink-0 mt-0.5" role="switch" [checked]="enabled()" (change)="enabled.set($any($event.target).checked)"
+                   data-test="retention-enabled" />
+            <span>
+              <span class="font-medium">Remove data older than its days</span>
+              <span class="block field-note text-[color:var(--text-muted)]">
+                Off: nothing is removed, whatever the days say. On: the daily pass after 02:00 removes what is older, outside every legal hold.
+              </span>
             </span>
-          </span>
-        </label>
+          </label>
+        </app-section>
 
-        <table class="table-modern retention-edit-table" aria-label="Days per kind of data">
-          <thead><tr><th scope="col">Data</th><th scope="col" class="w-44">Keep for (days)</th><th scope="col" class="w-48">If saved, a pass now removes</th></tr></thead>
-          <tbody>
+        <app-section title="Days per kind of data" [level]="3" sub="A number of days, or empty to keep it forever. Nothing is removed by saving.">
+          <app-form-row class="retention-heads" aria-hidden="true">
+            <span class="fr-5">Data</span><span class="fr-3">Keep for (days)</span><span class="fr-4">If saved, a pass now removes</span>
+          </app-form-row>
+          <div class="retention-rows" role="list" aria-label="Days per kind of data">
             @for (r of rows(); track r.c.dataClass; let i = $index) {
-              <tr [attr.data-class]="r.c.dataClass">
-                <th scope="row" class="align-top">
-                  <span class="block text-sm font-medium">{{ r.c.label }}</span>
+              <app-form-row class="retention-row" role="listitem" [attr.data-class]="r.c.dataClass">
+                <div class="fr-5 min-w-0">
+                  <label class="block text-sm font-medium" [attr.for]="r.c.configurable ? 'days-' + r.c.dataClass : null">{{ r.c.label }}</label>
                   @if (r.c.minDays != null) {
                     <span class="block text-xs text-[color:var(--text-muted)]">At least {{ r.c.minDays.toLocaleString('en-US') }} days, the platform's minimum</span>
                   }
-                </th>
-                <td class="align-top">
+                </div>
+                <div class="fr-3 min-w-0">
                   @if (r.c.configurable) {
-                    <input class="input" inputmode="numeric" [attr.aria-label]="r.c.label + ': days to keep'" placeholder="Forever"
-                           [value]="r.value" (input)="setValue(i, $any($event.target).value)" [attr.data-days]="r.c.dataClass" />
-                    @if (problems()[i]; as problem) { <p class="field-note text-crit-500" role="alert">{{ problem }}</p> }
-                    @else { <p class="field-note text-[color:var(--text-muted)]">{{ hint(r) }}</p> }
+                    <div class="field" [class.field-invalid]="!!problems()[i]">
+                      <input class="input" inputmode="numeric" [id]="'days-' + r.c.dataClass" placeholder="Forever"
+                             [value]="r.value" (input)="setValue(i, $any($event.target).value)" [attr.data-days]="r.c.dataClass" />
+                      @if (problems()[i]; as problem) { <p class="field-note text-crit-500" role="alert">{{ problem }}</p> }
+                      @else { <p class="field-note text-[color:var(--text-muted)]">{{ hint(r) }}</p> }
+                    </div>
                   } @else {
                     <span class="text-sm text-[color:var(--text-secondary)]">{{ keepText(r.c) }}</span>
                   }
-                </td>
-                <td class="align-top text-sm">
+                </div>
+                <div class="fr-4 min-w-0 text-sm" data-preview-cell>
                   @if (previewOf(r.c.dataClass); as p) {
                     {{ previewLine(p) }}
                     @if (p.state === 'NEEDS_CONFIRMATION' || p.state === 'HELD') {
-                      <span class="block"><span class="pill" [class]="'pill pill-' + stateOf(p.state).tone">{{ stateOf(p.state).label }}</span></span>
+                      <span class="block mt-1"><span class="pill" [class]="'pill pill-' + stateOf(p.state).tone">{{ stateOf(p.state).label }}</span></span>
                     }
-                  } @else { <span class="text-[color:var(--text-muted)]">—</span> }
-                </td>
-              </tr>
+                  } @else { <span class="text-[color:var(--text-muted)]">Preview to see</span> }
+                </div>
+              </app-form-row>
             }
-          </tbody>
-        </table>
+          </div>
+        </app-section>
         @if (preview(); as p) {
           <p class="text-sm text-[color:var(--text-secondary)] m-0" aria-live="polite" data-test="retention-edit-preview">
             With these days a pass now would remove {{ p.items.toLocaleString('en-US') }} item(s){{ p.workspaceHold ? ' once the workspace hold is released' : '' }}.
@@ -83,12 +101,12 @@ interface Row { c: RetentionClass; value: string; }
         }
         @if (error()) { <p class="text-sm text-crit-500 m-0" role="alert" data-test="retention-edit-error">{{ readable(error()) }}</p> }
       </div>
-      <div foot class="flex items-center gap-2 w-full">
-        <button type="button" class="btn btn-ghost btn-sm" (click)="ref.close()">Cancel</button>
-        <button type="button" class="btn btn-ghost btn-sm" [disabled]="invalid() || previewing()" (click)="runPreview()" data-test="retention-edit-preview-btn">
+      <div foot class="flex items-center justify-end gap-2 w-full">
+        <button type="button" class="btn btn-ghost btn-sm mr-auto" (click)="ref.close()">Cancel</button>
+        <button type="button" class="btn btn-default btn-sm" [disabled]="invalid() || previewing()" (click)="runPreview()" data-test="retention-edit-preview-btn">
           <app-icon name="eye" [busy]="previewing()" />Preview these days
         </button>
-        <button type="button" class="btn btn-primary btn-sm ml-auto" [disabled]="invalid() || saving()" (click)="save()" data-test="retention-save">
+        <button type="button" class="btn btn-primary btn-sm" [disabled]="invalid() || saving()" (click)="save()" data-test="retention-save">
           <app-icon name="save" [busy]="saving()" />Save retention
         </button>
       </div>

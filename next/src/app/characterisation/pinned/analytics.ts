@@ -44,8 +44,7 @@ export const PINNED: Record<string, unknown> = {
       "/data/analytics",
       "/data/ask",
       "/data/catalog",
-      "/data/files",
-      "/data/reports"
+      "/data/files"
     ]
   },
   "Analytics Studio, as a tenant user with every page": {
@@ -81,8 +80,7 @@ export const PINNED: Record<string, unknown> = {
       "/data/analytics",
       "/data/analytics/dashboards",
       "/data/catalog",
-      "/data/files",
-      "/data/reports"
+      "/data/files"
     ]
   },
   "Analytics Studio, as a workspace administrator": {
@@ -120,8 +118,7 @@ export const PINNED: Record<string, unknown> = {
       "/data/analytics/dashboards",
       "/data/ask",
       "/data/catalog",
-      "/data/files",
-      "/data/reports"
+      "/data/files"
     ]
   },
   "a dashboard, opened": {
@@ -133,8 +130,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /analyticsWorkspace.json/fetchAllDashboards",
       "GET /analyticsWorkspace.json/fetchAllAnalyses",
       "GET /analyticsLibrary.json/fetchAllQueries",
-      "GET /analyticsWorkspace.json/fetchDashboardById?analyticsDashboardId=1378",
-      "GET /analyticsWorkspace.json/fetchDashboardById?analyticsDashboardId=1379"
+      "GET /analyticsWorkspace.json/fetchDashboardById?analyticsDashboardId=1378"
     ],
     "headings": [],
     "buttons": [
@@ -156,9 +152,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/list?limit=20&page=1",
       "GET /analyticsWorkspace.json/fetchAllDashboards",
       "GET /analyticsWorkspace.json/fetchAllAnalyses",
-      "GET /analyticsLibrary.json/fetchAllQueries",
-      "GET /analyticsWorkspace.json/fetchDashboardById?analyticsDashboardId=1379",
-      "GET /analyticsWorkspace.json/fetchDashboardById?analyticsDashboardId=1378"
+      "GET /analyticsLibrary.json/fetchAllQueries"
     ],
     "headings": [
       "Dashboards"

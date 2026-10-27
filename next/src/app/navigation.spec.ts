@@ -84,11 +84,11 @@ const OLD_ADDRESSES: [string, string][] = [
   ['/admin/tenants', '/platform/workspaces'],
   ['/admin/users', '/administration/users'],
   ['/administration/billing', '/billing/usage'],
-  ['/administration/billing/analytics', '/platform/billing-analytics'],
+  ['/administration/billing/analytics', '/billing/analytics'],
   ['/administration/billing/documents', '/billing/documents'],
   ['/administration/billing/invoices', '/billing/invoices'],
   ['/administration/billing/invoices/INV-2026-0001', '/billing/invoices/INV-2026-0001'],
-  ['/administration/billing/rates', '/platform/rate-cards'],
+  ['/administration/billing/rates', '/billing/settings'],
   ['/ai/agents', '/pipelines/prompts'],
   ['/ai/assistant', '/ai/assistant'],
   ['/ai/connections', '/settings/model-connections'],
@@ -110,7 +110,6 @@ const OLD_ADDRESSES: [string, string][] = [
   ['/jobs/new', '/pipelines/schedules/new'],
   ['/objects', '/data/files'],
   ['/queue', '/runs/by-date'],
-  ['/reports', '/runs/analytics'],
   ['/settings/forms', '/settings/task-registry'],
   ['/settings/lookup', '/settings/values'],
   ['/settings/pipeline-forms', '/settings/task-registry'],
@@ -159,8 +158,14 @@ const OLD_ADDRESSES: [string, string][] = [
   ['/integration/developer/changelog', '/developers/portal/changelog'],
   ['/integration/developer/guides/quickstart', '/developers/portal/guides/quickstart'],
   ['/documents/intelligence', '/documents/in'],
-  ['/documents/inbox', '/documents/file-drop'],
-  ['/documents/reports', '/data/reports'],
+  ['/documents/inbox', '/documents/intake/file-drop'],
+  // Owner 2026-10-20 (§0.1): Datasets renamed Approved data; Email-in and File drop are sections of Intake.
+  ['/documents/datasets', '/documents/approved-data'],
+  ['/documents/email-in', '/documents/intake/email-in'],
+  ['/documents/file-drop', '/documents/intake/file-drop'],
+  ['/documents/upload', '/documents/intake/upload'],
+  ['/documents/reports', '/reports/library'],
+  ['/data/reports', '/reports/library'],
   ['/documents/files', '/data/files'],
   ['/documents/converter', '/tools/converter'],
   ['/documents/transcript', '/tools/transcript'],
@@ -174,14 +179,18 @@ const OLD_ADDRESSES: [string, string][] = [
   ['/configuration/home-pages', '/settings/home-pages'],
   ['/configuration/task-groups', '/settings/task-groups'],
   ['/configuration/engine', '/platform/engine'],
-  ['/billing/analytics', '/platform/billing-analytics'],
-  ['/billing/rates', '/platform/rate-cards'],
+  ['/billing/rates', '/billing/settings'],
   ['/administration/tenants', '/platform/workspaces'],
   ['/administration/tenant-requests', '/platform/requests'],
   ['/administration/managed-service', '/platform/managed-service'],
   ['/administration/staff-activity', '/platform/staff-activity'],
-  ['/administration/work-in-workspace', '/platform/work-in-workspace'],
-  ['/administration/reliability', '/platform/reliability'],
+  ['/administration/work-in-workspace', '/platform/workspaces'],
+  ['/administration/reliability', '/platform/service-health'],
+  // Owner decisions #20-#23 (2026-10-19): the Platform pages that went land where their function is now.
+  ['/platform/work-in-workspace', '/platform/workspaces'],
+  ['/platform/reliability', '/platform/service-health'],
+  ['/platform/billing-analytics', '/billing/analytics'],
+  ['/platform/rate-cards', '/billing/settings'],
 ];
 
 describe('MIG-246: every old address lands on its page', () => {
@@ -197,6 +206,12 @@ describe('MIG-246: every old address lands on its page', () => {
   it('carries the query string through a redirect (the dashboard drill-down, a notification link)', async () => {
     const landed = await land('/operations/jobs/history?targetDate=2026-09-28&targetHr=9&jobStatus=Failed');
     expect(landed.url).toBe('/runs/latest?targetDate=2026-09-28&targetHr=9&jobStatus=Failed');
+  });
+
+  it('carries the query string through the Documents tabs\' moves (owner 2026-10-20)', async () => {
+    expect((await land('/documents/datasets?type=1001')).url).toBe('/documents/approved-data?type=1001');
+    expect((await land('/documents/email-in?channel=email')).url).toBe('/documents/intake/email-in?channel=email');
+    expect((await land('/documents/file-drop?upload=1')).url).toBe('/documents/intake/file-drop?upload=1');
   });
 
   it('marks every old address a full match, so a short one cannot swallow a longer one', () => {
@@ -250,8 +265,10 @@ describe('MIG-246: the renamed pages keep their gates', () => {
     ['/documents/in', 'Documents in', 'document-intelligence', undefined],
     // Tab hubs (2026-10-12): Document Intelligence's views as tabs of Documents, same key.
     ['/documents/types', 'Document types', 'document-intelligence', undefined],
-    ['/documents/datasets', 'Datasets', 'document-intelligence', undefined],
-    ['/documents/email-in', 'Email-in', 'document-intelligence', undefined],
+    ['/documents/approved-data', 'Approved data', 'document-intelligence', undefined],
+    // Owner 2026-10-20 (§0.1): Intake's sections, each with its own key and floor.
+    ['/documents/intake/upload', 'Upload documents', 'document-intelligence', undefined],
+    ['/documents/intake/email-in', 'Email-in', 'document-intelligence', undefined],
     // UX review DR2 (2026-10-13): Document review is the Review hub's Documents tab, same key.
     ['/review/documents', 'Document review', 'document-review', undefined],
     ['/review/documents/:extractionId', 'Review a document', 'document-review', undefined],
@@ -260,10 +277,15 @@ describe('MIG-246: the renamed pages keep their gates', () => {
     ['/review/runs', 'Runs to review', 'task-inbox', undefined],
     ['/data/files', 'Browse files', 'objects', 'TENANT_USER'],
     // MIG-239: built. Browse files' key and floor: every member reads and uploads; configuring is an administrator's.
-    ['/documents/file-drop', 'File drop', 'objects', 'TENANT_USER'],
+    ['/documents/intake/file-drop', 'File drop', 'objects', 'TENANT_USER'],
     ['/tools/converter', 'Document Converter', 'tools-converter', undefined],
-    // MIG-253: generated outputs, behind the converter's key (no key of its own yet).
-    ['/data/reports', 'Generated reports', 'tools-converter', undefined],
+    // MIG-253's generated outputs, beneath Reports since MIG-403, still behind the converter's key.
+    ['/reports/from-pipelines', 'Reports from pipelines', 'tools-converter', undefined],
+    // MIG-403: Report Studio's tabs and pages (Templates and a template open to report-generate too: pageKeys).
+    ['/reports/overview', 'Reports overview', 'report-studio', undefined],
+    ['/reports/library', 'Report library', 'report-library', undefined],
+    ['/reports/library/:reportId', 'Report', 'report-library', undefined],
+    ['/reports/data', 'Report data', 'report-data', undefined],
     ['/tools/transcript', 'Audio Transcript', 'tools-transcript', undefined],
     ['/data/analytics', 'Analytics Studio', 'analytics', undefined],
     ['/data/analytics/dashboards', 'Dashboards', 'analytics-dashboards', undefined],
@@ -282,11 +304,10 @@ describe('MIG-246: the renamed pages keep their gates', () => {
     ['/platform/workspaces', 'Workspaces', undefined, 'PLATFORM_ADMIN'],
     ['/platform/requests', 'Workspace requests', undefined, 'PLATFORM_ADMIN'],
     ['/platform/managed-service', 'Managed service', undefined, 'PLATFORM_ADMIN'],
-    ['/platform/work-in-workspace', 'Work in a workspace', undefined, 'PLATFORM_ADMIN'],
     ['/platform/staff-activity', 'Staff activity', undefined, 'PLATFORM_ADMIN'],
-    ['/platform/reliability', 'Reliability', undefined, 'PLATFORM_ADMIN'],
-    ['/platform/billing-analytics', 'Billing analytics', undefined, 'PLATFORM_ADMIN'],
-    ['/platform/rate-cards', 'Rate cards', undefined, 'PLATFORM_ADMIN'],
+    ['/platform/service-health', 'Service health', undefined, 'PLATFORM_ADMIN'],
+    ['/billing/analytics', 'Billing analytics', undefined, 'TENANT_ADMIN'],
+    ['/billing/settings', 'Billing settings', undefined, 'PLATFORM_ADMIN'],
     ['/platform/engine', 'Engine settings', undefined, 'PLATFORM_ADMIN'],
   ];
   for (const [path, title, pageKey, minRole] of PAGES) {
@@ -390,6 +411,8 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
   const REVIEW = 'Run & review › Review -> /review';
   const DASHBOARDS = 'See results › Dashboards -> /data/analytics/dashboards';
   const ANALYSIS = 'See results › Analysis -> /data';
+  // MIG-403: Report Studio's hub, between Analysis and Tools.
+  const REPORTS = 'See results › Reports -> /reports';
   const TOOLS = 'See results › Tools -> /tools';
   const ADMINISTRATION = 'Administration & billing › Administration -> /administration';
   const BILLING = 'Administration & billing › Billing -> /billing';
@@ -397,7 +420,7 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
   const DEVELOPERS = 'Administration & billing › Developers -> /developers';
   const EVERY_MEMBER_PAGE = [
     ...HOME, CONNECTIONS, DOCUMENTS, FORMS, PIPELINES, AI_ASSISTANT, APPROVALS, RUNS, REVIEW,
-    DASHBOARDS, ANALYSIS, TOOLS,
+    DASHBOARDS, ANALYSIS, REPORTS, TOOLS,
   ];
   const ADMIN_MENU = [...EVERY_MEMBER_PAGE, ADMINISTRATION, BILLING, SETTINGS, DEVELOPERS];
 
@@ -444,6 +467,13 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
       'dashboards-edit'])).toEqual([...HOME, FORMS, RUNS, REVIEW, DASHBOARDS]);
     expect(menuFor('TENANT_USER', ['document-review'])).toEqual([...HOME, REVIEW]);
     expect(menuFor('TENANT_USER', ['reports', 'analytics-dashboards'])).not.toContain(REVIEW);
+  });
+
+  // MIG-403: a reviewer's profile gets the Reports hub and library (identity V8.11); the hub shows its tabs the key opens.
+  it('shows Reports to whoever holds any of its tab keys', () => {
+    expect(menuFor('TENANT_USER', ['report-library'])).toEqual([...HOME, REPORTS]);
+    // An action key alone (publishing) opens no tab.
+    expect(menuFor('TENANT_USER', ['report-publish'])).toEqual(HOME);
   });
 
   it('a tenant user with no page', () => {

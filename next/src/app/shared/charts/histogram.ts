@@ -54,6 +54,7 @@ export interface HistogramBin {
                   [attr.tabindex]="clickable() ? 0 : -1"
                   [attr.aria-hidden]="clickable() ? null : 'true'"
                   [title]="bin.label"
+                  [attr.aria-label]="bin.label"
                   (click)="clickable() && binClicked.emit(bin)"></button>
         }
       </div>

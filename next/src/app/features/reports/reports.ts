@@ -1,5 +1,5 @@
 import { DateRange, DateRangePicker, RangePreset, rangeKey, restoreRange } from '../../shared/ui/date-range';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router, RouterLink } from '@angular/router';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
@@ -12,6 +12,8 @@ import { formatMoney } from '../billing/billing-format';
 import { ToastService } from '../../shared/ui/toast.service';
 import { statusColor } from '../../shared/charts/status-color';
 import { Combobox } from '../../shared/ui/combobox';
+import { WorkspaceSelect } from '../../shared/ui/workspace-select';
+import { WorkspaceDirectory } from '../../core/workspaces/workspace-directory';
 import { Donut } from '../../shared/charts/donut';
 import { BarChart, Bar } from '../../shared/charts/bar-chart';
 import { DaySeries, daySeries } from '../../shared/charts/day-series';
@@ -174,7 +176,7 @@ interface QueueLog {
  */
 @Component({
   selector: 'app-reports',
-  imports: [RefreshButton, PageHeader, DateRangePicker, Icon, StatTile, StatusPill, TableShell, Donut, BarChart, Histogram, ReportPivot, Combobox, Pagination, DecimalPipe, RouterLink, ServerTimePipe],
+  imports: [RefreshButton, PageHeader, DateRangePicker, Icon, StatTile, StatusPill, TableShell, Donut, BarChart, Histogram, ReportPivot, Combobox, WorkspaceSelect, Pagination, DecimalPipe, RouterLink, ServerTimePipe],
   templateUrl: './reports.html',
 })
 export class Reports implements OnInit {
@@ -201,6 +203,16 @@ export class Reports implements OnInit {
   readonly statusFilter = signal('');
   readonly ownerFilter = signal('');
   readonly tenantFilter = signal('');
+  /** Owner #5: a platform administrator picks the workspace with THE selector in the page header (kept for the session),
+   *  not a filter of its own in the bar; the runs are narrowed by that workspace's name, as the bar's filter did. */
+  private readonly directory = inject(WorkspaceDirectory);
+  readonly workspaceId = signal<number | null>(this.directory.remembered());
+  pickWorkspace(id: number | null): void { this.workspaceId.set(id); }
+  /** Follows the pick, and the directory's names once they arrive (a remembered pick is known before its name). */
+  readonly followWorkspace = effect(() => {
+    const id = this.workspaceId();
+    this.tenantFilter.set(id == null ? '' : this.directory.nameOf(id));
+  });
 
   /** Options come from the RAW payload, so choosing one never empties the other pickers. */
   /** Plain strings as combobox rows; the filters are names, so the value is the label. */
@@ -234,13 +246,13 @@ export class Reports implements OnInit {
     if (key === 'job') this.jobFilter.set('');
     if (key === 'status') this.statusFilter.set('');
     if (key === 'owner') this.ownerFilter.set('');
-    if (key === 'tenant') this.tenantFilter.set('');
+    if (key === 'tenant') this.pickWorkspace(null);
   }
 
   clearFilters(): void {
     this.taskFilter.set(''); this.jobFilter.set('');
     this.statusFilter.set(''); this.ownerFilter.set('');
-    this.tenantFilter.set('');
+    this.pickWorkspace(null);
   }
 
   /**
@@ -506,7 +518,7 @@ export class Reports implements OnInit {
    */
   readonly durationFoot = computed(() => {
     const parts: string[] = [];
-    // The split, when it is known, rather than the caveat alone. "34s · 0s running" says in
+    // The split, when it is known, rather than the caveat alone. "34 sec · 0 sec running" says in
     // four words what the old "wait included" only hinted at.
     parts.push(this.medianExecution() >= 0
       ? `${formatDuration(this.medianExecution())} running, rest is queue wait`
