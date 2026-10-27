@@ -1,0 +1,185 @@
+[
+ {
+  "name": "pl-list",
+  "route": "/pipelines/list",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "table.table-modern tbody tr"
+   },
+   {
+    "wait": 800
+   }
+  ],
+  "thumb": true
+ },
+ {
+  "name": "pl-new",
+  "route": "/pipelines/new",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "[data-test=start-with]"
+   },
+   {
+    "wait": 500
+   }
+  ],
+  "clip": "[data-test=start-with]",
+  "pad": 16,
+  "thumb": true
+ },
+ {
+  "name": "pl-builder",
+  "route": "/pipelines/1104/edit?tab=steps",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": ".step-card"
+   },
+   {
+    "wait": 800
+   }
+  ],
+  "thumb": true
+ },
+ {
+  "name": "pl-step-panel",
+  "route": "/pipelines/1104/edit?tab=steps",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": ".step-card[data-step=measure]"
+   },
+   {
+    "click": ".step-card[data-step=measure] .step-open"
+   },
+   {
+    "waitFor": "app-side-panel"
+   },
+   {
+    "wait": 900
+   }
+  ]
+ },
+ {
+  "name": "pl-flow",
+  "route": "/pipelines/1109/edit?tab=steps",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": ".step-card"
+   },
+   {
+    "click": "[data-test=steps-layout] button:has-text('Flow')"
+   },
+   {
+    "waitFor": "[data-test=flow-stages]"
+   },
+   {
+    "wait": 1500
+   }
+  ]
+ },
+ {
+  "name": "pl-sample",
+  "route": "/pipelines/1348/edit?tab=steps",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "button:has-text('Test with sample')"
+   },
+   {
+    "click": "button:has-text('Test with sample')"
+   },
+   {
+    "waitFor": "app-sample-dialog"
+   },
+   {
+    "wait": 600
+   }
+  ],
+  "clip": "app-sample-dialog",
+  "pad": 8,
+  "thumb": true
+ },
+ {
+  "name": "pl-settings",
+  "route": "/pipelines/1104/edit?tab=settings",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "#pipeline-source"
+   },
+   {
+    "wait": 800
+   }
+  ],
+  "thumb": true
+ },
+ {
+  "name": "pl-review",
+  "route": "/pipelines/1104/edit?tab=settings",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "#pipeline-review"
+   },
+   {
+    "wait": 600
+   }
+  ],
+  "clip": "#pipeline-review",
+  "pad": 12,
+  "viewport": [
+   1920,
+   2400
+  ]
+ },
+ {
+  "name": "pl-parameters",
+  "route": "/pipelines/1160/edit?tab=settings",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "#pipeline-parameters"
+   },
+   {
+    "wait": 600
+   }
+  ],
+  "clip": "#pipeline-parameters",
+  "pad": 12,
+  "viewport": [
+   1920,
+   2400
+  ]
+ },
+ {
+  "name": "pl-history",
+  "route": "/pipelines/1104/edit?tab=history",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "text=Versions"
+   },
+   {
+    "wait": 800
+   }
+  ],
+  "thumb": true
+ },
+ {
+  "name": "pl-yaml",
+  "route": "/pipelines/1114/edit?tab=yaml",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "#definitionYaml"
+   },
+   {
+    "wait": 800
+   }
+  ]
+ }
+]
