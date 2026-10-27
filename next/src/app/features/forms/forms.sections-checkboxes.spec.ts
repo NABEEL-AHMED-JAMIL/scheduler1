@@ -60,6 +60,16 @@ describe('Forms -- sections', () => {
     expect(el.querySelector('fieldset')).toBeNull();   // no size containers in a fieldset: a <section>
   });
 
+  it('lays a section\'s short fields in a grid and lets long ones span it (wide screens); ungrouped fields stay a column', () => {
+    const { el } = render(FIELDS);
+    const grids = Array.from(el.querySelectorAll('section.form-section .form-section-grid'));
+    expect(grids.length).toBe(3);
+    const cell = (key: string) => el.querySelector(`#fill-${key}`)?.closest('.form-section-grid > div');
+    expect(cell('first_name')?.classList.contains('form-span')).toBe(false);
+    expect(cell('ros')?.classList.contains('form-span')).toBe(true);
+    expect(el.querySelector('#fill-notes')?.closest('.form-section-grid')).toBeNull();
+  });
+
   it('keeps the section on save, trims it, and refuses one that is too long or not one line', () => {
     const saved = draftForSave(draft([{ key: 'a', label: 'A', type: 'text', required: false, section: '  Patient  ' },
       { key: 'b', label: 'B', type: 'text', required: false, section: '   ' }]));

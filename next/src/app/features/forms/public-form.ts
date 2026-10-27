@@ -26,7 +26,7 @@ type Refusal = { title: string; text: string; signIn: boolean };
   template: `
     <div class="min-h-screen flex flex-col bg-page">
       <header class="border-b border-subtle">
-        <div class="mx-auto w-full max-w-3xl px-5 h-14 flex items-center gap-3">
+        <div class="mx-auto w-full px-5 h-14 flex items-center gap-3" [class.max-w-3xl]="!sectioned()" [class.max-w-6xl]="sectioned()">
           <app-brand-mark />
           <div class="ml-auto flex items-center gap-1.5">
             <button type="button" class="btn btn-ghost btn-icon btn-sm"
@@ -38,7 +38,7 @@ type Refusal = { title: string; text: string; signIn: boolean };
         </div>
       </header>
 
-      <main class="mx-auto w-full max-w-3xl px-5 py-10 flex-1">
+      <main class="mx-auto w-full px-5 py-10 flex-1" [class.max-w-3xl]="!sectioned()" [class.max-w-6xl]="sectioned()">
         @if (loading()) {
           <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]" role="status">Opening the form…</div>
         } @else if (refusal(); as r) {
@@ -99,6 +99,8 @@ export class PublicForm implements OnInit {
 
   readonly loading = signal(true);
   readonly view = signal<PublicFormView | null>(null);
+  /** Whether the form groups its fields in sections (2026-10-26): then the page is wide. */
+  readonly sectioned = computed(() => (this.view()?.fields ?? []).some(f => !!f.section?.trim()));
   readonly refusal = signal<Refusal | null>(null);
   readonly answers = signal<Answers>({});
   readonly problems = signal<Record<string, string>>({});

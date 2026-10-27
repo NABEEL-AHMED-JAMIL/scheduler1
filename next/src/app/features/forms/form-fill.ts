@@ -19,7 +19,8 @@ import { PageHeader } from '../../shared/ui/page-header';
   selector: 'app-form-fill',
   imports: [PageHeader, FormRenderer, Icon, LoadError, RouterLink],
   template: `
-    <div class="page max-w-3xl">
+    <!-- A form in sections uses a wide screen: its sections lay short fields side by side (form-renderer). -->
+    <div class="page" [class.max-w-3xl]="!sectioned()" [class.max-w-6xl]="sectioned()">
       <app-page-header [trail]="[{ label: 'Get data in' }, { label: 'Forms', link: '/forms/builder' }]">
         <div class="page-head">
           <div class="min-w-0">
@@ -91,6 +92,8 @@ export class FormFill implements OnInit {
   readonly loading = signal(true);
   readonly error = signal('');
   readonly answers = signal<Answers>({});
+  /** Whether the form groups its fields in sections (2026-10-26): then the page is wide. */
+  readonly sectioned = computed(() => (this.form()?.fields ?? []).some(f => !!f.section?.trim()));
   readonly problems = signal<Record<string, string>>({});
   readonly message = signal('');
   readonly sending = signal(false);

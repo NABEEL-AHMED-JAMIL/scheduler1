@@ -28,6 +28,9 @@ export interface UploadWanted {
  * every change is handed back, and chosen files and drawn signatures are handed to the page to upload. The fill-in page
  * and the builder's preview both draw it.
  */
+/** The field types that take a section grid's whole row. */
+const SPANNING = ['longText', 'table', 'checkboxes', 'file', 'signature', 'yesNo'];
+
 /** The image extensions a form may accept, by MIME type. */
 const IMAGE_MIME: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif' };
 
@@ -42,7 +45,12 @@ const IMAGE_MIME: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpe
           <section class="form-section flex flex-col gap-4 min-w-0" [attr.data-section]="g.section"
                    [attr.aria-labelledby]="idPrefix() + '-section-' + gi">
             <h3 class="section-title form-section-title" [id]="idPrefix() + '-section-' + gi">{{ g.section }}</h3>
-            @for (f of g.fields; track f.key) { <ng-container *ngTemplateOutlet="fieldTpl; context: { $implicit: f }" /> }
+            <!-- A section's short fields sit side by side on a wide screen; long ones (text, tables, ticks, files) span it. -->
+            <div class="form-section-grid">
+              @for (f of g.fields; track f.key) {
+                <div class="min-w-0" [class.form-span]="spans(f)"><ng-container *ngTemplateOutlet="fieldTpl; context: { $implicit: f }" /></div>
+              }
+            </div>
           </section>
         } @else {
           @for (f of g.fields; track f.key) { <ng-container *ngTemplateOutlet="fieldTpl; context: { $implicit: f }" /> }
@@ -261,6 +269,11 @@ export class FormRenderer {
 
   limits(f: FormField): string {
     return selectionText(f);
+  }
+
+  /** In a section's grid, the fields that take the whole row: long text, tables, checkboxes, files, signatures, yes/no. */
+  spans(f: FormField): boolean {
+    return SPANNING.includes(f.type);
   }
 
   /** The field's own placeholder, else its type's default ("Enter case number", "e.g. SYN-nnn", "Choose…"). */
