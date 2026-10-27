@@ -1,0 +1,93 @@
+[
+ {
+  "name": "tour-referral",
+  "route": "/documents/in",
+  "as": "summit.admin",
+  "caption": "Documents in: Elena Marsh's referral, read and approved (fictional patient, synthetic data)",
+  "thumb": true
+ },
+ {
+  "name": "tour-workflow",
+  "route": "/workflows/designer?key=patient-journey",
+  "as": "summit.admin",
+  "caption": "The Patient journey approval workflow on its map",
+  "thumb": true
+ },
+ {
+  "name": "tour-registration",
+  "route": "/pipelines/schedules/1101/runs/2051?tab=items",
+  "as": "summit.admin",
+  "caption": "The registration run's Items tab: one item for the patient"
+ },
+ {
+  "name": "tour-triage",
+  "route": "/pipelines/schedules/1102/runs/2046",
+  "as": "summit.admin",
+  "caption": "The triage run: vitals checked, scored, and the abnormal ones sent to the charge nurse"
+ },
+ {
+  "name": "tour-wound",
+  "route": "/pipelines/schedules/1104/runs/2044",
+  "as": "summit.admin",
+  "caption": "The wound photo run: measured in code, described as a DRAFT, approved by wound care",
+  "thumb": true
+ },
+ {
+  "name": "tour-xray",
+  "route": "/pipelines/schedules/1105/runs/2045",
+  "as": "summit.admin",
+  "caption": "The chest X-ray run, approved by the radiologist"
+ },
+ {
+  "name": "tour-care-plan",
+  "route": "/review/requests?id=2051",
+  "as": "summit.admin",
+  "caption": "The request's history: Dr. Nguyen approves for Dr. Patel, and the senior doctor is asked because the risk is High",
+  "thumb": true
+ },
+ {
+  "name": "tour-ward",
+  "route": "/pipelines/schedules/1108/executions",
+  "as": "summit.admin",
+  "retake": "Summit Valley: Journey 11 (daily progress and its backfill) has not run yet"
+ },
+ {
+  "name": "tour-discharge",
+  "route": "/reports/library",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "fill": [
+     "input[placeholder='Search report or template']",
+     "Discharge"
+    ]
+   },
+   {
+    "wait": 1200
+   },
+   {
+    "click": "text=Discharge \u00b7 SV-000117"
+   },
+   {
+    "waitFor": "text=Verify signature"
+   },
+   {
+    "wait": 1500
+   }
+  ],
+  "caption": "The discharge summary in Reports \u203a Library, approved and signed",
+  "thumb": true
+ },
+ {
+  "name": "tour-health-chart",
+  "route": "/reports/library",
+  "as": "summit.admin",
+  "retake": "Summit Valley: Journey 14 (the patient's health chart report) has not run yet"
+ },
+ {
+  "name": "tour-dashboard",
+  "route": "/data/analytics/dashboards?board=1033",
+  "as": "summit.admin",
+  "retake": "Summit Valley: Journey 15 (cohort stages) has not run, so the Patient journey board has no files to read"
+ }
+]
