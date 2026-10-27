@@ -1,0 +1,3 @@
+entry,mrn,temp_c,hr,spo2,notes,expected
+1,SV-000117,38.9,112,91,Short of breath on exertion,abnormal: notice sent
+2,SV-000124,36.8,78,98,Comfortable,normal: no notice

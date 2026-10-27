@@ -1,0 +1,77 @@
+{
+  "first_name": "Theo",
+  "last_name": "Brannigan",
+  "dob": "2019-04-17",
+  "sex": "Male",
+  "preferred_language": "English",
+  "phone": "+1 555 0106",
+  "email": "theo.brannigan@example.com",
+  "address": "168 Hazel Road, Millbrook, IL 60999",
+  "is_minor": true,
+  "guardian_name": "Siobhan Brannigan",
+  "guardian_relationship": "Mother",
+  "guardian_phone": "+1 555 0146",
+  "emergency_name": "Siobhan Brannigan",
+  "emergency_relationship": "Mother",
+  "emergency_phone": "+1 555 0156",
+  "insurance_payer": "Prairie Mutual Health",
+  "insurance_member_id": "PMH-334803",
+  "insurance_group": "GRP-8799",
+  "subscriber_name": "Siobhan Brannigan",
+  "subscriber_relationship": "Child",
+  "visit_date": "2026-10-22",
+  "reason_for_visit": "Wheezing at night for a week, using the inhaler more than usual.",
+  "symptom_duration": "1 week",
+  "pain_score": 0,
+  "height_cm": 122,
+  "weight_kg": 23,
+  "conditions": [
+    {
+      "condition": "Asthma",
+      "since": "2022",
+      "status": "Active"
+    }
+  ],
+  "medications": [
+    {
+      "name": "Albuterol inhaler",
+      "dose": "2 puffs",
+      "frequency": "Every 4 hours as needed",
+      "route": "Inhaled"
+    }
+  ],
+  "allergies": [
+    {
+      "substance": "Peanuts",
+      "allergy_type": "Food",
+      "reaction": "Anaphylaxis (throat swelling)",
+      "severity": "Severe"
+    }
+  ],
+  "immunizations": [
+    {
+      "vaccine": "MMR",
+      "date_given": "2023-05-01"
+    },
+    {
+      "vaccine": "Influenza",
+      "date_given": "2025-10-03"
+    }
+  ],
+  "tobacco": "Never",
+  "alcohol": "None",
+  "recreational_drugs": "No",
+  "ros_positives": [
+    "Wheezing",
+    "Cough",
+    "Sleep problems"
+  ],
+  "primary_care_physician": "Dr. Henrik Solberg, Northside Clinic",
+  "preferred_pharmacy": "Millbrook Pharmacy, Main St",
+  "consent_treatment": true,
+  "consent_privacy": true,
+  "consent_financial": true,
+  "signed_by": "Siobhan Brannigan",
+  "signed_date": "2026-10-22",
+  "synthetic": true
+}

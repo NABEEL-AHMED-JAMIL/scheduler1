@@ -1,0 +1,901 @@
+claim_id,payer,status,paid,denial_reason,remit_date
+CLM-000001,Medicare (sandbox),paid,2063.41,,2026-09-01
+CLM-000002,Self-pay,denied,0,CO-97 bundled,2026-09-01
+CLM-000003,Medicare (sandbox),paid,1099.61,,2026-09-01
+CLM-000004,Prairie Health Plan (fictional),paid,940.31,,2026-09-01
+CLM-000005,Medicare (sandbox),paid,1767.3,,2026-09-01
+CLM-000006,Medicare (sandbox),paid,1257.11,,2026-09-01
+CLM-000007,Granite Mutual (fictional),paid,2351.25,,2026-09-01
+CLM-000008,Medicare (sandbox),paid,775.19,,2026-09-01
+CLM-000009,Medicare (sandbox),paid,484.87,,2026-09-01
+CLM-000010,Granite Mutual (fictional),paid,1705.37,,2026-09-01
+CLM-000011,Self-pay,paid,1612.89,,2026-09-01
+CLM-000012,Self-pay,paid,1377.02,,2026-09-01
+CLM-000013,Granite Mutual (fictional),paid,1729.84,,2026-09-01
+CLM-000014,Prairie Health Plan (fictional),paid,2327.32,,2026-09-01
+CLM-000015,Self-pay,paid,789.83,,2026-09-01
+CLM-000016,Medicare (sandbox),paid,964.38,,2026-09-01
+CLM-000017,Self-pay,paid,2194.88,,2026-09-01
+CLM-000018,Medicare (sandbox),paid,401.58,,2026-09-01
+CLM-000019,Granite Mutual (fictional),paid,662.16,,2026-09-01
+CLM-000020,Self-pay,paid,1931.33,,2026-09-01
+CLM-000021,Medicare (sandbox),paid,2032.89,,2026-09-01
+CLM-000022,Granite Mutual (fictional),paid,1633.49,,2026-09-01
+CLM-000023,Medicare (sandbox),paid,2066.34,,2026-09-01
+CLM-000024,Self-pay,paid,1742.68,,2026-09-01
+CLM-000025,Granite Mutual (fictional),paid,1058.96,,2026-09-01
+CLM-000026,Lakeshore Care (fictional),paid,977.96,,2026-09-01
+CLM-000027,Lakeshore Care (fictional),paid,534.81,,2026-09-01
+CLM-000028,Granite Mutual (fictional),paid,715.84,,2026-09-01
+CLM-000029,Medicare (sandbox),paid,1844.29,,2026-09-01
+CLM-000030,Medicare (sandbox),paid,730.38,,2026-09-01
+CLM-000031,Prairie Health Plan (fictional),denied,0,CO-50 not medically necessary,2026-09-02
+CLM-000032,Lakeshore Care (fictional),paid,1288.81,,2026-09-02
+CLM-000033,Granite Mutual (fictional),paid,1127.42,,2026-09-02
+CLM-000034,Lakeshore Care (fictional),paid,1915.96,,2026-09-02
+CLM-000035,Self-pay,paid,2037.45,,2026-09-02
+CLM-000036,Prairie Health Plan (fictional),paid,1358.56,,2026-09-02
+CLM-000037,Granite Mutual (fictional),paid,123.47,,2026-09-02
+CLM-000038,Lakeshore Care (fictional),paid,151.01,,2026-09-02
+CLM-000039,Prairie Health Plan (fictional),paid,1707.5,,2026-09-02
+CLM-000040,Granite Mutual (fictional),paid,2079.85,,2026-09-02
+CLM-000041,Granite Mutual (fictional),paid,2286.79,,2026-09-02
+CLM-000042,Granite Mutual (fictional),denied,0,PR-1 deductible,2026-09-02
+CLM-000043,Lakeshore Care (fictional),paid,1988.33,,2026-09-02
+CLM-000044,Prairie Health Plan (fictional),paid,602.98,,2026-09-02
+CLM-000045,Lakeshore Care (fictional),paid,936.97,,2026-09-02
+CLM-000046,Prairie Health Plan (fictional),paid,1468.25,,2026-09-02
+CLM-000047,Lakeshore Care (fictional),paid,2250.94,,2026-09-02
+CLM-000048,Medicare (sandbox),paid,1715.15,,2026-09-02
+CLM-000049,Self-pay,paid,843.49,,2026-09-02
+CLM-000050,Medicare (sandbox),paid,377.37,,2026-09-02
+CLM-000051,Medicare (sandbox),paid,91.35,,2026-09-02
+CLM-000052,Prairie Health Plan (fictional),paid,2198.12,,2026-09-02
+CLM-000053,Lakeshore Care (fictional),paid,2050.53,,2026-09-02
+CLM-000054,Prairie Health Plan (fictional),paid,589.69,,2026-09-02
+CLM-000055,Medicare (sandbox),paid,1173.18,,2026-09-02
+CLM-000056,Medicare (sandbox),paid,1817.78,,2026-09-02
+CLM-000057,Prairie Health Plan (fictional),denied,0,PR-1 deductible,2026-09-02
+CLM-000058,Granite Mutual (fictional),paid,93.83,,2026-09-02
+CLM-000059,Prairie Health Plan (fictional),paid,1740.7,,2026-09-02
+CLM-000060,Self-pay,paid,1835.48,,2026-09-02
+CLM-000061,Medicare (sandbox),paid,199.77,,2026-09-03
+CLM-000062,Granite Mutual (fictional),paid,338.85,,2026-09-03
+CLM-000063,Prairie Health Plan (fictional),paid,124.34,,2026-09-03
+CLM-000064,Prairie Health Plan (fictional),denied,0,CO-97 bundled,2026-09-03
+CLM-000065,Self-pay,paid,2131.96,,2026-09-03
+CLM-000066,Granite Mutual (fictional),paid,1667.81,,2026-09-03
+CLM-000067,Prairie Health Plan (fictional),paid,2315.71,,2026-09-03
+CLM-000068,Self-pay,paid,1032.97,,2026-09-03
+CLM-000069,Granite Mutual (fictional),paid,2396.94,,2026-09-03
+CLM-000070,Granite Mutual (fictional),paid,1367.63,,2026-09-03
+CLM-000071,Self-pay,paid,721.72,,2026-09-03
+CLM-000072,Granite Mutual (fictional),paid,1877.2,,2026-09-03
+CLM-000073,Prairie Health Plan (fictional),paid,828.25,,2026-09-03
+CLM-000074,Lakeshore Care (fictional),paid,1028.99,,2026-09-03
+CLM-000075,Lakeshore Care (fictional),paid,812.02,,2026-09-03
+CLM-000076,Lakeshore Care (fictional),paid,358.23,,2026-09-03
+CLM-000077,Lakeshore Care (fictional),paid,2147.67,,2026-09-03
+CLM-000078,Medicare (sandbox),denied,0,CO-97 bundled,2026-09-03
+CLM-000079,Granite Mutual (fictional),paid,959.74,,2026-09-03
+CLM-000080,Self-pay,paid,1888.74,,2026-09-03
+CLM-000081,Lakeshore Care (fictional),paid,1028.95,,2026-09-03
+CLM-000082,Granite Mutual (fictional),paid,1239.0,,2026-09-03
+CLM-000083,Prairie Health Plan (fictional),paid,2224.69,,2026-09-03
+CLM-000084,Medicare (sandbox),paid,2134.89,,2026-09-03
+CLM-000085,Prairie Health Plan (fictional),paid,1945.8,,2026-09-03
+CLM-000086,Self-pay,paid,272.7,,2026-09-03
+CLM-000087,Granite Mutual (fictional),paid,540.49,,2026-09-03
+CLM-000088,Prairie Health Plan (fictional),paid,2342.62,,2026-09-03
+CLM-000089,Prairie Health Plan (fictional),denied,0,CO-50 not medically necessary,2026-09-03
+CLM-000090,Prairie Health Plan (fictional),paid,1048.91,,2026-09-03
+CLM-000091,Lakeshore Care (fictional),paid,1834.24,,2026-09-04
+CLM-000092,Prairie Health Plan (fictional),paid,479.04,,2026-09-04
+CLM-000093,Medicare (sandbox),paid,704.03,,2026-09-04
+CLM-000094,Granite Mutual (fictional),paid,436.11,,2026-09-04
+CLM-000095,Self-pay,paid,356.46,,2026-09-04
+CLM-000096,Prairie Health Plan (fictional),paid,1979.58,,2026-09-04
+CLM-000097,Lakeshore Care (fictional),paid,1350.0,,2026-09-04
+CLM-000098,Medicare (sandbox),denied,0,CO-50 not medically necessary,2026-09-04
+CLM-000099,Granite Mutual (fictional),paid,1592.05,,2026-09-04
+CLM-000100,Granite Mutual (fictional),paid,1160.15,,2026-09-04
+CLM-000101,Prairie Health Plan (fictional),paid,648.41,,2026-09-04
+CLM-000102,Granite Mutual (fictional),paid,759.68,,2026-09-04
+CLM-000103,Self-pay,paid,249.09,,2026-09-04
+CLM-000104,Granite Mutual (fictional),paid,1264.93,,2026-09-04
+CLM-000105,Self-pay,paid,551.0,,2026-09-04
+CLM-000106,Medicare (sandbox),paid,2167.67,,2026-09-04
+CLM-000107,Medicare (sandbox),paid,1302.66,,2026-09-04
+CLM-000108,Lakeshore Care (fictional),paid,436.87,,2026-09-04
+CLM-000109,Lakeshore Care (fictional),paid,1110.51,,2026-09-04
+CLM-000110,Medicare (sandbox),denied,0,CO-97 bundled,2026-09-04
+CLM-000111,Prairie Health Plan (fictional),paid,2034.58,,2026-09-04
+CLM-000112,Medicare (sandbox),paid,927.79,,2026-09-04
+CLM-000113,Self-pay,denied,0,CO-16 missing information,2026-09-04
+CLM-000114,Granite Mutual (fictional),paid,1631.11,,2026-09-04
+CLM-000115,Lakeshore Care (fictional),paid,584.96,,2026-09-04
+CLM-000116,Lakeshore Care (fictional),paid,1838.93,,2026-09-04
+CLM-000117,Medicare (sandbox),paid,664.32,,2026-09-04
+CLM-000118,Self-pay,paid,2333.92,,2026-09-04
+CLM-000119,Lakeshore Care (fictional),paid,319.21,,2026-09-04
+CLM-000120,Prairie Health Plan (fictional),paid,444.32,,2026-09-04
+CLM-000121,Lakeshore Care (fictional),denied,0,CO-16 missing information,2026-09-05
+CLM-000122,Medicare (sandbox),paid,2123.22,,2026-09-05
+CLM-000123,Lakeshore Care (fictional),paid,129.02,,2026-09-05
+CLM-000124,Self-pay,paid,1844.96,,2026-09-05
+CLM-000125,Prairie Health Plan (fictional),paid,740.68,,2026-09-05
+CLM-000126,Self-pay,paid,367.73,,2026-09-05
+CLM-000127,Self-pay,paid,132.33,,2026-09-05
+CLM-000128,Granite Mutual (fictional),paid,1583.44,,2026-09-05
+CLM-000129,Prairie Health Plan (fictional),paid,494.0,,2026-09-05
+CLM-000130,Lakeshore Care (fictional),paid,911.6,,2026-09-05
+CLM-000131,Medicare (sandbox),paid,918.34,,2026-09-05
+CLM-000132,Lakeshore Care (fictional),paid,609.37,,2026-09-05
+CLM-000133,Granite Mutual (fictional),paid,1106.4,,2026-09-05
+CLM-000134,Prairie Health Plan (fictional),paid,2319.98,,2026-09-05
+CLM-000135,Self-pay,paid,885.13,,2026-09-05
+CLM-000136,Lakeshore Care (fictional),paid,1150.62,,2026-09-05
+CLM-000137,Granite Mutual (fictional),paid,603.16,,2026-09-05
+CLM-000138,Self-pay,paid,1831.79,,2026-09-05
+CLM-000139,Medicare (sandbox),paid,1624.32,,2026-09-05
+CLM-000140,Lakeshore Care (fictional),paid,1702.25,,2026-09-05
+CLM-000141,Self-pay,paid,1222.12,,2026-09-05
+CLM-000142,Medicare (sandbox),paid,2358.72,,2026-09-05
+CLM-000143,Self-pay,paid,1860.27,,2026-09-05
+CLM-000144,Self-pay,paid,1490.92,,2026-09-05
+CLM-000145,Medicare (sandbox),paid,506.36,,2026-09-05
+CLM-000146,Self-pay,paid,1890.47,,2026-09-05
+CLM-000147,Lakeshore Care (fictional),paid,707.66,,2026-09-05
+CLM-000148,Prairie Health Plan (fictional),denied,0,PR-1 deductible,2026-09-05
+CLM-000149,Medicare (sandbox),paid,879.45,,2026-09-05
+CLM-000150,Prairie Health Plan (fictional),paid,2071.84,,2026-09-05
+CLM-000151,Granite Mutual (fictional),paid,422.48,,2026-09-06
+CLM-000152,Granite Mutual (fictional),paid,1478.89,,2026-09-06
+CLM-000153,Granite Mutual (fictional),paid,355.36,,2026-09-06
+CLM-000154,Prairie Health Plan (fictional),paid,685.15,,2026-09-06
+CLM-000155,Self-pay,denied,0,PR-1 deductible,2026-09-06
+CLM-000156,Lakeshore Care (fictional),paid,1287.38,,2026-09-06
+CLM-000157,Granite Mutual (fictional),denied,0,CO-97 bundled,2026-09-06
+CLM-000158,Medicare (sandbox),paid,774.69,,2026-09-06
+CLM-000159,Self-pay,paid,1706.83,,2026-09-06
+CLM-000160,Granite Mutual (fictional),paid,435.55,,2026-09-06
+CLM-000161,Lakeshore Care (fictional),paid,2082.46,,2026-09-06
+CLM-000162,Prairie Health Plan (fictional),paid,354.71,,2026-09-06
+CLM-000163,Prairie Health Plan (fictional),paid,52.6,,2026-09-06
+CLM-000164,Self-pay,paid,940.7,,2026-09-06
+CLM-000165,Granite Mutual (fictional),paid,2103.77,,2026-09-06
+CLM-000166,Medicare (sandbox),denied,0,CO-50 not medically necessary,2026-09-06
+CLM-000167,Granite Mutual (fictional),paid,2187.76,,2026-09-06
+CLM-000168,Prairie Health Plan (fictional),paid,1688.56,,2026-09-06
+CLM-000169,Lakeshore Care (fictional),paid,1978.18,,2026-09-06
+CLM-000170,Lakeshore Care (fictional),paid,780.55,,2026-09-06
+CLM-000171,Granite Mutual (fictional),paid,544.39,,2026-09-06
+CLM-000172,Self-pay,paid,1345.96,,2026-09-06
+CLM-000173,Prairie Health Plan (fictional),paid,1143.73,,2026-09-06
+CLM-000174,Prairie Health Plan (fictional),paid,104.07,,2026-09-06
+CLM-000175,Medicare (sandbox),paid,599.54,,2026-09-06
+CLM-000176,Self-pay,paid,54.68,,2026-09-06
+CLM-000177,Medicare (sandbox),denied,0,CO-16 missing information,2026-09-06
+CLM-000178,Granite Mutual (fictional),paid,1351.18,,2026-09-06
+CLM-000179,Self-pay,paid,214.05,,2026-09-06
+CLM-000180,Self-pay,paid,698.48,,2026-09-06
+CLM-000181,Lakeshore Care (fictional),paid,2023.72,,2026-09-07
+CLM-000182,Medicare (sandbox),paid,40.82,,2026-09-07
+CLM-000183,Granite Mutual (fictional),paid,1441.71,,2026-09-07
+CLM-000184,Lakeshore Care (fictional),paid,1659.16,,2026-09-07
+CLM-000185,Prairie Health Plan (fictional),paid,762.57,,2026-09-07
+CLM-000186,Granite Mutual (fictional),paid,1703.35,,2026-09-07
+CLM-000187,Granite Mutual (fictional),denied,0,CO-97 bundled,2026-09-07
+CLM-000188,Lakeshore Care (fictional),paid,2054.63,,2026-09-07
+CLM-000189,Granite Mutual (fictional),paid,2332.2,,2026-09-07
+CLM-000190,Granite Mutual (fictional),paid,80.23,,2026-09-07
+CLM-000191,Self-pay,paid,874.71,,2026-09-07
+CLM-000192,Self-pay,paid,205.22,,2026-09-07
+CLM-000193,Lakeshore Care (fictional),paid,1259.26,,2026-09-07
+CLM-000194,Medicare (sandbox),paid,1283.95,,2026-09-07
+CLM-000195,Medicare (sandbox),paid,1144.99,,2026-09-07
+CLM-000196,Prairie Health Plan (fictional),paid,1978.65,,2026-09-07
+CLM-000197,Medicare (sandbox),paid,343.34,,2026-09-07
+CLM-000198,Granite Mutual (fictional),paid,55.36,,2026-09-07
+CLM-000199,Self-pay,paid,2197.7,,2026-09-07
+CLM-000200,Granite Mutual (fictional),denied,0,CO-16 missing information,2026-09-07
+CLM-000201,Lakeshore Care (fictional),paid,1794.42,,2026-09-07
+CLM-000202,Prairie Health Plan (fictional),paid,495.76,,2026-09-07
+CLM-000203,Granite Mutual (fictional),paid,1090.13,,2026-09-07
+CLM-000204,Lakeshore Care (fictional),paid,920.94,,2026-09-07
+CLM-000205,Medicare (sandbox),paid,979.13,,2026-09-07
+CLM-000206,Lakeshore Care (fictional),paid,505.77,,2026-09-07
+CLM-000207,Self-pay,paid,730.94,,2026-09-07
+CLM-000208,Prairie Health Plan (fictional),paid,53.72,,2026-09-07
+CLM-000209,Medicare (sandbox),denied,0,CO-97 bundled,2026-09-07
+CLM-000210,Prairie Health Plan (fictional),denied,0,PR-1 deductible,2026-09-07
+CLM-000211,Lakeshore Care (fictional),paid,1581.97,,2026-09-08
+CLM-000212,Self-pay,paid,1650.71,,2026-09-08
+CLM-000213,Self-pay,paid,930.03,,2026-09-08
+CLM-000214,Self-pay,paid,440.08,,2026-09-08
+CLM-000215,Self-pay,paid,1756.79,,2026-09-08
+CLM-000216,Prairie Health Plan (fictional),paid,497.84,,2026-09-08
+CLM-000217,Medicare (sandbox),paid,560.19,,2026-09-08
+CLM-000218,Self-pay,paid,2122.55,,2026-09-08
+CLM-000219,Lakeshore Care (fictional),denied,0,CO-50 not medically necessary,2026-09-08
+CLM-000220,Self-pay,paid,559.1,,2026-09-08
+CLM-000221,Granite Mutual (fictional),paid,457.46,,2026-09-08
+CLM-000222,Medicare (sandbox),paid,1630.44,,2026-09-08
+CLM-000223,Self-pay,paid,1993.44,,2026-09-08
+CLM-000224,Granite Mutual (fictional),paid,2303.72,,2026-09-08
+CLM-000225,Medicare (sandbox),paid,234.49,,2026-09-08
+CLM-000226,Lakeshore Care (fictional),denied,0,CO-16 missing information,2026-09-08
+CLM-000227,Self-pay,paid,374.68,,2026-09-08
+CLM-000228,Medicare (sandbox),paid,439.43,,2026-09-08
+CLM-000229,Granite Mutual (fictional),paid,139.27,,2026-09-08
+CLM-000230,Medicare (sandbox),paid,709.78,,2026-09-08
+CLM-000231,Self-pay,paid,1699.4,,2026-09-08
+CLM-000232,Prairie Health Plan (fictional),paid,1522.1,,2026-09-08
+CLM-000233,Granite Mutual (fictional),paid,1231.97,,2026-09-08
+CLM-000234,Medicare (sandbox),paid,1516.75,,2026-09-08
+CLM-000235,Self-pay,paid,410.41,,2026-09-08
+CLM-000236,Medicare (sandbox),paid,378.43,,2026-09-08
+CLM-000237,Medicare (sandbox),paid,858.47,,2026-09-08
+CLM-000238,Lakeshore Care (fictional),paid,1284.89,,2026-09-08
+CLM-000239,Medicare (sandbox),paid,473.17,,2026-09-08
+CLM-000240,Medicare (sandbox),denied,0,CO-16 missing information,2026-09-08
+CLM-000241,Self-pay,paid,472.1,,2026-09-09
+CLM-000242,Self-pay,paid,1327.38,,2026-09-09
+CLM-000243,Self-pay,paid,313.68,,2026-09-09
+CLM-000244,Lakeshore Care (fictional),paid,247.83,,2026-09-09
+CLM-000245,Lakeshore Care (fictional),paid,1789.27,,2026-09-09
+CLM-000246,Self-pay,paid,168.8,,2026-09-09
+CLM-000247,Self-pay,paid,1161.98,,2026-09-09
+CLM-000248,Medicare (sandbox),paid,802.21,,2026-09-09
+CLM-000249,Self-pay,paid,58.49,,2026-09-09
+CLM-000250,Granite Mutual (fictional),paid,586.46,,2026-09-09
+CLM-000251,Self-pay,paid,383.34,,2026-09-09
+CLM-000252,Medicare (sandbox),paid,1013.66,,2026-09-09
+CLM-000253,Granite Mutual (fictional),paid,1420.47,,2026-09-09
+CLM-000254,Medicare (sandbox),paid,88.93,,2026-09-09
+CLM-000255,Self-pay,denied,0,PR-1 deductible,2026-09-09
+CLM-000256,Medicare (sandbox),paid,207.71,,2026-09-09
+CLM-000257,Self-pay,paid,901.6,,2026-09-09
+CLM-000258,Medicare (sandbox),paid,549.53,,2026-09-09
+CLM-000259,Granite Mutual (fictional),paid,788.8,,2026-09-09
+CLM-000260,Self-pay,denied,0,PR-1 deductible,2026-09-09
+CLM-000261,Prairie Health Plan (fictional),paid,90.7,,2026-09-09
+CLM-000262,Self-pay,paid,2288.18,,2026-09-09
+CLM-000263,Medicare (sandbox),denied,0,CO-97 bundled,2026-09-09
+CLM-000264,Granite Mutual (fictional),paid,1341.47,,2026-09-09
+CLM-000265,Self-pay,paid,254.21,,2026-09-09
+CLM-000266,Prairie Health Plan (fictional),paid,1904.96,,2026-09-09
+CLM-000267,Lakeshore Care (fictional),denied,0,CO-50 not medically necessary,2026-09-09
+CLM-000268,Self-pay,paid,313.4,,2026-09-09
+CLM-000269,Prairie Health Plan (fictional),paid,999.5,,2026-09-09
+CLM-000270,Medicare (sandbox),paid,57.67,,2026-09-09
+CLM-000271,Lakeshore Care (fictional),paid,237.22,,2026-09-10
+CLM-000272,Self-pay,paid,705.48,,2026-09-10
+CLM-000273,Lakeshore Care (fictional),paid,541.5,,2026-09-10
+CLM-000274,Granite Mutual (fictional),paid,240.13,,2026-09-10
+CLM-000275,Granite Mutual (fictional),paid,794.88,,2026-09-10
+CLM-000276,Lakeshore Care (fictional),paid,1250.0,,2026-09-10
+CLM-000277,Self-pay,paid,1061.9,,2026-09-10
+CLM-000278,Prairie Health Plan (fictional),paid,777.49,,2026-09-10
+CLM-000279,Self-pay,paid,744.49,,2026-09-10
+CLM-000280,Granite Mutual (fictional),paid,631.93,,2026-09-10
+CLM-000281,Prairie Health Plan (fictional),paid,1388.17,,2026-09-10
+CLM-000282,Prairie Health Plan (fictional),paid,2073.07,,2026-09-10
+CLM-000283,Prairie Health Plan (fictional),paid,1373.47,,2026-09-10
+CLM-000284,Prairie Health Plan (fictional),denied,0,CO-16 missing information,2026-09-10
+CLM-000285,Prairie Health Plan (fictional),paid,1062.08,,2026-09-10
+CLM-000286,Granite Mutual (fictional),paid,2003.1,,2026-09-10
+CLM-000287,Granite Mutual (fictional),paid,1097.13,,2026-09-10
+CLM-000288,Lakeshore Care (fictional),paid,1713.4,,2026-09-10
+CLM-000289,Lakeshore Care (fictional),paid,741.63,,2026-09-10
+CLM-000290,Medicare (sandbox),paid,115.51,,2026-09-10
+CLM-000291,Lakeshore Care (fictional),denied,0,CO-50 not medically necessary,2026-09-10
+CLM-000292,Lakeshore Care (fictional),denied,0,CO-16 missing information,2026-09-10
+CLM-000293,Lakeshore Care (fictional),paid,1900.65,,2026-09-10
+CLM-000294,Prairie Health Plan (fictional),denied,0,PR-1 deductible,2026-09-10
+CLM-000295,Lakeshore Care (fictional),paid,882.31,,2026-09-10
+CLM-000296,Granite Mutual (fictional),paid,1879.91,,2026-09-10
+CLM-000297,Lakeshore Care (fictional),denied,0,CO-50 not medically necessary,2026-09-10
+CLM-000298,Self-pay,paid,1303.87,,2026-09-10
+CLM-000299,Lakeshore Care (fictional),paid,595.81,,2026-09-10
+CLM-000300,Self-pay,denied,0,PR-1 deductible,2026-09-10
+CLM-000301,Prairie Health Plan (fictional),paid,1828.55,,2026-09-11
+CLM-000302,Lakeshore Care (fictional),paid,1395.1,,2026-09-11
+CLM-000303,Self-pay,paid,889.34,,2026-09-11
+CLM-000304,Medicare (sandbox),paid,1110.77,,2026-09-11
+CLM-000305,Self-pay,paid,297.1,,2026-09-11
+CLM-000306,Self-pay,paid,1344.72,,2026-09-11
+CLM-000307,Self-pay,paid,1719.98,,2026-09-11
+CLM-000308,Self-pay,paid,1204.45,,2026-09-11
+CLM-000309,Medicare (sandbox),paid,1302.22,,2026-09-11
+CLM-000310,Lakeshore Care (fictional),paid,417.96,,2026-09-11
+CLM-000311,Prairie Health Plan (fictional),paid,1496.29,,2026-09-11
+CLM-000312,Medicare (sandbox),denied,0,CO-50 not medically necessary,2026-09-11
+CLM-000313,Self-pay,paid,1877.04,,2026-09-11
+CLM-000314,Granite Mutual (fictional),denied,0,CO-50 not medically necessary,2026-09-11
+CLM-000315,Granite Mutual (fictional),paid,1935.15,,2026-09-11
+CLM-000316,Self-pay,paid,2352.0,,2026-09-11
+CLM-000317,Lakeshore Care (fictional),paid,948.95,,2026-09-11
+CLM-000318,Self-pay,paid,1954.96,,2026-09-11
+CLM-000319,Lakeshore Care (fictional),paid,1849.44,,2026-09-11
+CLM-000320,Granite Mutual (fictional),paid,1683.91,,2026-09-11
+CLM-000321,Lakeshore Care (fictional),paid,746.03,,2026-09-11
+CLM-000322,Prairie Health Plan (fictional),paid,1409.8,,2026-09-11
+CLM-000323,Self-pay,denied,0,CO-16 missing information,2026-09-11
+CLM-000324,Medicare (sandbox),paid,1089.95,,2026-09-11
+CLM-000325,Prairie Health Plan (fictional),paid,1723.07,,2026-09-11
+CLM-000326,Medicare (sandbox),paid,1201.86,,2026-09-11
+CLM-000327,Medicare (sandbox),paid,1031.32,,2026-09-11
+CLM-000328,Granite Mutual (fictional),paid,1659.23,,2026-09-11
+CLM-000329,Granite Mutual (fictional),paid,1549.94,,2026-09-11
+CLM-000330,Self-pay,paid,1646.29,,2026-09-11
+CLM-000331,Granite Mutual (fictional),paid,1720.0,,2026-09-12
+CLM-000332,Self-pay,paid,447.74,,2026-09-12
+CLM-000333,Lakeshore Care (fictional),paid,1168.24,,2026-09-12
+CLM-000334,Self-pay,paid,228.13,,2026-09-12
+CLM-000335,Medicare (sandbox),paid,1386.93,,2026-09-12
+CLM-000336,Self-pay,paid,2122.44,,2026-09-12
+CLM-000337,Medicare (sandbox),paid,1697.52,,2026-09-12
+CLM-000338,Medicare (sandbox),paid,1619.87,,2026-09-12
+CLM-000339,Granite Mutual (fictional),paid,1224.5,,2026-09-12
+CLM-000340,Medicare (sandbox),paid,968.67,,2026-09-12
+CLM-000341,Medicare (sandbox),paid,661.16,,2026-09-12
+CLM-000342,Medicare (sandbox),paid,150.38,,2026-09-12
+CLM-000343,Prairie Health Plan (fictional),paid,1930.2,,2026-09-12
+CLM-000344,Self-pay,paid,2047.41,,2026-09-12
+CLM-000345,Granite Mutual (fictional),paid,1550.01,,2026-09-12
+CLM-000346,Lakeshore Care (fictional),paid,186.49,,2026-09-12
+CLM-000347,Self-pay,paid,728.39,,2026-09-12
+CLM-000348,Medicare (sandbox),paid,147.63,,2026-09-12
+CLM-000349,Medicare (sandbox),paid,1821.24,,2026-09-12
+CLM-000350,Self-pay,paid,148.81,,2026-09-12
+CLM-000351,Lakeshore Care (fictional),paid,2137.35,,2026-09-12
+CLM-000352,Self-pay,paid,1174.96,,2026-09-12
+CLM-000353,Medicare (sandbox),paid,2101.92,,2026-09-12
+CLM-000354,Self-pay,paid,1065.74,,2026-09-12
+CLM-000355,Self-pay,paid,2339.78,,2026-09-12
+CLM-000356,Prairie Health Plan (fictional),paid,929.81,,2026-09-12
+CLM-000357,Granite Mutual (fictional),paid,1347.25,,2026-09-12
+CLM-000358,Self-pay,paid,961.1,,2026-09-12
+CLM-000359,Medicare (sandbox),paid,381.95,,2026-09-12
+CLM-000360,Lakeshore Care (fictional),paid,1375.23,,2026-09-12
+CLM-000361,Prairie Health Plan (fictional),paid,2057.61,,2026-09-13
+CLM-000362,Lakeshore Care (fictional),paid,355.65,,2026-09-13
+CLM-000363,Lakeshore Care (fictional),paid,2329.87,,2026-09-13
+CLM-000364,Self-pay,paid,1212.73,,2026-09-13
+CLM-000365,Granite Mutual (fictional),paid,1344.19,,2026-09-13
+CLM-000366,Medicare (sandbox),paid,925.96,,2026-09-13
+CLM-000367,Prairie Health Plan (fictional),paid,2312.78,,2026-09-13
+CLM-000368,Granite Mutual (fictional),paid,197.83,,2026-09-13
+CLM-000369,Lakeshore Care (fictional),paid,1129.7,,2026-09-13
+CLM-000370,Granite Mutual (fictional),denied,0,CO-16 missing information,2026-09-13
+CLM-000371,Medicare (sandbox),denied,0,PR-1 deductible,2026-09-13
+CLM-000372,Lakeshore Care (fictional),paid,1216.35,,2026-09-13
+CLM-000373,Self-pay,paid,1896.34,,2026-09-13
+CLM-000374,Self-pay,paid,1543.06,,2026-09-13
+CLM-000375,Lakeshore Care (fictional),paid,444.15,,2026-09-13
+CLM-000376,Self-pay,denied,0,PR-1 deductible,2026-09-13
+CLM-000377,Granite Mutual (fictional),paid,352.29,,2026-09-13
+CLM-000378,Granite Mutual (fictional),paid,596.9,,2026-09-13
+CLM-000379,Granite Mutual (fictional),paid,1971.47,,2026-09-13
+CLM-000380,Medicare (sandbox),paid,2172.02,,2026-09-13
+CLM-000381,Medicare (sandbox),paid,225.26,,2026-09-13
+CLM-000382,Self-pay,paid,285.68,,2026-09-13
+CLM-000383,Medicare (sandbox),paid,1607.34,,2026-09-13
+CLM-000384,Medicare (sandbox),paid,2190.31,,2026-09-13
+CLM-000385,Self-pay,paid,1588.24,,2026-09-13
+CLM-000386,Self-pay,denied,0,CO-16 missing information,2026-09-13
+CLM-000387,Self-pay,paid,1613.24,,2026-09-13
+CLM-000388,Self-pay,paid,1091.59,,2026-09-13
+CLM-000389,Lakeshore Care (fictional),paid,1054.04,,2026-09-13
+CLM-000390,Medicare (sandbox),paid,2171.69,,2026-09-13
+CLM-000391,Prairie Health Plan (fictional),paid,1483.45,,2026-09-14
+CLM-000392,Medicare (sandbox),paid,1619.39,,2026-09-14
+CLM-000393,Prairie Health Plan (fictional),paid,1774.59,,2026-09-14
+CLM-000394,Lakeshore Care (fictional),paid,460.62,,2026-09-14
+CLM-000395,Prairie Health Plan (fictional),paid,722.89,,2026-09-14
+CLM-000396,Prairie Health Plan (fictional),paid,1822.14,,2026-09-14
+CLM-000397,Granite Mutual (fictional),paid,521.48,,2026-09-14
+CLM-000398,Prairie Health Plan (fictional),paid,1952.0,,2026-09-14
+CLM-000399,Lakeshore Care (fictional),paid,602.78,,2026-09-14
+CLM-000400,Prairie Health Plan (fictional),paid,2039.18,,2026-09-14
+CLM-000401,Granite Mutual (fictional),paid,55.89,,2026-09-14
+CLM-000402,Lakeshore Care (fictional),paid,994.86,,2026-09-14
+CLM-000403,Prairie Health Plan (fictional),paid,1824.73,,2026-09-14
+CLM-000404,Lakeshore Care (fictional),paid,1745.72,,2026-09-14
+CLM-000405,Prairie Health Plan (fictional),paid,1041.78,,2026-09-14
+CLM-000406,Prairie Health Plan (fictional),paid,1905.1,,2026-09-14
+CLM-000407,Lakeshore Care (fictional),paid,1224.51,,2026-09-14
+CLM-000408,Granite Mutual (fictional),paid,849.92,,2026-09-14
+CLM-000409,Lakeshore Care (fictional),paid,1990.5,,2026-09-14
+CLM-000410,Lakeshore Care (fictional),denied,0,CO-16 missing information,2026-09-14
+CLM-000411,Lakeshore Care (fictional),paid,40.33,,2026-09-14
+CLM-000412,Prairie Health Plan (fictional),paid,940.29,,2026-09-14
+CLM-000413,Lakeshore Care (fictional),paid,2026.15,,2026-09-14
+CLM-000414,Lakeshore Care (fictional),paid,1760.95,,2026-09-14
+CLM-000415,Lakeshore Care (fictional),paid,1307.22,,2026-09-14
+CLM-000416,Prairie Health Plan (fictional),denied,0,PR-1 deductible,2026-09-14
+CLM-000417,Medicare (sandbox),denied,0,CO-16 missing information,2026-09-14
+CLM-000418,Lakeshore Care (fictional),denied,0,CO-97 bundled,2026-09-14
+CLM-000419,Medicare (sandbox),paid,1214.4,,2026-09-14
+CLM-000420,Self-pay,paid,878.61,,2026-09-14
+CLM-000421,Lakeshore Care (fictional),paid,1684.26,,2026-09-15
+CLM-000422,Granite Mutual (fictional),paid,899.46,,2026-09-15
+CLM-000423,Self-pay,paid,2078.98,,2026-09-15
+CLM-000424,Lakeshore Care (fictional),paid,267.51,,2026-09-15
+CLM-000425,Self-pay,denied,0,PR-1 deductible,2026-09-15
+CLM-000426,Self-pay,paid,1244.92,,2026-09-15
+CLM-000427,Medicare (sandbox),paid,59.93,,2026-09-15
+CLM-000428,Granite Mutual (fictional),paid,859.58,,2026-09-15
+CLM-000429,Granite Mutual (fictional),denied,0,CO-16 missing information,2026-09-15
+CLM-000430,Granite Mutual (fictional),paid,2110.83,,2026-09-15
+CLM-000431,Prairie Health Plan (fictional),denied,0,CO-50 not medically necessary,2026-09-15
+CLM-000432,Self-pay,paid,1385.05,,2026-09-15
+CLM-000433,Prairie Health Plan (fictional),paid,140.23,,2026-09-15
+CLM-000434,Self-pay,paid,1082.86,,2026-09-15
+CLM-000435,Prairie Health Plan (fictional),denied,0,PR-1 deductible,2026-09-15
+CLM-000436,Lakeshore Care (fictional),paid,42.77,,2026-09-15
+CLM-000437,Granite Mutual (fictional),paid,96.93,,2026-09-15
+CLM-000438,Granite Mutual (fictional),paid,615.17,,2026-09-15
+CLM-000439,Prairie Health Plan (fictional),paid,882.95,,2026-09-15
+CLM-000440,Self-pay,paid,1465.61,,2026-09-15
+CLM-000441,Self-pay,paid,2368.32,,2026-09-15
+CLM-000442,Prairie Health Plan (fictional),paid,620.26,,2026-09-15
+CLM-000443,Medicare (sandbox),paid,446.11,,2026-09-15
+CLM-000444,Self-pay,paid,2135.77,,2026-09-15
+CLM-000445,Lakeshore Care (fictional),paid,1578.93,,2026-09-15
+CLM-000446,Lakeshore Care (fictional),paid,116.23,,2026-09-15
+CLM-000447,Self-pay,paid,238.63,,2026-09-15
+CLM-000448,Medicare (sandbox),paid,856.72,,2026-09-15
+CLM-000449,Medicare (sandbox),paid,1988.36,,2026-09-15
+CLM-000450,Granite Mutual (fictional),paid,1677.24,,2026-09-15
+CLM-000451,Granite Mutual (fictional),paid,402.55,,2026-09-16
+CLM-000452,Lakeshore Care (fictional),denied,0,CO-97 bundled,2026-09-16
+CLM-000453,Medicare (sandbox),paid,1473.75,,2026-09-16
+CLM-000454,Granite Mutual (fictional),paid,1147.42,,2026-09-16
+CLM-000455,Prairie Health Plan (fictional),paid,1212.81,,2026-09-16
+CLM-000456,Granite Mutual (fictional),paid,1182.75,,2026-09-16
+CLM-000457,Medicare (sandbox),paid,566.8,,2026-09-16
+CLM-000458,Prairie Health Plan (fictional),paid,1194.55,,2026-09-16
+CLM-000459,Self-pay,paid,134.41,,2026-09-16
+CLM-000460,Prairie Health Plan (fictional),paid,1094.28,,2026-09-16
+CLM-000461,Lakeshore Care (fictional),paid,1478.32,,2026-09-16
+CLM-000462,Medicare (sandbox),denied,0,CO-50 not medically necessary,2026-09-16
+CLM-000463,Prairie Health Plan (fictional),denied,0,CO-97 bundled,2026-09-16
+CLM-000464,Granite Mutual (fictional),paid,716.88,,2026-09-16
+CLM-000465,Self-pay,paid,1622.61,,2026-09-16
+CLM-000466,Lakeshore Care (fictional),paid,1793.68,,2026-09-16
+CLM-000467,Granite Mutual (fictional),paid,915.89,,2026-09-16
+CLM-000468,Medicare (sandbox),paid,652.99,,2026-09-16
+CLM-000469,Self-pay,paid,1139.07,,2026-09-16
+CLM-000470,Medicare (sandbox),denied,0,CO-50 not medically necessary,2026-09-16
+CLM-000471,Self-pay,paid,1022.14,,2026-09-16
+CLM-000472,Prairie Health Plan (fictional),paid,481.91,,2026-09-16
+CLM-000473,Lakeshore Care (fictional),paid,2074.82,,2026-09-16
+CLM-000474,Medicare (sandbox),paid,703.69,,2026-09-16
+CLM-000475,Granite Mutual (fictional),paid,1918.74,,2026-09-16
+CLM-000476,Lakeshore Care (fictional),denied,0,CO-50 not medically necessary,2026-09-16
+CLM-000477,Lakeshore Care (fictional),paid,2226.13,,2026-09-16
+CLM-000478,Prairie Health Plan (fictional),paid,2063.89,,2026-09-16
+CLM-000479,Prairie Health Plan (fictional),paid,118.54,,2026-09-16
+CLM-000480,Granite Mutual (fictional),paid,2299.16,,2026-09-16
+CLM-000481,Prairie Health Plan (fictional),paid,1828.38,,2026-09-17
+CLM-000482,Self-pay,paid,2043.67,,2026-09-17
+CLM-000483,Lakeshore Care (fictional),paid,1225.73,,2026-09-17
+CLM-000484,Prairie Health Plan (fictional),denied,0,CO-97 bundled,2026-09-17
+CLM-000485,Self-pay,paid,2158.83,,2026-09-17
+CLM-000486,Prairie Health Plan (fictional),paid,1951.43,,2026-09-17
+CLM-000487,Prairie Health Plan (fictional),paid,516.03,,2026-09-17
+CLM-000488,Lakeshore Care (fictional),denied,0,CO-97 bundled,2026-09-17
+CLM-000489,Medicare (sandbox),paid,144.66,,2026-09-17
+CLM-000490,Prairie Health Plan (fictional),paid,2280.17,,2026-09-17
+CLM-000491,Prairie Health Plan (fictional),denied,0,CO-16 missing information,2026-09-17
+CLM-000492,Granite Mutual (fictional),paid,1670.37,,2026-09-17
+CLM-000493,Medicare (sandbox),paid,102.74,,2026-09-17
+CLM-000494,Prairie Health Plan (fictional),paid,1954.0,,2026-09-17
+CLM-000495,Medicare (sandbox),paid,1102.21,,2026-09-17
+CLM-000496,Self-pay,paid,1679.81,,2026-09-17
+CLM-000497,Prairie Health Plan (fictional),paid,1617.46,,2026-09-17
+CLM-000498,Self-pay,paid,208.47,,2026-09-17
+CLM-000499,Granite Mutual (fictional),paid,49.27,,2026-09-17
+CLM-000500,Self-pay,paid,2296.49,,2026-09-17
+CLM-000501,Self-pay,paid,1484.92,,2026-09-17
+CLM-000502,Self-pay,paid,401.58,,2026-09-17
+CLM-000503,Medicare (sandbox),paid,2249.78,,2026-09-17
+CLM-000504,Medicare (sandbox),paid,1512.08,,2026-09-17
+CLM-000505,Lakeshore Care (fictional),paid,792.51,,2026-09-17
+CLM-000506,Prairie Health Plan (fictional),paid,330.56,,2026-09-17
+CLM-000507,Granite Mutual (fictional),paid,2382.2,,2026-09-17
+CLM-000508,Lakeshore Care (fictional),paid,1076.68,,2026-09-17
+CLM-000509,Medicare (sandbox),paid,344.49,,2026-09-17
+CLM-000510,Prairie Health Plan (fictional),paid,806.16,,2026-09-17
+CLM-000511,Lakeshore Care (fictional),paid,837.63,,2026-09-18
+CLM-000512,Prairie Health Plan (fictional),paid,442.1,,2026-09-18
+CLM-000513,Prairie Health Plan (fictional),paid,1007.87,,2026-09-18
+CLM-000514,Self-pay,paid,2231.73,,2026-09-18
+CLM-000515,Prairie Health Plan (fictional),paid,1240.83,,2026-09-18
+CLM-000516,Granite Mutual (fictional),paid,1787.56,,2026-09-18
+CLM-000517,Medicare (sandbox),paid,661.4,,2026-09-18
+CLM-000518,Medicare (sandbox),paid,997.9,,2026-09-18
+CLM-000519,Self-pay,paid,2291.91,,2026-09-18
+CLM-000520,Prairie Health Plan (fictional),paid,798.05,,2026-09-18
+CLM-000521,Granite Mutual (fictional),paid,482.57,,2026-09-18
+CLM-000522,Lakeshore Care (fictional),paid,1045.73,,2026-09-18
+CLM-000523,Granite Mutual (fictional),paid,1803.39,,2026-09-18
+CLM-000524,Medicare (sandbox),paid,2358.86,,2026-09-18
+CLM-000525,Granite Mutual (fictional),paid,2287.95,,2026-09-18
+CLM-000526,Self-pay,paid,2240.61,,2026-09-18
+CLM-000527,Medicare (sandbox),paid,616.96,,2026-09-18
+CLM-000528,Prairie Health Plan (fictional),paid,2235.14,,2026-09-18
+CLM-000529,Medicare (sandbox),paid,879.99,,2026-09-18
+CLM-000530,Prairie Health Plan (fictional),denied,0,CO-50 not medically necessary,2026-09-18
+CLM-000531,Prairie Health Plan (fictional),paid,1608.88,,2026-09-18
+CLM-000532,Lakeshore Care (fictional),denied,0,CO-16 missing information,2026-09-18
+CLM-000533,Lakeshore Care (fictional),paid,1283.57,,2026-09-18
+CLM-000534,Granite Mutual (fictional),paid,160.49,,2026-09-18
+CLM-000535,Lakeshore Care (fictional),paid,482.52,,2026-09-18
+CLM-000536,Self-pay,paid,2287.23,,2026-09-18
+CLM-000537,Lakeshore Care (fictional),paid,211.93,,2026-09-18
+CLM-000538,Prairie Health Plan (fictional),denied,0,CO-50 not medically necessary,2026-09-18
+CLM-000539,Granite Mutual (fictional),paid,2056.91,,2026-09-18
+CLM-000540,Lakeshore Care (fictional),paid,1496.05,,2026-09-18
+CLM-000541,Medicare (sandbox),paid,1913.26,,2026-09-19
+CLM-000542,Prairie Health Plan (fictional),paid,1655.04,,2026-09-19
+CLM-000543,Granite Mutual (fictional),paid,975.81,,2026-09-19
+CLM-000544,Medicare (sandbox),paid,2299.55,,2026-09-19
+CLM-000545,Lakeshore Care (fictional),paid,1313.44,,2026-09-19
+CLM-000546,Self-pay,paid,998.24,,2026-09-19
+CLM-000547,Granite Mutual (fictional),paid,2297.78,,2026-09-19
+CLM-000548,Granite Mutual (fictional),paid,1338.47,,2026-09-19
+CLM-000549,Lakeshore Care (fictional),paid,1520.18,,2026-09-19
+CLM-000550,Prairie Health Plan (fictional),paid,1272.65,,2026-09-19
+CLM-000551,Self-pay,denied,0,PR-1 deductible,2026-09-19
+CLM-000552,Prairie Health Plan (fictional),paid,2037.82,,2026-09-19
+CLM-000553,Lakeshore Care (fictional),denied,0,CO-16 missing information,2026-09-19
+CLM-000554,Granite Mutual (fictional),paid,1253.04,,2026-09-19
+CLM-000555,Medicare (sandbox),paid,1638.11,,2026-09-19
+CLM-000556,Self-pay,paid,605.15,,2026-09-19
+CLM-000557,Medicare (sandbox),paid,110.07,,2026-09-19
+CLM-000558,Prairie Health Plan (fictional),paid,267.42,,2026-09-19
+CLM-000559,Lakeshore Care (fictional),paid,1654.35,,2026-09-19
+CLM-000560,Self-pay,paid,471.51,,2026-09-19
+CLM-000561,Medicare (sandbox),paid,2156.46,,2026-09-19
+CLM-000562,Self-pay,denied,0,CO-97 bundled,2026-09-19
+CLM-000563,Granite Mutual (fictional),paid,1506.77,,2026-09-19
+CLM-000564,Granite Mutual (fictional),paid,954.91,,2026-09-19
+CLM-000565,Granite Mutual (fictional),paid,1436.91,,2026-09-19
+CLM-000566,Lakeshore Care (fictional),paid,955.82,,2026-09-19
+CLM-000567,Self-pay,paid,1135.79,,2026-09-19
+CLM-000568,Granite Mutual (fictional),paid,1102.78,,2026-09-19
+CLM-000569,Medicare (sandbox),paid,1736.7,,2026-09-19
+CLM-000570,Self-pay,paid,202.14,,2026-09-19
+CLM-000571,Granite Mutual (fictional),paid,700.14,,2026-09-20
+CLM-000572,Prairie Health Plan (fictional),paid,1058.05,,2026-09-20
+CLM-000573,Self-pay,paid,525.05,,2026-09-20
+CLM-000574,Lakeshore Care (fictional),paid,2214.13,,2026-09-20
+CLM-000575,Medicare (sandbox),paid,2190.89,,2026-09-20
+CLM-000576,Self-pay,paid,1670.33,,2026-09-20
+CLM-000577,Granite Mutual (fictional),paid,2339.47,,2026-09-20
+CLM-000578,Prairie Health Plan (fictional),paid,2278.83,,2026-09-20
+CLM-000579,Prairie Health Plan (fictional),denied,0,CO-16 missing information,2026-09-20
+CLM-000580,Prairie Health Plan (fictional),paid,987.37,,2026-09-20
+CLM-000581,Prairie Health Plan (fictional),paid,844.57,,2026-09-20
+CLM-000582,Lakeshore Care (fictional),denied,0,PR-1 deductible,2026-09-20
+CLM-000583,Prairie Health Plan (fictional),paid,637.24,,2026-09-20
+CLM-000584,Prairie Health Plan (fictional),paid,1377.35,,2026-09-20
+CLM-000585,Lakeshore Care (fictional),paid,934.65,,2026-09-20
+CLM-000586,Self-pay,paid,107.74,,2026-09-20
+CLM-000587,Granite Mutual (fictional),paid,1189.22,,2026-09-20
+CLM-000588,Granite Mutual (fictional),paid,2278.96,,2026-09-20
+CLM-000589,Self-pay,paid,640.03,,2026-09-20
+CLM-000590,Granite Mutual (fictional),paid,324.18,,2026-09-20
+CLM-000591,Lakeshore Care (fictional),paid,2376.67,,2026-09-20
+CLM-000592,Granite Mutual (fictional),paid,1641.82,,2026-09-20
+CLM-000593,Granite Mutual (fictional),paid,1703.93,,2026-09-20
+CLM-000594,Self-pay,paid,1187.97,,2026-09-20
+CLM-000595,Granite Mutual (fictional),paid,861.54,,2026-09-20
+CLM-000596,Granite Mutual (fictional),paid,1739.89,,2026-09-20
+CLM-000597,Medicare (sandbox),paid,1331.2,,2026-09-20
+CLM-000598,Prairie Health Plan (fictional),paid,2022.64,,2026-09-20
+CLM-000599,Granite Mutual (fictional),paid,1597.07,,2026-09-20
+CLM-000600,Prairie Health Plan (fictional),paid,779.9,,2026-09-20
+CLM-000601,Self-pay,paid,476.96,,2026-09-21
+CLM-000602,Self-pay,paid,1868.69,,2026-09-21
+CLM-000603,Medicare (sandbox),paid,1056.37,,2026-09-21
+CLM-000604,Medicare (sandbox),denied,0,CO-97 bundled,2026-09-21
+CLM-000605,Prairie Health Plan (fictional),paid,885.99,,2026-09-21
+CLM-000606,Medicare (sandbox),paid,1124.74,,2026-09-21
+CLM-000607,Granite Mutual (fictional),paid,2039.7,,2026-09-21
+CLM-000608,Self-pay,paid,1922.51,,2026-09-21
+CLM-000609,Granite Mutual (fictional),denied,0,CO-16 missing information,2026-09-21
+CLM-000610,Prairie Health Plan (fictional),paid,1922.15,,2026-09-21
+CLM-000611,Granite Mutual (fictional),paid,621.03,,2026-09-21
+CLM-000612,Lakeshore Care (fictional),paid,2234.42,,2026-09-21
+CLM-000613,Self-pay,paid,1837.37,,2026-09-21
+CLM-000614,Prairie Health Plan (fictional),paid,2391.81,,2026-09-21
+CLM-000615,Lakeshore Care (fictional),paid,1043.1,,2026-09-21
+CLM-000616,Lakeshore Care (fictional),paid,408.17,,2026-09-21
+CLM-000617,Self-pay,paid,1270.45,,2026-09-21
+CLM-000618,Self-pay,paid,1561.65,,2026-09-21
+CLM-000619,Medicare (sandbox),paid,242.32,,2026-09-21
+CLM-000620,Prairie Health Plan (fictional),paid,1631.74,,2026-09-21
+CLM-000621,Lakeshore Care (fictional),paid,70.08,,2026-09-21
+CLM-000622,Self-pay,paid,1926.97,,2026-09-21
+CLM-000623,Medicare (sandbox),paid,668.01,,2026-09-21
+CLM-000624,Granite Mutual (fictional),paid,2093.01,,2026-09-21
+CLM-000625,Self-pay,paid,138.12,,2026-09-21
+CLM-000626,Granite Mutual (fictional),paid,1346.87,,2026-09-21
+CLM-000627,Medicare (sandbox),paid,2296.13,,2026-09-21
+CLM-000628,Medicare (sandbox),paid,889.36,,2026-09-21
+CLM-000629,Prairie Health Plan (fictional),paid,368.16,,2026-09-21
+CLM-000630,Medicare (sandbox),paid,1592.86,,2026-09-21
+CLM-000631,Granite Mutual (fictional),paid,1890.99,,2026-09-22
+CLM-000632,Granite Mutual (fictional),paid,2227.79,,2026-09-22
+CLM-000633,Prairie Health Plan (fictional),paid,924.33,,2026-09-22
+CLM-000634,Medicare (sandbox),paid,1185.43,,2026-09-22
+CLM-000635,Medicare (sandbox),denied,0,CO-97 bundled,2026-09-22
+CLM-000636,Granite Mutual (fictional),paid,2218.35,,2026-09-22
+CLM-000637,Medicare (sandbox),paid,2184.13,,2026-09-22
+CLM-000638,Granite Mutual (fictional),paid,1727.58,,2026-09-22
+CLM-000639,Lakeshore Care (fictional),paid,842.7,,2026-09-22
+CLM-000640,Granite Mutual (fictional),paid,800.47,,2026-09-22
+CLM-000641,Medicare (sandbox),paid,1747.56,,2026-09-22
+CLM-000642,Granite Mutual (fictional),denied,0,PR-1 deductible,2026-09-22
+CLM-000643,Lakeshore Care (fictional),denied,0,PR-1 deductible,2026-09-22
+CLM-000644,Lakeshore Care (fictional),paid,792.46,,2026-09-22
+CLM-000645,Self-pay,paid,158.5,,2026-09-22
+CLM-000646,Medicare (sandbox),denied,0,CO-50 not medically necessary,2026-09-22
+CLM-000647,Prairie Health Plan (fictional),paid,2045.01,,2026-09-22
+CLM-000648,Granite Mutual (fictional),paid,1474.17,,2026-09-22
+CLM-000649,Medicare (sandbox),paid,1892.77,,2026-09-22
+CLM-000650,Granite Mutual (fictional),paid,1353.74,,2026-09-22
+CLM-000651,Granite Mutual (fictional),paid,131.89,,2026-09-22
+CLM-000652,Lakeshore Care (fictional),paid,1856.69,,2026-09-22
+CLM-000653,Self-pay,paid,542.34,,2026-09-22
+CLM-000654,Self-pay,paid,206.25,,2026-09-22
+CLM-000655,Prairie Health Plan (fictional),paid,1164.15,,2026-09-22
+CLM-000656,Medicare (sandbox),paid,490.42,,2026-09-22
+CLM-000657,Medicare (sandbox),denied,0,CO-16 missing information,2026-09-22
+CLM-000658,Prairie Health Plan (fictional),paid,2359.99,,2026-09-22
+CLM-000659,Self-pay,paid,1995.55,,2026-09-22
+CLM-000660,Lakeshore Care (fictional),paid,1870.6,,2026-09-22
+CLM-000661,Granite Mutual (fictional),paid,389.43,,2026-09-23
+CLM-000662,Medicare (sandbox),paid,2275.19,,2026-09-23
+CLM-000663,Medicare (sandbox),paid,1718.54,,2026-09-23
+CLM-000664,Medicare (sandbox),paid,1215.82,,2026-09-23
+CLM-000665,Medicare (sandbox),denied,0,CO-16 missing information,2026-09-23
+CLM-000666,Medicare (sandbox),paid,1146.78,,2026-09-23
+CLM-000667,Medicare (sandbox),paid,780.59,,2026-09-23
+CLM-000668,Self-pay,paid,524.53,,2026-09-23
+CLM-000669,Prairie Health Plan (fictional),paid,2255.06,,2026-09-23
+CLM-000670,Prairie Health Plan (fictional),paid,2340.64,,2026-09-23
+CLM-000671,Self-pay,paid,2398.41,,2026-09-23
+CLM-000672,Granite Mutual (fictional),paid,1930.41,,2026-09-23
+CLM-000673,Lakeshore Care (fictional),denied,0,CO-50 not medically necessary,2026-09-23
+CLM-000674,Prairie Health Plan (fictional),paid,1293.23,,2026-09-23
+CLM-000675,Self-pay,paid,1944.14,,2026-09-23
+CLM-000676,Medicare (sandbox),paid,2395.11,,2026-09-23
+CLM-000677,Lakeshore Care (fictional),denied,0,CO-50 not medically necessary,2026-09-23
+CLM-000678,Medicare (sandbox),denied,0,CO-16 missing information,2026-09-23
+CLM-000679,Prairie Health Plan (fictional),paid,1141.82,,2026-09-23
+CLM-000680,Self-pay,paid,523.39,,2026-09-23
+CLM-000681,Self-pay,paid,2302.4,,2026-09-23
+CLM-000682,Medicare (sandbox),paid,1301.04,,2026-09-23
+CLM-000683,Medicare (sandbox),paid,2273.62,,2026-09-23
+CLM-000684,Prairie Health Plan (fictional),denied,0,CO-16 missing information,2026-09-23
+CLM-000685,Prairie Health Plan (fictional),denied,0,CO-97 bundled,2026-09-23
+CLM-000686,Lakeshore Care (fictional),paid,2247.49,,2026-09-23
+CLM-000687,Prairie Health Plan (fictional),paid,1118.8,,2026-09-23
+CLM-000688,Self-pay,paid,1132.9,,2026-09-23
+CLM-000689,Medicare (sandbox),paid,2383.42,,2026-09-23
+CLM-000690,Prairie Health Plan (fictional),paid,2344.43,,2026-09-23
+CLM-000691,Lakeshore Care (fictional),paid,1822.43,,2026-09-24
+CLM-000692,Prairie Health Plan (fictional),paid,985.63,,2026-09-24
+CLM-000693,Prairie Health Plan (fictional),paid,2214.48,,2026-09-24
+CLM-000694,Lakeshore Care (fictional),paid,2193.59,,2026-09-24
+CLM-000695,Self-pay,paid,489.6,,2026-09-24
+CLM-000696,Medicare (sandbox),paid,1942.73,,2026-09-24
+CLM-000697,Granite Mutual (fictional),paid,1371.63,,2026-09-24
+CLM-000698,Prairie Health Plan (fictional),paid,592.09,,2026-09-24
+CLM-000699,Granite Mutual (fictional),denied,0,CO-50 not medically necessary,2026-09-24
+CLM-000700,Medicare (sandbox),paid,780.32,,2026-09-24
+CLM-000701,Self-pay,paid,1745.23,,2026-09-24
+CLM-000702,Medicare (sandbox),paid,299.86,,2026-09-24
+CLM-000703,Medicare (sandbox),paid,1783.75,,2026-09-24
+CLM-000704,Lakeshore Care (fictional),paid,513.81,,2026-09-24
+CLM-000705,Self-pay,paid,1723.1,,2026-09-24
+CLM-000706,Self-pay,paid,96.78,,2026-09-24
+CLM-000707,Prairie Health Plan (fictional),paid,235.7,,2026-09-24
+CLM-000708,Granite Mutual (fictional),paid,476.7,,2026-09-24
+CLM-000709,Lakeshore Care (fictional),paid,2377.3,,2026-09-24
+CLM-000710,Medicare (sandbox),paid,1345.4,,2026-09-24
+CLM-000711,Granite Mutual (fictional),denied,0,CO-97 bundled,2026-09-24
+CLM-000712,Self-pay,paid,1696.64,,2026-09-24
+CLM-000713,Medicare (sandbox),paid,2216.07,,2026-09-24
+CLM-000714,Self-pay,paid,1531.58,,2026-09-24
+CLM-000715,Lakeshore Care (fictional),paid,1881.66,,2026-09-24
+CLM-000716,Lakeshore Care (fictional),paid,1937.1,,2026-09-24
+CLM-000717,Granite Mutual (fictional),paid,1118.36,,2026-09-24
+CLM-000718,Medicare (sandbox),paid,187.99,,2026-09-24
+CLM-000719,Medicare (sandbox),paid,276.97,,2026-09-24
+CLM-000720,Lakeshore Care (fictional),paid,1770.1,,2026-09-24
+CLM-000721,Prairie Health Plan (fictional),paid,2046.47,,2026-09-25
+CLM-000722,Prairie Health Plan (fictional),paid,2023.2,,2026-09-25
+CLM-000723,Lakeshore Care (fictional),paid,152.85,,2026-09-25
+CLM-000724,Self-pay,paid,1465.19,,2026-09-25
+CLM-000725,Prairie Health Plan (fictional),paid,257.17,,2026-09-25
+CLM-000726,Self-pay,paid,690.66,,2026-09-25
+CLM-000727,Prairie Health Plan (fictional),paid,1185.45,,2026-09-25
+CLM-000728,Lakeshore Care (fictional),paid,1878.15,,2026-09-25
+CLM-000729,Lakeshore Care (fictional),paid,230.59,,2026-09-25
+CLM-000730,Lakeshore Care (fictional),paid,1299.43,,2026-09-25
+CLM-000731,Prairie Health Plan (fictional),paid,2157.47,,2026-09-25
+CLM-000732,Granite Mutual (fictional),paid,1299.15,,2026-09-25
+CLM-000733,Lakeshore Care (fictional),paid,1223.49,,2026-09-25
+CLM-000734,Self-pay,paid,1399.18,,2026-09-25
+CLM-000735,Lakeshore Care (fictional),paid,2162.13,,2026-09-25
+CLM-000736,Prairie Health Plan (fictional),denied,0,CO-97 bundled,2026-09-25
+CLM-000737,Medicare (sandbox),denied,0,CO-50 not medically necessary,2026-09-25
+CLM-000738,Medicare (sandbox),paid,1447.58,,2026-09-25
+CLM-000739,Medicare (sandbox),denied,0,CO-50 not medically necessary,2026-09-25
+CLM-000740,Self-pay,paid,566.6,,2026-09-25
+CLM-000741,Lakeshore Care (fictional),denied,0,PR-1 deductible,2026-09-25
+CLM-000742,Prairie Health Plan (fictional),paid,1992.26,,2026-09-25
+CLM-000743,Medicare (sandbox),paid,1366.68,,2026-09-25
+CLM-000744,Granite Mutual (fictional),denied,0,CO-50 not medically necessary,2026-09-25
+CLM-000745,Medicare (sandbox),paid,1109.01,,2026-09-25
+CLM-000746,Self-pay,paid,867.33,,2026-09-25
+CLM-000747,Self-pay,paid,681.5,,2026-09-25
+CLM-000748,Self-pay,paid,591.43,,2026-09-25
+CLM-000749,Lakeshore Care (fictional),paid,2116.94,,2026-09-25
+CLM-000750,Prairie Health Plan (fictional),paid,2351.18,,2026-09-25
+CLM-000751,Self-pay,paid,981.59,,2026-09-26
+CLM-000752,Lakeshore Care (fictional),paid,1644.29,,2026-09-26
+CLM-000753,Self-pay,denied,0,PR-1 deductible,2026-09-26
+CLM-000754,Prairie Health Plan (fictional),paid,1690.32,,2026-09-26
+CLM-000755,Lakeshore Care (fictional),paid,762.22,,2026-09-26
+CLM-000756,Granite Mutual (fictional),paid,537.11,,2026-09-26
+CLM-000757,Self-pay,paid,597.28,,2026-09-26
+CLM-000758,Lakeshore Care (fictional),paid,1452.89,,2026-09-26
+CLM-000759,Self-pay,paid,796.94,,2026-09-26
+CLM-000760,Granite Mutual (fictional),paid,487.44,,2026-09-26
+CLM-000761,Medicare (sandbox),paid,752.28,,2026-09-26
+CLM-000762,Medicare (sandbox),paid,1659.18,,2026-09-26
+CLM-000763,Self-pay,paid,2037.34,,2026-09-26
+CLM-000764,Granite Mutual (fictional),denied,0,PR-1 deductible,2026-09-26
+CLM-000765,Prairie Health Plan (fictional),paid,2023.02,,2026-09-26
+CLM-000766,Medicare (sandbox),paid,311.12,,2026-09-26
+CLM-000767,Self-pay,paid,464.34,,2026-09-26
+CLM-000768,Lakeshore Care (fictional),paid,1078.08,,2026-09-26
+CLM-000769,Self-pay,paid,1134.61,,2026-09-26
+CLM-000770,Self-pay,paid,1955.26,,2026-09-26
+CLM-000771,Medicare (sandbox),denied,0,CO-97 bundled,2026-09-26
+CLM-000772,Medicare (sandbox),paid,1484.24,,2026-09-26
+CLM-000773,Medicare (sandbox),paid,1463.33,,2026-09-26
+CLM-000774,Granite Mutual (fictional),paid,2252.2,,2026-09-26
+CLM-000775,Medicare (sandbox),paid,147.82,,2026-09-26
+CLM-000776,Granite Mutual (fictional),paid,1903.98,,2026-09-26
+CLM-000777,Granite Mutual (fictional),paid,629.79,,2026-09-26
+CLM-000778,Granite Mutual (fictional),paid,717.36,,2026-09-26
+CLM-000779,Lakeshore Care (fictional),paid,1765.78,,2026-09-26
+CLM-000780,Lakeshore Care (fictional),paid,2078.87,,2026-09-26
+CLM-000781,Prairie Health Plan (fictional),paid,199.66,,2026-09-27
+CLM-000782,Medicare (sandbox),paid,1988.03,,2026-09-27
+CLM-000783,Prairie Health Plan (fictional),paid,104.77,,2026-09-27
+CLM-000784,Granite Mutual (fictional),paid,199.28,,2026-09-27
+CLM-000785,Medicare (sandbox),paid,1633.0,,2026-09-27
+CLM-000786,Self-pay,paid,1327.42,,2026-09-27
+CLM-000787,Self-pay,denied,0,PR-1 deductible,2026-09-27
+CLM-000788,Medicare (sandbox),paid,1917.69,,2026-09-27
+CLM-000789,Self-pay,paid,2062.05,,2026-09-27
+CLM-000790,Lakeshore Care (fictional),paid,2286.04,,2026-09-27
+CLM-000791,Self-pay,paid,1262.11,,2026-09-27
+CLM-000792,Prairie Health Plan (fictional),paid,539.62,,2026-09-27
+CLM-000793,Granite Mutual (fictional),paid,1216.71,,2026-09-27
+CLM-000794,Medicare (sandbox),paid,1386.09,,2026-09-27
+CLM-000795,Prairie Health Plan (fictional),paid,1789.32,,2026-09-27
+CLM-000796,Granite Mutual (fictional),paid,1030.62,,2026-09-27
+CLM-000797,Medicare (sandbox),paid,1263.7,,2026-09-27
+CLM-000798,Lakeshore Care (fictional),paid,1406.41,,2026-09-27
+CLM-000799,Prairie Health Plan (fictional),paid,1069.9,,2026-09-27
+CLM-000800,Granite Mutual (fictional),paid,600.09,,2026-09-27
+CLM-000801,Lakeshore Care (fictional),denied,0,PR-1 deductible,2026-09-27
+CLM-000802,Lakeshore Care (fictional),paid,1705.3,,2026-09-27
+CLM-000803,Lakeshore Care (fictional),paid,246.68,,2026-09-27
+CLM-000804,Lakeshore Care (fictional),paid,651.31,,2026-09-27
+CLM-000805,Self-pay,paid,522.69,,2026-09-27
+CLM-000806,Granite Mutual (fictional),paid,487.41,,2026-09-27
+CLM-000807,Granite Mutual (fictional),paid,1605.2,,2026-09-27
+CLM-000808,Lakeshore Care (fictional),paid,79.65,,2026-09-27
+CLM-000809,Self-pay,paid,373.36,,2026-09-27
+CLM-000810,Self-pay,paid,2083.51,,2026-09-27
+CLM-000811,Lakeshore Care (fictional),paid,1970.13,,2026-09-28
+CLM-000812,Medicare (sandbox),paid,1804.79,,2026-09-28
+CLM-000813,Self-pay,paid,93.54,,2026-09-28
+CLM-000814,Self-pay,paid,1303.37,,2026-09-28
+CLM-000815,Granite Mutual (fictional),paid,291.53,,2026-09-28
+CLM-000816,Self-pay,paid,1541.84,,2026-09-28
+CLM-000817,Lakeshore Care (fictional),paid,1690.08,,2026-09-28
+CLM-000818,Self-pay,denied,0,CO-16 missing information,2026-09-28
+CLM-000819,Granite Mutual (fictional),paid,1835.46,,2026-09-28
+CLM-000820,Self-pay,paid,2266.8,,2026-09-28
+CLM-000821,Medicare (sandbox),paid,2380.99,,2026-09-28
+CLM-000822,Granite Mutual (fictional),paid,1353.9,,2026-09-28
+CLM-000823,Granite Mutual (fictional),paid,1290.24,,2026-09-28
+CLM-000824,Prairie Health Plan (fictional),denied,0,CO-16 missing information,2026-09-28
+CLM-000825,Self-pay,paid,213.05,,2026-09-28
+CLM-000826,Medicare (sandbox),paid,68.94,,2026-09-28
+CLM-000827,Lakeshore Care (fictional),paid,1668.92,,2026-09-28
+CLM-000828,Self-pay,paid,2358.37,,2026-09-28
+CLM-000829,Medicare (sandbox),paid,1112.18,,2026-09-28
+CLM-000830,Lakeshore Care (fictional),paid,817.37,,2026-09-28
+CLM-000831,Medicare (sandbox),paid,742.4,,2026-09-28
+CLM-000832,Prairie Health Plan (fictional),paid,481.26,,2026-09-28
+CLM-000833,Prairie Health Plan (fictional),denied,0,PR-1 deductible,2026-09-28
+CLM-000834,Self-pay,paid,708.51,,2026-09-28
+CLM-000835,Prairie Health Plan (fictional),paid,449.22,,2026-09-28
+CLM-000836,Granite Mutual (fictional),paid,1215.37,,2026-09-28
+CLM-000837,Medicare (sandbox),paid,1841.87,,2026-09-28
+CLM-000838,Self-pay,paid,2169.49,,2026-09-28
+CLM-000839,Prairie Health Plan (fictional),paid,1560.86,,2026-09-28
+CLM-000840,Granite Mutual (fictional),paid,573.49,,2026-09-28
+CLM-000841,Granite Mutual (fictional),paid,302.38,,2026-09-29
+CLM-000842,Lakeshore Care (fictional),denied,0,CO-97 bundled,2026-09-29
+CLM-000843,Medicare (sandbox),paid,494.74,,2026-09-29
+CLM-000844,Prairie Health Plan (fictional),paid,627.95,,2026-09-29
+CLM-000845,Prairie Health Plan (fictional),paid,434.35,,2026-09-29
+CLM-000846,Granite Mutual (fictional),paid,1782.4,,2026-09-29
+CLM-000847,Medicare (sandbox),paid,1107.12,,2026-09-29
+CLM-000848,Self-pay,paid,2385.03,,2026-09-29
+CLM-000849,Prairie Health Plan (fictional),paid,695.68,,2026-09-29
+CLM-000850,Medicare (sandbox),paid,1619.45,,2026-09-29
+CLM-000851,Prairie Health Plan (fictional),paid,1597.21,,2026-09-29
+CLM-000852,Self-pay,paid,1892.67,,2026-09-29
+CLM-000853,Granite Mutual (fictional),paid,1463.81,,2026-09-29
+CLM-000854,Medicare (sandbox),paid,2347.64,,2026-09-29
+CLM-000855,Prairie Health Plan (fictional),paid,619.39,,2026-09-29
+CLM-000856,Granite Mutual (fictional),paid,738.75,,2026-09-29
+CLM-000857,Lakeshore Care (fictional),denied,0,PR-1 deductible,2026-09-29
+CLM-000858,Lakeshore Care (fictional),paid,1152.06,,2026-09-29
+CLM-000859,Self-pay,denied,0,CO-50 not medically necessary,2026-09-29
+CLM-000860,Granite Mutual (fictional),paid,2097.81,,2026-09-29
+CLM-000861,Lakeshore Care (fictional),paid,1783.16,,2026-09-29
+CLM-000862,Lakeshore Care (fictional),paid,1519.75,,2026-09-29
+CLM-000863,Medicare (sandbox),paid,1925.33,,2026-09-29
+CLM-000864,Medicare (sandbox),denied,0,CO-16 missing information,2026-09-29
+CLM-000865,Granite Mutual (fictional),paid,2090.12,,2026-09-29
+CLM-000866,Prairie Health Plan (fictional),paid,829.32,,2026-09-29
+CLM-000867,Lakeshore Care (fictional),paid,1198.15,,2026-09-29
+CLM-000868,Medicare (sandbox),paid,523.62,,2026-09-29
+CLM-000869,Lakeshore Care (fictional),denied,0,PR-1 deductible,2026-09-29
+CLM-000870,Self-pay,paid,868.5,,2026-09-29
+CLM-000871,Lakeshore Care (fictional),paid,1937.35,,2026-09-30
+CLM-000872,Lakeshore Care (fictional),paid,999.84,,2026-09-30
+CLM-000873,Lakeshore Care (fictional),denied,0,PR-1 deductible,2026-09-30
+CLM-000874,Medicare (sandbox),paid,437.95,,2026-09-30
+CLM-000875,Self-pay,paid,1633.37,,2026-09-30
+CLM-000876,Prairie Health Plan (fictional),paid,1352.86,,2026-09-30
+CLM-000877,Medicare (sandbox),paid,1553.96,,2026-09-30
+CLM-000878,Self-pay,paid,242.18,,2026-09-30
+CLM-000879,Prairie Health Plan (fictional),paid,312.0,,2026-09-30
+CLM-000880,Prairie Health Plan (fictional),paid,2345.57,,2026-09-30
+CLM-000881,Self-pay,paid,1767.35,,2026-09-30
+CLM-000882,Medicare (sandbox),paid,2395.63,,2026-09-30
+CLM-000883,Self-pay,paid,634.18,,2026-09-30
+CLM-000884,Prairie Health Plan (fictional),paid,1368.5,,2026-09-30
+CLM-000885,Prairie Health Plan (fictional),paid,1499.14,,2026-09-30
+CLM-000886,Lakeshore Care (fictional),paid,2057.98,,2026-09-30
+CLM-000887,Self-pay,paid,1819.07,,2026-09-30
+CLM-000888,Lakeshore Care (fictional),paid,707.55,,2026-09-30
+CLM-000889,Prairie Health Plan (fictional),paid,438.8,,2026-09-30
+CLM-000890,Self-pay,paid,1010.04,,2026-09-30
+CLM-000891,Lakeshore Care (fictional),paid,1638.48,,2026-09-30
+CLM-000892,Granite Mutual (fictional),paid,2120.4,,2026-09-30
+CLM-000893,Medicare (sandbox),paid,2121.73,,2026-09-30
+CLM-000894,Medicare (sandbox),paid,1944.4,,2026-09-30
+CLM-000895,Prairie Health Plan (fictional),paid,1261.44,,2026-09-30
+CLM-000896,Granite Mutual (fictional),paid,408.86,,2026-09-30
+CLM-000897,Self-pay,paid,1782.28,,2026-09-30
+CLM-000898,Lakeshore Care (fictional),paid,77.93,,2026-09-30
+CLM-000899,Self-pay,paid,202.72,,2026-09-30
+CLM-000900,Medicare (sandbox),paid,546.25,,2026-09-30

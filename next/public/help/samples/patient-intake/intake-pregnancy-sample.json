@@ -1,0 +1,53 @@
+{
+  "first_name": "Noor",
+  "last_name": "Abernathy",
+  "dob": "1997-02-08",
+  "sex": "Female",
+  "preferred_language": "English",
+  "phone": "+1 555 0104",
+  "email": "noor.abernathy@example.com",
+  "address": "234 Willow Crescent, Millbrook, IL 60999",
+  "is_minor": false,
+  "emergency_name": "Morgan Abernathy",
+  "emergency_relationship": "Partner",
+  "emergency_phone": "+1 555 0154",
+  "insurance_payer": "Lakeshore Care Plan",
+  "insurance_member_id": "LCP-398672",
+  "insurance_group": "GRP-2147",
+  "subscriber_name": "Noor Abernathy",
+  "subscriber_relationship": "Self",
+  "visit_date": "2026-10-21",
+  "reason_for_visit": "Pregnant about 24 weeks; bad headache since yesterday, blurry vision and swollen ankles.",
+  "symptom_duration": "1 day",
+  "pain_score": 7,
+  "height_cm": 165,
+  "weight_kg": 74,
+  "medications": [
+    {
+      "name": "Prenatal vitamin",
+      "dose": "1 tablet",
+      "frequency": "Once daily",
+      "route": "By mouth"
+    }
+  ],
+  "tobacco": "Never",
+  "alcohol": "None",
+  "recreational_drugs": "No",
+  "occupation": "Dental hygienist",
+  "ros_positives": [
+    "Headache",
+    "Vision changes",
+    "Leg or ankle swelling",
+    "Nausea or vomiting"
+  ],
+  "pregnancy_status": "Pregnant",
+  "lmp_date": "2026-05-12",
+  "primary_care_physician": "Dr. Priya Raman, Millbrook Family Practice",
+  "preferred_pharmacy": "Riverbend Drugs, 4th Ave",
+  "consent_treatment": true,
+  "consent_privacy": true,
+  "consent_financial": true,
+  "signed_by": "Noor Abernathy",
+  "signed_date": "2026-10-21",
+  "synthetic": true
+}

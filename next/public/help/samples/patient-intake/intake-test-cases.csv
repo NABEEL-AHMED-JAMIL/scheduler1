@@ -1,0 +1,26 @@
+case,how_it_arrives,first_name,last_name,date_of_birth,sex,under_18,reason_for_visit,expected_priority,why,missing_or_invalid
+P01,form,Lena,Halvorsen,1991-03-14,Female,no,"Yearly check-up; feeling well, would like routine blood tests.",low,"Routine physical, no symptoms, no risks.",
+P02,form,Marcus,Odum,1984-11-02,Male,no,Sinus pain and congestion for ten days; asking about antibiotics.,medium,"Drug allergies (penicillin, sulfa) matter for the antibiotic he asks about.",
+P03,form,Ingrid,Castellanos,1948-06-21,Female,no,Dizzy when standing up and fell at home last week; bruised left hip.,high,"A fall on warfarin (bleeding risk) with dizziness, nine medicines, age 78.",
+P04,form,Noor,Abernathy,1997-02-08,Female,no,"Pregnant about 24 weeks; bad headache since yesterday, blurry vision and swollen ankles.",high,"Pregnant ~24 weeks with headache, vision changes and swelling (possible pre-eclampsia).",
+P05,form,Dale,Pruitt,1974-09-30,Male,no,"Cough for three weeks, some weight loss, short of breath on stairs.",medium,Current smoker (1 pack/day) with a 3-week cough and weight loss: needs prompt work-up.,
+P06,form,Theo,Brannigan,2019-04-17,Male,yes,"Wheezing at night for a week, using the inhaler more than usual.",medium,Child (7) with worsening asthma; severe peanut allergy (anaphylaxis).,
+P07,form,Rafael,Quintero,1992-01-25,Male,no,"Blood sugars above 300 for two days, thirsty, nauseous.",high,"Type 1 diabetes on insulin with sugars over 300, nausea and abdominal pain: rule out ketoacidosis.",
+P08,form,Wendell,Ashby,1966-12-03,Male,no,Needs a refill of his blood pressure tablets.,low,"Refill visit, no symptoms; much information missing.",insurance; emergency contact; height and weight; medication doses; primary care physician; pharmacy
+P09,form,Paloma,Restrepo,1988-07-19,Female,no,Burn on the right forearm from a kitchen pan two days ago.,low,"Small burn, two days old, no other symptoms.",phone
+P10,form,Callum,Devereux,1979-05-11,Male,no,Itchy rash on both hands after a new glove brand at work.,medium,Latex allergy flare at work; severe shellfish allergy on record.,
+P11,form,Bartholomew,Ingersoll,1958-08-27,Male,no,"Black, tarry stools for two days and feeling weak; had a heart stent in August.",high,Black stools (possible GI bleed) on apixaban plus clopidogrel.,
+P12,form,Ambrose,Fairweather,1942-02-14,Male,no,"Chest tightness when walking uphill, eases with rest; more short of breath this month.",high,Exertional chest pain with breathlessness at 84 (possible angina).,
+P13,form,Juniper,Kowalczyk,2010-03-09,Female,yes,"Twisted right knee at soccer practice yesterday; swollen, can walk.",low,"Knee sprain, walking, no red flags.",
+P14,form,Delphine,Marchetti,1981-10-05,Female,no,Low mood and poor sleep for two months; sertraline does not seem to help.,medium,Ongoing depression not improving on sertraline; screen for safety.,
+P15,form,Gregor,Lindqvist,1966-04-22,Male,no,More breathless than usual and coughing up more phlegm since last week.,medium,COPD flare in a former smoker.,
+P16,form,Ottilie,Varga,1988-01-30,Female,no,Migraines three times a week; over-the-counter tablets no longer work.,medium,Frequent migraines; severe ibuprofen allergy (angioedema) limits treatment.,
+P17,form,Margarethe,Oyelaran,1956-09-12,Female,no,Two low sugar episodes this week and a nosebleed that took an hour to stop.,high,Hypoglycaemia on insulin and prolonged bleeding on warfarin.,
+P18,form,Kai,Matsuda,2001-06-03,Male,no,Wants a general check-up and help to cut down on drinking.,low,"Daily alcohol and current cannabis use; asks for help, no acute symptoms.",
+P19,form,Esperanza,Dahlberg,1993-08-16,Female,no,Nausea most mornings for a week; period is late.,medium,Possible pregnancy (period about 7 weeks ago) with nausea.,
+P20,form,Leopold,Haverkamp,1971-03-28,Male,no,Blood pressure check; home readings about 150/95.,low,"Raised home blood pressure, BMI about 36, no symptoms; no insurance.",insurance
+P21,scanned PDF,Rosalind,Achterberg,1979-02-19,Female,no,Tired and cold all the time; asks for a thyroid blood test.,low,"Stable hypothyroidism, fatigue, no red flags.",
+P22,scanned PDF,Desmond,Okonkwo-Hale,1963-05-07,Male,no,"Painful, swollen finger joints in the mornings; due for methotrexate blood tests.",medium,"Rheumatoid arthritis flare on methotrexate (high-risk, needs monitoring).",
+P23,scanned PDF,Philippa,Szabo,1968-03-11,Female,no,"Heart racing on and off for a week, worse with coffee.",medium,Palpitations for a week on metoprolol; penicillin allergy.,
+P24,scanned PDF,Florian,Brandtmeier,1985-03-27,Male,no,"Low back pain after lifting at work, running out of tramadol.",medium,Back pain needing opioid refill (tramadol); current smoker.,
+P25,scanned PDF,Cornelius,Vandermolen,1954-07-01,Male,no,Swollen ankles and short of breath lying flat for a week.,high,Ankle swelling and breathlessness lying flat at 72 (possible heart failure).,medications (page 2 missing); allergies (page 2 missing); medical history (page 2 missing)

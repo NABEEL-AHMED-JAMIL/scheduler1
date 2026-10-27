@@ -1,0 +1,41 @@
+member_id,payer,plan_code,status,copay,mrn
+SVH-100200,Summit Mutual,SM-SILVER,active,0,SV-000117
+SVH-100213,Valley Care Plan,VC-GOLD,active,20,SV-000127
+SVH-100226,Prairie Health,PH-GOLD,active,20,SV-000134
+SVH-100239,Medicare (synthetic),MC-SILVER,active,0,SV-000141
+SVH-100252,Summit Mutual,SM-GOLD,active,35,SV-000148
+SVH-100265,Valley Care Plan,VC-GOLD,active,0,SV-000155
+SVH-100278,Prairie Health,PH-SILVER,inactive,0,SV-000162
+SVH-100291,Medicare (synthetic),MC-GOLD,active,20,SV-000169
+SVH-100304,Summit Mutual,SM-GOLD,active,20,SV-000176
+SVH-100317,Valley Care Plan,VC-SILVER,active,20,SV-000183
+SVH-300000,Summit Mutual,SM-BRONZE,inactive,20,SV-000400
+SVH-300011,Valley Care Plan,VC-BRONZE,active,0,SV-000401
+SVH-300022,Prairie Health,PH-GOLD,active,20,SV-000402
+SVH-300033,Medicare (synthetic),MC-SILVER,active,35,SV-000403
+SVH-300044,Summit Mutual,SM-GOLD,active,35,SV-000404
+SVH-300055,Valley Care Plan,VC-BRONZE,active,20,SV-000405
+SVH-300066,Prairie Health,PH-SILVER,active,20,SV-000406
+SVH-300077,Medicare (synthetic),MC-BRONZE,active,35,SV-000407
+SVH-300088,Summit Mutual,SM-BRONZE,active,0,SV-000408
+SVH-300099,Valley Care Plan,VC-GOLD,active,35,SV-000409
+SVH-300110,Prairie Health,PH-SILVER,active,20,SV-000410
+SVH-300121,Medicare (synthetic),MC-GOLD,active,0,SV-000411
+SVH-300132,Summit Mutual,SM-SILVER,active,20,SV-000412
+SVH-300143,Valley Care Plan,VC-SILVER,active,0,SV-000413
+SVH-300154,Prairie Health,PH-SILVER,active,20,SV-000414
+SVH-300165,Medicare (synthetic),MC-SILVER,active,35,SV-000415
+SVH-300176,Summit Mutual,SM-GOLD,active,35,SV-000416
+SVH-300187,Valley Care Plan,VC-SILVER,active,35,SV-000417
+SVH-300198,Prairie Health,PH-BRONZE,active,20,SV-000418
+SVH-300209,Medicare (synthetic),MC-SILVER,active,20,SV-000419
+SVH-300220,Summit Mutual,SM-GOLD,active,35,SV-000420
+SVH-300231,Valley Care Plan,VC-BRONZE,active,35,SV-000421
+SVH-300242,Prairie Health,PH-SILVER,active,35,SV-000422
+SVH-300253,Medicare (synthetic),MC-BRONZE,active,20,SV-000423
+SVH-300264,Summit Mutual,SM-SILVER,inactive,20,SV-000424
+SVH-300275,Valley Care Plan,VC-BRONZE,active,0,SV-000425
+SVH-300286,Prairie Health,PH-GOLD,inactive,35,SV-000426
+SVH-300297,Medicare (synthetic),MC-BRONZE,inactive,20,SV-000427
+SVH-300308,Summit Mutual,SM-GOLD,active,0,SV-000428
+SVH-300319,Valley Care Plan,VC-GOLD,active,0,SV-000429

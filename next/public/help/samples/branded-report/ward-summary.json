@@ -1,0 +1,46 @@
+{
+  "site": "Summit Valley Medical Center",
+  "period": "October 2026",
+  "beds": 160,
+  "occupied": 138,
+  "average_occupancy_pct": 86.2,
+  "note": "Synthetic demonstration data.",
+  "wards": [
+    {
+      "ward": "Ward 4A",
+      "beds": 32,
+      "occupied": 29,
+      "occupancy_pct": 90.6
+    },
+    {
+      "ward": "Ward 4B",
+      "beds": 32,
+      "occupied": 30,
+      "occupancy_pct": 93.8
+    },
+    {
+      "ward": "Ward 5A",
+      "beds": 28,
+      "occupied": 22,
+      "occupancy_pct": 78.6
+    },
+    {
+      "ward": "Ward 5B",
+      "beds": 28,
+      "occupied": 25,
+      "occupancy_pct": 89.3
+    },
+    {
+      "ward": "ICU",
+      "beds": 16,
+      "occupied": 15,
+      "occupancy_pct": 93.8
+    },
+    {
+      "ward": "Maternity",
+      "beds": 24,
+      "occupied": 17,
+      "occupancy_pct": 70.8
+    }
+  ]
+}

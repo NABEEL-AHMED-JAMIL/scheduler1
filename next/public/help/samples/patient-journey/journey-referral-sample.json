@@ -1,0 +1,11 @@
+{
+  "patient_id": "SV-000117",
+  "patient_name": "Elena Marsh",
+  "date_of_birth": "1959-03-14",
+  "reason": "Type 2 diabetes with an infected left-foot wound; heart failure",
+  "urgency": "urgent",
+  "insurance_member_id": "SVH-100200",
+  "referral_date": "2026-10-18",
+  "referred_to": "Summit Valley Medical Center, Ward 4B",
+  "referring_npi": "5751437431"
+}

@@ -1,0 +1,14 @@
+{
+  "mrn": "SV-000117",
+  "name": "Elena Marsh",
+  "diagnosis": "Type 2 diabetes with an infected left-foot wound; heart failure",
+  "course": "Admitted with an infected left-foot wound and raised glucose. Treated with wound care and medicine review; oxygen saturation recovered from 88 % on day 3 to 95 % on day 5.",
+  "meds_on_discharge": [
+    "metformin 1000 mg",
+    "furosemide 40 mg",
+    "warfarin 5 mg"
+  ],
+  "follow_up": "Wound clinic and diabetes review in 7 days.",
+  "follow_up_at": "2026-10-30",
+  "synthetic": true
+}

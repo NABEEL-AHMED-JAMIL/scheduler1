@@ -1,0 +1,73 @@
+{
+  "title": "Wound photo review",
+  "period": "19 to 23 October 2026",
+  "clinic": "Summit Valley wound clinic (synthetic)",
+  "photos": [
+    {
+      "mrn": "SV-000117",
+      "site": "left foot, plantar",
+      "visit": 1,
+      "visit_date": "2026-10-19",
+      "length_cm": 4.2,
+      "width_cm": 2.8,
+      "area_cm2": 9.24,
+      "photo_key": "wound/photos/wound-SV-000117-v1.jpg",
+      "caption": "SV-000117 · visit 1 · 2026-10-19 · 9.24 cm²"
+    },
+    {
+      "mrn": "SV-000117",
+      "site": "left foot, plantar",
+      "visit": 2,
+      "visit_date": "2026-10-21",
+      "length_cm": 3.6,
+      "width_cm": 2.3,
+      "area_cm2": 6.5,
+      "photo_key": "wound/photos/wound-SV-000117-v2.jpg",
+      "caption": "SV-000117 · visit 2 · 2026-10-21 · 6.5 cm²"
+    },
+    {
+      "mrn": "SV-000117",
+      "site": "left foot, plantar",
+      "visit": 3,
+      "visit_date": "2026-10-23",
+      "length_cm": 2.9,
+      "width_cm": 1.8,
+      "area_cm2": 4.1,
+      "photo_key": "wound/photos/wound-SV-000117-v3.jpg",
+      "caption": "SV-000117 · visit 3 · 2026-10-23 · 4.1 cm²"
+    },
+    {
+      "mrn": "SV-000148",
+      "site": "right heel",
+      "visit": 1,
+      "visit_date": "2026-10-20",
+      "length_cm": 3.1,
+      "width_cm": 2.0,
+      "area_cm2": 4.87,
+      "photo_key": "wound/photos/wound-SV-000148-v1.jpg",
+      "caption": "SV-000148 · visit 1 · 2026-10-20 · 4.87 cm²"
+    },
+    {
+      "mrn": "SV-000148",
+      "site": "right heel",
+      "visit": 2,
+      "visit_date": "2026-10-23",
+      "length_cm": 2.7,
+      "width_cm": 1.7,
+      "area_cm2": 3.6,
+      "photo_key": "wound/photos/wound-SV-000148-v2.jpg",
+      "caption": "SV-000148 · visit 2 · 2026-10-23 · 3.6 cm²"
+    },
+    {
+      "mrn": "SV-000169",
+      "site": "sacrum",
+      "visit": 1,
+      "visit_date": "2026-10-22",
+      "length_cm": 5.0,
+      "width_cm": 3.2,
+      "area_cm2": 12.57,
+      "photo_key": "wound/photos/wound-SV-000169-v1.jpg",
+      "caption": "SV-000169 · visit 1 · 2026-10-22 · 12.57 cm²"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "name": "Elena Marsh",
+  "mrn": "SV-000117",
+  "diagnosis": "Type 2 diabetes with an infected left-foot wound; heart failure (NYHA II)",
+  "course": "Admitted on 19 October 2026 with an infected plantar wound. IV antibiotics for five days, then oral; the wound area fell from 9.2 to 4.1 cm². Blood glucose controlled on basal insulin. No signs of fluid overload. DRAFT text for the attending physician to check.",
+  "follow_up": "Wound clinic in 7 days; diabetes nurse in 14 days",
+  "meds_on_discharge": [
+    "Amoxicillin-clavulanate 875/125 mg twice daily for 7 days",
+    "Insulin glargine 18 units at night",
+    "Furosemide 20 mg each morning",
+    "Metformin 1 g twice daily"
+  ]
+}

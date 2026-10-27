@@ -1,0 +1,176 @@
+{
+  "first_name": "Ingrid",
+  "last_name": "Castellanos",
+  "dob": "1948-06-21",
+  "sex": "Female",
+  "preferred_language": "English",
+  "phone": "+1 555 0103",
+  "email": "ingrid.castellanos@example.com",
+  "address": "394 Tamarack Trail, Millbrook, IL 60999",
+  "is_minor": false,
+  "emergency_name": "Avery Castellanos",
+  "emergency_relationship": "Sister",
+  "emergency_phone": "+1 555 0153",
+  "insurance_payer": "Medicare (synthetic)",
+  "insurance_member_id": "MCR-620390",
+  "insurance_group": "GRP-3114",
+  "subscriber_name": "Ingrid Castellanos",
+  "subscriber_relationship": "Self",
+  "secondary_payer": "Lakeshore Care Plan",
+  "secondary_member_id": "LCP-908060",
+  "visit_date": "2026-10-21",
+  "reason_for_visit": "Dizzy when standing up and fell at home last week; bruised left hip.",
+  "symptom_duration": "2 weeks",
+  "pain_score": 5,
+  "height_cm": 158,
+  "weight_kg": 61,
+  "conditions": [
+    {
+      "condition": "Atrial fibrillation",
+      "since": "2015",
+      "status": "Controlled"
+    },
+    {
+      "condition": "Type 2 diabetes",
+      "since": "2009",
+      "status": "Controlled"
+    },
+    {
+      "condition": "Hypothyroidism",
+      "since": "2012",
+      "status": "Controlled"
+    },
+    {
+      "condition": "Mild memory loss",
+      "since": "2023",
+      "status": "Active"
+    }
+  ],
+  "surgeries": [
+    {
+      "procedure": "Right hip replacement",
+      "year": 2018
+    }
+  ],
+  "family_history": [
+    {
+      "relative": "Mother",
+      "condition": "Stroke"
+    }
+  ],
+  "medications": [
+    {
+      "name": "Warfarin",
+      "dose": "5 mg",
+      "frequency": "Once daily in the evening",
+      "route": "By mouth"
+    },
+    {
+      "name": "Metformin",
+      "dose": "500 mg",
+      "frequency": "Twice daily",
+      "route": "By mouth"
+    },
+    {
+      "name": "Lisinopril",
+      "dose": "10 mg",
+      "frequency": "Once daily",
+      "route": "By mouth"
+    },
+    {
+      "name": "Atorvastatin",
+      "dose": "20 mg",
+      "frequency": "At night",
+      "route": "By mouth"
+    },
+    {
+      "name": "Furosemide",
+      "dose": "40 mg",
+      "frequency": "Every morning",
+      "route": "By mouth"
+    },
+    {
+      "name": "Omeprazole",
+      "dose": "20 mg",
+      "frequency": "Before breakfast",
+      "route": "By mouth"
+    },
+    {
+      "name": "Levothyroxine",
+      "dose": "75 mcg",
+      "frequency": "Every morning",
+      "route": "By mouth"
+    },
+    {
+      "name": "Donepezil",
+      "dose": "5 mg",
+      "frequency": "At night",
+      "route": "By mouth"
+    },
+    {
+      "name": "Vitamin D3",
+      "dose": "1000 IU",
+      "frequency": "Once daily",
+      "route": "By mouth"
+    }
+  ],
+  "tobacco": "Former",
+  "alcohol": "None",
+  "recreational_drugs": "No",
+  "occupation": "Retired librarian",
+  "ros_positives": [
+    "Dizziness or fainting",
+    "Falls in the last year",
+    "Fatigue",
+    "Leg or ankle swelling"
+  ],
+  "pregnancy_status": "Not pregnant",
+  "primary_care_physician": "Dr. Tomasz Wilk, Riverside Health Primary Care",
+  "preferred_pharmacy": "Riverbend Drugs, 4th Ave",
+  "consent_treatment": true,
+  "consent_privacy": true,
+  "consent_financial": true,
+  "signed_by": "Ingrid Castellanos",
+  "signed_date": "2026-10-21",
+  "intake_id": "S-SAMPLE",
+  "source": "form",
+  "received_at": "2026-10-26T09:12:00",
+  "patient_name": "Ingrid Castellanos",
+  "age_text": "78 years",
+  "bmi": 24.1,
+  "triage_priority": "high",
+  "ai_summary": "Sample summary.",
+  "priority_rows": [
+    {
+      "priority": "high"
+    }
+  ],
+  "ai_triage_reasons": [
+    "fall with dizziness on warfarin"
+  ],
+  "ai_flags": [
+    {
+      "type": "high-risk medicine",
+      "detail": "warfarin"
+    }
+  ],
+  "high_risk_meds": "warfarin",
+  "code_flags": "polypharmacy (9 medicines)",
+  "ai_missing_information": [
+    "medicine doses"
+  ],
+  "code_missing": null,
+  "validation_line": null,
+  "tobacco_text": "Never",
+  "ros_list": [
+    "Dizziness or fainting",
+    "Falls in the last year",
+    "Fatigue",
+    "Leg or ankle swelling"
+  ],
+  "reviewed_by": "Riverside Health reviewer",
+  "reviewed_at": "2026-10-26T10:05:00-05:00",
+  "review_note": "Sample note.",
+  "senior_line": null,
+  "synthetic": true
+}

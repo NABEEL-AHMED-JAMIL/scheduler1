@@ -1,0 +1,1129 @@
+[
+ {
+  "name": "rcp-b-brand",
+  "route": "/reports/assets/branding/01M5WZHAXH5ZVQAC1FYZBMKH18",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "text=Live preview"
+   },
+   {
+    "wait": 1500
+   }
+  ]
+ },
+ {
+  "name": "rcp-b-assets",
+  "route": "/reports/assets",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "text=Dr. Anika Patel signature"
+   },
+   {
+    "wait": 1200
+   }
+  ]
+ },
+ {
+  "name": "rcp-b-designer-chart",
+  "route": "/reports/templates/01M5WZJ2ZKCBQVP9NJMPFWAREX/design",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "text=Components"
+   },
+   {
+    "wait": 2500
+   }
+  ],
+  "thumb": true
+ },
+ {
+  "name": "rcp-b-statement-step",
+  "route": "/pipelines/1237/edit?tab=steps",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": ".step-card[data-step=report]"
+   },
+   {
+    "click": ".step-card[data-step=report] .step-open"
+   },
+   {
+    "waitFor": "app-side-panel"
+   },
+   {
+    "wait": 1000
+   }
+  ]
+ },
+ {
+  "name": "rcp-b-statement-run",
+  "route": "/pipelines/schedules/1237/runs/1927",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "wait": 3000
+   }
+  ]
+ },
+ {
+  "name": "rcp-b-statements",
+  "route": "/reports/library",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "input[aria-label='Search reports']"
+   },
+   {
+    "fill": [
+     "input[aria-label='Search reports']",
+     "Statement"
+    ]
+   },
+   {
+    "wait": 1800
+   }
+  ]
+ },
+ {
+  "name": "rcp-b-discharge-design",
+  "route": "/reports/templates/01M5WZJ28PXFRYHP8F1TJAK4CJ/design",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "text=Components"
+   },
+   {
+    "wait": 1500
+   },
+   {
+    "click": "button[aria-label^='Test data']"
+   },
+   {
+    "waitFor": "text=No test data"
+   },
+   {
+    "click": "button:has-text('No test data')"
+   },
+   {
+    "wait": 1200
+   },
+   {
+    "click": "button:has-text('Layers') >> nth=0"
+   },
+   {
+    "wait": 500
+   },
+   {
+    "click": "button.rsd-layer:has-text('Signature')"
+   },
+   {
+    "wait": 1200
+   }
+  ]
+ },
+ {
+  "name": "rcp-b-discharge-signed",
+  "route": "/reports/library/01M5XJB02N3HE1990124TM1Q59",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "text=Current version"
+   },
+   {
+    "wait": 1500
+   }
+  ]
+ },
+ {
+  "name": "rcp-b-verify",
+  "route": "/reports/library/01M5XJB02N3HE1990124TM1Q59",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "text=Current version"
+   },
+   {
+    "click": "button:has-text('Verify signature')"
+   },
+   {
+    "waitFor": "app-rs-verify-panel"
+   },
+   {
+    "wait": 2500
+   }
+  ],
+  "clip": "app-side-panel",
+  "pad": 0
+ },
+ {
+  "name": "rcp-b-grid-design",
+  "route": "/reports/templates/01M5WZJ2AY8N1SWZETGKQV64JJ/design",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "text=Components"
+   },
+   {
+    "wait": 1500
+   },
+   {
+    "click": "button[aria-label^='Test data']"
+   },
+   {
+    "waitFor": "text=No test data"
+   },
+   {
+    "click": "button:has-text('No test data')"
+   },
+   {
+    "wait": 1200
+   },
+   {
+    "click": "button:has-text('Layers') >> nth=0"
+   },
+   {
+    "wait": 500
+   },
+   {
+    "click": "button.rsd-layer:has-text('Imaging and wound photos')"
+   },
+   {
+    "wait": 1200
+   }
+  ]
+ },
+ {
+  "name": "rcp-b-nightly-schedule",
+  "route": "/pipelines/schedules/new?taskDetailId=1113",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "#jobName"
+   },
+   {
+    "fill": [
+     "#jobName",
+     "ADT feed (nightly and inbox)"
+    ]
+   },
+   {
+    "click": "[data-frequency=Daily]"
+   },
+   {
+    "wait": 400
+   },
+   {
+    "select": [
+     "#startTime",
+     "02"
+    ]
+   },
+   {
+    "select": [
+     "select[aria-label='Start time, minute']",
+     "00"
+    ]
+   },
+   {
+    "click": "#onArrival"
+   },
+   {
+    "fill": [
+     "#filePattern",
+     "adt-*.csv"
+    ]
+   },
+   {
+    "wait": 1500
+   }
+  ],
+  "thumb": true
+ },
+ {
+  "name": "rcp-b-read-s3",
+  "route": "/pipelines/1113/edit?tab=steps",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": ".step-card[data-step=new]"
+   },
+   {
+    "click": ".step-card[data-step=new] .step-open"
+   },
+   {
+    "waitFor": "app-side-panel"
+   },
+   {
+    "wait": 1000
+   }
+  ]
+ },
+ {
+  "name": "rcp-b-form-settings",
+  "route": "/forms/builder",
+  "as": "summit.admin",
+  "viewport": [
+   1920,
+   1400
+  ],
+  "steps": [
+   {
+    "click": "tr:has-text(\"Nurse triage\") button[aria-haspopup] >> nth=0"
+   },
+   {
+    "click": "[cdkmenuitem]:has-text(\"Edit\")"
+   },
+   {
+    "waitFor": "[data-form-editor]"
+   },
+   {
+    "click": "[data-tab=settings]"
+   },
+   {
+    "wait": 1000
+   }
+  ]
+ },
+ {
+  "name": "rcp-b-triage-step",
+  "route": "/pipelines/1102/edit?tab=steps",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": ".step-card[data-step=tell]"
+   },
+   {
+    "click": ".step-card[data-step=tell] .step-open"
+   },
+   {
+    "waitFor": "app-side-panel"
+   },
+   {
+    "wait": 1000
+   }
+  ]
+ },
+ {
+  "name": "rcp-b-backfill",
+  "route": "/pipelines/schedules",
+  "as": "summit.admin",
+  "viewport": [
+   1920,
+   1200
+  ],
+  "steps": [
+   {
+    "waitFor": "input[aria-label='Search schedules']"
+   },
+   {
+    "fill": [
+     "input[aria-label='Search schedules']",
+     "Consent forms by date"
+    ]
+   },
+   {
+    "wait": 800
+   },
+   {
+    "click": "button[aria-label='Actions for Consent forms by date range']"
+   },
+   {
+    "waitFor": "[data-test=backfill]"
+   },
+   {
+    "wait": 600
+   },
+   {
+    "click": "[data-test=backfill]"
+   },
+   {
+    "waitFor": "[data-test=backfill-preview]"
+   },
+   {
+    "wait": 1500
+   }
+  ],
+  "clip": "app-side-panel",
+  "pad": 0,
+  "retake": "Summit Valley: shown on Consent forms by date range, the only active schedule with a backfill to preview; retake on Denials by month once it is active and has billed runs, so the estimate shows an amount"
+ },
+ {
+  "name": "rcp-b-backfills",
+  "route": "/runs/backfills",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "[data-test=backfills-list]"
+   },
+   {
+    "wait": 800
+   }
+  ]
+ },
+ {
+  "name": "rcp-b-teams",
+  "route": "/administration/teams",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "click": "tr:has-text('Summit Valley: Senior physicians') >> nth=0"
+   },
+   {
+    "waitFor": "[data-testid=team-detail]"
+   },
+   {
+    "wait": 1000
+   }
+  ],
+  "retake": "Summit Valley: no team has a lead yet (every team shows No lead); retake once Dr. Okafor leads Senior physicians"
+ },
+ {
+  "name": "rcp-b-review-settings",
+  "route": "/pipelines/1105/edit?tab=settings",
+  "as": "summit.admin",
+  "viewport": [
+   1920,
+   2400
+  ],
+  "steps": [
+   {
+    "waitFor": "#pipeline-review"
+   },
+   {
+    "wait": 600
+   }
+  ],
+  "clip": "#pipeline-review",
+  "pad": 12
+ },
+ {
+  "name": "rcp-b-approval-step",
+  "route": "/workflows/designer?key=patient-journey",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "g[data-node][data-id=doctor]"
+   },
+   {
+    "click": "g[data-node][data-id=doctor]"
+   },
+   {
+    "wait": 1200
+   }
+  ]
+ },
+ {
+  "name": "rcp-b-condition",
+  "route": "/workflows/designer?key=patient-journey",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "g[data-node][data-id=high-risk]"
+   },
+   {
+    "click": "g[data-node][data-id=high-risk]"
+   },
+   {
+    "wait": 1200
+   }
+  ],
+  "thumb": true
+ },
+ {
+  "name": "rcp-b-on-behalf",
+  "route": "/review/requests?id=2051",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "text=History"
+   },
+   {
+    "wait": 2000
+   }
+  ]
+ },
+ {
+  "name": "rcp-x-mpi-steps",
+  "route": "/pipelines/1142/edit?tab=steps",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": ".step-card"
+   },
+   {
+    "wait": 900
+   }
+  ],
+  "clip": "div.card:has(.step-card)",
+  "pad": 8
+ },
+ {
+  "name": "rcp-x-mpi-run",
+  "route": "/pipelines/schedules/1142/runs/1879",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "app-run-steps-table"
+   },
+   {
+    "wait": 900
+   }
+  ],
+  "clip": "app-run-steps-table",
+  "pad": 8,
+  "thumb": true
+ },
+ {
+  "name": "rcp-x-er-pdf-panel",
+  "route": "/pipelines/1116/edit?tab=steps",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": ".step-card[data-step=pdf]"
+   },
+   {
+    "click": ".step-card[data-step=pdf] .step-open"
+   },
+   {
+    "waitFor": "app-side-panel"
+   },
+   {
+    "wait": 1200
+   }
+  ],
+  "clip": "app-side-panel",
+  "pad": 0,
+  "viewport": [
+   1920,
+   1600
+  ]
+ },
+ {
+  "name": "rcp-x-er-run",
+  "route": "/pipelines/schedules/1116/runs/1876",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "app-run-steps-table"
+   },
+   {
+    "wait": 900
+   }
+  ],
+  "clip": "app-run-steps-table",
+  "pad": 8
+ },
+ {
+  "name": "rcp-x-referral-duplicate",
+  "route": "/documents/intake/upload",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "app-table-shell[data-test=intake] tbody tr"
+   },
+   {
+    "wait": 900
+   }
+  ],
+  "clip": "app-table-shell[data-test=intake]",
+  "pad": 8
+ },
+ {
+  "name": "rcp-x-wound-items",
+  "route": "/pipelines/schedules/1208/runs/1969?tab=items",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "text=wound-photo-dark.jpg"
+   },
+   {
+    "wait": 1200
+   }
+  ]
+ },
+ {
+  "name": "rcp-x-claims-steps",
+  "route": "/pipelines/1230/edit?tab=steps",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": ".step-card"
+   },
+   {
+    "wait": 900
+   }
+  ],
+  "clip": "div.card:has(.step-card)",
+  "pad": 8
+ },
+ {
+  "name": "rcp-x-claims-run",
+  "route": "/pipelines/schedules/1230/runs/1962",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "app-run-steps-table"
+   },
+   {
+    "wait": 900
+   }
+  ],
+  "clip": "app-run-steps-table",
+  "pad": 8
+ },
+ {
+  "name": "rcp-x-recon-steps",
+  "route": "/pipelines/1235/edit?tab=steps",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": ".step-card"
+   },
+   {
+    "wait": 900
+   }
+  ],
+  "clip": "div.card:has(.step-card)",
+  "pad": 8,
+  "viewport": [
+   1920,
+   1600
+  ]
+ },
+ {
+  "name": "rcp-x-recon-join",
+  "route": "/pipelines/1235/edit?tab=steps",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": ".step-card[data-step=joined]"
+   },
+   {
+    "click": ".step-card[data-step=joined] .step-open"
+   },
+   {
+    "waitFor": "app-side-panel"
+   },
+   {
+    "wait": 1200
+   }
+  ],
+  "clip": "app-side-panel",
+  "pad": 0,
+  "viewport": [
+   1920,
+   1200
+  ]
+ },
+ {
+  "name": "rcp-x-cab-run",
+  "route": "/pipelines/schedules/1276/runs/1915",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "app-run-steps-table"
+   },
+   {
+    "wait": 900
+   }
+  ],
+  "clip": "app-run-steps-table",
+  "pad": 8
+ },
+ {
+  "name": "rcp-x-weight-run",
+  "route": "/pipelines/schedules/1304/runs/1902",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "app-run-steps-table"
+   },
+   {
+    "wait": 900
+   }
+  ],
+  "clip": "app-run-steps-table",
+  "pad": 8
+ },
+ {
+  "name": "rcp-x-cohort-steps",
+  "route": "/pipelines/1348/edit?tab=steps",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": ".step-card"
+   },
+   {
+    "wait": 900
+   }
+  ],
+  "clip": "div.card:has(.step-card)",
+  "pad": 8
+ },
+ {
+  "name": "rcp-x-cohort-run",
+  "route": "/pipelines/schedules/1348/runs/1907",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "app-run-steps-table"
+   },
+   {
+    "wait": 900
+   }
+  ],
+  "clip": "app-run-steps-table",
+  "pad": 8
+ },
+ {
+  "name": "rcp-x-partner-steps",
+  "route": "/pipelines/1351/edit?tab=steps",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": ".step-card"
+   },
+   {
+    "wait": 900
+   }
+  ],
+  "clip": "div.card:has(.step-card)",
+  "pad": 8
+ },
+ {
+  "name": "rcp-x-partner-run",
+  "route": "/pipelines/schedules/1351/runs/1963",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "app-run-steps-table"
+   },
+   {
+    "wait": 900
+   }
+  ],
+  "clip": "app-run-steps-table",
+  "pad": 8
+ },
+ {
+  "name": "rcp-x-budget-steps",
+  "route": "/pipelines/1362/edit?tab=steps",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": ".step-card"
+   },
+   {
+    "wait": 900
+   }
+  ],
+  "clip": "div.card:has(.step-card)",
+  "pad": 8
+ },
+ {
+  "name": "rcp-x-budget-run",
+  "route": "/pipelines/schedules/1362/runs/1889",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "app-run-steps-table"
+   },
+   {
+    "wait": 900
+   }
+  ],
+  "clip": "app-run-steps-table",
+  "pad": 8
+ },
+ {
+  "name": "rcp-x-orders-run",
+  "route": "/pipelines/schedules/1401/runs/1923",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "app-run-steps-table"
+   },
+   {
+    "wait": 900
+   }
+  ],
+  "clip": "app-run-steps-table",
+  "pad": 8
+ },
+ {
+  "name": "rcp-x-orders-split",
+  "route": "/pipelines/1401/edit?tab=steps",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": ".step-card[data-step=skus]"
+   },
+   {
+    "click": ".step-card[data-step=skus] .step-open"
+   },
+   {
+    "waitFor": "app-side-panel"
+   },
+   {
+    "wait": 1200
+   }
+  ],
+  "clip": "app-side-panel",
+  "pad": 0,
+  "viewport": [
+   1920,
+   1200
+  ]
+ },
+ {
+  "name": "rcp-x-311-run",
+  "route": "/pipelines/schedules/1417/runs/1895",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "app-run-steps-table"
+   },
+   {
+    "wait": 900
+   }
+  ],
+  "clip": "app-run-steps-table",
+  "pad": 8
+ },
+ {
+  "name": "rcp-x-creds-run",
+  "route": "/pipelines/schedules/1435/runs/1897",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "app-run-steps-table"
+   },
+   {
+    "wait": 900
+   }
+  ],
+  "clip": "app-run-steps-table",
+  "pad": 8
+ },
+ {
+  "name": "rcp-x-chain-run",
+  "route": "/pipelines/schedules/1275/runs/1919",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "app-run-steps-table"
+   },
+   {
+    "wait": 900
+   }
+  ],
+  "clip": "app-run-steps-table",
+  "pad": 8
+ },
+ {
+  "name": "rcp-x-run-pipeline-add",
+  "route": "/pipelines/1142/edit?tab=steps",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": ".step-card"
+   },
+   {
+    "fill": [
+     "#addStep",
+     "run pipeline"
+    ]
+   },
+   {
+    "wait": 1200
+   }
+  ],
+  "keepFocus": true,
+  "clip": "div.card:has(.step-card)",
+  "pad": 8
+ },
+ {
+  "name": "rcp-x-run-and-wait-guide",
+  "route": "/developers/portal",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "text=Run and wait"
+   },
+   {
+    "click": "a:has-text('Run and wait'), button:has-text('Run and wait')"
+   },
+   {
+    "wait": 1500
+   }
+  ]
+ },
+ {
+  "name": "rcp-j-referral-run",
+  "route": "/pipelines/schedules/1099/runs/2034",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "app-run-steps-table"
+   },
+   {
+    "wait": 1200
+   }
+  ],
+  "caption": "Journey 1's run: the approved referral read, checked, shaped, kept, and the admission announced",
+  "thumb": true
+ },
+ {
+  "name": "rcp-j-wf-registered",
+  "route": "/workflows/designer?key=patient-journey",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "g[data-node][data-id=eligible]"
+   },
+   {
+    "click": "g[data-node][data-id=eligible]"
+   },
+   {
+    "wait": 1200
+   }
+  ],
+  "caption": "The Patient journey workflow, its condition Registered? selected"
+ },
+ {
+  "name": "rcp-j-registration-steps",
+  "route": "/pipelines/1101/edit?tab=steps",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": ".step-card"
+   },
+   {
+    "wait": 1000
+   }
+  ],
+  "caption": "Journey 4's steps: the referral, the cohort record, the payer call, the roster and the FHIR record"
+ },
+ {
+  "name": "rcp-j-wound-flow",
+  "route": "/pipelines/1104/edit?tab=steps",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": ".step-card"
+   },
+   {
+    "click": "[data-test=steps-layout] button:has-text('Flow')"
+   },
+   {
+    "waitFor": "[data-test=flow-stages]"
+   },
+   {
+    "wait": 1500
+   }
+  ],
+  "caption": "Journey 7 in the Flow view"
+ },
+ {
+  "name": "rcp-j-careplan-ai",
+  "route": "/pipelines/schedules/1106/runs/2052?tab=ai",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "text=Care plan (DRAFT)"
+   },
+   {
+    "click": "text=Care plan (DRAFT)"
+   },
+   {
+    "wait": 1500
+   }
+  ],
+  "caption": "Journey 9's AI answers: the Care plan (DRAFT) call"
+ },
+ {
+  "name": "rcp-j-wf-doctor",
+  "route": "/workflows/designer?key=patient-journey",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "g[data-node][data-id=doctor]"
+   },
+   {
+    "click": "g[data-node][data-id=doctor]"
+   },
+   {
+    "wait": 1200
+   }
+  ],
+  "caption": "The attending physician's approval step and its deadline, reminder and escalation"
+ },
+ {
+  "name": "rcp-j-packet-run",
+  "route": "/pipelines/schedules/1110/runs/2055",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "app-run-steps-table"
+   },
+   {
+    "wait": 1200
+   }
+  ],
+  "caption": "Journey 13's run: the report from the published template, the follow-up booked and sent"
+ },
+ {
+  "name": "rcp-j-cohort-run",
+  "route": "/pipelines/schedules/1112/runs/2073",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "app-run-steps-table"
+   },
+   {
+    "wait": 1200
+   }
+  ],
+  "caption": "Journey 15's run: 35 steps from the stage files and runs to the two dashboard files",
+  "retake": "Summit Valley: after the cohort replay (job 16), so the feed covers ten patients"
+ },
+ {
+  "name": "rcp-ai-denials-steps",
+  "route": "/pipelines/1233/edit?tab=steps",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "button:has-text('Validate')"
+   },
+   {
+    "wait": 2500
+   }
+  ],
+  "caption": "Denials: reasons classified and routed, its six steps",
+  "retake": "Summit Valley: a completed run of Denials: reasons classified and routed (job 143, not run yet), its AI answers tab",
+  "thumb": true
+ },
+ {
+  "name": "rcp-ai-ocr-steps",
+  "route": "/pipelines/1161/edit?tab=steps",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "button:has-text('Validate')"
+   },
+   {
+    "wait": 2500
+   }
+  ],
+  "caption": "Faxed referrals: split pages and read them, its four steps",
+  "retake": "Summit Valley: a run of the fax pipeline (job 67, not run yet), its Items tab with a page to check by hand"
+ },
+ {
+  "name": "rcp-ai-call-steps",
+  "route": "/pipelines/1295/edit?tab=steps",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "button:has-text('Validate')"
+   },
+   {
+    "wait": 2500
+   }
+  ],
+  "caption": "Care-call insight, one report per call, its six steps",
+  "retake": "Summit Valley: a run of the care-call pipeline (job 209, not run yet), its AI answers and the reports"
+ },
+ {
+  "name": "intake-rcp-assess",
+  "route": "/pipelines/1475/edit?tab=steps",
+  "as": "riverside.admin",
+  "viewport": [
+   1920,
+   1500
+  ],
+  "steps": [
+   {
+    "waitFor": "text=Counts and the priority row for the report"
+   },
+   {
+    "wait": 1200
+   }
+  ],
+  "thumb": true
+ },
+ {
+  "name": "intake-rcp-doc-type",
+  "route": "/documents/types",
+  "as": "riverside.admin",
+  "viewport": [
+   1920,
+   1300
+  ],
+  "steps": [
+   {
+    "click": "button:text-is(\"Patient intake · New patient intake form\")"
+   },
+   {
+    "waitFor": "#typeName"
+   },
+   {
+    "wait": 1200
+   }
+  ]
+ },
+ {
+  "name": "intake-rcp-prompt",
+  "route": "/pipelines/prompts/1069/edit",
+  "as": "riverside.admin",
+  "viewport": [
+   1920,
+   1400
+  ],
+  "steps": [
+   {
+    "waitFor": "text=System instructions"
+   },
+   {
+    "wait": 1200
+   }
+  ]
+ },
+ {
+  "name": "intake-rcp-from-documents",
+  "route": "/pipelines/1477/edit?tab=steps",
+  "as": "riverside.admin",
+  "viewport": [
+   1920,
+   1100
+  ],
+  "steps": [
+   {
+    "waitFor": "text=A nurse reviews the summaries and flags"
+   },
+   {
+    "wait": 1200
+   }
+  ]
+ },
+ {
+  "name": "intake-rcp-report",
+  "route": "/reports/templates/01M5XMD8P95MN94QBMXEB65KJR/design",
+  "as": "riverside.admin",
+  "viewport": [
+   1920,
+   1300
+  ],
+  "steps": [
+   {
+    "waitFor": "text=Why this priority"
+   },
+   {
+    "wait": 2500
+   }
+  ],
+  "retake": "Riverside: a signed Patient intake · S-<n> from a real intake once the workflow has run (this is the template with its test sample)"
+ }
+]

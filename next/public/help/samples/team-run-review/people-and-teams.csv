@@ -1,0 +1,6 @@
+name,email (fictional),role,teams (lead first)
+Dr. Anika Patel,anika.patel@summit-valley.example,Workspace member,Physicians (lead)
+Dr. Minh Nguyen,minh.nguyen@summit-valley.example,Workspace member,Physicians
+Dr. Chidi Okafor,chidi.okafor@summit-valley.example,Workspace member,Physicians; Senior physicians (lead)
+Dr. Lena Schmidt,lena.schmidt@summit-valley.example,Workspace member,Radiology (lead)
+Jordan Reyes,jordan.reyes@summit-valley.example,Workspace administrator,—
