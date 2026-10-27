@@ -1,0 +1,209 @@
+[
+ {
+  "name": "adm-users",
+  "route": "/administration/users",
+  "as": "summit.admin"
+ },
+ {
+  "name": "adm-new-user",
+  "route": "/administration/users",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "click": "app-page-header button:has-text('New user')"
+   },
+   {
+    "waitFor": "#fullName"
+   },
+   {
+    "wait": 500
+   }
+  ],
+  "clip": ".cdk-overlay-pane",
+  "pad": 0,
+  "thumb": true
+ },
+ {
+  "name": "adm-user-access",
+  "route": "/administration/users/1042",
+  "as": "summit.admin",
+  "settle": 1500,
+  "clip": "#ue-access",
+  "pad": 8
+ },
+ {
+  "name": "adm-user-security",
+  "route": "/administration/users/1042",
+  "as": "summit.admin",
+  "settle": 1500,
+  "clip": "#ue-security",
+  "pad": 8
+ },
+ {
+  "name": "adm-user-danger",
+  "route": "/administration/users/1042",
+  "as": "summit.admin",
+  "settle": 1500,
+  "clip": "#ue-danger",
+  "pad": 8
+ },
+ {
+  "name": "adm-access-profiles",
+  "route": "/administration/access-profiles",
+  "as": "summit.admin"
+ },
+ {
+  "name": "adm-profile-editor",
+  "route": "/administration/access-profiles",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "click": "[aria-label='Actions for Clinician']"
+   },
+   {
+    "click": "button:has-text('Edit pages')"
+   },
+   {
+    "waitFor": "[data-testid=profile-pages]"
+   },
+   {
+    "wait": 800
+   }
+  ],
+  "thumb": true
+ },
+ {
+  "name": "adm-grant-tabs",
+  "route": "/administration/access-profiles",
+  "as": "summit.admin",
+  "settle": 1500,
+  "steps": [
+   {
+    "scroll": "[data-testid=access-grants]"
+   },
+   {
+    "click": "[data-testid=grant-person]"
+   },
+   {
+    "wait": 1500
+   },
+   {
+    "press": "Escape"
+   },
+   {
+    "select": [
+     "[data-testid=grant-person]",
+     {
+      "label": "Dr. Anika Patel"
+     }
+    ]
+   },
+   {
+    "waitFor": "[data-testid=grant-tree]"
+   },
+   {
+    "wait": 600
+   },
+   {
+    "scrollTop": true
+   },
+   {
+    "wait": 300
+   }
+  ],
+  "clip": "[data-testid=access-grants]",
+  "pad": 8,
+  "thumb": true
+ },
+ {
+  "name": "adm-delegates",
+  "route": "/administration/access-profiles",
+  "as": "summit.admin",
+  "settle": 1500,
+  "steps": [
+   {
+    "scroll": "[data-testid=access-grants]"
+   },
+   {
+    "click": "[data-testid=view-delegates]"
+   },
+   {
+    "waitFor": "[data-testid=delegate-list]"
+   },
+   {
+    "wait": 800
+   },
+   {
+    "scrollTop": true
+   },
+   {
+    "wait": 300
+   }
+  ],
+  "clip": "[data-testid=access-grants]",
+  "pad": 8
+ },
+ {
+  "name": "adm-changes",
+  "route": "/administration/access-profiles",
+  "as": "summit.admin",
+  "settle": 1500,
+  "steps": [
+   {
+    "scroll": "[data-testid=access-grants]"
+   },
+   {
+    "click": "[data-testid=view-changes]"
+   },
+   {
+    "waitFor": "[data-testid=change-log]"
+   },
+   {
+    "wait": 800
+   },
+   {
+    "scroll": "[data-testid=access-grants] .seg"
+   }
+  ],
+  "retake": "Changes lists team changes as raw codes (TEAM_CREATED, TEAM_MEMBER_ADDED); retake once they read as words"
+ },
+ {
+  "name": "adm-teams",
+  "route": "/administration/teams",
+  "as": "summit.admin",
+  "retake": "Summit Valley: team leads not set yet (every team shows No lead)"
+ },
+ {
+  "name": "adm-team-panel",
+  "route": "/administration/teams",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "click": "tr:has-text('Physicians') >> nth=0"
+   },
+   {
+    "waitFor": "[data-testid=team-detail]"
+   },
+   {
+    "wait": 1000
+   }
+  ],
+  "retake": "Summit Valley: Dr. Patel not yet named lead of Physicians",
+  "thumb": true
+ },
+ {
+  "name": "adm-appearance",
+  "route": "/administration/appearance",
+  "as": "summit.admin",
+  "clip": "[data-test=workspace-theme-card]",
+  "pad": 8,
+  "thumb": true
+ },
+ {
+  "name": "adm-managed-banner",
+  "route": "/pipelines/list",
+  "as": "openData.admin",
+  "clip": "[data-managed-banner]",
+  "pad": 12
+ }
+]
