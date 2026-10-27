@@ -1,0 +1,75 @@
+[
+ {
+  "name": "sec-sign-in-rules",
+  "route": "/administration/security",
+  "as": "summit.admin",
+  "clip": "[data-test=rules-card]",
+  "pad": 8,
+  "thumb": true
+ },
+ {
+  "name": "sec-sso",
+  "route": "/administration/security",
+  "as": "summit.admin",
+  "clip": "[data-test=sso-card]",
+  "pad": 8
+ },
+ {
+  "name": "sec-history",
+  "route": "/administration/security",
+  "as": "summit.admin",
+  "settle": 1500,
+  "clip": "app-sign-in-history",
+  "pad": 8,
+  "thumb": true
+ },
+ {
+  "name": "sec-team-activity",
+  "route": "/administration/team-activity",
+  "as": "summit.admin",
+  "thumb": true
+ },
+ {
+  "name": "sec-data-policies",
+  "route": "/administration/data-policies",
+  "as": "summit.admin",
+  "thumb": true
+ },
+ {
+  "name": "sec-level-rule",
+  "route": "/administration/data-policies",
+  "as": "summit.admin",
+  "clip": "section[aria-labelledby=policy-rule]",
+  "pad": 8
+ },
+ {
+  "name": "sec-review-policy",
+  "route": "/administration/data-policies",
+  "as": "summit.admin",
+  "clip": "[data-review-policy]",
+  "pad": 8
+ },
+ {
+  "name": "sec-retention",
+  "route": "/administration/data-policies",
+  "as": "summit.admin",
+  "settle": 1500,
+  "clip": "[data-retention]",
+  "pad": 8,
+  "thumb": true
+ },
+ {
+  "name": "sec-masked",
+  "route": "/data/catalog?flag=sensitive",
+  "as": "summit.res.ito",
+  "settle": 1500,
+  "steps": [
+   {
+    "click": "table tbody tr >> nth=0"
+   },
+   {
+    "wait": 1500
+   }
+  ]
+ }
+]
