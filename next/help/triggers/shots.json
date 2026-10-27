@@ -1,0 +1,247 @@
+[
+ {
+  "name": "trg-list",
+  "route": "/pipelines/schedules",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "table.table-modern tbody tr"
+   },
+   {
+    "wait": 1000
+   }
+  ]
+ },
+ {
+  "name": "trg-run-with",
+  "route": "/pipelines/schedules",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "input[aria-label='Search schedules']"
+   },
+   {
+    "fill": [
+     "input[aria-label='Search schedules']",
+     "Consent forms by date"
+    ]
+   },
+   {
+    "wait": 800
+   },
+   {
+    "click": "button[aria-label='Actions for Consent forms by date range']"
+   },
+   {
+    "waitFor": "[data-test=run-with]"
+   },
+   {
+    "wait": 600
+   },
+   {
+    "click": "[data-test=run-with]"
+   },
+   {
+    "waitFor": "app-run-parameter-fields"
+   },
+   {
+    "wait": 800
+   }
+  ],
+  "clip": "app-form-dialog",
+  "pad": 8,
+  "thumb": true
+ },
+ {
+  "name": "trg-schedule",
+  "route": "/pipelines/schedules/1114/edit",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "[data-next-runs]"
+   },
+   {
+    "wait": 800
+   }
+  ],
+  "thumb": true
+ },
+ {
+  "name": "trg-cron",
+  "route": "/pipelines/schedules/1114/edit",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "[data-frequency=Cron]"
+   },
+   {
+    "click": "[data-frequency=Cron]"
+   },
+   {
+    "wait": 1200
+   }
+  ],
+  "clip": ".schedule-box",
+  "pad": 12
+ },
+ {
+  "name": "trg-file",
+  "route": "/pipelines/schedules/new?taskDetailId=1295",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "#jobName"
+   },
+   {
+    "fill": [
+     "#jobName",
+     "Care-call insight (hourly and inbox)"
+    ]
+   },
+   {
+    "click": "[data-frequency=Hr]"
+   },
+   {
+    "click": "#onArrival"
+   },
+   {
+    "fill": [
+     "#filePattern",
+     "call-*.m4a"
+    ]
+   },
+   {
+    "wait": 1500
+   }
+  ],
+  "thumb": true
+ },
+ {
+  "name": "trg-document",
+  "route": "/pipelines/schedules/new?taskDetailId=1099&whenApproved=1045",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "[data-document-trigger]"
+   },
+   {
+    "fill": [
+     "#jobName",
+     "Journey 1 \u00b7 Referral to admission"
+    ]
+   },
+   {
+    "click": "[data-execution=Manual]"
+   },
+   {
+    "wait": 1500
+   }
+  ],
+  "thumb": true
+ },
+ {
+  "name": "trg-form",
+  "route": "/forms/builder",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "table tbody tr"
+   },
+   {
+    "wait": 800
+   }
+  ]
+ },
+ {
+  "name": "trg-events",
+  "route": "/developers/api-clients",
+  "as": "summit.admin",
+  "viewport": [
+   1920,
+   2600
+  ],
+  "steps": [
+   {
+    "waitFor": "[data-event-routes]"
+   },
+   {
+    "wait": 800
+   }
+  ],
+  "clip": "app-table-shell:has([data-event-routes])",
+  "pad": 12,
+  "thumb": true
+ },
+ {
+  "name": "trg-workflow",
+  "route": "/workflows/designer",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "click": "text=Patient journey"
+   },
+   {
+    "wait": 2000
+   }
+  ],
+  "retake": "Summit Valley: the workflow list beside Patient journey shows a test workflow (MIG-424 isolation (test)); retake once it is gone"
+ },
+ {
+  "name": "trg-backfill",
+  "route": "/pipelines/schedules",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "input[aria-label='Search schedules']"
+   },
+   {
+    "fill": [
+     "input[aria-label='Search schedules']",
+     "Consent forms by date"
+    ]
+   },
+   {
+    "wait": 800
+   },
+   {
+    "click": "button[aria-label='Actions for Consent forms by date range']"
+   },
+   {
+    "waitFor": "[data-test=run-with]"
+   },
+   {
+    "wait": 600
+   },
+   {
+    "click": "[data-test=backfill]"
+   },
+   {
+    "waitFor": "[data-test=backfill-preview]"
+   },
+   {
+    "wait": 1500
+   }
+  ],
+  "viewport": [
+   1920,
+   1200
+  ],
+  "clip": "app-side-panel",
+  "pad": 0,
+  "retake": "Summit Valley: the cost estimate says no run was billed yet; retake on a schedule with billed runs (Denials by month, once active) to show an amount",
+  "thumb": true
+ },
+ {
+  "name": "trg-backfills",
+  "route": "/runs/backfills",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "[data-test=backfills-list]"
+   },
+   {
+    "wait": 800
+   }
+  ]
+ }
+]
