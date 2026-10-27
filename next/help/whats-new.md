@@ -2,6 +2,7 @@
 
 Newest first. Each line: `- date · [Title](#article) · one sentence`.
 
+- 2026-10-27 · [Approver's signature](#rs-approve--the-approvers-own-signature) · A report shows the signature of whoever approved it, placed at approval with their name, title and time; with none of their own, their typed name and "Signed digitally".
 - 2026-10-27 · [Result formats](#dev-runs--the-result-as-json-pdf-html-or-markdown) · Your systems choose the run's result as JSON, PDF, HTML or Markdown: on the API, run and wait, webhooks and Call API.
 - 2026-10-27 · [Options written as](#doc-types) · A choice field can say how a page writes each option, so a lab printout's H reads as High.
 - 2026-10-27 · [Form file fields in image and audio steps](#step-ai) · Name a form's photo or recording field in the step itself; no hidden _key column needed.

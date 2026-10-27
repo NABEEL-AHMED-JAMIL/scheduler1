@@ -102,6 +102,11 @@
                         <dt>{{ ap.signed ? 'Approved and signed' : 'Approved' }}</dt>
                         <dd>{{ ap.approverName }} · {{ ap.approvedAt | rsTime: 'recent' }}@if (ap.signed) { · <button type="button" class="link-inline" (click)="verifyVersion(v)">check signature</button> }
                           @if (!ap.signed && ap.notSignedReason) { <span class="text-xs text-[color:var(--text-muted)] block">{{ ap.notSignedReason }}</span> }</dd>
+                        @if (ap.signers?.length) {
+                          <dt>Signature on it</dt>
+                          <dd data-test="approval-signers">@for (s of ap.signers!; track s.slot) {
+                            <span class="block">{{ s.name }}@if (s.title) { · {{ s.title }} } · {{ signerWords(s) }}</span> }</dd>
+                        }
                       } @else if (v.review) {
                         <dt>Approval</dt><dd data-test="review-state">{{ reviewWords(v) }}@if (v.review.state === 'OPEN') {
                           <span class="text-xs text-[color:var(--text-muted)] block">Asked by {{ v.review.requestedByName }} · {{ v.review.requestedAt | rsTime: 'recent' }}@if (v.review.inTaskInbox) { · in the reviewers' <a routerLink="/review/approvals" class="link-inline">Review › Approvals</a> }@if (v.review.needsSecond) { · two approvals }</span> }

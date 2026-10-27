@@ -219,6 +219,9 @@
                 </select></label>
             }
             <span class="text-xs text-[color:var(--text-muted)]">Keeps the picture's shape and keeps it with the end of the report. A template without it set up leaves it out.</span>
+            @if (a.kind === 'SIGNATURE') {
+              <span class="text-xs text-[color:var(--text-muted)]" data-test="fixed-signature-note">This places {{ a.ownerName || 'this person' }}'s signature whoever approves the report. For the signature of whoever approves, add <b>Approver's signature</b> in the template designer: it places their own at approval.</span>
+            }
             <div class="flex flex-wrap items-center gap-2">
               <button type="button" class="btn btn-default btn-sm" [disabled]="busy() || !placeTemplate()" (click)="place()"><app-icon name="plus" />Add to the template's draft</button>
               @if (placeTemplate()) { <a class="link-inline text-sm" [routerLink]="['/reports/templates', placeTemplate(), 'design']">Open in the template designer <app-icon name="arrowRight" /></a> }

@@ -40,8 +40,13 @@ the name along the axis) and one or more series fields, and pick the chart type.
 | **Image or logo** | An approved logo or image from Assets & branding; the template pins its version |
 | **Image from data** | The picture a field names (a bucket file or a run's file), read as the person generating, re-encoded to its printed size; when it is missing, a placeholder or nothing |
 | **Image grid** | A picture per item of a list, 1 to 6 to a row, with a caption; rows never split across pages |
-| **Signature** | An approved signature picture, placed only by its owner or with their grant ([Branding and assets](#rs-branding--signatures-and-stamps)) |
+| **Approver's signature** | The signature of whoever approves the version: at approval, that person's own latest approved signature, their name, the title on their signature and the time; with no signature of their own, their typed name and "Signed digitally". **Whose signature** picks the approver or, with two approvals, the second approver; a stamp may stand beside it ([Approve, sign and verify](#rs-approve--the-approvers-own-signature)) |
+| **Signature (fixed person)** | One person's approved signature picture, always theirs whoever approves; placed only by its owner or with their grant ([Branding and assets](#rs-branding--signatures-and-stamps)) |
 | **Stamp** | An approved stamp picture (needs a grant) |
+
+> **Warning:** Beside an approval (a "Reviewed by" or "Approved by", or an approver's signature), use **Approver's
+> signature**, never a fixed person's signature: the checks warn *One person's signature beside an approval*, because
+> when someone else approves, the report would show one person's signature next to another person's approval.
 
 ## Layout
 

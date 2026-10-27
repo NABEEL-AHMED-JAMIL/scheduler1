@@ -46,7 +46,9 @@ const LABELS: Record<string, string> = {
   format: 'Format', style: 'Style', size: 'Size', keepTogether: "Keep together · don't split across pages", pageBreakBefore: 'Start a new page before it',
   pageBreakAfter: 'Start a new page after it', hidden: 'Hidden (not in the report)', sort: 'Sort', size_spacer: 'Space',
   // MIG-406: signatures, stamps, images from the data, the grid.
-  stampRef: 'Stamp beside it', caption: 'Caption', placement: 'Where', imageSource: 'Pictures from', imageField: 'Picture field',
+  stampRef: 'Stamp beside it', caption: 'Caption', placement: 'Where',
+  // MIG-428: whose signature an approver's signature places.
+  approver: 'Whose signature', imageSource: 'Pictures from', imageField: 'Picture field',
   captionField: 'Caption field', captionFields: 'Caption fields (up to 4, joined with ·)', imageHeight: 'Picture height', maxItems: 'At most pictures', columns_grid: 'Pictures a row',
   // QA 2026-10-20 (media 3e1cb7d): row filters, a list's field, the value's size.
   filter: 'Show only rows where', field: 'Show this field of the first row', emphasis: 'Value size',
@@ -72,6 +74,7 @@ const OPTION_WORDS: Record<string, Record<string, string>> = {
   errorCorrection: { L: 'L · 7 %', M: 'M · 15 %', Q: 'Q · 25 %', H: 'H · 30 %' },
   operator: { eq: 'equals', ne: 'is not', lt: 'is below', lte: 'is at most', gt: 'is above', gte: 'is at least', isNull: 'is empty',
     isNotNull: 'is not empty', in: 'is one of', notIn: 'is none of', contains: 'contains', startsWith: 'starts with', endsWith: 'ends with' },
+  approver: { first: 'The approver (the first of two)', second: 'The second approver' },
   aggregate: { sum: 'Sum', avg: 'Average', min: 'Lowest', max: 'Highest', count: 'Count', rows: 'Rows', countDistinct: 'Distinct values',
     percentOfTotal: '% of total' },
 };
@@ -128,7 +131,14 @@ export function fieldsFor(type: string, definitions: Record<string, JsonSchema>)
     else if (key === 'emphasis' && Array.isArray(s.enum)) field = { key, label, kind: 'enum', group, options: s.enum.map(String),
       optionLabels: { kpi: 'Large (KPI)', normal: 'Normal (detail field)' }, defaultLabel: 'Default (large)' };
     else if (key === 'assetRef' || key === 'stampRef') field = { key, label: type === 'signature' && key === 'assetRef' ? 'Signature' : type === 'stamp' && key === 'assetRef' ? 'Stamp' : label,
-      kind: 'asset', group: 'content', hint: key === 'assetRef' && (type === 'signature' || type === 'stamp') ? 'Approved, and yours to place (or granted to you).' : undefined };
+      kind: 'asset', group: 'content', hint: key === 'assetRef' && type === 'signature'
+        ? "Approved, and yours to place (or granted to you). Always this person's, whoever approves: for the approver's own, use Approver's signature."
+        : key === 'assetRef' && type === 'stamp' ? 'Approved, and yours to place (or granted to you).'
+        : key === 'stampRef' && type === 'approverSignature' ? "A workspace stamp beside the approver's signature (yours to place, or granted)." : undefined };
+    // MIG-428: whose own signature the approval places -- never a picture chosen here.
+    else if (key === 'approver' && Array.isArray(s.enum)) field = { key, label, kind: 'enum', group, options: s.enum.map(String),
+      optionLabels: OPTION_WORDS[key], defaultLabel: 'Default (the approver)',
+      hint: "At approval: that person's own latest approved signature, name, role and time; with none, their typed name and \"Signed digitally\"." };
     else if (key === 'imageSource') field = { key, label, kind: 'imageSource', group: 'data' };
     else if (key === 'binding' && type === 'imageGrid') field = { key, label: 'List', kind: 'listBinding', group: 'data' };
     else if (key === 'imageField' || key === 'captionField') field = { key, label, kind: 'itemField', group: 'data' };

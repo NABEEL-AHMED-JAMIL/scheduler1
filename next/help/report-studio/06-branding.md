@@ -35,6 +35,10 @@ PDF when its owner approves a report: it records who approved and when, and any 
 
 ![A signature's page](rs-asset-signature "A signature's page: its approved version, where it is used, who may place it, and its digital signature")
 
+5. On a template with an **Approver's signature**, nobody places it at all: when its person approves a report, their
+   latest approved signature is placed there with their name and its **Title**, and nobody else's ever is
+   ([The approver's own signature](#rs-approve--the-approvers-own-signature)).
+
 > **Warning:** A signature picture is not a signature. Only an approval signs the PDF. Never let the picture stand for
 > an approval that did not happen.
 

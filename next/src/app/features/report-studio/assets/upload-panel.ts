@@ -48,7 +48,8 @@ const SVG_SIDE = 2048;
                 @for (p of people(); track p.userId) { <option [ngValue]="p.userId">{{ p.name }}</option> }
               </select>
               <span class="field-note">Only this person — or someone they grant it to — places the signature on a template. When they
-                approve a report, its PDF is digitally signed in their name.</span></label>
+                approve a report, its PDF is digitally signed in their name, and an Approver's signature on it shows this picture with their
+                name and the title below.</span></label>
             <label class="field"><span class="label">Title · optional</span>
               <input class="input" maxlength="120" [ngModel]="title()" (ngModelChange)="title.set($event)" aria-label="Title" placeholder="Quality lead" /></label>
           }

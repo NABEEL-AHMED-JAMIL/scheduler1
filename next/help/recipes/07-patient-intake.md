@@ -50,8 +50,9 @@ Two roads lead to the same summary:
 - A **model connection** with a text model (Riverside: *Local Ollama*, `qwen3:8b`). See [Models](#ai-models).
 - A **team** of the nurses who review intakes (Riverside: *Reviewer*), and at least one workspace administrator who is
   the senior nurse. See [Teams](#adm-teams).
-- A **brand profile** with your logo, the reviewing nurse's signature and your approval stamp, with **Digitally sign
-  PDFs when approved** ticked. See [Branding](#rs-branding).
+- A **brand profile** with your logo and your approval stamp, with **Digitally sign PDFs when approved** ticked, and
+  each nurse's own signature in **Assets & branding** (it **Belongs to** her, with her **Title**). See
+  [Branding](#rs-branding).
 - The sample files (synthetic, fictional patients):
   - [intake-answers-sample.json](/help/samples/patient-intake/intake-answers-sample.json): Ingrid Castellanos, 78, on
     warfarin after a fall: an adult intake as the form keeps it (expected priority high).
@@ -174,7 +175,7 @@ together, so no part is split across two pages.
 | Insurance | Payer, **member IDs masked to their last 4**, group, policy holder, secondary insurance |
 | Missing information to ask | The AI's list, what the rules found missing, and the checks that failed |
 | Consents | The three consents, who signed and when |
-| Nurse's review | Reviewed by, when, the nurse's note, the senior nurse (or *Not needed*); the signature with the stamp; a QR code *Scan to verify this report* |
+| Nurse's review | Reviewed by, when, the nurse's note, the senior nurse (or *Not needed*); an **Approver's signature** (the approving nurse's own, placed at approval) with the stamp; a QR code *Scan to verify this report* |
 
 Test it with `intake-summary-sample.json`, keep it as a test sample, and **Publish**.
 
@@ -445,7 +446,8 @@ SELECT round(avg(CASE WHEN triage_priority = 'high' THEN 100.0 ELSE 0 END), 1) A
 3. The nurse approves with a note. Because the priority is high, an administrator gets the senior nurse's approval.
 4. After both, **Reports › Library** has **Patient intake · S-<number>**. Approved with **Approve and sign**, it reads
    **Signed**; **Verify signature** says it holds. The PDF shows the phone and member ID masked to their last 4 digits,
-   the reviewing nurse's name and time under the summary, and the QR code.
+   the reviewing nurse's name and time under the summary, the approving nurse's own signature, name and title, and the
+   QR code.
 5. Fill the child sample: the guardian section appears when **Is the patient under 18?** is **Yes** and its fields are
    required; **Women's health** stays hidden for a male patient.
 6. Reject one intake with a reason: the request ends rejected, and no report is made for it.

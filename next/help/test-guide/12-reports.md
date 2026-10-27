@@ -1,7 +1,7 @@
 ---
 id: qa-reports
 title: "Test area 12: Report Studio"
-summary: Templates and publishing, creating a report and its versions, approving and signing, verifying a signature, COPY and VOID, the page limit, reports from a pipeline, and who may do what.
+summary: Templates and publishing, creating a report and its versions, approving and signing, the approver's own signature, verifying a signature, COPY and VOID, the page limit, reports from a pipeline, and who may do what.
 section: Results
 who: Testers; A designs and generates, A2 and R approve, with V and X for access and isolation
 where: Reports › Overview (/reports/overview); Reports › Templates (/reports/templates); Reports › Library (/reports/library); Reports › Settings (/reports/settings)
@@ -57,6 +57,15 @@ Tested by ______ on ______
 | QA-12.23 | Settings are the administrators' | As R, go to `/reports/settings` | Refused | ☐ Pass ☐ Fail |
 | QA-12.24 | A viewer has no Report Studio | As V, go to `/reports/library` | Refused (unless V's profile includes Reports) | ☐ Pass ☐ Fail |
 | QA-12.25 | Another workspace cannot open the report | As A, copy the report's address; as X, open it | The report does not open for X; nothing of it is shown (not yet verified) | ☐ Pass ☐ Fail |
+
+## The approver's own signature
+| # | Check | Steps | Expected | Pass / Fail |
+|---|---|---|---|---|
+| QA-12.26 | The template waits for the approver | As A, in a draft of `QA summary`, add **Approver's signature** from **Approval**; publish; generate **v1** | The designer's box reads **Approver's signature**; v1's PDF shows an empty dashed box, **Awaiting approval**, where it goes | ☐ Pass ☐ Fail |
+| QA-12.27 | Each approver's own signature | Make sure A2 and R each have an approved signature in **Assets & branding** that **Belongs to** them, with a **Title**; generate two reports from `QA summary`; A2 approves one, R the other | Each PDF shows its approver's own signature, name, title and the time of approval, never the other's; the report's page lists them under **Signature on it** | ☐ Pass ☐ Fail |
+| QA-12.28 | No signature of their own | An approver with no approved signature (or retire theirs first) approves a new version | The PDF shows their typed name and **SIGNED DIGITALLY**, no picture; **Signature on it** says *typed name, signed digitally* | ☐ Pass ☐ Fail |
+| QA-12.29 | The check warns about a fixed signature | In a draft, put a **Signature (fixed person)** in the same section as a **Label and value** labelled `Reviewed by` | The checks warn *One person's signature beside an approval* on that signature and name **Approver's signature**; it is a warning, publishing still works | ☐ Pass ☐ Fail |
+| QA-12.30 | An approved version stays as approved | After QA-12.27, upload a new version of A2's signature and approve it; download the version A2 approved earlier | The earlier PDF is unchanged (Verify signature still holds) and shows the old signature; A2's next approval shows the new one | ☐ Pass ☐ Fail |
 
 ## Example
 At Summit Valley the Summit Valley admin generates Elena Marsh's discharge summary; the page tells him *You generated it;

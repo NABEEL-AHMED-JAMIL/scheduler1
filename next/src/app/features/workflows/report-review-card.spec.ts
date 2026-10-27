@@ -74,6 +74,21 @@ describe('Report review card (Report Studio phase 7)', () => {
     expect(decided).toEqual(['RPT-0011 v3 approved and its PDF signed.']);
   });
 
+  it("MIG-428: says what the approver's signature will show -- your own, or your typed name", async () => {
+    const own = mount(card({ yourSignature: { own: true, assetId: 'A1', assetLabel: 'AST-004', name: 'Alex Morgan signature', title: 'Registered nurse', version: 2 } }));
+    await own.fixture.whenStable();
+    own.fixture.detectChanges();
+    expect(own.el.querySelector('[data-test="review-your-signature"]')!.textContent).toContain('Your own signature “Alex Morgan signature” (v2), your name, Registered nurse and the time');
+    const typed = mount(card({ yourSignature: { own: false } }));
+    await typed.fixture.whenStable();
+    typed.fixture.detectChanges();
+    expect(typed.el.querySelector('[data-test="review-your-signature"]')!.textContent).toContain('Your typed name and “Signed digitally”');
+    const none = mount(card());
+    await none.fixture.whenStable();
+    none.fixture.detectChanges();
+    expect(none.el.querySelector('[data-test="review-your-signature"]')).toBeNull();
+  });
+
   it('says the first of two approvals, and a rejection needs its reason', async () => {
     const { fixture, api, refused, el } = mount(card({ stage: 'FIRST', secondApprover: true }));
     await fixture.whenStable();

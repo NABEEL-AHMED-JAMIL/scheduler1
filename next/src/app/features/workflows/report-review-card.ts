@@ -99,6 +99,10 @@ export const CARD_PAGES = 4;
               }
               <div><dt>Warnings when made</dt><dd>{{ c.problems }}</dd></div>
               <div><dt>Signature</dt><dd>{{ c.signing.configured ? 'Signed in your name when you approve' : 'Recorded unsigned: no signing certificate' }}</dd></div>
+              @if (c.yourSignature; as y) {
+                <div data-test="review-your-signature"><dt>On the page</dt><dd>@if (y.own) { Your own signature “{{ y.name }}” (v{{ y.version }}), your name@if (y.title) {, {{ y.title }}} and the time }
+                  @else { Your typed name and “Signed digitally”: you have no approved signature of your own }</dd></div>
+              }
             </dl>
             @if (c.mayApprove && !done()) {
               <div class="rvc-decide" data-test="review-decide">

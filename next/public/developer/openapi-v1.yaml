@@ -447,7 +447,9 @@ paths:
         application/pdf, text/html, text/markdown; a wildcard is json); json when neither says, and any other format is a
         400 (`unsupported-format`) naming the allowed ones. pdf, html and md are the run's report (its Generate report step):
         its PDF -- the signed one once approved and signed --, its HTML, or Markdown made from that HTML (headings, tables and
-        lists; pictures, signatures, charts and the QR code as links to the PDF), whose first line names it ("From signed
+        lists; pictures, signatures, charts and the QR code as links to the PDF). A report whose template has an approver's
+        signature shows, once approved, the approving person's own signature (or their typed name, "Signed digitally"),
+        name, title and time in all three; before that, "Awaiting approval". Markdown's first line names it ("From signed
         report RPT-0093 version 1") -- Markdown is never signed: the PDF is the record. A run that made several reports (one
         per row) names one with `report` (else 409 `several-reports`, listing them in `reports`). Without a report, html and
         md are the result rows above as a table (masked the same way), and pdf is a 404 (`no-report`). A pipeline marked

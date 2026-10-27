@@ -18,7 +18,7 @@ import { AuthService } from '../../core/auth/auth.service';
 import { ReportStudioApi, studioError } from './report-studio.api';
 import { ProblemList } from './problem-list';
 import {
-  JobRow, OutputRow, REPORT_DELETE_WORDS, REPORT_KEPT_WORDS, ReportDetail, ReportVersionRow, VersionRow, bundleParts, chipWord, deletedWords, idempotencyKey,
+  ApprovalSigner, JobRow, OutputRow, REPORT_DELETE_WORDS, REPORT_KEPT_WORDS, ReportDetail, ReportVersionRow, VersionRow, bundleParts, chipWord, deletedWords, idempotencyKey,
   isRunning, pageLimitOf, recordsWord, size, stageWord,
   openableOutputs,
 } from './report-studio.model';
@@ -232,6 +232,13 @@ export class ReportPage implements OnInit {
       next: () => { this.asking.set(false); this.toast.success(`v${v.version} waits for approval in the reviewers' Review › Approvals.`); this.load(); },
       error: e => { this.asking.set(false); this.toast.error(studioError(e).message); },
     });
+  }
+
+  /** MIG-428: how the approver's signature on the PDF was made: their own signature picture, or their typed name. */
+  signerWords(s: ApprovalSigner): string {
+    const who = s.slot === 2 ? 'second approver' : 'approver';
+    return s.signature === 'ASSET' ? `${who}'s own signature${s.assetVersion ? ' (v' + s.assetVersion + ')' : ''}`
+      : `${who}'s typed name, signed digitally (no signature of their own)`;
   }
 
   /** The review's state in words, for the version's details. */

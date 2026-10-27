@@ -77,6 +77,8 @@ const TITLES: Record<string, string> = {
   ASSET_NOT_FOUND: 'A picture is missing', IMAGE_UNREADABLE: 'A picture could not be read', UNSUPPORTED_COMPONENT: 'A block is not supported yet',
   CONTENT_IGNORED: 'Some content is left out', CHART_FIELD_TYPE_INVALID: 'A chart field has the wrong type', EXPRESSION_INVALID: 'A formula is not valid',
   TEMPLATE_INVALID: 'The template has a problem', SNAPSHOT_TOO_LARGE: 'The data is too large', LIMIT_EXCEEDED: 'Over a limit',
+  // MIG-428: a fixed person's signature next to an approval.
+  FIXED_SIGNATURE_NEAR_APPROVAL: "One person's signature beside an approval",
 };
 
 /** A problem's title, as the drawing heads each box ("Required field missing: quality.readmission_target"). */

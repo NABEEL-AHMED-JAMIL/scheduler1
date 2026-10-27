@@ -99,6 +99,11 @@ Tested by ______ on ______
 | QA-19.44 | Viewer sees nothing | As V open the form, Submissions, the runs of *Patient intake · assess*, Documents and the Library | Each is refused or empty of intakes | ☐ Pass ☐ Fail |
 | QA-19.45 | Another workspace | As X open the form's fill address, the workflow, the template, the document type and a report's address copied from Riverside | Each is not found or refused; nothing of Riverside's shows | ☐ Pass ☐ Fail |
 
+## The approving nurse's signature
+| # | Check | Steps | Expected | Pass / Fail |
+|---|---|---|---|---|
+| QA-19.46 | The approving nurse's own signature | Approve one summary as R and another as a second nurse who can approve | Each signed PDF's *Nurse's review* shows the signature, name and title of the nurse who approved it, never the other's (a nurse with no signature of her own: her typed name and **SIGNED DIGITALLY**) | ☐ Pass ☐ Fail |
+
 ## Example
 At Riverside Health the front desk sends Ingrid Castellanos's intake; the reviewer, as the nurse, approves it with a note,
 and the administrator approves it again as the senior nurse because the DRAFT priority is high. The signed summary names

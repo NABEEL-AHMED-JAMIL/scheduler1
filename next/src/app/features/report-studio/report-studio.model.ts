@@ -331,6 +331,8 @@ export interface ReportReviewCard {
   secondApprover: boolean;
   stage: 'FIRST' | 'FINAL';
   signing: { configured: boolean; certificate?: string | null };
+  /** MIG-428: the template has an approver's signature: what it shows when you approve (your own signature, or your typed name). */
+  yourSignature?: { own: boolean; assetId?: string; assetLabel?: string; name?: string; title?: string | null; version?: number | null } | null;
 }
 
 /** Phase 7: an approval's answer -- the approval (signed or not), or the first of two. */
@@ -447,6 +449,22 @@ export interface Approval {
   certificateSha256?: string | null;
   certificateSubject?: string | null;
   reason?: string | null;
+  /** MIG-428: who the approver's signature on the PDF shows, slot by slot (none: the template has no approver's signature). */
+  signers?: ApprovalSigner[] | null;
+  /** MIG-428: the HTML was filled too (its downloads show the approver's signature). */
+  approvedHtml?: boolean;
+}
+
+/** MIG-428: one approver's signature placed at approval: their own signature picture (ASSET) or their typed name (TYPED). */
+export interface ApprovalSigner {
+  slot: 1 | 2;
+  userId: number;
+  name?: string | null;
+  title?: string | null;
+  at?: string | null;
+  signature: 'ASSET' | 'TYPED';
+  assetId?: string | null;
+  assetVersion?: number | null;
 }
 
 /** What Verify signature says (MIG-406): the file's own signature facts and whether it is one of the workspace's approved versions. */

@@ -1,7 +1,7 @@
 ---
 id: rs-approve
 title: Approve, sign and verify
-summary: Ask for approval, approve and sign in Review › Approvals or on the report, two approvals, who approves, and Verify signature.
+summary: Ask for approval, approve and sign in Review › Approvals or on the report, the approver's own signature on the page, two approvals, who approves, and Verify signature.
 section: Approve and sign
 who: Approve and sign reports, and not the person who generated the version
 where: Run & review › Review › Approvals (/review/approvals); Reports › Library (/reports/library); Reports › Settings (/reports/settings)
@@ -28,6 +28,25 @@ The version then waits in the approvers' **Review › Approvals**. A newer versi
 
 > **Note:** Whoever generated a version never approves it (the page says "You generated it; someone else approves it").
 > Only a report's **current** version can be approved; an older one never approved reads **Superseded**.
+
+## The approver's own signature
+A template with an **Approver's signature** shows on each version whose approval it is, in that person's own hand:
+
+- Until it is approved, the version shows an empty box, **Awaiting approval**. Before you approve, the task in **Review ›
+  Approvals** says under **On the page** whether it will show your own signature or your typed name.
+- At **Approve and sign**, the box is filled with the approver's own latest approved signature (a signature in **Assets
+  & branding** that **Belongs to** them), their name, the **Title** on that signature, and the time, on a 24-hour clock
+  in the workspace's time zone. The PDF is then signed, so the signature on the page is covered by the digital one.
+- Someone with no approved signature of their own gets their typed name and **Signed digitally** instead. Never
+  another person's picture.
+- With **Two approvals**, an Approver's signature set to **The second approver** is filled with the second person, at
+  the second approval; with one approval it says **No second approval**.
+- The report's page lists under **Signature on it** whose signature was placed and whether it was their own signature
+  or their typed name. The HTML download shows it too.
+- An approved version stays exactly as it was approved: a signature replaced or retired later never changes it. The
+  next approval places the signature in use then.
+
+> **Note:** A stamp beside it stays the workspace's stamp, chosen in the template.
 
 ## Two approvals
 With **Two approvals** on (Reports › Settings), a second person approves after the first: the first chooses **Give the
