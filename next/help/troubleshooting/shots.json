@@ -1,0 +1,57 @@
+[
+ {
+  "name": "ts-failed-runs",
+  "route": "/runs/failed",
+  "as": "summit.admin",
+  "caption": "Runs \u203a Failed: the same error grouped as one pattern, with what kind of failure it is",
+  "thumb": true
+ },
+ {
+  "name": "ts-missing-file",
+  "route": "/pipelines/schedules/1151/runs/1970",
+  "as": "summit.admin",
+  "caption": "A run that failed because the day's file was not there yet"
+ },
+ {
+  "name": "ts-timeout",
+  "route": "/pipelines/schedules/1452/runs/1909",
+  "as": "summit.admin",
+  "caption": "A call that timed out on both tries, with Retry from step 1"
+ },
+ {
+  "name": "ts-photo",
+  "route": "/pipelines/schedules/1208/runs/1969",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "click": "text=Attempt 1"
+   },
+   {
+    "wait": 1200
+   }
+  ],
+  "caption": "Attempt 1 of a run whose photos could not be measured",
+  "thumb": true
+ },
+ {
+  "name": "ts-too-many-calls",
+  "route": "/pipelines/schedules/1232/runs/1904",
+  "as": "summit.admin",
+  "caption": "Call API refuses before sending anything: the input needs more calls than the step allows",
+  "thumb": true
+ },
+ {
+  "name": "ts-contract",
+  "route": "/pipelines/schedules/1360/runs/1964",
+  "as": "summit.admin",
+  "caption": "A data contract stops the run on the first line that does not hold to it",
+  "thumb": true
+ },
+ {
+  "name": "ts-rejected",
+  "route": "/pipelines/schedules/1365/runs/1922",
+  "as": "summit.admin",
+  "caption": "An Approval step rejected with a reason: the run fails and names who rejected it and why",
+  "thumb": true
+ }
+]
