@@ -63,10 +63,11 @@ export const routes: Routes = [
       import('./features/tenant-request/request-workspace').then(m => m.RequestWorkspace),
   },
   {
-    // Public like the landing page: the setup guide describes the console's own screens and
-    // carries nothing tenant-specific, so it can be linked to and read before signing in.
+    // Public like the landing page: the help centre describes the console's own screens and
+    // carries nothing tenant-specific, so it can be linked to and read before signing in. The page names each article
+    // in the tab itself ("<Article> · Help · ETL Console").
     path: 'docs',
-    title: 'Setup guide',
+    title: 'Help',
     loadComponent: () => import('./features/docs/docs').then(m => m.Docs),
   },
   {

@@ -92,7 +92,7 @@ describe('Login -- ways out', () => {
     const page = render({});
     expect(page.querySelector('a[href="/"]')).not.toBeNull();
     expect(page.querySelector('a[href="/request-workspace"]')?.textContent).toContain('Request a workspace');
-    expect(page.querySelector('a[href="/docs"]')?.textContent).toContain('Setup guide');
+    expect(page.querySelector('a[href="/docs"]')?.textContent).toContain('Help centre');
   });
 
   it('says who resets a forgotten password', () => {

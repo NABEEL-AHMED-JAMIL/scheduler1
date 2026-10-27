@@ -170,7 +170,7 @@ import { ThemeService } from '../../core/theme.service';
           <span class="text-sm text-[color:var(--text-muted)]">ETL Console — data pipelines, review and signed reports.</span>
           <nav class="flex flex-wrap items-center gap-x-5 gap-y-2 sm:ml-auto" aria-label="More">
             <a routerLink="/" class="link-inline text-sm">← Back to the front page</a>
-            <a routerLink="/docs" class="link-inline text-sm">Setup guide</a>
+            <a routerLink="/docs" class="link-inline text-sm">Help centre</a>
             <a routerLink="/login" class="link-inline text-sm">Sign in</a>
           </nav>
         </div>

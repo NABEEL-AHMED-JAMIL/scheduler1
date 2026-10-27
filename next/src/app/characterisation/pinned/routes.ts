@@ -36,7 +36,7 @@ export const PINNED: Record<string, unknown> = {
     },
     {
       "path": "/docs",
-      "title": "Setup guide",
+      "title": "Help",
       "guards": [],
       "lazy": true
     },

@@ -75,7 +75,7 @@ import { ThemeService } from '../../core/theme.service';
           <div class="mx-auto w-full max-w-6xl px-5 h-16 flex items-center gap-3">
             <app-brand-mark />
             <div class="ml-auto flex items-center gap-1.5">
-              <a routerLink="/docs" class="btn btn-default btn-sm hidden sm:inline-flex">Setup guide</a>
+              <a routerLink="/docs" class="btn btn-default btn-sm hidden sm:inline-flex">Help centre</a>
               <button type="button" class="btn btn-ghost btn-icon btn-sm"
                       [attr.aria-label]="theme.theme() === 'dark' ? 'Switch to light' : 'Switch to dark'"
                       (click)="theme.toggle()">
@@ -206,7 +206,7 @@ import { ThemeService } from '../../core/theme.service';
           <span class="text-sm text-[color:var(--text-muted)]">
             ETL Console — data pipelines, review and signed reports.
           </span>
-          <a routerLink="/docs" class="link-inline ml-auto text-sm">Setup guide</a>
+          <a routerLink="/docs" class="link-inline ml-auto text-sm">Help centre</a>
           <a routerLink="/login" class="link-inline text-sm">Sign in</a>
         </div>
       </footer>
