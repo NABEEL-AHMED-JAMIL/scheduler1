@@ -1,0 +1,20 @@
+[
+ {
+  "name": "gl-menu",
+  "route": "/dashboard",
+  "as": "summit.admin",
+  "clip": "aside.app-sidebar",
+  "pad": 0,
+  "caption": "The menu of a workspace administrator: the groups in the order of the work",
+  "thumb": true
+ },
+ {
+  "name": "gl-frequencies",
+  "route": "/pipelines/schedules/1108/edit",
+  "as": "summit.admin",
+  "clip": ".schedule-box",
+  "pad": 16,
+  "caption": "How often: the six frequencies, and the timetable as a sentence",
+  "thumb": true
+ }
+]
