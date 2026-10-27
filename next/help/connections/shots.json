@@ -1,0 +1,267 @@
+[
+ {
+  "name": "con-storage",
+  "route": "/connections/storage",
+  "as": "summit.admin",
+  "retake": "Summit Valley: the storage connections' descriptions name an internal ticket; retake once they read plainly",
+  "thumb": true
+ },
+ {
+  "name": "con-storage-new",
+  "route": "/connections/storage",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "click": "text=New storage connection"
+   },
+   {
+    "waitFor": "#provider"
+   },
+   {
+    "select": [
+     "#provider",
+     "S3"
+    ]
+   },
+   {
+    "wait": 500
+   }
+  ],
+  "clip": ".cdk-overlay-pane"
+ },
+ {
+  "name": "con-databases",
+  "route": "/connections/databases",
+  "as": "summit.admin",
+  "thumb": true
+ },
+ {
+  "name": "con-database-dialog",
+  "route": "/connections/databases",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "click": "text=Store systems (read-only)"
+   },
+   {
+    "waitFor": "#dbHost"
+   },
+   {
+    "wait": 500
+   }
+  ],
+  "clip": ".cdk-overlay-pane"
+ },
+ {
+  "name": "con-api-collections",
+  "route": "/connections/api-collections",
+  "as": "summit.admin"
+ },
+ {
+  "name": "con-api-collection",
+  "route": "/connections/api-collections",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "click": "text=Public health APIs"
+   },
+   {
+    "waitFor": "app-table-shell[heading=\"Environments\"]"
+   },
+   {
+    "wait": 800
+   }
+  ],
+  "thumb": true
+ },
+ {
+  "name": "con-api-environments",
+  "route": "/connections/api-collections",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "click": "text=Public health APIs"
+   },
+   {
+    "waitFor": "app-table-shell[heading=\"Environments\"]"
+   },
+   {
+    "wait": 800
+   }
+  ],
+  "clip": "app-table-shell[heading=\"Environments\"]",
+  "viewport": [
+   1920,
+   2800
+  ]
+ },
+ {
+  "name": "con-api-used-by",
+  "route": "/connections/api-collections",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "click": "text=Public health APIs"
+   },
+   {
+    "waitFor": "app-table-shell[heading=\"Used by\"]"
+   },
+   {
+    "wait": 800
+   }
+  ],
+  "clip": "app-table-shell[heading=\"Used by\"]",
+  "viewport": [
+   1920,
+   2800
+  ],
+  "retake": "Summit Valley: no pipeline pins a collection version yet (every row says Latest)"
+ },
+ {
+  "name": "con-api-history",
+  "route": "/connections/api-collections",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "click": "text=Public health APIs"
+   },
+   {
+    "waitFor": "app-table-shell[heading=\"Environments\"]"
+   },
+   {
+    "click": "a:has-text(\"History\")"
+   },
+   {
+    "waitFor": "app-table-shell[heading=\"Versions\"]"
+   },
+   {
+    "wait": 800
+   }
+  ]
+ },
+ {
+  "name": "con-api-request",
+  "route": "/connections/api-collections",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "click": "text=Public health APIs"
+   },
+   {
+    "waitFor": "app-table-shell[heading=\"Environments\"]"
+   },
+   {
+    "click": "button:text-is(\"FHIR: patients\")"
+   },
+   {
+    "waitFor": "app-side-panel"
+   },
+   {
+    "wait": 1200
+   }
+  ],
+  "retake": "Summit Valley: show a test's answer once a test has been run on this API",
+  "thumb": true
+ },
+ {
+  "name": "con-api-paging",
+  "route": "/connections/api-collections",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "click": "text=Public health APIs"
+   },
+   {
+    "waitFor": "app-table-shell[heading=\"Environments\"]"
+   },
+   {
+    "click": "button:text-is(\"FHIR: patients\")"
+   },
+   {
+    "waitFor": "app-side-panel"
+   },
+   {
+    "wait": 800
+   },
+   {
+    "click": "app-side-panel button:text-is(\"Settings\")"
+   },
+   {
+    "wait": 800
+   }
+  ],
+  "thumb": true
+ },
+ {
+  "name": "con-api-auth",
+  "route": "/connections/api-collections",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "click": "text=Summit Valley platform API"
+   },
+   {
+    "waitFor": "app-table-shell[heading=\"Environments\"]"
+   },
+   {
+    "click": "text=Edit details"
+   },
+   {
+    "waitFor": "#acAuthType"
+   },
+   {
+    "wait": 600
+   }
+  ],
+  "clip": ".cdk-overlay-pane"
+ },
+ {
+  "name": "con-api-import",
+  "route": "/connections/api-collections",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "click": "button:has-text(\"Import\")"
+   },
+   {
+    "waitFor": "#impName"
+   },
+   {
+    "wait": 500
+   }
+  ],
+  "clip": ".cdk-overlay-pane"
+ },
+ {
+  "name": "con-contracts",
+  "route": "/connections/contracts",
+  "as": "summit.admin"
+ },
+ {
+  "name": "con-contract-panel",
+  "route": "/connections/contracts",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "click": "button:text-is(\"lab_result\")"
+   },
+   {
+    "waitFor": "app-side-panel"
+   },
+   {
+    "wait": 1200
+   }
+  ],
+  "thumb": true
+ },
+ {
+  "name": "con-sources",
+  "route": "/connections/sources",
+  "as": "summit.admin"
+ },
+ {
+  "name": "con-connectors",
+  "route": "/connections/connectors",
+  "as": "summit.admin"
+ }
+]
