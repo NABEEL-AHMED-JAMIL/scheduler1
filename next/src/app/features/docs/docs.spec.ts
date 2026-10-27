@@ -21,7 +21,7 @@ const DATA: HelpData = {
   whatsNew: [{ date: '2026-10-26', title: 'Report designer', article: 'rs-designer', text: 'New.' }],
   topics: [
     { id: 'getting-started', title: 'Getting started', chapter: 1, part: 'Part I · Start here', icon: 'zap', blurb: 'Sign in.', paths: [],
-      sections: ['Start here'], summary: 'Where everyone starts.', start: [], faq: [], related: [], articles: ['gs-sign-in'] },
+      sections: ['Start here'], summary: 'Where everyone starts.', start: [], faq: [], related: [], articles: ['gs-sign-in', 'sec-managed'] },
     { id: 'report-studio', title: 'Report Studio', chapter: 13, part: 'Part VI · See results', icon: 'template', blurb: 'Reports.',
       paths: ['/reports/overview'], sections: ['Get started', 'Design'], summary: 'Design **once**, sign every version.',
       start: [{ title: 'Lay it out', article: 'rs-designer', text: 'Use the designer.', figure: 'rs-shot' }],
@@ -33,6 +33,8 @@ const DATA: HelpData = {
   articles: [
     { id: 'gs-sign-in', topic: 'getting-started', section: 'Start here', title: 'Sign in', summary: 'Your first sign-in.', minutes: 1,
       aliases: ['start'], popular: 'Sign in for the first time', md: 'Sign in with the password that works once.\n\n## Steps\n1. Open **Sign in**.\n\n## The menu\n<!-- widget: menu-map -->\n' },
+    { id: 'sec-managed', topic: 'getting-started', section: 'Start here', title: 'The managed service', summary: 'Our team builds for you.', minutes: 1,
+      where: [{ label: 'Administration › Activity', path: '/administration/team-activity' }], md: 'What changes.\n' },
     { id: 'rs-overview', topic: 'report-studio', section: 'Get started', title: 'Report Studio at a glance', summary: 'The tabs.', minutes: 2,
       aliases: ['reports'], where: [{ label: 'Reports › Overview', path: '/reports/overview' }], related: ['rs-designer'],
       md: 'Report Studio turns data into reports.\n\n## The workflow\n1. Make a template.\n\n> **Tip:** Keep a test sample.\n\n```A placeholder\n{{report.period}}\n```\n' },
@@ -85,6 +87,20 @@ describe('The help centre\'s front', () => {
   });
 });
 
+describe('The front\'s counts and lists', () => {
+  it('counts every article the topics hold for this reader -- a managed-service article too, though Activity is in the menu only while managed', async () => {
+    const admin: NavViewer = { canOpen: () => true, isAdmin: true, isPlatform: false, showTeam: false };
+    const page = await mount('', true, admin);
+    expect(page.querySelector('[data-test="doc-stats"] div:nth-child(2) dd')!.textContent!.trim()).toBe('5');
+    expect(page.querySelector('[data-topic="getting-started"] [data-test="topic-count"]')!.textContent).toContain('All 2 articles');
+  });
+
+  it('never cuts a title mid-word: no truncated article links on the front', async () => {
+    const page = await mount();
+    expect(page.querySelectorAll('[data-topic] .truncate, [data-test="doc-build-list"] .truncate').length).toBe(0);
+  });
+});
+
 describe('A topic page', () => {
   it('has its hero, Start here with pictures, what you can do by section, and its questions', async () => {
     const page = await mount('topic-report-studio');
@@ -132,7 +148,7 @@ describe('An article', () => {
   });
 
   it('goes to the next article in the book\'s order, across topics, as a page of its own', async () => {
-    const page = await mount('gs-sign-in');
+    const page = await mount('sec-managed');
     const next = page.querySelector('[data-test="doc-next"]')!;
     expect(next.textContent).toContain('Report Studio at a glance');
     click(next);

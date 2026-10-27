@@ -255,9 +255,9 @@ export function gateOf(path: string): (NavGate & { tabs?: NavTab[] }) | null {
                             <span class="font-semibold">{{ t.title }}</span>
                             <span class="ml-auto text-sm text-[color:var(--accent-text)] font-medium" data-test="topic-count">All {{ countText(articlesOf(t).length) }} →</span>
                           </a>
-                          <ul class="mt-3 grid gap-x-6 gap-y-1.5 sm:grid-cols-2 text-sm">
+                          <ul class="mt-3 grid gap-x-6 gap-y-2 sm:grid-cols-2 text-sm leading-snug" data-test="doc-build-list">
                             @for (a of articlesOf(t).slice(0, 8); track a.id) {
-                              <li class="truncate"><a class="link-inline" [href]="'/docs#' + a.id" (click)="open($event, a.id)">{{ a.title }}</a></li>
+                              <li class="min-w-0"><a class="link-inline !inline whitespace-normal" [href]="'/docs#' + a.id" (click)="open($event, a.id)">{{ a.title }}</a></li>
                             }
                           </ul>
                         </div>
@@ -681,7 +681,9 @@ export class Docs {
   /** Whether a signed-in reader's menu opens any of these pages (none named: yes); signed out, always. */
   private offered(paths: string[]): boolean {
     if (!this.auth.isLoggedIn() || !paths.length) return true;
-    return paths.some(p => { const gate = gateOf(p.split('?')[0]); return !gate || this.nav.visible(gate); });
+    // Our team's activity is in the menu only while the workspace is managed; how the managed service works (and that
+    // a self-managed workspace's data stays its own) is worth reading either way, so its gate does not hide help.
+    return paths.some(p => { const gate = gateOf(p.split('?')[0]); return !gate || this.nav.visible(gate.teamOnly ? { ...gate, teamOnly: false } : gate); });
   }
 
   articlesOf(t: HelpTopic): HelpArticle[] {
