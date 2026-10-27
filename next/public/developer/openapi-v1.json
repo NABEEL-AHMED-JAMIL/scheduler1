@@ -4998,11 +4998,11 @@
             "md"
           ]
         ],
-        "description": "MIG-426: the formats run.completed carries the run's result in, as data.results (WebhookRunResults): json, pdf, html, md -- each once, in the order given; [] (the default) sends the Run alone, as before. An unknown one is a 422 at resultFormats[i]. Asked at each attempt, so a retry or a redelivery carries the result as it stands then.\n"
+        "description": "The formats run.completed carries the run's result in, as data.results (WebhookRunResults): json, pdf, html, md -- each once, in the order given; [] (the default) sends the Run alone, as before. An unknown one is a 422 at resultFormats[i]. Asked at each attempt, so a retry or a redelivery carries the result as it stands then.\n"
       },
       "WebhookRunResults": {
         "type": "object",
-        "description": "MIG-426: run.completed's data.results, for a webhook with resultFormats -- the same answers as GET /runs/{runId}/result in each format: json the RunResult (masked); md and html the text, pdf base64, each from the run's report (the signed PDF once signed; Markdown made from its HTML, never signed) or, with no report, html and md from the result rows. A format the run cannot be given in -- a sensitive pipeline's report (403), no report for a PDF (404), several reports (409), or past the 5 MB of documents a delivery carries (413, read it with the API) -- is in problems instead, by format.\n",
+        "description": "run.completed's data.results, for a webhook with resultFormats -- the same answers as GET /runs/{runId}/result in each format: json the RunResult (masked); md and html the text, pdf base64, each from the run's report (the signed PDF once signed; Markdown made from its HTML, never signed) or, with no report, html and md from the result rows. A format the run cannot be given in -- a sensitive pipeline's report (403), no report for a PDF (404), several reports (409), or past the 5 MB of documents a delivery carries (413, read it with the API) -- is in problems instead, by format.\n",
         "properties": {
           "formats": {
             "$ref": "#/components/schemas/ResultFormats"
