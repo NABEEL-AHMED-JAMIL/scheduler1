@@ -1,0 +1,168 @@
+[
+ {
+  "name": "form-list",
+  "route": "/forms/builder",
+  "as": "summit.admin",
+  "retake": "Summit Valley: a test form (AI Assistant test \u00b7 Visit feedback) sits second in the list"
+ },
+ {
+  "name": "form-builder",
+  "route": "/forms/builder",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "click": "tr:has-text(\"Admission intake\") button[aria-haspopup] >> nth=0"
+   },
+   {
+    "click": "[cdkmenuitem]:has-text(\"Edit\")"
+   },
+   {
+    "waitFor": "[data-form-editor]"
+   },
+   {
+    "wait": 1000
+   },
+   {
+    "click": "[data-field-row] >> nth=2"
+   },
+   {
+    "wait": 600
+   }
+  ],
+  "thumb": true
+ },
+ {
+  "name": "form-logic",
+  "route": "/forms/builder",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "click": "tr:has-text(\"Admission intake\") button[aria-haspopup] >> nth=0"
+   },
+   {
+    "click": "[cdkmenuitem]:has-text(\"Edit\")"
+   },
+   {
+    "waitFor": "[data-form-editor]"
+   },
+   {
+    "click": "[data-tab=logic]"
+   },
+   {
+    "wait": 800
+   }
+  ]
+ },
+ {
+  "name": "form-settings",
+  "route": "/forms/builder",
+  "as": "summit.admin",
+  "viewport": [
+   1920,
+   1600
+  ],
+  "steps": [
+   {
+    "click": "tr:has-text(\"Expense claim\") button[aria-haspopup] >> nth=0"
+   },
+   {
+    "click": "[cdkmenuitem]:has-text(\"Edit\")"
+   },
+   {
+    "waitFor": "[data-form-editor]"
+   },
+   {
+    "click": "[data-tab=settings]"
+   },
+   {
+    "wait": 1000
+   }
+  ],
+  "thumb": true
+ },
+ {
+  "name": "form-fill",
+  "route": "/forms/builder",
+  "as": "summit.admin",
+  "viewport": [
+   1920,
+   1600
+  ],
+  "steps": [
+   {
+    "click": "a:text-is(\"Admission intake\")"
+   },
+   {
+    "wait": 1500
+   }
+  ],
+  "thumb": true
+ },
+ {
+  "name": "form-submissions",
+  "route": "/forms/submissions?formId=1015",
+  "as": "summit.admin",
+  "thumb": true
+ },
+ {
+  "name": "form-submission",
+  "route": "/forms/submissions?formId=1015",
+  "as": "summit.admin",
+  "viewport": [
+   1920,
+   1500
+  ],
+  "steps": [
+   {
+    "click": "tr[data-submission] button:has-text(\"View\") >> nth=0"
+   },
+   {
+    "wait": 1000
+   }
+  ],
+  "retake": "Summit Valley: a submission with receipt files and a drawn signature (these two have none)"
+ },
+ {
+  "name": "form-logic-rule",
+  "route": "/forms/builder",
+  "as": "summit.admin",
+  "viewport": [
+   1920,
+   4000
+  ],
+  "steps": [
+   {
+    "click": "tr:has-text(\"Admission intake\") button[aria-haspopup] >> nth=0"
+   },
+   {
+    "click": "[cdkmenuitem]:has-text(\"Edit\")"
+   },
+   {
+    "waitFor": "[data-form-editor]"
+   },
+   {
+    "wait": 1000
+   }
+  ],
+  "clip": "[data-field-row]:has-text(\"Required when\")",
+  "thumb": true
+ },
+ {
+  "name": "intake-form-fill",
+  "route": "/forms/1027/fill",
+  "as": "riverside.frontDesk",
+  "viewport": [
+   1920,
+   1300
+  ],
+  "steps": [
+   {
+    "waitFor": "h3:text-is(\"Patient\")"
+   },
+   {
+    "wait": 1200
+   }
+  ],
+  "retake": "Take once the console that draws form sections is deployed (on 26 Oct the live console showed New patient intake without section headings)"
+ }
+]
