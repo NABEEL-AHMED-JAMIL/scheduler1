@@ -255,6 +255,17 @@
                             until someone else joins and can decide it.</span>
                         </p>
                       }
+                      <div data-test="wf-decision-save">
+                        <label class="label" for="st-decision-save">Keep the decision as <span class="font-normal normal-case text-[color:var(--text-muted)]">(optional)</span></label>
+                        <input id="st-decision-save" class="input font-mono" maxlength="64" placeholder="e.g. nurse_review" [ngModel]="s.saveAs || ''"
+                               (ngModelChange)="set('saveAs', $event)" [disabled]="!canEdit()" />
+                        <p class="text-xs text-[color:var(--text-muted)] mt-1">
+                          @if (s.saveAs) {
+                            Later steps read {{ s.saveAs }}.decision, .byName, .at and .comment &mdash; e.g. a Run pipeline parameter
+                            {{ placeholderOf(s.saveAs + '.byName') }} or a Condition on {{ s.saveAs }}.decision.
+                          } @else { Name it to pass who decided, when and why to the steps after this one. }
+                        </p>
+                      </div>
                       @if (s.type === 'approval') {
                         <label class="flex items-center gap-2 text-sm"><input type="checkbox" [ngModel]="s.rejectNeedsComment" (ngModelChange)="set('rejectNeedsComment', $event)" />A rejection needs a reason</label>
                         <div>

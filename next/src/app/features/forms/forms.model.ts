@@ -6,7 +6,8 @@
  * Owner decision 2026-09-30: a form is shared inside its workspace only -- there are no public or expiring links yet.
  */
 
-export type FieldType = 'text' | 'longText' | 'number' | 'date' | 'choice' | 'yesNo' | 'email' | 'table' | 'file' | 'signature' | 'lookup';
+export type FieldType = 'text' | 'longText' | 'number' | 'date' | 'choice' | 'yesNo' | 'email' | 'table' | 'file' | 'signature' | 'lookup'
+  | 'checkboxes';
 export type ColumnType = 'text' | 'number' | 'date' | 'choice' | 'yesNo' | 'email';
 export type RuleOp = 'eq' | 'ne' | 'in' | 'gt' | 'lt' | 'filled' | 'empty';
 
@@ -59,6 +60,14 @@ export interface FormField {
   toDocuments?: boolean | null;
   /** A lookup's source: another form of the workspace, and the field whose answers it offers. */
   lookup?: { formId: number | null; field: string } | null;
+  /**
+   * 2026-10-26: the title of the group the field belongs to (one line, at most 80). A field whose section differs from the
+   * one above it starts a new group under that heading; fields with none stay ungrouped.
+   */
+  section?: string | null;
+  /** 2026-10-26, checkboxes: the least and most options ticked (each optional; the least applies once anything is ticked). */
+  minSelected?: number | null;
+  maxSelected?: number | null;
 }
 
 /** A form as listed; `fields` only when one form is fetched. The job behind it is an administrator's to see. */
@@ -189,7 +198,7 @@ export interface FormDraft {
   workflowKey?: string | null;
 }
 
-export type AnswerValue = string | boolean | null | TableRow[] | UploadRef[] | UploadRef;
+export type AnswerValue = string | boolean | null | string[] | TableRow[] | UploadRef[] | UploadRef;
 export type Answers = Record<string, AnswerValue>;
 
 export const FIELD_TYPES: { value: FieldType; label: string }[] = [
@@ -198,6 +207,7 @@ export const FIELD_TYPES: { value: FieldType; label: string }[] = [
   { value: 'number', label: 'Number' },
   { value: 'date', label: 'Date' },
   { value: 'choice', label: 'Choice' },
+  { value: 'checkboxes', label: 'Checkboxes (tick all that apply)' },
   { value: 'yesNo', label: 'Yes / no' },
   { value: 'email', label: 'E-mail' },
   { value: 'table', label: 'Table' },
@@ -241,6 +251,46 @@ export const MAX_FIELDS = 50;
 /** FormFields.MAX_PLACEHOLDER and MAX_HELP. */
 export const MAX_PLACEHOLDER = 120;
 export const MAX_HELP = 500;
+/** FormFields.MAX_SECTION. */
+export const MAX_SECTION = 80;
+
+/** Fields with an options list: a choice and checkboxes. */
+export function hasOptions(type: FieldType | string): boolean {
+  return type === 'choice' || type === 'checkboxes';
+}
+
+/** A run of consecutive fields under one section title (null: fields with no section). */
+export interface FieldGroup {
+  section: string | null;
+  fields: FormField[];
+}
+
+/** The fields in order, grouped: a field whose section differs from the one above starts a group (sections never reorder). */
+export function sectionGroups(fields: FormField[]): FieldGroup[] {
+  const groups: FieldGroup[] = [];
+  for (const f of fields) {
+    const section = f.section?.trim() || null;
+    const last = groups[groups.length - 1];
+    if (last && last.section === section) last.fields.push(f);
+    else groups.push({ section, fields: [f] });
+  }
+  return groups;
+}
+
+/** The options ticked in a checkboxes answer. */
+export function tickedOf(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : typeof value === 'string' && value ? [value] : [];
+}
+
+/** A checkboxes field's limits in words: "Tick 1 to 3", "Tick at least 2", "Tick up to 3"; empty when it has none. */
+export function selectionText(f: Pick<FormField, 'minSelected' | 'maxSelected'>): string {
+  const min = f.minSelected ?? null;
+  const max = f.maxSelected ?? null;
+  if (min && max) return min === max ? `Tick ${min}` : `Tick ${min} to ${max}`;
+  if (min) return `Tick at least ${min}`;
+  if (max) return `Tick up to ${max}`;
+  return '';
+}
 /** The types whose empty control shows a placeholder (FormFields.PLACEHOLDER_TYPES). */
 export const PLACEHOLDER_TYPES: FieldType[] = ['text', 'longText', 'number', 'date', 'choice', 'email', 'lookup'];
 
@@ -352,7 +402,7 @@ export function uniqueKey(label: string, taken: string[]): string {
 
 export function blankField(taken: string[], type: FieldType = 'text'): FormField {
   const label = `Question ${taken.length + 1}`;
-  return { key: uniqueKey(label, taken), label, type, required: false, help: '', options: type === 'choice' ? ['Option 1'] : null,
+  return { key: uniqueKey(label, taken), label, type, required: false, help: '', options: hasOptions(type) ? ['Option 1'] : null,
     ...typeDefaults(type) };
 }
 
@@ -397,6 +447,16 @@ function order(answer: unknown, value: unknown): number {
 export function holds(rule: FieldRule, answers: Record<string, unknown>): boolean {
   const answer = answers[rule.field];
   const empty = isEmptyAnswer(answer);
+  if (!empty && Array.isArray(answer) && rule.op !== 'filled' && rule.op !== 'empty') {
+    // Checkboxes: eq is "this option is ticked", ne "it is not", in "one of these is" (FormFields.holds).
+    const ticked = answer.filter(a => typeof a !== 'object');
+    switch (rule.op) {
+      case 'eq': return ticked.some(t => same(t, rule.value));
+      case 'ne': return !ticked.some(t => same(t, rule.value));
+      case 'in': return Array.isArray(rule.value) && ticked.some(t => (rule.value as unknown[]).some(v => same(t, v)));
+      default: return false;
+    }
+  }
   switch (rule.op) {
     case 'filled': return !empty;
     case 'empty': return empty;
@@ -469,12 +529,14 @@ export function definitionProblems(draft: FormDraft): Record<string, string> {
     else if (RESERVED_KEYS.includes(key)) problem = `The key '${key}' is used by the submission itself.`;
     else if (seen.has(key)) problem = `Another field already has the key '${key}'.`;
     else if ((f.help ?? '').trim().length > MAX_HELP) problem = `Its help text is longer than ${MAX_HELP} characters.`;
+    else if ((f.section ?? '').trim().length > MAX_SECTION) problem = `Its section is longer than ${MAX_SECTION} characters.`;
+    else if (/[\u0000-\u001f\u007f]/.test((f.section ?? '').trim())) problem = 'Its section is one line of text, with no line breaks or tabs.';
     else if (takesPlaceholder(f.type) && (f.placeholder ?? '').trim().length > MAX_PLACEHOLDER) {
       problem = `Its placeholder is longer than ${MAX_PLACEHOLDER} characters.`;
     } else if (takesPlaceholder(f.type) && /[\u0000-\u001f\u007f]/.test((f.placeholder ?? '').trim())) {
       problem = 'Its placeholder is one line of text, with no line breaks or tabs.';
-    } else if (f.type === 'choice' && !(f.options ?? []).filter(o => o.trim()).length) problem = 'A choice needs at least one option.';
-    else if (f.type === 'choice' && new Set((f.options ?? []).map(o => o.trim().toLowerCase())).size !== (f.options ?? []).length) {
+    } else if (hasOptions(f.type) && !(f.options ?? []).filter(o => o.trim()).length) problem = 'A choice needs at least one option.';
+    else if (hasOptions(f.type) && new Set((f.options ?? []).map(o => o.trim().toLowerCase())).size !== (f.options ?? []).length) {
       problem = 'An option is listed twice.';
     } else problem = extendedProblem(f, draft.fields.slice(0, i));
     seen.add(key);
@@ -506,6 +568,14 @@ function extendedProblem(f: FormField, earlier: FormField[]): string {
     if (f.maxFiles != null && (f.maxFiles < 1 || f.maxFiles > 10)) return 'A field takes 1 to 10 files.';
   }
   if (f.type === 'lookup' && (!f.lookup?.formId || !f.lookup.field)) return 'Pick the form and the field whose answers it offers.';
+  if (f.type === 'checkboxes') {
+    const count = (f.options ?? []).filter(o => o.trim()).length;
+    const min = f.minSelected ?? null;
+    const max = f.maxSelected ?? null;
+    if (min != null && (min < 0 || min > count)) return `The least to tick is from 0 to ${count} (its options).`;
+    if (max != null && (max < 1 || max > count)) return `The most to tick is from 1 to ${count} (its options).`;
+    if (min != null && max != null && min > max) return 'The least to tick is more than the most.';
+  }
   for (const [rule, what] of [[f.showWhen, 'shown'], [f.requiredWhen, 'required']] as const) {
     if (!rule) continue;
     const on = earlier.find(e => e.key === rule.field);
@@ -513,6 +583,7 @@ function extendedProblem(f: FormField, earlier: FormField[]): string {
     const op = RULE_OPS.find(o => o.value === rule.op);
     if (!op) return 'Pick the rule\'s test.';
     if (op.needsValue && (on.type === 'table' || UPLOAD_TYPES.includes(on.type))) return `A ${on.type} field can only be tested for answered or not.`;
+    if (on.type === 'checkboxes' && (rule.op === 'gt' || rule.op === 'lt')) return 'A checkboxes field is tested for an option ticked (is, is not, is one of) or answered.';
     if (op.needsValue && isEmptyAnswer(rule.value)) return `Say what '${on.label}' is compared with.`;
   }
   return '';
@@ -542,7 +613,10 @@ export function draftForSave(draft: FormDraft): FormDraft {
       key: f.key.trim(), label: f.label.trim(), type: f.type, required: !!f.required,
       help: f.help?.trim() || null,
       ...(takesPlaceholder(f.type) && f.placeholder?.trim() ? { placeholder: f.placeholder.trim() } : {}),
-      options: f.type === 'choice' ? (f.options ?? []).map(o => o.trim()).filter(o => !!o) : null,
+      ...(f.section?.trim() ? { section: f.section.trim() } : {}),
+      options: hasOptions(f.type) ? (f.options ?? []).map(o => o.trim()).filter(o => !!o) : null,
+      ...(f.type === 'checkboxes' && f.minSelected ? { minSelected: f.minSelected } : {}),
+      ...(f.type === 'checkboxes' && f.maxSelected ? { maxSelected: f.maxSelected } : {}),
       ...(ruleForSave(f.showWhen, draft.fields) ? { showWhen: ruleForSave(f.showWhen, draft.fields) } : {}),
       ...(ruleForSave(f.requiredWhen, draft.fields) ? { requiredWhen: ruleForSave(f.requiredWhen, draft.fields) } : {}),
       ...(f.type === 'table' ? {
@@ -581,6 +655,14 @@ export function answerProblems(fields: FormField[], answers: Answers, lookupValu
       continue;
     }
     if (f.type === 'signature') continue;
+    if (f.type === 'checkboxes') {
+      const ticked = tickedOf(value);
+      const unknown = ticked.find(t => !(f.options ?? []).includes(t));
+      if (unknown) problems[f.key] = `'${unknown}' is not an option.`;
+      else if (f.minSelected && ticked.length < f.minSelected) problems[f.key] = `Tick at least ${f.minSelected} (this has ${ticked.length}).`;
+      else if (f.maxSelected && ticked.length > f.maxSelected) problems[f.key] = `Tick at most ${f.maxSelected} (this has ${ticked.length}).`;
+      continue;
+    }
     if (f.type === 'lookup') {
       const text = String(value).trim().toLowerCase();
       if (!(lookupValues[f.key] ?? []).some(v => v.toLowerCase() === text)) problems[f.key] = 'Choose one of the listed values.';
@@ -649,6 +731,7 @@ export function answersForSubmit(fields: FormField[], answers: Answers): Record<
       }
       case 'file': out[f.key] = (value as UploadRef[]).map(u => u.uploadId); break;
       case 'signature': out[f.key] = (value as UploadRef).uploadId; break;
+      case 'checkboxes': out[f.key] = (f.options ?? []).filter(o => tickedOf(value).includes(o)); break;
       default:
         out[f.key] = f.type === 'number' && typeof value === 'string' ? Number(value.trim()) : typeof value === 'string' ? value.trim() : value;
     }

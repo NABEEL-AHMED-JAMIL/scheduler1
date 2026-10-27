@@ -13,7 +13,8 @@ import { AnswerChange, FormRenderer } from './form-renderer';
 import {
   ALLOWED_EXTENSIONS, Answers, COLUMN_TYPES, FIELD_TYPES, FORM_STATUSES, FieldRule, FieldType, FormDraft, FormField, FormStatus, FormSummary,
   LinkableJob, MAX_FIELDS, RULE_OPS, blankField, definitionProblems, draftForSave, formTone, formsOf, lookupSources, optionsFromText,
-  ruleText, typeDefaults, typeLabel, uniqueKey, MAX_PLACEHOLDER, MAX_HELP, takesPlaceholder, defaultPlaceholder,
+  ruleText, typeDefaults, typeLabel, uniqueKey, MAX_PLACEHOLDER, MAX_HELP, takesPlaceholder, defaultPlaceholder, MAX_SECTION, hasOptions,
+  selectionText,
 } from './forms.model';
 
 type RuleKind = 'showWhen' | 'requiredWhen';
@@ -22,7 +23,7 @@ type BuilderTab = 'build' | 'logic' | 'settings';
 /** The icon each field type shows in the palette and the properties panel. */
 const TYPE_ICONS: Record<FieldType, string> = {
   text: 'edit', longText: 'list', number: 'chart', date: 'calendar', choice: 'selector', yesNo: 'checkCircle', email: 'mail',
-  table: 'table', file: 'file', signature: 'edit', lookup: 'search',
+  table: 'table', file: 'file', signature: 'edit', lookup: 'search', checkboxes: 'check',
 };
 import { FormShare } from './form-share';
 import { FormsApi } from './forms.service';
@@ -103,6 +104,32 @@ export class FormBuilder implements OnInit {
   readonly maxFields = MAX_FIELDS;
   readonly maxPlaceholder = MAX_PLACEHOLDER;
   readonly maxHelp = MAX_HELP;
+  readonly maxSection = MAX_SECTION;
+  readonly hasOptions = hasOptions;
+  readonly selectionText = selectionText;
+
+  /** The canvas draws each field alone: its section heading is drawn once, above the first field of the section. */
+  unsectioned(f: FormField): FormField {
+    return f.section ? { ...f, section: null } : f;
+  }
+
+  /** The section a field starts on the canvas, or null when it continues the one above (or has none). */
+  sectionStart(fields: FormField[], index: number): string | null {
+    const here = fields[index]?.section?.trim() || null;
+    const above = index > 0 ? fields[index - 1]?.section?.trim() || null : null;
+    return here && here !== above ? here : null;
+  }
+
+  /** The sections used so far, for the section box's suggestions. */
+  sectionsUsed(fields: FormField[]): string[] {
+    return [...new Set(fields.map(f => f.section?.trim()).filter((s): s is string => !!s))];
+  }
+
+  /** A number box's value as a whole number, or null when empty. */
+  wholeOrNull(text: string): number | null {
+    const t = (text ?? '').trim();
+    return t === '' || Number.isNaN(Number(t)) ? null : Math.round(Number(t));
+  }
   readonly takesPlaceholder = takesPlaceholder;
 
   /**
@@ -226,7 +253,7 @@ export class FormBuilder implements OnInit {
         if (patch.label !== undefined && f.autoKey) {
           next.key = uniqueKey(patch.label, d.fields.filter((_, j) => j !== index).map(o => o.key));
         }
-        if (patch.type === 'choice' && !(next.options ?? []).length) next.options = ['Option 1'];
+        if (patch.type && hasOptions(patch.type) && !(next.options ?? []).length) next.options = ['Option 1'];
         if (patch.type && patch.type !== f.type) Object.assign(next, typeDefaults(patch.type), keepOwn(f, patch.type));
         return next;
       });

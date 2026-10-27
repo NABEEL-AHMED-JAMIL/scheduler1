@@ -17,7 +17,7 @@ import { confirmWith } from '../../shared/ui/confirm';
 import { TeamsApi } from '../../core/teams/teams.api';
 import { Colleague, RequestRow, WorkflowDetail, WorkflowSummary, WorkflowsApi, CANNOT_ACT } from './workflows.api';
 import { DraftStep, OPERATORS, OUTCOME_FIELDS, RESULT_TAKES, ResultField, RunResults, STEP_TYPES, StepType, Who, WhoKind, canEnd, fromJson, newStep,
-  problemStep, resultName, runFields, subjectWho, toJson, runSaveAs } from './designer.model';
+  problemStep, resultName, runFields, subjectWho, toJson, runSaveAs, decisionFields } from './designer.model';
 import { shortTime } from './history';
 import { splitTail } from './inbox-list';
 import { PageHeader } from '../../shared/ui/page-header';
@@ -336,6 +336,11 @@ export class WorkflowDesigner implements OnInit {
     this.setResults('fields', fields);
   }
 
+  /** A placeholder as a step's text names it: {{nurse.byName}}. */
+  placeholderOf(field: string): string {
+    return '{{' + field + '}}';
+  }
+
   /** What a Condition after the selected step can read: its outcome and each kept value, by name. */
   readonly runFieldNames = computed(() => { const s = this.step(); return s && s.type === 'run_pipeline' && s.waitFor ? runFields(s) : []; });
 
@@ -346,6 +351,7 @@ export class WorkflowDesigner implements OnInit {
     this.steps().slice(0, i).forEach(s => {
       if (s.type === 'run_pipeline' && s.waitFor) out.push(...runFields(s));
       if (s.type === 'call_api') ['status', 'ok', 'error'].forEach(f => out.push(`${s.saveAs || 'api'}.${f}`));
+      if (s.type === 'approval' || s.type === 'task') out.push(...decisionFields(s));
     });
     return out;
   });

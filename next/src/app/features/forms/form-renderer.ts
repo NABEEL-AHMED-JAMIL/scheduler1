@@ -1,8 +1,10 @@
 import { DateField } from '../../shared/ui/date-field';
+import { NgTemplateOutlet } from '@angular/common';
 import { Component, computed, input, output } from '@angular/core';
 import { Field } from '../../shared/ui/field';
 import { Icon } from '../../shared/ui/icon';
-import { AnswerValue, Answers, FormField, TableRow, UploadRef, placeholderOf, requiredNow, visibleFields } from './forms.model';
+import { AnswerValue, Answers, FormField, TableRow, UploadRef, placeholderOf, requiredNow, sectionGroups, selectionText, tickedOf,
+  visibleFields } from './forms.model';
 import { SignaturePad } from './signature-pad';
 
 /** One answer changed: the field's key and what it holds now (text as typed, a yes/no as a boolean, rows, uploads). */
@@ -31,10 +33,25 @@ const IMAGE_MIME: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpe
 
 @Component({
   selector: 'app-form-renderer',
-  imports: [DateField, Field, Icon, SignaturePad],
+  imports: [DateField, Field, Icon, NgTemplateOutlet, SignaturePad],
   template: `
     <div class="flex flex-col gap-4 min-w-0">
-      @for (f of shown(); track f.key; let i = $index) {
+      @for (g of groups(); track $index; let gi = $index) {
+        @if (g.section) {
+          <!-- 2026-10-26: a section's fields under its heading. A <section>, not a <fieldset>: no size containers in a fieldset. -->
+          <section class="form-section flex flex-col gap-4 min-w-0" [attr.data-section]="g.section"
+                   [attr.aria-labelledby]="idPrefix() + '-section-' + gi">
+            <h3 class="section-title form-section-title" [id]="idPrefix() + '-section-' + gi">{{ g.section }}</h3>
+            @for (f of g.fields; track f.key) { <ng-container *ngTemplateOutlet="fieldTpl; context: { $implicit: f }" /> }
+          </section>
+        } @else {
+          @for (f of g.fields; track f.key) { <ng-container *ngTemplateOutlet="fieldTpl; context: { $implicit: f }" /> }
+        }
+      } @empty {
+        <p class="text-sm text-[color:var(--text-muted)]">This form has no fields yet.</p>
+      }
+    </div>
+    <ng-template #fieldTpl let-f>
         <app-field [label]="f.label" [for]="idPrefix() + '-' + f.key" [required]="isRequired(f)" [hint]="f.help || ''"
                    [error]="problems()[f.key] || ''">
           @switch (f.type) {
@@ -148,6 +165,18 @@ const IMAGE_MIME: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpe
                 </select>
               }
             }
+            @case ('checkboxes') {
+              <div class="form-checks grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-x-6 gap-y-1.5" role="group"
+                   [id]="idPrefix() + '-' + f.key" [attr.aria-label]="f.label" [attr.data-field]="f.key">
+                @for (o of f.options ?? []; track o) {
+                  <label class="flex items-start gap-2 text-sm min-w-0">
+                    <input type="checkbox" class="mt-0.5" [checked]="isTicked(f.key, o)" [disabled]="disabled()" [attr.data-option]="o"
+                           (change)="tick(f, o, $any($event.target).checked)" /><span class="min-w-0">{{ o }}</span>
+                  </label>
+                }
+              </div>
+              @if (limits(f); as l) { <span class="text-xs text-[color:var(--text-muted)]" data-limits>{{ l }}</span> }
+            }
             @case ('longText') {
               <textarea class="input" rows="4" [id]="idPrefix() + '-' + f.key" [value]="text(f.key)" [disabled]="disabled()"
                         [attr.data-field]="f.key" [attr.placeholder]="placeholder(f)" (input)="set(f.key, $any($event.target).value)"></textarea>
@@ -194,10 +223,7 @@ const IMAGE_MIME: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpe
             }
           }
         </app-field>
-      } @empty {
-        <p class="text-sm text-[color:var(--text-muted)]">This form has no fields yet.</p>
-      }
-    </div>
+    </ng-template>
   `,
 })
 export class FormRenderer {
@@ -217,6 +243,25 @@ export class FormRenderer {
 
   /** The fields asked now: those whose rules show them. */
   readonly shown = computed(() => visibleFields(this.fields(), this.answers()));
+  /** The fields asked now under their sections (a section with no field shown now is not drawn). */
+  readonly groups = computed(() => sectionGroups(this.shown()));
+
+  // ---- checkboxes (2026-10-26) ---------------------------------------------------------------------------------
+
+  isTicked(key: string, option: string): boolean {
+    return tickedOf(this.answers()[key]).includes(option);
+  }
+
+  /** Ticks or unticks one option; the answer keeps the options' own order. */
+  tick(f: FormField, option: string, on: boolean): void {
+    const now = new Set(tickedOf(this.answers()[f.key]));
+    if (on) now.add(option); else now.delete(option);
+    this.set(f.key, (f.options ?? []).filter(o => now.has(o)));
+  }
+
+  limits(f: FormField): string {
+    return selectionText(f);
+  }
 
   /** The field's own placeholder, else its type's default ("Enter case number", "e.g. SYN-nnn", "Choose…"). */
   placeholder(f: FormField): string | null {

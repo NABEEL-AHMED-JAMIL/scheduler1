@@ -178,6 +178,8 @@ export function toJson(steps: DraftStep[]): { steps: Record<string, unknown>[] }
           if (s.slaHours) out['slaHours'] = s.slaHours;
           if (s.slaHours && s.reminderHours) out['reminderHours'] = s.reminderHours;
           if (s.slaHours && s.escalateTo && s.escalateTo.kind !== 'manager') out['escalateTo'] = who(s.escalateTo);
+          // 2026-10-26: where the decision is kept on the request ({decision, by, byName, at, comment}); none keeps nothing.
+          if (s.saveAs?.trim()) out['saveAs'] = s.saveAs.trim();
           if (s.type === 'approval') {
             out['rejectNeedsComment'] = !!s.rejectNeedsComment;
             if (s.onReject && s.onReject !== 'end') out['onReject'] = s.onReject;
@@ -265,4 +267,11 @@ function who(value: Who | null | undefined): Who {
   const kind = value?.kind ?? 'requester';
   // A subject assignee keeps its field ("reviewers"): without it workflow-service refuses the step (WorkflowSteps).
   return kind === 'user' || kind === 'role' || kind === 'team' || kind === 'subject' ? { kind, value: value?.value ?? '' } : { kind };
+}
+
+/** 2026-10-26: what a later step reads of an approval's or a task's decision kept at saveAs. */
+export const DECISION_FIELDS = ['decision', 'byName', 'by', 'at', 'comment'];
+
+export function decisionFields(s: Pick<DraftStep, 'saveAs'>): string[] {
+  return s.saveAs?.trim() ? DECISION_FIELDS.map(f => `${s.saveAs!.trim()}.${f}`) : [];
 }

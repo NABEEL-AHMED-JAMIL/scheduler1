@@ -164,7 +164,7 @@ describe('Form builder -- the editor', () => {
     const { screen, fixture, el } = screenWith();
     screen.edit(FORMS[0]);
     fixture.detectChanges();
-    expect(el.querySelectorAll('[data-add-type]').length).toBe(11);
+    expect(el.querySelectorAll('[data-add-type]').length).toBe(12);   // 12 since checkboxes (2026-10-26)
     expect(Array.from(el.querySelectorAll('[data-field-row]')).length).toBe(2);
     expect(el.querySelector('[data-field-row="0"]')!.classList).toContain('is-on');
     expect(el.querySelector('[data-field-props]')!.textContent).toContain('Field · Patient ID');
