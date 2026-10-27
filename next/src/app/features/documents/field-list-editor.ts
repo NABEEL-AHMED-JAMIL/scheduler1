@@ -71,7 +71,7 @@ export class FieldListEditor {
   options(f: TypeField): string { return listText(f.options); }
   split(text: string): string[] { return textList(text); }
   /** MIG-426: "High = H; Low = L" -- the words a page writes each option as. */
-  optionAliases(f: TypeField): string { return aliasText(f.optionAliases); }
+  optionAliases(f: TypeField): string { return aliasText(f.optionAliases, f.options); }
   aliasesOf(text: string): Record<string, string[]> { return textAliases(text); }
 
   patch(index: number, patch: Partial<TypeField>): void {

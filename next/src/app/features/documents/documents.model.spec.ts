@@ -221,6 +221,8 @@ describe('option aliases', () => {
     expect(map).toEqual({ High: ['H', 'HI', 'HH'], Low: ['L'], Normal: ['N'] });
     expect(aliasText(map)).toBe('High = H, HI, HH; Low = L; Normal = N');
     expect(aliasText(null)).toBe('');
+    expect(aliasText({ Low: ['L'], High: ['H'], Normal: ['N'], Other: ['O'] }, ['Normal', 'High', 'Low']))
+      .toBe('Normal = N; High = H; Low = L; Other = O');
     expect(textAliases('no equals sign')).toEqual({});
   });
 

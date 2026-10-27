@@ -727,9 +727,14 @@ export function textList(text: string): string[] { return text.split(',').map(s 
  * MIG-426: a choice's option aliases as the editor's box holds them -- "High = H, HI; Low = L" -- and back. An entry without
  * "=" or without a word after it is dropped; an option named twice keeps both lists' words, once each.
  */
-export function aliasText(map: Record<string, string[]> | null | undefined): string {
-  return Object.entries(map ?? {}).filter(([, words]) => (words ?? []).length).map(([option, words]) => `${option} = ${words.join(', ')}`)
-    .join('; ');
+export function aliasText(map: Record<string, string[]> | null | undefined, options?: string[] | null): string {
+  const at = (option: string) => {
+    const i = (options ?? []).findIndex(o => o.trim().toLowerCase() === option.trim().toLowerCase());
+    return i < 0 ? Number.MAX_SAFE_INTEGER : i;
+  };
+  // In the options' order (the service keeps the map in its own), an option it does not name last.
+  return Object.entries(map ?? {}).filter(([, words]) => (words ?? []).length).sort(([a], [b]) => at(a) - at(b))
+    .map(([option, words]) => `${option} = ${words.join(', ')}`).join('; ');
 }
 export function textAliases(text: string): Record<string, string[]> {
   const out: Record<string, string[]> = {};
