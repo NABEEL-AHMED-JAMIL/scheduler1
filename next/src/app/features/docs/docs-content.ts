@@ -83,7 +83,7 @@ export const STEPS: Step[] = [
       'Then send documents in on Documents › Intake: Upload, or mail them to the workspace\'s Email-in address. File drop, on the same tab, stores files that start pipelines.',
       'An approved document\'s values land in Documents › Approved data. Document types says what each type\'s approval starts; set it on a schedule.',
       'A document type the Data Catalog holds as Confidential or Restricted has its approved data masked for anyone who is not its owner '
-        + 'and has no access grant -- on Approved data, in its CSV export, in an approved document\'s fields and in Ask your data: tagged '
+        + 'and has no access grant — on Approved data, in its CSV export, in an approved document\'s fields and in Ask your data: tagged '
         + 'columns, and a person\'s name, email, phone number or id found in any field, even when only one document is approved. '
         + 'Documents still in review are shown as they are, for the reviewer to check.',
       'Forms: build a form whose answers start a pipeline or feed a review. In a field\'s settings, a Placeholder shows example '
@@ -165,11 +165,11 @@ export const STEPS: Step[] = [
         + 'each run started, the pipeline version, the status and the report. Tick two runs to compare them field by field, with what changed in the '
         + 'pipeline between them. An item\'s panel opens it with All runs of this item.',
       'On Outputs, View shows a file in place: a kept PDF in the PDF viewer, a kept table as a table, a file the run put in a bucket in the file preview. Download takes it away.',
-      'A pipeline marked sensitive (its settings) has a person\'s details masked for anyone the data policy masks them for -- '
-        + 'names, emails, phone numbers, ids, addresses -- in every item\'s values, its data at each step, the compare, the CSV, the zip\'s '
-        + 'item.json and the run\'s outputs, from its very first row. An item\'s name stays visible -- its file name, or the id column '
-        + 'that names it (a record id, a patient id) -- so you can find it and tell items apart.',
-      'The files such a pipeline keeps -- a saved file, an item\'s files, a report\'s PDF -- are its real output and are not masked: '
+      'A pipeline marked sensitive (its settings) has a person\'s details masked for anyone the data policy masks them for — '
+        + 'names, emails, phone numbers, ids, addresses — in every item\'s values, its data at each step, the compare, the CSV, the zip\'s '
+        + 'item.json and the run\'s outputs, from its very first row. An item\'s name stays visible — its file name, or the id column '
+        + 'that names it (a record id, a patient id) — so you can find it and tell items apart.',
+      'The files such a pipeline keeps — a saved file, an item\'s files, a report\'s PDF — are its real output and are not masked: '
         + 'downloading, viewing or previewing them needs the Download sensitive files permission (Administration › Access profiles). '
         + 'Without it you see each file\'s name, size and type, and a lock in place of Download. Workspace admins always have it.',
       'Retry a failed run from the step that failed (Runs › Failed groups failures by their error), or run a schedule for each period of a past range (Backfills).',
