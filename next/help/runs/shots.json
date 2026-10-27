@@ -1,0 +1,125 @@
+[
+ {
+  "name": "run-latest",
+  "route": "/runs/latest",
+  "as": "summit.admin",
+  "thumb": true
+ },
+ {
+  "name": "run-by-date",
+  "route": "/runs/by-date",
+  "as": "summit.admin"
+ },
+ {
+  "name": "run-page",
+  "route": "/pipelines/schedules/1104/runs/2042",
+  "as": "summit.admin",
+  "thumb": true
+ },
+ {
+  "name": "run-outputs-pdf",
+  "route": "/pipelines/schedules/1104/runs/2042?tab=outputs",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "click": "tr:has-text('.pdf') >> text=View"
+   },
+   {
+    "wait": 2500
+   }
+  ]
+ },
+ {
+  "name": "run-items",
+  "route": "/pipelines/schedules/1208/runs/1969?tab=items",
+  "as": "summit.admin"
+ },
+ {
+  "name": "run-item-panel",
+  "route": "/pipelines/schedules/1208/runs/1969?tab=items",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "click": "button[aria-label='Open wound-photo-SV-000148.jpg']"
+   },
+   {
+    "wait": 2500
+   }
+  ],
+  "thumb": true
+ },
+ {
+  "name": "run-items-selected",
+  "route": "/pipelines/schedules/1251/runs/1905?tab=items",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "click": "tbody tr:nth-child(1) input[type=checkbox]"
+   },
+   {
+    "click": "tbody tr:nth-child(2) input[type=checkbox]"
+   },
+   {
+    "click": "tbody tr:nth-child(3) input[type=checkbox]"
+   },
+   {
+    "wait": 800
+   }
+  ]
+ },
+ {
+  "name": "run-schedule-items",
+  "route": "/pipelines/schedules/1453/items",
+  "as": "summit.admin",
+  "thumb": true
+ },
+ {
+  "name": "run-compare",
+  "route": "/pipelines/schedules/1453/items",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "click": "input[aria-label='Compare run 1911']"
+   },
+   {
+    "click": "input[aria-label='Compare run 1910']"
+   },
+   {
+    "wait": 2500
+   },
+   {
+    "scroll": "[data-test=compare]"
+   }
+  ],
+  "clip": "[data-test=compare]"
+ },
+ {
+  "name": "run-failed",
+  "route": "/runs/failed",
+  "as": "summit.admin",
+  "thumb": true
+ },
+ {
+  "name": "run-failed-panel",
+  "route": "/runs/failed",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "click": "tr:has-text('#1970') >> text=Late census feed alert"
+   },
+   {
+    "wait": 2000
+   }
+  ]
+ },
+ {
+  "name": "run-failed-items",
+  "route": "/pipelines/schedules/1251/runs/1905?tab=items",
+  "as": "summit.admin"
+ },
+ {
+  "name": "run-big",
+  "route": "/pipelines/schedules/1132/runs/2019",
+  "as": "summit.admin"
+ }
+]
