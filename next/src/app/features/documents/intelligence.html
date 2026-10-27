@@ -69,7 +69,12 @@
                 <td class="text-right text-xs">{{ t.fieldCount ?? t.definition?.fields?.length ?? 0 }}</td>
                 <td class="text-right text-xs">{{ t.tableCount ?? t.definition?.tables?.length ?? 0 }}</td>
                 <td class="text-right text-xs">{{ t.definition?.rules?.length ?? 0 }}</td>
-                <td class="text-xs whitespace-nowrap">{{ thresholdOf(t) }}</td>
+                <td class="text-xs whitespace-nowrap">{{ thresholdOf(t) }}
+                  <!-- ZT-AI70: a type with a threshold that cannot approve on its own says so (owner: only with a lookup on key fields). -->
+                  @if (t.autoApproveThreshold != null && t.autoApprove && !t.autoApprove.possible) {
+                    <span class="pill pill-warn block mt-0.5" data-testid="auto-approve-off-pill" [attr.title]="t.autoApprove.reasons.join(' ')">Off: every document reviewed</span>
+                  }
+                </td>
                 <td><span class="pill pill-neutral mono">v{{ t.currentVersion }}</span></td>
                 <td class="text-xs whitespace-nowrap">{{ t.builtIn ? 'Built-in' : 'This workspace' }}</td>
                 <td class="text-xs min-w-40 max-w-80" data-test="type-starts" [attr.data-type]="t.typeKey">

@@ -57,8 +57,9 @@ two people at the front desk both file it: the workspace keeps one document, and
 
 ### Check the referral
 
-1. Open **Run & review › Review › Documents**. The letter waits there unless every value was read surely enough to be
-   approved on its own.
+1. Open **Run & review › Review › Documents**. The letter waits there: a referral is approved on its own only when every
+   value is sure enough and its key fields (patient ID, referring NPI) were confirmed by lookups against your reference
+   data, and this workspace has none yet.
 2. Open it, choose **Claim**, and work down the fields marked **check**, comparing each with the page on the left
    (see [Review a document](#doc-review)). The letter says: referral date `2026-10-20`, referred to `Summit Valley
    Medical Center, Wound care clinic`, patient `Harold Brennan`, born `1951-03-14`, urgency `Urgent`.

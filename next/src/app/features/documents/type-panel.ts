@@ -9,7 +9,7 @@ import { StatusPill } from '../../shared/ui/status-pill';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import {
   DocumentType, ListSource, RULE_KINDS, RULE_LABELS, RuleKind, TypeDefinition, TypeField, TypeRule, TypeTable, blankDefinition, blankRule, blankTable,
-  definitionProblems, definitionToSave, editableDefinition, listText, refusalText, statusOf, textList,
+  autoApproveVerdict, definitionProblems, definitionToSave, editableDefinition, listText, refusalText, statusOf, textList,
 } from './documents.model';
 import { DocumentsApi, TypeSave } from './documents.service';
 import { FieldListEditor } from './field-list-editor';
@@ -99,6 +99,18 @@ type Mode = 'view' | 'edit' | 'copy' | 'new' | 'version';
                 </div>
               </app-field>
             </div>
+            <!-- ZT-AI70: whether this type's documents can be approved on their own, and why not. -->
+            @if (autoApprove(); as v) {
+              @if (v.possible) {
+                <p class="text-sm rounded-lg border p-3 border-[color:var(--border-subtle)]" role="status" data-testid="auto-approve-on">Documents are approved on their own when every value
+                  clears {{ thresholdPct() }}% and every key field ({{ v.keyFields.join(', ') }}) is confirmed by its lookup; any other goes to review.</p>
+              } @else {
+                <div class="text-sm rounded-lg border p-3 border-[color:var(--warn-text)]" role="status" data-testid="auto-approve-off">
+                  <p class="font-medium">Auto-approve is off: every document of this type goes to review.</p>
+                  <ul class="list-disc pl-5">@for (r of v.reasons; track r) { <li>{{ r }}</li> }</ul>
+                </div>
+              }
+            }
             <app-field label="Instructions" for="typeInstructions" hint="Anything the model should know when it extracts this type: your own conventions.">
               <textarea id="typeInstructions" class="input min-h-16" rows="2" [value]="def().instructions ?? ''" [readOnly]="!editing()" (input)="patch({ instructions: $any($event.target).value })"></textarea>
             </app-field>
@@ -106,7 +118,7 @@ type Mode = 'view' | 'edit' | 'copy' | 'new' | 'version';
 
           <section class="flex flex-col gap-2" aria-label="Fields">
             <h3 class="text-sm font-semibold">Fields ({{ def().fields.length }})</h3>
-            <app-field-list-editor [fields]="def().fields" [readonly]="!editing()" noun="Field" (changed)="patch({ fields: $event })" />
+            <app-field-list-editor [fields]="def().fields" [readonly]="!editing()" noun="Field" [keys]="true" (changed)="patch({ fields: $event })" />
           </section>
 
           <section class="flex flex-col gap-2" aria-label="Tables">
@@ -310,6 +322,9 @@ export class TypePanel implements OnInit {
     return t?.builtIn ? this.data.types.find(x => !x.builtIn && x.typeKey === t.typeKey) ?? null : null;
   });
   readonly keywords = computed(() => listText(this.def().keywords));
+  /** ZT-AI70: the auto-approve verdict of the type as edited (the service's own rule). */
+  readonly autoApprove = computed(() => autoApproveVerdict(this.def()));
+
   readonly thresholdPct = computed(() => {
     const t = this.def().autoApproveThreshold;
     return t == null ? '' : String(Math.round(t * 100));

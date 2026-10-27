@@ -16,8 +16,9 @@ When a file arrives, three things happen before anyone looks at it:
 3. **Its fields are extracted.** The type's fields and tables are read from the text, each value with how sure the
    reading is and where on the page it was found.
 
-What comes out is a draft: values a person checks in review, unless every one is sure enough for the document to be
-approved on its own.
+What comes out is a draft: values a person checks in review, unless every one is sure enough and the type's key fields
+were confirmed by their lookups, so that the document is approved on its own (see
+[Auto-approve needs key fields](#doc-types)).
 
 ![Documents in](doc-documents-in "Documents in: each document's type, fields to check, confidence and state")
 
@@ -54,7 +55,7 @@ value was not found. A value a reviewer corrected counts as the reviewer's.
 | **Failed** | The extraction did not finish; choose **Extract again** |
 | **In review** | Waiting for a person in **Review › Documents** |
 | **Approved** | Approved by a reviewer |
-| **Auto-approved** | Every value was sure enough and nothing was wrong |
+| **Auto-approved** | Every value was sure enough, nothing was wrong, and every key field's lookup confirmed it |
 | **Rejected** | A reviewer rejected it, with a reason |
 
 ## One document per file

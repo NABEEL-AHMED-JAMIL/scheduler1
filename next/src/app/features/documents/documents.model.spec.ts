@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { HttpErrorResponse } from '@angular/common/http';
 import {
-  TypeDefinition, blankDefinition, boxPercent, correctionsOf, definitionProblems, definitionToSave, documentFields,
+  TypeDefinition, autoApproveVerdict, blankDefinition, boxPercent, correctionsOf, definitionProblems, definitionToSave, documentFields,
   editableDefinition, fieldName, fileName, isLow, isNumberColumn, linesMinWidthRem, listName, lowLine, nextInQueue, nextRowIndex, percent, recentRows, refusalText, ruleText,
   shortcutOf, skippedWhy, statusLabel, stepIndex, tableViews, textList, totalsOf, typeLabel, aliasText, textAliases,
 } from './documents.model';
@@ -323,3 +323,36 @@ describe('the line-items table (UX final DR1)', () => {
     expect(linesMinWidthRem([...invoice, { type: 'text' }, { type: 'date' }])).toBe(40);
   });
 });
+
+// ZT-AI70 (owner, 2026-10-27: "Only with a lookup on key fields"): confidence alone never approves a document.
+describe('auto-approve', () => {
+  const def = (over: Partial<TypeDefinition> = {}): TypeDefinition => ({
+    autoApproveThreshold: 0.9, rules: [], tables: [],
+    fields: [{ key: 'payer_name', label: 'Payer', type: 'text', required: true }, { key: 'member_id', label: 'Member ID', type: 'text' }],
+    ...over,
+  });
+
+  it('is off without key fields, without a threshold, or with a key field no lookup checks', () => {
+    expect(autoApproveVerdict(def()).possible).toBe(false);
+    expect(autoApproveVerdict(def()).reasons[0]).toContain('No key field is marked');
+    const keyed = def({ fields: [{ key: 'payer_name', label: 'Payer', type: 'text', keyField: true }] });
+    expect(autoApproveVerdict(keyed).reasons).toEqual([
+      'The key field Payer (payer_name) has no lookup rule: add one against a dataset or a file of your reference data (Rules > Lookup), '
+      + 'or every document goes to review.']);
+    expect(autoApproveVerdict({ ...keyed, autoApproveThreshold: null }).reasons[0]).toContain('No auto-approve threshold is set');
+  });
+
+  it('is on with a lookup on every key field, as the service says it', () => {
+    const on = def({
+      fields: [{ key: 'payer_name', label: 'Payer', type: 'text', keyField: true }],
+      rules: [{ rule: 'lookup', field: 'payer_name', list: { bucket: 'riverside-health-s3', key: 'ref/payers.csv', column: 'payer' } }],
+    });
+    expect(autoApproveVerdict(on)).toEqual({ possible: true, keyFields: ['payer_name'], reasons: [] });
+  });
+
+  it('keeps the key-field flag when the definition is saved', () => {
+    const saved = definitionToSave(def({ fields: [{ key: 'payer_name', label: 'Payer', type: 'text', keyField: true }] }));
+    expect(saved.fields[0].keyField).toBe(true);
+  });
+});
+

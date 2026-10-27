@@ -9,7 +9,8 @@ related: doc-intake, doc-file-drop, doc-types, doc-checks, doc-review, doc-bulk-
 ---
 These checks follow a document from the moment it arrives to its approved data: the types it is matched to, the ways it
 comes in, how it is read, how a person checks and decides it, and what its approval starts. A model's reading is a draft:
-nothing reaches approved data until a person (or the type's auto-approve line) passes it.
+nothing reaches approved data until a person passes it, or the type's auto-approve line does with every key field
+confirmed by its lookup.
 
 **Before you start:** a few synthetic PDFs: two referral letters, one invoice whose lines do not add up to its subtotal,
 and a copy of one referral under another file name. An email account you may send from, if your platform has Email-in.
@@ -70,6 +71,16 @@ Tested by ______ on ______
 |---|---|---|---|---|
 | QA-05.31 | A lab printout's H, L and N | **Document types**, the lab result type › **Edit**: on the **Flag** column, **Options written as** `High = H; Low = L; Normal = N`; **Save as the next version**; add a lab PDF whose flags are printed `H`, `L` and `N` | The flags read **High**, **Low** and **Normal**, each pointing at its letter on the page, with no "Not one of" problem | ☐ Pass ☐ Fail |
 | QA-05.32 | A word for two options is refused | **Options written as** `High = H; Low = H`; **Save** | Refused: the word `H` is given to both High and Low | ☐ Pass ☐ Fail |
+
+
+## Auto-approve and key fields
+| # | Check | Steps | Expected | Pass / Fail |
+|---|---|---|---|---|
+| QA-05.33 | Confidence alone never approves | As A, read a clean **Insurance card** with every value sure (no lookup on its type) | **State** **In review**; the document says **Not approved on its own: ...** with what is missing | ☐ Pass ☐ Fail |
+| QA-05.34 | The type says why auto-approve is off | **Document types**, open **Insurance card** | **Auto-approve is off: every document of this type goes to review**, naming each key field (**Payer**, **Member ID**) with no lookup; the list shows **Off: every document reviewed** under **Auto-approve at** | ☐ Pass ☐ Fail |
+| QA-05.35 | Key fields with lookups turn it on | **Edit**: add a **Lookup** on **Payer** and on **Member ID** against a payer list in your bucket; **Save**; read a card whose payer and member ID are on the list | The panel says **Documents are approved on their own when...**; the card is **Approved**, **On its own** | ☐ Pass ☐ Fail |
+| QA-05.36 | A key value not on the list waits | Read a card whose payer is not on the list | **In review**; the payer says **Not in** the list | ☐ Pass ☐ Fail |
+| QA-05.37 | A table's column cannot be a key field | **Edit** a type with a table | The **Key** box is on the document's fields only, never on a table's columns | ☐ Pass ☐ Fail |
 
 ## Access and isolation
 | # | Check | Steps | Expected | Pass / Fail |

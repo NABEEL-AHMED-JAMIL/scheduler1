@@ -24,6 +24,12 @@ import { FIELD_TYPES, TypeField, aliasText, blankField, listText, textAliases, t
           </select>
           <label class="flex items-center gap-1 text-xs whitespace-nowrap">
             <input type="checkbox" class="checkbox" [disabled]="readonly()" [checked]="!!f.required" (change)="patch(i, { required: $any($event.target).checked })" />Required
+            @if (keys()) {
+              <!-- ZT-AI70: a key identity field; auto-approve needs a lookup rule on each. -->
+              <input type="checkbox" class="checkbox ml-2" [disabled]="readonly()" [checked]="!!f.keyField" [attr.aria-label]="noun() + ' ' + (i + 1) + ' key field'"
+                     title="A key field identifies the document (payer, patient, member id). Documents are approved on their own only when every key field's lookup confirms it."
+                     (change)="patch(i, { keyField: $any($event.target).checked })" />Key
+            }
           </label>
           @if (!readonly()) {
             <div class="flex items-center gap-0.5 justify-end">
@@ -64,6 +70,8 @@ export class FieldListEditor {
   readonly readonly = input(false);
   /** "Field" or "Column": how a row is named to a screen reader and on Add. */
   readonly noun = input('Field');
+  /** ZT-AI70: whether a row may be marked a key field (a document's fields, never a table's columns). */
+  readonly keys = input(false);
   readonly changed = output<TypeField[]>();
   readonly types = FIELD_TYPES;
 

@@ -184,4 +184,33 @@ describe('TypePanel', () => {
     expect(api.setTypeStatus).toHaveBeenCalledWith(2001, 'Inactive');
     expect(panel.type()?.status).toBe('Inactive');
   });
+
+  // ZT-AI70 (owner, 2026-10-27: "Only with a lookup on key fields"): confidence alone never approves a document.
+  it('says auto-approve is off, and why, for a type with a line and no looked-up key field', async () => {
+    const { fixture, el } = panelWith({}, { ...OWN, definition: { ...PO_DEFINITION, autoApproveThreshold: 0.9, rules: [] } });
+    await fixture.whenStable();
+    const off = el.querySelector('[data-testid="auto-approve-off"]');
+    expect(off?.textContent).toContain('Auto-approve is off: every document of this type goes to review.');
+    expect(off?.textContent).toContain('No key field is marked');
+    expect(el.querySelector('[data-testid="auto-approve-on"]')).toBeNull();
+  });
+
+  it('says auto-approve is on when every key field has its lookup', async () => {
+    const keyed = { ...PO_DEFINITION, autoApproveThreshold: 0.9,
+      fields: PO_DEFINITION.fields.map((f, i) => i === 0 ? { ...f, keyField: true } : f),
+      rules: [{ rule: 'lookup', field: PO_DEFINITION.fields[0].key, list: { bucket: 'b', key: 'ref.csv', column: 'n' } }] };
+    const { fixture, el } = panelWith({}, { ...OWN, definition: keyed });
+    await fixture.whenStable();
+    expect(el.querySelector('[data-testid="auto-approve-on"]')?.textContent).toContain(PO_DEFINITION.fields[0].key);
+    expect(el.querySelector('[data-testid="auto-approve-off"]')).toBeNull();
+  });
+
+  it('offers Key on the document\'s fields only, never on a table\'s columns', async () => {
+    const { fixture, el } = panelWith({}, OWN);
+    await fixture.whenStable();
+    const fields = el.querySelector('section[aria-label="Fields"]')!;
+    const tables = el.querySelector('section[aria-label="Tables"]')!;
+    expect(fields.querySelectorAll('[aria-label$=" key field"]').length).toBe(PO_DEFINITION.fields.length);
+    expect(tables.querySelectorAll('[aria-label$=" key field"]').length).toBe(0);
+  });
 });

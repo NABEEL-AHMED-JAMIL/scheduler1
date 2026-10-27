@@ -85,8 +85,9 @@ Two roads lead to the same summary:
 2. Give it a field for every single answer of the form below (the same keys), a **table** for each table answer
    (medicines, allergies, conditions, operations, family history, vaccines) and a table `ros_positives` **Symptoms ticked
    (review of systems)** with one column `symptom`, and a yes / no field `signed` for the signature.
-3. Mark `first_name`, `last_name`, `dob` and `reason_for_visit` **Required**. **Auto-approve at** `97` %, so nearly
-   every scan is checked by a person. **What it is**: "A filled-in new-patient intake form" and its sections; **Words on
+3. Mark `first_name`, `last_name`, `dob` and `reason_for_visit` **Required**. **Auto-approve at** `97` %, and tick
+   **Key** on `first_name`, `last_name` and `dob`: with no lookup of your patient list on them yet, every scan is checked by a
+   person (see [Auto-approve needs key fields](#doc-types)). **What it is**: "A filled-in new-patient intake form" and its sections; **Words on
    the page**: `new patient intake, patient intake, intake form, review of systems, medicines you take now, allergies,
    consents and signature, emergency contact, insurance company`.
 4. Add three rules ([Checks a document must pass](#doc-checks)): the visit is not dated before the date of birth

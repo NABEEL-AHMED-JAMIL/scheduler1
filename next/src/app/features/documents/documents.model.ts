@@ -232,6 +232,8 @@ export interface TypeField {
   options?: string[] | null;
   /** MIG-426, choice only: the words a page writes each option as -- {"High": ["H"], "Low": ["L"]}; a printout's H reads as High. */
   optionAliases?: Record<string, string[]> | null;
+  /** ZT-AI70: a key identity field (payer, patient, member id); auto-approve needs a lookup rule on each. Document fields only. */
+  keyField?: boolean | null;
 }
 
 export interface TypeTable {
@@ -310,10 +312,39 @@ export interface DocumentType {
   fieldCount?: number | null;
   tableCount?: number | null;
   autoApproveThreshold?: number | null;
+  /** ZT-AI70: whether its documents can be approved on their own, and why not (the service's verdict). */
+  autoApprove?: AutoApproveVerdict | null;
   definition?: TypeDefinition | null;
   dateCreated?: string | null;
   dateUpdated?: string | null;
   versions?: TypeVersionRow[];
+}
+
+/** ZT-AI70: a type's auto-approve, as the service says it (AutoApprove.Verdict). */
+export interface AutoApproveVerdict { possible: boolean; keyFields: string[]; reasons: string[]; }
+
+/**
+ * ZT-AI70 (owner, 2026-10-27: "Only with a lookup on key fields"): confidence alone never approves a document. A type approves on
+ * its own only with a threshold, its key fields marked, and a lookup rule on each key field -- the service's own rule
+ * (AutoApprove.of), computed here too so the editor says it while the type is edited.
+ */
+export function autoApproveVerdict(d: TypeDefinition): AutoApproveVerdict {
+  const label = (key: string) => { const f = d.fields.find(x => x.key === key); return f?.label?.trim() ? `${f.label} (${key})` : key; };
+  const keyFields = d.fields.filter(f => !!f.keyField).map(f => f.key);
+  const reasons: string[] = [];
+  if (d.autoApproveThreshold == null) reasons.push('No auto-approve threshold is set: every document goes to review.');
+  if (!keyFields.length) {
+    reasons.push('No key field is marked. Mark the fields that identify a document (the payer, the patient, the member id) and check '
+      + 'each with a lookup rule against your reference data; until then every document goes to review.');
+  }
+  for (const key of keyFields) {
+    const looked = d.rules.some(r => r.rule === 'lookup' && !r.table && r.field === key);
+    if (!looked) {
+      reasons.push(`The key field ${label(key)} has no lookup rule: add one against a dataset or a file of your reference data `
+        + '(Rules > Lookup), or every document goes to review.');
+    }
+  }
+  return { possible: reasons.length === 0, keyFields, reasons };
 }
 
 /** One starter of the catalog (/documentType.json/starters), and where this workspace stands with it. */
@@ -858,6 +889,8 @@ export function definitionToSave(d: TypeDefinition): TypeDefinition {
     ...((f.aliases ?? []).length ? { aliases: f.aliases } : {}),
     ...(f.type === 'choice' ? { options: f.options ?? [] } : {}),
     ...(f.type === 'choice' && Object.keys(f.optionAliases ?? {}).length ? { optionAliases: f.optionAliases } : {}),
+    // ZT-AI70: kept as given; a table's columns are never key fields (the service refuses one).
+    ...(f.keyField ? { keyField: true } : {}),
   });
   const USES: Record<string, (keyof TypeRule)[]> = {
     sumEquals: ['table', 'column', 'field', 'tolerance'], sumOf: ['fields', 'field', 'tolerance'],
