@@ -1,0 +1,98 @@
+[
+ {
+  "name": "bill-cost",
+  "route": "/billing/usage",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "app-cost-by-day"
+   },
+   {
+    "wait": 2500
+   }
+  ],
+  "thumb": true
+ },
+ {
+  "name": "bill-pipelines",
+  "route": "/billing/usage",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "app-pipeline-costs"
+   },
+   {
+    "wait": 2500
+   }
+  ],
+  "clip": "app-pipeline-costs",
+  "thumb": true
+ },
+ {
+  "name": "bill-model-calls",
+  "route": "/billing/usage",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "app-model-calls"
+   },
+   {
+    "wait": 2500
+   }
+  ],
+  "clip": "app-model-calls"
+ },
+ {
+  "name": "bill-backfill",
+  "route": "/pipelines/schedules/1024/executions",
+  "as": "riverside.admin",
+  "steps": [
+   {
+    "waitFor": "[data-test=backfill-open]"
+   },
+   {
+    "wait": 800
+   },
+   {
+    "click": "[data-test=backfill-open]"
+   },
+   {
+    "waitFor": "[data-test=backfill-estimate]"
+   },
+   {
+    "wait": 1500
+   }
+  ],
+  "clip": "app-side-panel",
+  "pad": 0,
+  "retake": "Summit Valley: Denials by month (backfill a quarter), once its schedule is switched on (the showcase pauses it)",
+  "thumb": true
+ },
+ {
+  "name": "bill-invoice",
+  "route": "/billing/invoices/INV-2026-10-0003",
+  "as": "riverside.admin",
+  "steps": [
+   {
+    "waitFor": "[data-test=invoice-status]"
+   },
+   {
+    "wait": 1500
+   }
+  ],
+  "retake": "Summit Valley: its first issued invoice, with a receipt (Riverside's issued one has a test line name)",
+  "thumb": true
+ },
+ {
+  "name": "bill-documents",
+  "route": "/billing/documents",
+  "as": "riverside.admin",
+  "steps": [
+   {
+    "wait": 3000
+   }
+  ],
+  "retake": "Summit Valley: its statement once a month is issued",
+  "thumb": true
+ }
+]
