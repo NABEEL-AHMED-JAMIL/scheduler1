@@ -82,7 +82,8 @@ export const STEPS: Step[] = [
       'Documents: on Document types, add the types you read from the starters, grouped by market, or define your own with the fields to read.',
       'Then send documents in on Documents › Intake: Upload, or mail them to the workspace\'s Email-in address. File drop, on the same tab, stores files that start pipelines.',
       'An approved document\'s values land in Documents › Approved data. Document types says what each type\'s approval starts; set it on a schedule.',
-      'Forms: build a form whose answers start a pipeline or feed a review.',
+      'Forms: build a form whose answers start a pipeline or feed a review. In a field\'s settings, a Placeholder shows example '
+        + 'text inside its empty box (up to 120 characters) and Help text a short hint under it (up to 500); the canvas shows both as you type.',
     ],
     notes: [
       'Values a document type is unsure of go to Review › Documents for a person to check.',
@@ -449,6 +450,8 @@ export const HOW_TOS: HowTo[] = [
 export interface WhatsNew { date: string; title: string; text: string; article: string; }
 
 export const WHATS_NEW: WhatsNew[] = [
+  { date: '2026-10-26', title: 'Placeholders and help in forms', article: 'data-in',
+    text: 'A form\'s field can show example text inside its empty box and a hint under it, wherever the form is filled.' },
   { date: '2026-10-26', title: 'Run pipeline step', article: 'build',
     text: 'A pipeline can call another with parameters, once or once per row, and take its answer as rows.' },
   { date: '2026-10-26', title: 'Run and wait', article: 'developers',

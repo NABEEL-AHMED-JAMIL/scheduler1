@@ -1625,6 +1625,17 @@ components:
               label: { type: string }
               type: { type: string }
               required: { type: boolean }
+              help:
+                type: string
+                maxLength: 500
+                description: "A short hint shown under the field. Display text only, never markup; absent when it has none."
+              placeholder:
+                type: string
+                maxLength: 120
+                description: >-
+                  Example text shown inside the field's empty control (text, longText, number, date, email, choice and
+                  lookup fields only). One line of display text, never markup and never a substitute for `label`; absent
+                  when it has none.
               options: { type: array, items: { type: string } }
     Submission:
       type: object
