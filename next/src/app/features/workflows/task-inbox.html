@@ -328,7 +328,7 @@
             @if (taskFields().length && !decidedInStudio(d) && !stepApproval(d)) {
               <section aria-labelledby="task-details-title">
                 <h3 class="section-title mb-3" id="task-details-title">Request details</h3>
-                <ng-container *ngTemplateOutlet="fieldList; context: { $implicit: taskFields() }" />
+                <app-request-data [entries]="taskFields()" />
               </section>
             }
             <section aria-labelledby="task-history-title">
@@ -372,7 +372,7 @@
             @if (requestFields().length) {
               <section aria-labelledby="request-details-title">
                 <h3 class="section-title mb-3" id="request-details-title">Request details</h3>
-                <ng-container *ngTemplateOutlet="fieldList; context: { $implicit: requestFields() }" />
+                <app-request-data [entries]="requestFields()" />
               </section>
             }
             <section aria-labelledby="request-history-title">
@@ -411,43 +411,6 @@
 <ng-template #titled let-title>
   @let parts = refOf(title);
   @if (parts.ref) {<ng-container>{{ parts.name + ' ' }}</ng-container><span class="inbox-title-ref">{{ parts.ref }}</span>} @else {<ng-container>{{ title }}</ng-container>}
-</ng-template>
-
-<!-- A request's details: each value as its shape reads (value-kind.ts). -->
-<ng-template #fieldList let-fields>
-  <dl class="inbox-fields" data-test="request-fields">
-    @for (f of fields; track f.label) {
-      <div [class.is-wide]="f.view.kind === 'table' || f.view.kind === 'long'" [attr.data-kind]="f.view.kind">
-        <dt>{{ f.label }}</dt>
-        <dd>
-          @switch (f.view.kind) {
-            @case ('id') { <span class="inbox-id">{{ f.view.text }}</span> }
-            @case ('page') {
-              <a class="link-inline inline-flex items-center gap-1" [routerLink]="f.view.path" [queryParams]="f.view.query" data-test="field-page"><app-icon name="external" size="0.9em" />Open</a>
-            }
-            @case ('long') { <span class="inbox-long">{{ f.view.text }}</span> }
-            @case ('chips') { <span class="inbox-chips">@for (c of f.view.items; track $index) { <span class="pill pill-neutral">{{ c }}</span> }</span> }
-            @case ('file') {
-              @if (f.view.href) {
-                <a class="inbox-file" [href]="f.view.href" target="_blank" rel="noopener"><app-icon [name]="f.view.image ? 'image' : 'file'" size="0.95em" />{{ f.view.name }}</a>
-              } @else {
-                <span class="inbox-file"><app-icon [name]="f.view.image ? 'image' : 'file'" size="0.95em" />{{ f.view.name }}</span>
-              }
-            }
-            @case ('table') {
-              <div class="inbox-table-wrap">
-                <table class="inbox-table">
-                  <thead><tr>@for (c of f.view.columns; track $index) { <th scope="col">{{ c }}</th> }</tr></thead>
-                  <tbody>@for (row of f.view.rows; track $index) { <tr>@for (cell of row; track $index) { <td>{{ cell }}</td> }</tr> }</tbody>
-                </table>
-              </div>
-            }
-            @default { {{ f.view.text }} }
-          }
-        </dd>
-      </div>
-    }
-  </dl>
 </ng-template>
 
 <!-- A history: a dot per event in its tone, who and when under it, a comment as a quote. -->

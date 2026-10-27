@@ -16,7 +16,16 @@ export type ValueView =
   | { kind: 'chips'; items: string[] }
   | { kind: 'table'; columns: string[]; rows: string[][] }
   | { kind: 'file'; name: string; image: boolean; href: string | null }
-  | { kind: 'page'; path: string; query: Record<string, string> };
+  | { kind: 'page'; path: string; query: Record<string, string> }
+  | { kind: 'masked'; text: string };
+
+/**
+ * The platform's mask (platform-commons SensitiveValues.MASK): a value a policy hides arrives as it, or starting with it
+ * ("•••@•••.com", "••• 4242"). It reads as hidden, never as the value.
+ */
+export const MASK = '•••';
+export const MASKED_TITLE = 'Hidden: personal data';
+export const isMasked = (text: unknown): boolean => typeof text === 'string' && text.trim().startsWith(MASK);
 
 const IMAGE = /\.(png|jpe?g|gif|webp|svg|bmp|tiff?|heic|avif)$/i;
 const DOCUMENT = /\.(pdf|docx?|xlsx?|pptx?|csv|tsv|txt|rtf|odt|ods|json|xml|zip|eml|msg|md|parquet)$/i;
@@ -33,6 +42,7 @@ export function valueKind(value: unknown): ValueView {
   if (value !== null && typeof value === 'object') return recordView(value as Record<string, unknown>);
   if (typeof value === 'number') return { kind: 'text', text: String(value) };
   const text = String(value ?? '').trim();
+  if (isMasked(text)) return { kind: 'masked', text };
   const parsed = jsonOf(text);
   if (parsed !== undefined) return valueKind(parsed);
   const page = pageOf(text);
@@ -45,9 +55,12 @@ export function valueKind(value: unknown): ValueView {
   return { kind: 'text', text };
 }
 
-/** A label for a key, in sentence case: "submittedBy" and "submitted_by" read "Submitted by", "submissionId" "Submission ID". */
+/**
+ * A label for a key, in sentence case: "submittedBy" and "submitted_by" read "Submitted by", "submissionId" "Submission ID",
+ * "ai_summary" "AI summary".
+ */
 export function labelOf(key: string): string {
-  const words = key.replace(/[_-]+/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').trim().toLowerCase().replace(/\bid\b/g, 'ID');
+  const words = key.replace(/[_-]+/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').trim().toLowerCase().replace(/\bid\b/g, 'ID').replace(/\bai\b/g, 'AI');
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 

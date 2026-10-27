@@ -6,9 +6,11 @@ import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { Icon } from '../../shared/ui/icon';
 import { SidePanel } from '../../shared/ui/side-panel';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
-import type { TaskDetail } from '../workflows/workflows.api';
+import type { Colleague, TaskDetail } from '../workflows/workflows.api';
 import { ExtractedField, ReviewDetail, isLow, lowLine, percent } from '../documents/documents.model';
-import { labelOf } from '../workflows/value-kind';
+import { AuthService } from '../../core/auth/auth.service';
+import { RequestDataView } from '../workflows/request-data-view';
+import { requestContext, requestData } from '../workflows/request-data';
 import { ReviewItem, ageOf } from './review-sources';
 import { KIND_LABEL, linkOf } from './review-home.model';
 
@@ -31,7 +33,7 @@ interface RunReview { reviewStatus?: string; required?: string[]; decisions?: { 
  */
 @Component({
   selector: 'app-review-item-panel',
-  imports: [SidePanel, Icon, RouterLink, ServerTimePipe],
+  imports: [SidePanel, Icon, RouterLink, ServerTimePipe, RequestDataView],
   template: `
     <app-side-panel [heading]="heading()" [subtitle]="kindLabel() + (item.from ? ' · ' + item.from : '')" data-test="review-panel">
       <dl class="grid grid-cols-[8rem_minmax(0,1fr)] gap-x-4 gap-y-2 text-sm m-0">
@@ -60,12 +62,8 @@ interface RunReview { reviewStatus?: string; required?: string[]; decisions?: { 
           <h3 class="text-sm font-semibold mb-1">{{ t.name }}</h3>
           <p class="text-sm m-0 text-[color:var(--text-secondary)]">{{ t.requestTitle }}@if (t.workflowName) { <span> · {{ t.workflowName }}</span> }</p>
           @if (fields().length) {
-            <dl class="grid grid-cols-[8rem_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-sm mt-3 mb-0">
-              @for (f of fields(); track f.label) {
-                <dt class="text-[color:var(--text-muted)] truncate" [title]="f.label">{{ f.label }}</dt>
-                <dd class="m-0 [overflow-wrap:anywhere]">{{ f.value }}</dd>
-              }
-            </dl>
+            <!-- Owner 2026-10-27: the request's data as Approvals shows it (a run's outcome, a decision, each value by its shape). -->
+            <div class="mt-3"><app-request-data [entries]="fields()" /></div>
           }
         </section>
       }
@@ -131,10 +129,15 @@ export class ReviewItemPanel implements OnInit {
   readonly run = signal<RunReview | null>(null);
   readonly doc = signal<ReviewDetail | null>(null);
 
-  readonly fields = computed(() => Object.entries(this.task()?.subject ?? {})
-    .filter(([k, v]) => v !== null && v !== undefined && v !== '' && k !== 'link')
-    .slice(0, 12)
-    .map(([k, v]) => ({ label: labelOf(k), value: typeof v === 'object' ? JSON.stringify(v) : String(v) })));
+  private readonly auth = inject(AuthService);
+  /** The request's first twelve values, read as Approvals reads them; Approvals has them all. The link is the panel's own. */
+  readonly fields = computed(() => {
+    const t = this.task();
+    const subject = Object.fromEntries(Object.entries(t?.subject ?? {}).filter(([k]) => k !== 'link'));
+    return requestData(subject, requestContext(this.colleagues(), this.auth, t?.history)).slice(0, 12);
+  });
+  /** The workspace's people, for a decision's or a username's name. */
+  private readonly colleagues = signal<Colleague[]>([]);
 
   /** Every value the reviewer should look at, least sure first, as the review screen flags them. */
   private readonly allLow = computed<ExtractedField[]>(() => {
@@ -163,6 +166,11 @@ export class ReviewItemPanel implements OnInit {
       this.http.get<ApiResponse<TaskDetail>>(`${API_BASE}/taskInbox.json/task`, { params: { id: i.id } }).subscribe({
         next: r => { this.loading.set(false); if (r.status === API_SUCCESS && r.data) this.task.set(r.data); else this.error.set(r.message || 'The request could not be read.'); },
         ...settle('The request could not be read.'),
+      });
+      this.http.get<ApiResponse<Colleague[]>>(`${API_BASE}/taskInbox.json/colleagues`).subscribe({
+        next: r => { if (r.status === API_SUCCESS) this.colleagues.set(r.data ?? []); },
+        // Without the directory a decision keeps the name it was made with, and a username stays one.
+        error: () => {},
       });
     }
     if (i.runId != null && (i.via === 'core' || i.kind === 'run')) {

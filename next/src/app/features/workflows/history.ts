@@ -45,8 +45,9 @@ export function historyLines(events: HistoryEvent[], name: Names, stepName: (key
       case 'Escalated': line(`${step}: overdue, escalated to ${target(String(d['to'] ?? ''), name)}`, 'warn', str(d['note'])); break;
       case 'Reminded': line(`${step}: reminder sent`, 'plain'); break;
       case 'AssignedToAdministrators': line(`${step}: went to the administrators`, 'plain', str(d['reason'])); break;
-      case 'ConditionTrue': line(`${step}: yes`, 'plain'); break;
-      case 'ConditionFalse': line(`${step}: no`, 'plain'); break;
+      // A condition named as a question ("High priority?") answers it: "High priority? yes".
+      case 'ConditionTrue': line(`${step}${step.endsWith('?') ? '' : ':'} yes`, 'plain'); break;
+      case 'ConditionFalse': line(`${step}${step.endsWith('?') ? '' : ':'} no`, 'plain'); break;
       case 'PipelineStarted': line(`${step}: started run #${d['runId']}`, 'ok'); break;
       case 'PipelineFailed': line(`${step}: the pipeline could not start`, 'bad', str(d['error'])); break;
       case 'DatasetSaved': line(`${step}: saved to dataset ${d['dataset']}`, 'ok'); break;
@@ -130,7 +131,19 @@ export function shortTime(iso: string | null | undefined, timeZone?: string): st
   return `${Number(part('day'))} ${MONTHS[Number(part('month')) - 1]}, ${part('hour')}:${part('minute')}`;
 }
 
-const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+/**
+ * "27 Oct 2026, 00:52" (time-format.ts's dateTime): a moment kept in a request's data, which may be from another year.
+ * Naive or with an offset, read by instantOf; 24-hour, in the viewer's zone (or the one named).
+ */
+export function dateTime(iso: string | null | undefined, timeZone?: string): string {
+  const at = instantOf(iso);
+  if (!at) return iso ?? '';
+  const parts = new Intl.DateTimeFormat('en-GB', { year: 'numeric', day: 'numeric', month: 'numeric', timeZone }).formatToParts(at);
+  const part = (type: string) => parts.find(p => p.type === type)?.value ?? '';
+  return `${Number(part('day'))} ${MONTHS[Number(part('month')) - 1]} ${part('year')}, ${clock(at, timeZone)}`;
+}
+
+const WEEKDAYS = ['Sun','Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 /** The calendar day an instant falls on, in the viewer's zone (or the one named), as days since 1970. */
 export function dayNumber(at: Date, timeZone?: string): number {

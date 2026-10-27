@@ -16,11 +16,12 @@ import { ToastService } from '../../shared/ui/toast.service';
 import { confirmWith } from '../../shared/ui/confirm';
 import { Dialog } from '@angular/cdk/dialog';
 import { Observable } from 'rxjs';
-import { Colleague, Decision, InboxPage, InboxTask, RequestDetail, RequestRow, StartableWorkflow, TaskDetail, WorkflowsApi, CANNOT_ACT } from './workflows.api';
+import { Colleague, Decision, HistoryEvent, InboxPage, InboxTask, RequestDetail, RequestRow, StartableWorkflow, TaskDetail, WorkflowsApi, CANNOT_ACT } from './workflows.api';
 import { HistoryLine, compactTime, dropOwnStep, exactTime, historyLines, relativeTime, shortTime } from './history';
 import { TaskCountService } from './task-count.service';
 import { ListItem, RowTone, appendPage, choicesOf, commonOf, dueGroup, groupRows, matchesSearch, mergeHead, nextAfter, pastGroup, splitRef, stepFrom } from './inbox-list';
-import { ValueView, labelOf, valueKind } from './value-kind';
+import { RequestDataView } from './request-data-view';
+import { RequestDataContext, RequestEntry, entryText, requestContext, requestData, stepNamesOf } from './request-data';
 import { PageHeader } from '../../shared/ui/page-header';
 import { RefreshButton } from '../../shared/ui/refresh-button';
 import { BulkBar } from '../../shared/ui/bulk/bulk-bar';
@@ -36,9 +37,6 @@ const TABS: InboxTab[] = ['mine', 'teams', 'done', 'requests'];
 type PerTab<T> = Record<InboxTab, T>;
 const perTab = <T>(value: T): PerTab<T> => ({ mine: value, teams: value, done: value, requests: value });
 
-/** A request's field with how its value reads (value-kind.ts). */
-export interface FieldView { label: string; value: string; view: ValueView; }
-
 /**
  * The Task inbox (MIG-276), laid out as a mail client (owner, 2026-10-06): tabs over two panes that fill the screen and
  * scroll on their own -- the list, searchable and filtered, under day headers; the task with its decisions straight
@@ -48,7 +46,7 @@ export interface FieldView { label: string; value: string; view: ValueView; }
  */
 @Component({
   selector: 'app-task-inbox',
-  imports: [RunReviewCard, PipelineApprovalCard, ReportReviewCard, RefreshButton, PageHeader, FormsModule, NgTemplateOutlet, RouterLink, Icon, StatusPill, Combobox, Avatar, BulkBar],
+  imports: [RunReviewCard, PipelineApprovalCard, ReportReviewCard, RequestDataView, RefreshButton, PageHeader, FormsModule, NgTemplateOutlet, RouterLink, Icon, StatusPill, Combobox, Avatar, BulkBar],
   templateUrl: './task-inbox.html',
   host: { '(document:keydown)': 'onKey($event)' },
   styles: `
@@ -175,12 +173,12 @@ export class TaskInbox implements OnInit {
   /** The task's history, its own lines without its name: the heading already says it. */
   readonly taskHistory = computed<HistoryLine[]>(() => {
     const d = this.detail();
-    return d ? dropOwnStep(historyLines(d.history, id => this.historyName(id), key => this.stepName(key, d.tasks)), d.name) : [];
+    return d ? dropOwnStep(historyLines(d.history, id => this.historyName(id), key => this.stepName(key, d.tasks, d.history)), d.name) : [];
   });
 
   readonly requestHistory = computed<HistoryLine[]>(() => {
     const r = this.request();
-    return r ? historyLines(r.history, id => this.historyName(id), key => this.stepName(key, r.tasks)) : [];
+    return r ? historyLines(r.history, id => this.historyName(id), key => this.stepName(key, r.tasks, r.history)) : [];
   });
 
   // ---- the list ---------------------------------------------------------------------------------------------------
@@ -267,9 +265,9 @@ export class TaskInbox implements OnInit {
     return !!q && this.hasMore() && this.searched()[this.tab()] !== q;
   });
 
-  /** The request's details, each with how its value reads. */
-  readonly taskFields = computed<FieldView[]>(() => this.fieldViews(this.detail()?.subject));
-  readonly requestFields = computed<FieldView[]>(() => this.fieldViews(this.request()?.subject));
+  /** The request's data as a person reads it (request-data.ts): a run's outcome, a decision, each value by its shape. */
+  readonly taskFields = computed<RequestEntry[]>(() => requestData(this.detail()?.subject, this.dataContext(this.detail()?.history)));
+  readonly requestFields = computed<RequestEntry[]>(() => requestData(this.request()?.subject, this.dataContext(this.request()?.history)));
 
   constructor() {
     // A selection belongs to the list it was made from: another tab, search or filter starts it again.
@@ -841,11 +839,12 @@ export class TaskInbox implements OnInit {
     return this.name(id);
   }
 
-  stepName(key: string | null | undefined, tasks: { stepKey: string; name: string }[]): string {
+  /** A step by its name: its task's, else the one the engine entered it with (a run, a condition), else its key. */
+  stepName(key: string | null | undefined, tasks: { stepKey: string; name: string }[], history?: HistoryEvent[] | null): string {
     if (!key) return 'The request';
     const base = key.endsWith('#changes') ? key.slice(0, -'#changes'.length) : key;
     const t = tasks.find(x => x.stepKey === key) ?? tasks.find(x => x.stepKey === base);
-    return t ? t.name : base;
+    return t ? t.name : stepNamesOf(history).get(base) ?? base;
   }
 
   holder(t: InboxTask): string {
@@ -937,10 +936,6 @@ export class TaskInbox implements OnInit {
     return { jobQueueId: id, attempt, link };
   }
 
-  private fieldViews(subject: Record<string, unknown> | undefined | null): FieldView[] {
-    return this.fields(subject).map(f => ({ ...f, view: valueKind(f.value) }));
-  }
-
   stateLabel(t: InboxTask): string {
     if (t.state === 'Open') return t.overdue ? 'Overdue' : 'Pending';
     return t.state === 'ChangesRequested' ? 'Changes asked' : t.state;
@@ -948,34 +943,16 @@ export class TaskInbox implements OnInit {
 
   /**
    * The subject's fields as label and value, the way a person reads them (UI review U10, U14): a yes/no answer says
-   * Yes or No rather than true or false, and a person's username (Submitted by) reads as their name.
+   * Yes or No rather than true or false, a person's username (Submitted by) reads as their name, a run's outcome and a
+   * decision as their line (request-data.ts). A step's assignee ({kind, value}) is the workflow's routing, already shown as
+   * the "With ..." chip (QA 2026-10-20), and never a field.
    */
   fields(subject: Record<string, unknown> | undefined | null): { label: string; value: string }[] {
-    if (!subject) return [];
-    return Object.entries(subject)
-      .filter(([, v]) => v !== null && v !== undefined && v !== '')
-      // QA 2026-10-20: who a step goes to ({kind, value}: a team, a role, a person) is the workflow's routing, already
-      // shown as the "With ..." chip; as a field it read "Kind team / Value 1063".
-      .filter(([, v]) => !isAssignee(v))
-      .map(([k, v]) => ({ label: labelOf(k), value: this.valueText(v) }));
+    return requestData(subject, this.dataContext()).map(e => ({ label: e.label, value: entryText(e) }));
   }
 
-  private valueText(v: unknown): string {
-    if (typeof v === 'boolean' || v === 'true' || v === 'false') return v === true || v === 'true' ? 'Yes' : 'No';
-    if (typeof v === 'object') return JSON.stringify(v);
-    const text = String(v);
-    // The colleague list first: it carries the directory's full name, where the session may hold only the username.
-    const person = this.colleagues().find(c => c.username === text);
-    if (person?.fullName) return person.fullName;
-    const me = this.auth.user();
-    return me?.username && text === me.username && me.fullName ? me.fullName : text;
+  /** What the request's data is read with: the colleague directory for names, the history for a run's step. */
+  private dataContext(history?: HistoryEvent[] | null): RequestDataContext {
+    return requestContext(this.colleagues(), this.auth, history);
   }
-}
-
-/** A step's assignee as a subject names it: {kind: team | role | user | subject, value} and nothing else. */
-function isAssignee(v: unknown): boolean {
-  if (!v || typeof v !== 'object' || Array.isArray(v)) return false;
-  const keys = Object.keys(v as object);
-  const kind = (v as { kind?: unknown }).kind;
-  return keys.length === 2 && keys.includes('kind') && keys.includes('value') && ['team', 'role', 'user', 'subject'].includes(String(kind));
 }

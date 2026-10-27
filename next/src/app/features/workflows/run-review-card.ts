@@ -4,6 +4,7 @@ import { RouterLink } from '@angular/router';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { Icon } from '../../shared/ui/icon';
 import { StorageService } from '../objects/storage.service';
+import { DRAFT_TITLE } from './request-data';
 
 /** One output a run recorded (sourceJob.json/runOutputs), as far as this card reads it. */
 interface RunOutputRow {
@@ -75,7 +76,7 @@ export function reviewFields(row: Record<string, unknown>): { first: { label: st
       <section aria-labelledby="run-review-title" data-test="run-review-card">
         <div class="flex flex-wrap items-center gap-2 mb-3">
           <h3 class="section-title m-0" id="run-review-title">What to review</h3>
-          @if (isDraft()) { <span class="pill pill-warn" title="Made by a model for a person to check; not a decision">DRAFT</span> }
+          @if (isDraft()) { <span class="pill pill-warn" [title]="draftTitle">DRAFT</span> }
           @if (rows().length > 1) { <span class="text-xs text-[color:var(--text-muted)]">row 1 of {{ rows().length }}</span> }
           <span class="flex-1"></span>
           @if (pdf(); as p) {
@@ -127,6 +128,7 @@ export class RunReviewCard implements OnDestroy {
   readonly attempt = input<number>(1);
   /** The run page, for "Open the run". */
   readonly link = input<string | null>(null);
+  readonly draftTitle = DRAFT_TITLE;
 
   readonly loading = signal(true);
   readonly outputs = signal<RunOutputRow[]>([]);
