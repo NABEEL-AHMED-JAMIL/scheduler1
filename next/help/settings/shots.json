@@ -1,0 +1,115 @@
+[
+ {
+  "name": "set-alerts",
+  "route": "/settings/alerts",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "text=Census feed failed"
+   },
+   {
+    "wait": 1000
+   }
+  ],
+  "thumb": true
+ },
+ {
+  "name": "set-alert-rule",
+  "route": "/settings/alerts",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "[data-test=alerts-new-rule]"
+   },
+   {
+    "wait": 800
+   },
+   {
+    "click": "[data-test=alerts-new-rule]"
+   },
+   {
+    "waitFor": "[data-test=rule-kind]"
+   },
+   {
+    "wait": 1000
+   }
+  ],
+  "clip": "app-side-panel",
+  "pad": 0
+ },
+ {
+  "name": "set-model-connections",
+  "route": "/settings/model-connections",
+  "as": "riverside.admin",
+  "steps": [
+   {
+    "wait": 3000
+   }
+  ]
+ },
+ {
+  "name": "set-task-registry",
+  "route": "/settings/task-registry",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "wait": 3000
+   }
+  ],
+  "thumb": true
+ },
+ {
+  "name": "set-values",
+  "route": "/settings/values",
+  "as": "riverside.admin",
+  "steps": [
+   {
+    "wait": 2500
+   }
+  ],
+  "clip": "div.card.p-4.flex.items-start",
+  "retake": "A workspace with configuration values and secrets listed (no test workspace has any yet)",
+  "thumb": true
+ },
+ {
+  "name": "set-appearance",
+  "route": "/administration/appearance",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "[data-test=workspace-theme-card]"
+   },
+   {
+    "wait": 1000
+   }
+  ],
+  "retake": "Summit Valley: with its default set to Light (it reads no default today)",
+  "thumb": true
+ },
+ {
+  "name": "set-appearance-dark",
+  "route": "/administration/appearance",
+  "as": "summit.admin",
+  "theme": "dark",
+  "steps": [
+   {
+    "waitFor": "[data-test=workspace-theme-card]"
+   },
+   {
+    "wait": 1000
+   }
+  ]
+ },
+ {
+  "name": "set-help",
+  "route": "/docs",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "wait": 2500
+   }
+  ],
+  "retake": "The help centre once this new content is built into it (today it shows the old twelve parts)",
+  "thumb": true
+ }
+]
