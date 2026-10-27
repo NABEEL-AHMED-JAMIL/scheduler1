@@ -1,0 +1,144 @@
+[
+ {
+  "name": "rs-overview",
+  "route": "/reports/overview",
+  "as": "summit.admin"
+ },
+ {
+  "name": "rs-templates",
+  "route": "/reports/templates",
+  "as": "summit.admin",
+  "thumb": true
+ },
+ {
+  "name": "rs-template-page",
+  "route": "/reports/templates/01M5WZJ28PXFRYHP8F1TJAK4CJ",
+  "as": "summit.admin"
+ },
+ {
+  "name": "rs-designer",
+  "route": "/reports/templates/01M5WZJ2ZKCBQVP9NJMPFWAREX/design",
+  "as": "summit.admin",
+  "settle": 2500,
+  "thumb": true
+ },
+ {
+  "name": "rs-chart",
+  "route": "/reports/templates/01M5WZJ2ZKCBQVP9NJMPFWAREX/design",
+  "as": "summit.admin",
+  "settle": 2500,
+  "steps": [
+   {
+    "click": "button:has-text('Layers')"
+   },
+   {
+    "click": ".rsd-layer:has-text('Chart')"
+   },
+   {
+    "wait": 1500
+   }
+  ]
+ },
+ {
+  "name": "rs-ai-panel",
+  "route": "/reports/templates/01M5J407ZHRVG7CMAPNYWDP91T/design",
+  "as": "riverside.admin",
+  "settle": 2500,
+  "steps": [
+   {
+    "waitFor": "[data-ai-panel]"
+   },
+   {
+    "scroll": "[data-ai-panel]"
+   }
+  ],
+  "clip": "[data-ai-panel]",
+  "pad": 8,
+  "retake": "Summit Valley: no template draft there yet; this is Riverside's"
+ },
+ {
+  "name": "rs-data",
+  "route": "/reports/data",
+  "as": "summit.admin"
+ },
+ {
+  "name": "rs-assets",
+  "route": "/reports/assets",
+  "as": "summit.admin",
+  "thumb": true
+ },
+ {
+  "name": "rs-asset-signature",
+  "route": "/reports/assets/01M5WZH6XGMJSBYJZKK8DAV89Z",
+  "as": "summit.admin",
+  "viewport": [
+   1920,
+   1400
+  ]
+ },
+ {
+  "name": "rs-new-mapping",
+  "route": "/reports/new?templateId=01M5WZJ28PXFRYHP8F1TJAK4CJ",
+  "as": "summit.admin",
+  "settle": 2000,
+  "steps": [
+   {
+    "click": "button:has-text('Samples')"
+   },
+   {
+    "wait": 600
+   },
+   {
+    "selectIndex": [
+     "app-report-source-picker select",
+     1
+    ]
+   },
+   {
+    "wait": 2500
+   }
+  ],
+  "thumb": true
+ },
+ {
+  "name": "rs-report-page",
+  "route": "/reports/library/01M5XC24B3H1EMYMY4SBJP8CJ1",
+  "as": "summit.admin",
+  "thumb": true
+ },
+ {
+  "name": "rs-verify",
+  "route": "/reports/library/01M5XC24B3H1EMYMY4SBJP8CJ1",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "click": "button:has-text('Verify signature')"
+   },
+   {
+    "waitFor": "app-side-panel"
+   },
+   {
+    "click": "app-side-panel button:has-text('Check version')"
+   },
+   {
+    "wait": 2500
+   }
+  ],
+  "clip": "app-side-panel",
+  "pad": 0,
+  "viewport": [
+   1920,
+   1100
+  ]
+ },
+ {
+  "name": "rs-library",
+  "route": "/reports/library",
+  "as": "summit.admin"
+ },
+ {
+  "name": "rs-settings",
+  "route": "/reports/settings",
+  "as": "summit.admin"
+ }
+]
