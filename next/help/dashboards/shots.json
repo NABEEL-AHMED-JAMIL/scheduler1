@@ -1,0 +1,257 @@
+[
+ {
+  "name": "dash-list",
+  "route": "/data/analytics/dashboards",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "text=Bed board"
+   },
+   {
+    "wait": 800
+   }
+  ]
+ },
+ {
+  "name": "dash-board",
+  "route": "/data/analytics/dashboards?board=1004",
+  "as": "riverside.admin",
+  "steps": [
+   {
+    "waitFor": "[data-test=load-time]"
+   },
+   {
+    "wait": 1500
+   }
+  ],
+  "retake": "Summit Valley: Patient journey (filter bar, sections) once its feed files are written; its tiles fail today",
+  "thumb": true
+ },
+ {
+  "name": "dash-board-dark",
+  "route": "/data/analytics/dashboards?board=1004",
+  "as": "riverside.admin",
+  "theme": "dark",
+  "steps": [
+   {
+    "waitFor": "[data-test=load-time]"
+   },
+   {
+    "wait": 1500
+   }
+  ],
+  "retake": "Summit Valley: Patient journey in Dark, with the light shot"
+ },
+ {
+  "name": "dash-made-by",
+  "route": "/data/analytics/dashboards?board=1004",
+  "as": "riverside.admin",
+  "viewport": [
+   1920,
+   620
+  ],
+  "steps": [
+   {
+    "waitFor": "[data-test=load-time]"
+   },
+   {
+    "click": "summary:has-text('Files this board reads')"
+   },
+   {
+    "wait": 800
+   }
+  ],
+  "retake": "Summit Valley: Bed board (Made by Bed occupancy by ward) once all four of its widgets draw",
+  "thumb": true
+ },
+ {
+  "name": "dash-add-widget",
+  "route": "/data/analytics/dashboards?board=1004",
+  "as": "riverside.admin",
+  "steps": [
+   {
+    "waitFor": "[data-test=load-time]"
+   },
+   {
+    "click": "[data-overflow][aria-label='More actions']"
+   },
+   {
+    "click": "text=Add a widget"
+   },
+   {
+    "waitFor": "#w-title"
+   },
+   {
+    "fill": [
+     "#w-title",
+     "Patients by risk level"
+    ]
+   },
+   {
+    "wait": 600
+   }
+  ],
+  "clip": "div.card:has(#w-title)",
+  "pad": 12,
+  "thumb": true
+ },
+ {
+  "name": "dash-kind-picker",
+  "route": "/data/analytics/dashboards?board=1004",
+  "as": "riverside.admin",
+  "steps": [
+   {
+    "waitFor": "[data-test=load-time]"
+   },
+   {
+    "click": "[aria-label='Actions for Risk level']"
+   },
+   {
+    "click": "text=Choose a chart, with a preview\u2026"
+   },
+   {
+    "waitFor": "app-side-panel"
+   },
+   {
+    "wait": 1000
+   },
+   {
+    "hover": "app-side-panel >> text=Ranked bars"
+   },
+   {
+    "wait": 1200
+   }
+  ],
+  "clip": "app-side-panel",
+  "pad": 0
+ },
+ {
+  "name": "dash-pin",
+  "route": "/data/analytics?connection=riverside-health-s3&path=patient360/results/cohort.csv&name=cohort.csv",
+  "as": "riverside.admin",
+  "steps": [
+   {
+    "waitFor": "[data-test=visualise]"
+   },
+   {
+    "wait": 1500
+   },
+   {
+    "click": "[data-test=visualise]"
+   },
+   {
+    "waitFor": "[data-test=pin-chart]"
+   },
+   {
+    "wait": 1000
+   },
+   {
+    "click": "[data-test=pin-chart]"
+   },
+   {
+    "waitFor": "[data-test=pin-panel]"
+   },
+   {
+    "wait": 1000
+   }
+  ],
+  "clip": "app-side-panel:has([data-test=pin-panel])",
+  "retake": "Summit Valley: Fullest wards last week, pinned from Ask your data to Bed board",
+  "thumb": true
+ },
+ {
+  "name": "dash-studio",
+  "route": "/data/analytics?connection=riverside-health-s3&path=patient360/results/cohort.csv&name=cohort.csv",
+  "as": "riverside.admin",
+  "steps": [
+   {
+    "waitFor": "#a-tab-profile"
+   },
+   {
+    "wait": 1000
+   },
+   {
+    "click": "#a-tab-profile"
+   },
+   {
+    "wait": 4000
+   }
+  ],
+  "thumb": true
+ },
+ {
+  "name": "dash-catalog",
+  "route": "/data/catalog?flag=sensitive",
+  "as": "summit.admin",
+  "steps": [
+   {
+    "waitFor": "[data-phi-callout]"
+   },
+   {
+    "wait": 1500
+   }
+  ],
+  "thumb": true
+ },
+ {
+  "name": "dash-catalog-access",
+  "route": "/data/catalog?flag=sensitive",
+  "as": "summit.res.ito",
+  "steps": [
+   {
+    "waitFor": "tr[data-asset]"
+   },
+   {
+    "wait": 1000
+   },
+   {
+    "click": "tr[data-asset]"
+   },
+   {
+    "waitFor": "[data-catalog-panel]"
+   },
+   {
+    "wait": 1000
+   }
+  ],
+  "clip": "app-side-panel",
+  "pad": 0
+ },
+ {
+  "name": "dash-files",
+  "route": "/data/files?bucket=riverside-health-s3&prefix=patient360/results/",
+  "as": "riverside.admin",
+  "steps": [
+   {
+    "wait": 2500
+   }
+  ]
+ },
+ {
+  "name": "dash-converter",
+  "route": "/tools/converter",
+  "as": "riverside.admin",
+  "steps": [
+   {
+    "waitFor": "[data-test=converter-limits]"
+   },
+   {
+    "wait": 1000
+   }
+  ]
+ },
+ {
+  "name": "dash-transcript",
+  "route": "/tools/transcript",
+  "as": "riverside.admin",
+  "steps": [
+   {
+    "waitFor": "[data-test=transcript-limits]"
+   },
+   {
+    "wait": 800
+   }
+  ],
+  "clip": "app-section"
+ }
+]
