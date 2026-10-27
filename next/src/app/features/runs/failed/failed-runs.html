@@ -142,7 +142,7 @@
                     </td>
                     <td class="whitespace-nowrap">
                       <span class="block">{{ stepOf(run) }}</span>
-                      @if (run.task) { <span class="mono text-[11px] text-[color:var(--text-muted)]">{{ run.task }}</span> }
+                      @if (run.task) { <span class="text-[11px] text-[color:var(--text-muted)]" [title]="run.task">{{ stepName(run.task) }}</span> }
                     </td>
                     <td class="error-cell"><span class="block truncate" [title]="run.error || ''">{{ run.error || '—' }}</span></td>
                     <td><span class="kind-chip">{{ run.kindLabel }}</span></td>

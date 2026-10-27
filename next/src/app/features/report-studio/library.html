@@ -120,7 +120,7 @@
                 @if (isRunning(j.status)) { <span class="text-sm">{{ stageWord(j.status) }} · {{ j.progressPct }}%</span> }
                 @else {
                   <app-status [label]="chipWord(j.status)" />
-                  @if (j.errorCode) { <div class="text-xs mono mt-0.5">{{ j.errorCode }}</div> <div class="text-xs text-[color:var(--text-muted)] max-w-80">{{ j.error }}</div>
+                  @if (j.errorCode) { <div class="text-xs mono mt-0.5">{{ j.errorCode }}</div> <div class="text-xs text-[color:var(--text-muted)] max-w-80">{{ plain(j.error) }}</div>
                     <app-page-limit-actions [job]="j" [compact]="true" /> }
                 }
               </td>

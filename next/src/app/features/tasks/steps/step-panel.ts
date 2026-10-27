@@ -10,7 +10,7 @@ import { CallApiPreview } from './call-api-preview';
 import { REPORT_DESIGN_KEYS, ReportDesignSettings, ReportStepDesign } from './report-step-design';
 import {
   LIMITS, ON_ERRORS, ApiRequestChoice, BucketChoice, DocumentTypeChoice, JsonSchema, PromptChoice, WebhookChoice, Step, StepProblem, StepTaskEntry, canonicalStep, fieldsOf, onErrorLabel, parseJson, problemsAt, taskLabel,
-  validKey, ScheduleChoice } from './steps.model';
+  validKey, ScheduleChoice, plainHint } from './steps.model';
 
 export interface StepPanelData {
   step: Step;
@@ -91,7 +91,7 @@ export class StepPanel {
   readonly configError = signal('');
 
   readonly heading = computed(() => `Step ${this.data.index + 1} · ${this.edit().key || 'no key'}`);
-  readonly subtitle = computed(() => [taskLabel(this.data.task, this.data.step.task), this.data.task?.description].filter(Boolean).join(' · '));
+  readonly subtitle = computed(() => [taskLabel(this.data.task, this.data.step.task), plainHint(this.data.task?.description ?? '')].filter(Boolean).join(' · '));
   readonly keyError = computed(() => {
     const server = problemsAt(this.data.problems, 'key');
     if (server.length) return server.join(' · ');

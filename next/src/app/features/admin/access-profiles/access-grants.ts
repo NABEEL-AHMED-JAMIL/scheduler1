@@ -22,8 +22,22 @@ export function actionLabel(action: string): string {
     // MIG-424: two-factor required (or not) of a profile's people, or of the whole workspace.
     case 'PROFILE_TWO_FACTOR': return 'Changed a profile\'s two-factor rule';
     case 'WORKSPACE_TWO_FACTOR': return 'Changed the workspace\'s two-factor rule';
-    default: return action;
+    // ZT-U8: a team's changes are in the same log, and read as words too.
+    case 'TEAM_CREATED': return 'Made a team';
+    case 'TEAM_CHANGED': return 'Changed a team';
+    case 'TEAM_ARCHIVED': return 'Archived a team';
+    case 'TEAM_MEMBER_ADDED': return 'Added to a team';
+    case 'TEAM_MEMBER_REMOVED': return 'Removed from a team';
+    // Anything newer: its code read as words (SOME_NEW_THING -> "Some new thing"), never the code itself.
+    default: return /^[A-Z][A-Z0-9_]+$/.test(action) ? action.charAt(0) + action.slice(1).toLowerCase().replace(/_/g, ' ') : action;
   }
+}
+
+/** A change's detail: a page or tab key as it is, a team role (LEAD, MEMBER) as a word. */
+export function changeDetail(c: { action: string; key: string | null; after: string | null }): string {
+  const role: Record<string, string> = { LEAD: 'Lead', MEMBER: 'Member' };
+  if (c.action.startsWith('TEAM_')) return [c.key, c.after ? role[c.after] ?? c.after : null].filter(Boolean).join(' · ');
+  return c.key || (c.after ?? '');
 }
 
 /** "21 Oct 2026, 20:45" in the browser's own zone, 24-hour. */
@@ -203,7 +217,7 @@ function stamp(value: string | null | undefined): string {
                 <td>{{ c.actorName || '—' }}@if (c.delegateId) { <span class="pill pill-neutral ml-1">Delegate</span> }</td>
                 <td>{{ label(c.action) }}</td>
                 <td>{{ c.targetName || '—' }}</td>
-                <td class="mono text-xs">{{ c.key || (c.after ?? '') }}</td>
+                <td class="text-xs" [class.mono]="!c.action.startsWith('TEAM_')">{{ detail(c) }}</td>
                 <td class="whitespace-nowrap">{{ c.expiresAt ? when(c.expiresAt) : '' }}</td>
                 <td class="text-xs">{{ c.reason }}</td>
               </tr>
@@ -273,6 +287,7 @@ export class AccessGrants {
   }
 
   label(action: string): string { return actionLabel(action); }
+  detail(c: AccessChange): string { return changeDetail(c); }
   when(value: string | null | undefined): string { return stamp(value); }
 
   show(view: GrantsView): void {

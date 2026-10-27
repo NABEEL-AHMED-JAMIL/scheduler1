@@ -36,7 +36,7 @@
     } @else if (lastFailed(); as j) {
       <div class="rs-banner rs-banner-crit mb-3" role="status">
         <app-icon name="alert" class="icon-crit shrink-0" />
-        <div class="min-w-0 flex-1"><b>{{ j.label }} failed</b> <span class="mono text-xs">({{ j.errorCode }})</span>: {{ j.error }}
+        <div class="min-w-0 flex-1"><b>{{ j.label }} failed</b> <span class="mono text-xs">({{ j.errorCode }})</span>: {{ plain(j.error) }}
           No version was made@if (r.currentVersion) {; version {{ r.currentVersion }} is unchanged}.
           <!-- Owner 2026-10-21: over the page limit, what to do instead (where it applies). -->
           <app-page-limit-actions [job]="j" /></div>
@@ -194,7 +194,7 @@
             @if (againJob(); as j) {
               <div class="flex flex-col gap-1" aria-live="polite">
                 <span class="text-sm">{{ j.label }} · {{ stageWord(j.status) }} · {{ j.progressPct }}%</span>
-                @if (j.status === 'FAILED') { <span class="text-xs text-[color:var(--crit-text)]">{{ j.error }} No version was made.</span> }
+                @if (j.status === 'FAILED') { <span class="text-xs text-[color:var(--crit-text)]">{{ plain(j.error) }} No version was made.</span> }
               </div>
             }
             @if (againError()) { <p class="text-xs text-[color:var(--crit-text)]" role="alert">{{ againError() }}</p> }

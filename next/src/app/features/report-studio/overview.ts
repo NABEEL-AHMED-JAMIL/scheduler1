@@ -1,3 +1,4 @@
+import { plainHint } from '../../shared/ui/plain-words';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { PageHeader } from '../../shared/ui/page-header';
@@ -44,6 +45,8 @@ const FAIL_WORDS: Record<string, string> = {
   templateUrl: './overview.html',
 })
 export class ReportOverview implements OnInit {
+  /** ZT-U8: a job's message in the menu's words (Reports › Settings, not Report Studio › Settings). */
+  plain(text: string | null | undefined): string { return plainHint(text ?? ''); }
   private readonly api = inject(ReportStudioApi);
   private readonly auth = inject(AuthService);
   private readonly tabCounts = inject(RsTabCounts);

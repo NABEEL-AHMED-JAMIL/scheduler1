@@ -1,4 +1,5 @@
-import { Component, computed, input, linkedSignal, output, signal } from '@angular/core';
+import { Component, Injector, computed, effect, inject, input, linkedSignal, output, signal } from '@angular/core';
+import { TeamsApi } from '../../../core/teams/teams.api';
 import { Field } from '../../../shared/ui/field';
 import { Icon } from '../../../shared/ui/icon';
 import {
@@ -83,7 +84,7 @@ interface MapRow { key: string; value: unknown; }
               <select [id]="idOf(f)" class="input" [value]="choiceIndex(f)" [disabled]="disabled()" (change)="pick(f, $any($event.target).value)">
                 <option value="">{{ f.required ? 'Choose…' : 'None' }}</option>
                 @for (option of f.options; track $index) {
-                  <option [value]="'' + $index" [selected]="choiceIndex(f) === '' + $index">{{ optionText(option) }}</option>
+                  <option [value]="'' + $index" [selected]="choiceIndex(f) === '' + $index">{{ optionLabel(f, $index, option) }}</option>
                 }
               </select>
             </app-field>
@@ -95,7 +96,7 @@ interface MapRow { key: string; value: unknown; }
                 @for (option of f.options; track $index) {
                   <label class="flex items-center gap-2 text-sm">
                     <input type="checkbox" class="checkbox" [id]="idOf(f) + '-' + $index" [checked]="multiHas(f, option)" [disabled]="disabled()"
-                           (change)="toggleMulti(f, option, $any($event.target).checked)" />{{ optionText(option) }}
+                           (change)="toggleMulti(f, option, $any($event.target).checked)" />{{ optionLabel(f, $index, option) }}
                   </label>
                 }
               </div>
@@ -253,6 +254,34 @@ interface MapRow { key: string; value: unknown; }
               }
             </app-field>
           }
+          @case ('reviewers') {
+            <!-- ZT-U8: who reviews, picked by name -- a team's id was asked for but never shown anywhere. -->
+            <fieldset class="schema-group min-w-0" [attr.data-reviewers]="f.name">
+              <p class="label">{{ f.label }}</p>
+              @if (f.description) { <p class="field-note text-[color:var(--text-muted)] -mt-1 mb-2">{{ f.description }}</p> }
+              <div class="grid gap-3 sm:grid-cols-2">
+                <app-field label="Who" [for]="idOf(f) + '-who'">
+                  <select [id]="idOf(f) + '-who'" class="input" [disabled]="disabled()" (change)="pickReviewers(f, $any($event.target).value)">
+                    <option value="" [selected]="reviewersChoice(f) === ''">As the pipeline says (else the administrators)</option>
+                    <option value="role:TENANT_ADMIN" [selected]="reviewersChoice(f) === 'role:TENANT_ADMIN'">The workspace administrators</option>
+                    <option value="role:TENANT_USER" [selected]="reviewersChoice(f) === 'role:TENANT_USER'">Every member of the workspace</option>
+                    <option value="team" [selected]="reviewersChoice(f) === 'team'">A team</option>
+                  </select>
+                </app-field>
+                @if (reviewersChoice(f) === 'team') {
+                  <app-field label="Team" [for]="idOf(f) + '-team'" [hint]="teamChoices().length ? '' : 'No team yet: make one in Administration › Teams.'">
+                    <select [id]="idOf(f) + '-team'" class="input" [disabled]="disabled()" (change)="pickTeam(f, $any($event.target).value)">
+                      <option value="" [selected]="!reviewersTeam(f)">Choose a team…</option>
+                      @for (t of teamChoices(); track t.teamId) {
+                        <option [value]="'' + t.teamId" [selected]="reviewersTeam(f) === '' + t.teamId">{{ t.name }}</option>
+                      }
+                      @if (reviewersTeam(f) && !knownTeam(f)) { <option [value]="reviewersTeam(f)" selected>Team {{ reviewersTeam(f) }} (not in this workspace's list)</option> }
+                    </select>
+                  </app-field>
+                }
+              </div>
+            </fieldset>
+          }
           @case ('object') {
             <fieldset class="schema-group min-w-0">
               <p class="label">{{ f.label }}@if (f.required) { <span class="text-crit-500 ml-0.5" aria-hidden="true">*</span> }</p>
@@ -363,13 +392,30 @@ export class SchemaForm {
     this.apiRequests().find(r => '' + r.id === '' + (this.current()['requestId'] ?? ''))?.environments ?? []);
   /** MIG-424: the workspace's schedules, what a schedule setting (Run pipeline's pipeline) offers. */
   readonly schedules = input<ScheduleChoice[]>([]);
-  readonly scheduleHint = 'One of this workspace’s pipelines, by its schedule (Pipelines › Schedules).';
+  readonly scheduleHint = 'One of this workspace’s pipelines, by its schedule (Build › Pipelines › Schedules & triggers).';
   /** MIG-364: what a document-type setting says when its schema says nothing. */
   readonly documentTypeHint = 'One of this workspace’s document types (Documents › Document types).';
   readonly disabled = input(false);
   readonly valueChange = output<Record<string, unknown>>();
 
   readonly fields = computed(() => fieldsOf(this.schema()));
+  private readonly injector = inject(Injector);
+  /** The workspace's teams by name, read only when a form asks who reviews. */
+  readonly teamChoices = signal<{ teamId: number; name: string }[]>([]);
+  private teamsAsked = false;
+  /** Reads the teams the first time a who-reviews setting is drawn. */
+  readonly askTeams = effect(() => {
+    if (this.teamsAsked || !this.fields().some(f => f.kind === 'reviewers')) return;
+    this.teamsAsked = true;
+    let api: TeamsApi;
+    // A form drawn where no HTTP is provided (a test, a read-only preview) simply offers no teams.
+    try { api = this.injector.get(TeamsApi); } catch { return; }
+    api.list().subscribe({
+      next: r => this.teamChoices.set((r.data ?? []).filter(t => t.status !== 'ARCHIVED').map(t => ({ teamId: t.teamId, name: t.name }))
+        .sort((a, b) => a.name.localeCompare(b.name))),
+      error: () => this.teamChoices.set([]),
+    });
+  });
   readonly isMap = computed(() => isMapSchema(this.schema()));
   readonly mapKind = computed<FieldKind>(() => mapValueKind(this.schema()));
   /** What this form last handed back, until the parent hands it a new value. */
@@ -446,6 +492,29 @@ export class SchemaForm {
   coerceText(f: FieldSpec, raw: string): unknown { return coerce(f.kind === 'column' || f.kind === 'bucket' ? 'text' : f.kind, raw); }
 
   optionText(option: unknown): string { return typeof option === 'string' ? option : JSON.stringify(option); }
+  /** ZT-U8: an option as the screen says it (FAIL_TASK reads as "The step fails"); the value saved is the code. */
+  optionLabel(f: FieldSpec, index: number, option: unknown): string { return f.optionLabels?.[index] ?? this.optionText(option); }
+
+  private reviewersOf(f: FieldSpec): { kind?: string; value?: string } {
+    const v = this.current()[f.name];
+    return v && typeof v === 'object' ? (v as { kind?: string; value?: string }) : {};
+  }
+  /** '', 'role:TENANT_ADMIN', 'role:TENANT_USER' or 'team'. */
+  reviewersChoice(f: FieldSpec): string {
+    const r = this.reviewersOf(f);
+    return r.kind === 'team' ? 'team' : r.kind === 'role' && r.value ? `role:${r.value}` : '';
+  }
+  reviewersTeam(f: FieldSpec): string {
+    const r = this.reviewersOf(f);
+    return r.kind === 'team' && r.value ? '' + r.value : '';
+  }
+  knownTeam(f: FieldSpec): boolean { return this.teamChoices().some(t => '' + t.teamId === this.reviewersTeam(f)); }
+  pickReviewers(f: FieldSpec, choice: string): void {
+    if (!choice) this.set(f.name, undefined);
+    else if (choice === 'team') this.set(f.name, { kind: 'team', value: this.reviewersTeam(f) || '' });
+    else this.set(f.name, { kind: 'role', value: choice.slice(5) });
+  }
+  pickTeam(f: FieldSpec, teamId: string): void { this.set(f.name, { kind: 'team', value: teamId }); }
 
   /** The enum's options are bound by index: a choice may be a number or true, which a <select> would turn into text. */
   choiceIndex(f: FieldSpec): string {

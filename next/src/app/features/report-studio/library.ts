@@ -1,3 +1,4 @@
+import { plainHint } from '../../shared/ui/plain-words';
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Dialog } from '@angular/cdk/dialog';
@@ -43,6 +44,8 @@ type View = 'reports' | 'jobs';
   templateUrl: './library.html',
 })
 export class ReportLibrary implements OnInit {
+  /** ZT-U8: a job's message in the menu's words (Reports › Settings, not Report Studio › Settings). */
+  plain(text: string | null | undefined): string { return plainHint(text ?? ''); }
   private readonly api = inject(ReportStudioApi);
   private readonly auth = inject(AuthService);
   private readonly tabCounts = inject(RsTabCounts);

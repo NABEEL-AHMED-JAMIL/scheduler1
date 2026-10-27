@@ -1,3 +1,4 @@
+import { codeName } from '../../../shared/ui/plain-words';
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { ActivatedRoute } from '@angular/router';
@@ -108,7 +109,8 @@ export class FailedRuns implements OnInit {
     if (this.platform()) out.push({ name: 'tenantIds', title: 'Workspace', values: f?.workspaces ?? [], picked: picked.tenantIds });
     out.push({ name: 'taskDetailIds', title: 'Pipeline', values: f?.pipelines ?? [], picked: picked.taskDetailIds });
     out.push({ name: 'jobIds', title: 'Schedule', values: f?.schedules ?? [], picked: picked.jobIds });
-    out.push({ name: 'tasks', title: 'Failing step', values: f?.steps ?? [], picked: picked.tasks });
+    // ZT-U8: a step's code (call_api) reads as its words (Call API) where the answer named it by code.
+    out.push({ name: 'tasks', title: 'Failing step', values: (f?.steps ?? []).map(v => ({ ...v, name: v.name === v.key ? codeName(v.key) : v.name })), picked: picked.tasks });
     out.push({ name: 'kinds', title: 'Error kind', values: f?.kinds ?? [], picked: picked.kinds });
     out.push({ name: 'days', title: 'Day', values: (f?.days ?? []).map(d => ({ ...d, name: dayLabel(d.key) })), picked: picked.days });
     return out;
@@ -243,6 +245,8 @@ export class FailedRuns implements OnInit {
   retried(): void {
     this.load();
   }
+
+  stepName(code: string): string { return codeName(code); }
 
   stepOf(run: FailedRun): string {
     if (run.stepIndex == null) return run.status === 'Interrupt' ? 'The run (stopped responding)' : 'The run';

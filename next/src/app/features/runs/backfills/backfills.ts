@@ -66,7 +66,7 @@ const LIMIT = 25;
       } @else if (!rows().length && !loading()) {
         <div class="card p-10">
           <app-empty-state icon="history" [title]="show() === 'open' ? 'No backfill is running' : 'No backfills'"
-                           message="Pipelines › Schedules: a schedule's ⋮ menu › Backfill… runs it for each day of a past range.">
+                           message="Build › Pipelines › Schedules & triggers: a schedule's ⋮ menu › Backfill… runs it for each day of a past range.">
             <a class="btn btn-default btn-sm" routerLink="/pipelines/schedules"><app-icon name="calendar" />Schedules</a>
           </app-empty-state>
         </div>

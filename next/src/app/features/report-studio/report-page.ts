@@ -1,3 +1,4 @@
+import { plainHint } from '../../shared/ui/plain-words';
 import { Component, DestroyRef, OnInit, computed, inject, input, signal } from '@angular/core';
 import { Dialog } from '@angular/cdk/dialog';
 import { NgTemplateOutlet } from '@angular/common';
@@ -45,6 +46,8 @@ type Tab = 'details' | 'versions' | 'activity' | 'access';
   styleUrl: './report-page.css',
 })
 export class ReportPage implements OnInit {
+  /** ZT-U8: a job's message in the menu's words (Reports › Settings, not Report Studio › Settings). */
+  plain(text: string | null | undefined): string { return plainHint(text ?? ''); }
   /** Milliseconds in the console's duration words (formatDuration): "420 ms", "1.4 sec", "15 sec". */
   took(ms: number): string { return formatDuration(ms / 1000); }
 

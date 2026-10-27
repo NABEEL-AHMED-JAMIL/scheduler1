@@ -56,7 +56,7 @@
         <app-icon name="alert" class="icon-crit shrink-0" />
         <div class="min-w-0 flex-1">
           <div class="font-semibold">{{ j.reportName }} · generation {{ isMapping(j) ? 'blocked' : 'failed' }}</div>
-          <div class="text-sm">{{ j.label }} could not make a new version: {{ j.error }}
+          <div class="text-sm">{{ j.label }} could not make a new version: {{ plain(j.error) }}
             The report's last version is unchanged.</div>
           <app-page-limit-actions [job]="j" />
         </div>

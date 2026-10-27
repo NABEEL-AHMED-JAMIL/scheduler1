@@ -1,3 +1,4 @@
+import { plainHint } from '../../../shared/ui/plain-words';
 import type { RunParameter } from '../../jobs/run-parameters/run-parameters';
 import { formatDuration } from '../../../shared/ui/time-format';
 
@@ -765,7 +766,7 @@ function fileRowColumns(definition: Definition, index: number, tasks: StepTaskEn
 
 export type FieldKind = 'text' | 'textarea' | 'number' | 'integer' | 'boolean' | 'enum' | 'multi' | 'list' | 'objects' | 'object' | 'json'
   | 'scalar' | 'column' | 'step' | 'columns' | 'prompt' | 'bucket' | 'webhook' | 'document-type' | 'api-request' | 'api-environment'
-  | 'schedule';
+  | 'schedule' | 'reviewers';
 
 /** MIG-424: one of the workspace's schedules (jobs) a step may call (Run pipeline): its id, and its name as the choice shows it. */
 export interface ScheduleChoice { id: number; label: string; }
@@ -819,6 +820,8 @@ export interface FieldSpec {
   required: boolean;
   description: string;
   options: unknown[];
+  /** What each option reads as on screen (an enum's code, FAIL_TASK, reads as "The step fails"); same order as options. */
+  optionLabels?: string[];
   /** For a list: its items' kind (text, number, integer or scalar). */
   itemKind?: FieldKind;
   schema: JsonSchema;
@@ -847,8 +850,16 @@ export function isMapSchema(schema: JsonSchema | undefined): boolean {
 const isObjectSchema = (schema: JsonSchema | undefined) =>
   typeOf(schema) === 'object' && ((!!schema?.properties && Object.keys(schema.properties).length > 0) || isMapSchema(schema));
 
+/** Who reviews (an Approval step's, Read text from pages'): a role or a team, picked by name rather than typed as an id. */
+function isReviewers(schema: JsonSchema): boolean {
+  const p = schema.properties;
+  return typeOf(schema) === 'object' && !!p?.['kind'] && !!p?.['value']
+    && JSON.stringify([...(p['kind'].enum ?? [])].sort()) === JSON.stringify(['role', 'team']);
+}
+
 function kindOf(schema: JsonSchema): FieldKind {
   if (Array.isArray(schema.enum) && schema.enum.length) return 'enum';
+  if (isReviewers(schema)) return 'reviewers';
   if (isScalarMix(schema)) return 'scalar';
   switch (typeOf(schema)) {
     case 'string':
@@ -887,9 +898,14 @@ export function fieldsOf(schema: JsonSchema | null | undefined): FieldSpec[] {
       name, kind, schema: property,
       label: property.title || name,
       required: required.includes(name),
-      description: property.description ?? '',
+      description: plainHint(property.description ?? ''),
       options: kind === 'enum' ? [...(property.enum ?? [])] : kind === 'multi' ? [...(property.items?.enum ?? [])] : [],
     };
+    if (spec.options.length) {
+      const read = optionWords(spec.options, spec.description);
+      spec.optionLabels = read.labels;
+      spec.description = read.description;
+    }
     if (kind === 'list') {
       const item = property.items;
       spec.itemKind = isScalarMix(item) ? 'scalar' : typeOf(item) === 'string' ? 'text' : (typeOf(item) as FieldKind);
@@ -1001,4 +1017,33 @@ export function usesDocumentType(schema: JsonSchema | null | undefined): boolean
 /** MIG-321: whether a task's settings name a bucket anywhere (so its panel offers the workspace's buckets). */
 export function usesBucket(schema: JsonSchema | null | undefined): boolean {
   return usesFormat(schema, 'bucket');
+}
+
+export { plainHint };
+
+/** "FAIL_TASK" -> "Fail task": a code read as words, when nothing better says what it means. */
+export function codeWords(code: string): string {
+  const w = code.toLowerCase().replace(/_/g, ' ').trim();
+  return w.charAt(0).toUpperCase() + w.slice(1);
+}
+
+/**
+ * An enum's options as words. A step's hint often explains its codes ("FAIL_TASK: the step fails. CONTINUE_WITH_WARNING:
+ * the step completes with a warning."): each option then reads as its own explanation, and the hint keeps the rest. A
+ * code with no explanation reads as its words (CONTINUE_WITH_WARNING -> "Continue with warning"); any other value as it is.
+ */
+export function optionWords(options: unknown[], description: string): { labels: string[]; description: string } {
+  const codes = options.filter((o): o is string => typeof o === 'string' && /^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$|^[A-Z]{3,}$/.test(o));
+  let rest = description;
+  const said = new Map<string, string>();
+  for (const code of codes) {
+    const m = new RegExp(`(?:^|[\\s.;(])${code}\\s*[:=—-]\\s*([^.;]+)[.;]?`).exec(rest);
+    if (m) {
+      const words = m[1].trim();
+      said.set(code, words.charAt(0).toUpperCase() + words.slice(1));
+      rest = rest.replace(m[0], m[0].startsWith(code) ? '' : m[0].charAt(0));
+    }
+  }
+  const labels = options.map(o => typeof o !== 'string' ? JSON.stringify(o) : said.get(o) ?? (codes.includes(o) ? codeWords(o) : o));
+  return { labels, description: said.size ? rest.replace(/\s{2,}/g, ' ').replace(/^[\s.;,]+/, '').trim() : description };
 }

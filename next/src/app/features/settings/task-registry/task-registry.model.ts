@@ -157,6 +157,7 @@ const KIND_WORDS: Record<FieldKind, string> = {
   column: 'Column', step: 'Earlier step', columns: 'Columns', prompt: 'AI prompt', bucket: 'Bucket', webhook: 'Webhook',
   'document-type': 'Document type', 'api-request': 'API request', 'api-environment': 'API environment',
   schedule: 'Pipeline (schedule)',
+  reviewers: 'Who reviews (a role or a team)',
 };
 
 /** The registry's widget hints that name what a value points at (FORMATS), as words. */
