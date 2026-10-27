@@ -208,3 +208,11 @@ describe('The live menu map (the Reference article\'s widget)', () => {
     expect(roleOnly(NAV.find(n => n.label === 'Platform')!)).toBe('platform administrators');
   });
 });
+
+describe('The help\'s Markdown', () => {
+  it('keeps a numbered list\'s numbers when it goes on after a table', async () => {
+    const { parseHelp } = await import('./help-markdown');
+    const lists = parseHelp('1. One\n2. Two\n\n| A |\n|---|\n| x |\n\n3. Three\n4. Four\n').filter(b => b.kind === 'ol');
+    expect(lists.map(l => (l as { start?: number }).start ?? 1)).toEqual([1, 3]);
+  });
+});

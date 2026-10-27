@@ -40,7 +40,7 @@ export type HelpBlock =
   | { kind: 'h'; level: 2 | 3; id: string; spans: HelpSpan[] }
   | { kind: 'p'; spans: HelpSpan[] }
   | { kind: 'callout'; tone: CalloutTone; label: string; paras: HelpSpan[][] }
-  | { kind: 'ul' | 'ol'; items: HelpListItem[] }
+  | { kind: 'ul' | 'ol'; items: HelpListItem[]; start?: number }
   | { kind: 'code'; label: string; code: string }
   | { kind: 'table'; head: HelpSpan[][]; rows: HelpSpan[][][] }
   | { kind: 'figure'; name: string; alt: string; caption: string }
@@ -219,7 +219,9 @@ export function parseHelp(source: string, idPrefix = ''): HelpBlock[] {
           else break;
         } else break;
       }
-      blocks.push({ kind: ordered ? 'ol' : 'ul', items: items.map(it => ({ spans: parseSpans(it.text),
+      // A numbered list that goes on after a table or a picture ("3. ...") keeps its numbers.
+      const start = ordered ? Number(/^\s*(\d+)/.exec(first[2])?.[1] ?? 1) : 1;
+      blocks.push({ kind: ordered ? 'ol' : 'ul', ...(start > 1 ? { start } : {}), items: items.map(it => ({ spans: parseSpans(it.text),
         ...(it.sub ? { sub: { ordered: it.sub.ordered, items: it.sub.items.map(parseSpans) } } : {}) })) });
       continue;
     }

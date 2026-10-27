@@ -1,0 +1,116 @@
+/* The client book's print stylesheet (guide-outline.md, "The book's look"): A4, one 170 mm column, the console's palette. */
+@page {
+  size: A4;
+  margin: 20mm 18mm 22mm 22mm;
+  @top-left { content: "ETL Console · Client guide"; font: 7.5pt -apple-system, "Helvetica Neue", Arial, sans-serif; color: #676F7F; }
+  @bottom-left { content: "Edition 1 · Every example is fictional and its data synthetic"; font: 7.5pt -apple-system, "Helvetica Neue", Arial, sans-serif; color: #676F7F; }
+  @bottom-right { content: counter(page); font: 600 8.5pt -apple-system, "Helvetica Neue", Arial, sans-serif; color: #1E2939; }
+}
+@page :left { margin: 20mm 22mm 22mm 18mm; }
+@page cover { margin: 0; @top-left { content: none; } @bottom-left { content: none; } @bottom-right { content: none; } }
+@page front { @top-left { content: none; } @top-right { content: none; } }
+@page { @top-right { font: 7.5pt -apple-system, "Helvetica Neue", Arial, sans-serif; color: #0F766E; } }
+
+:root { --ink: #101828; --body: #1E2939; --muted: #676F7F; --teal: #0F766E; --blue: #2563EB; --rule: #E5E7EB;
+        --surface: #F9FAFB; --tint: #F3F7F7; }
+* { box-sizing: border-box; }
+html { font: 9.2pt/1.42 -apple-system, "Helvetica Neue", Arial, sans-serif; color: var(--body); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body { margin: 0; }
+h1, h2, h3, h4, h5 { color: var(--ink); font-weight: 600; line-height: 1.25; break-after: avoid; }
+h2 { font-size: 15pt; margin: 0 0 2mm; padding-top: 1mm; }
+h3 { font-size: 11.5pt; margin: 6mm 0 1.5mm; }
+h4 { font-size: 10pt; margin: 4mm 0 1mm; }
+h5, h6 { font-size: 9.6pt; margin: 3mm 0 1mm; }
+p { margin: 0 0 2.2mm; orphans: 3; widows: 3; }
+a { color: inherit; text-decoration: none; }
+article a, .faq a { color: var(--blue); }
+.pref { color: var(--muted); font-size: 0.9em; }
+code, pre { font-family: Menlo, "SF Mono", Consolas, monospace; font-size: 8.4pt; }
+code { background: var(--surface); border: 0.25pt solid var(--rule); border-radius: 1mm; padding: 0 0.6mm; }
+ul, ol { margin: 0 0 2.5mm; padding-left: 6mm; }
+li { margin: 0.6mm 0; }
+li::marker { color: var(--muted); font-weight: 600; }
+hr { border: 0; border-top: 0.5pt solid var(--rule); margin: 4mm 0; }
+.muted { color: var(--muted); }
+.mark { position: absolute; font-size: 1pt; color: #fff; line-height: 0; margin: 0; }
+
+/* Cover */
+.cover { page: cover; position: relative; height: 299mm; width: 212mm; margin: -1mm 0 0 -1mm; background: #101828; color: #fff; padding: 34mm 22mm 0; overflow: hidden; break-after: page; }
+.cover .band { position: absolute; left: 0; right: 0; top: 0; height: 14mm; background: var(--teal); }
+.cover .brand { font-size: 13pt; font-weight: 600; letter-spacing: 0.04em; color: #8FE3D6; margin: 0; }
+.cover h1 { color: #fff; font-size: 44pt; margin: 4mm 0 3mm; letter-spacing: -0.01em; }
+.cover .sub { font-size: 13pt; color: #D0D5DD; max-width: 140mm; }
+.cover-fig { position: absolute; left: 22mm; right: -30mm; top: 118mm; width: 210mm; border-radius: 2mm; box-shadow: 0 6mm 18mm rgba(0,0,0,.45); }
+.cover .edition { position: absolute; left: 22mm; bottom: 18mm; margin: 0; font-size: 10pt; color: #D0D5DD; }
+
+/* Copyright and contents */
+.copyright { page: front; break-after: page; padding-top: 150mm; font-size: 8.6pt; color: var(--muted); max-width: 140mm; }
+.copyright .big { font-size: 12pt; color: var(--ink); font-weight: 600; margin: 4mm 0; }
+.contents { page: front; break-after: page; }
+.contents h1 { font-size: 26pt; margin: 0 0 6mm; }
+.toc { list-style: none; padding: 0; margin: 0; columns: 2; column-gap: 9mm; font-size: 8.3pt; }
+.toc li { margin: 0; break-inside: avoid; }
+.toc a { display: flex; gap: 2mm; align-items: baseline; }
+.toc .t { flex: 1; }
+.toc .p { font-variant-numeric: tabular-nums; color: var(--muted); }
+.toc-part { color: var(--teal); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; font-size: 7pt; margin-top: 3.5mm !important; break-after: avoid; }
+.toc-ch { font-weight: 600; color: var(--ink); margin-top: 1.6mm !important; break-after: avoid; }
+.toc-ch .n { color: var(--teal); width: 5mm; }
+.toc-a { padding-left: 7mm; color: var(--body); }
+
+/* A chapter */
+.chapter { break-before: page; }
+.opener { break-after: page; position: relative; }
+.opener .part { color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; font-size: 8pt; margin: 6mm 0 0; }
+.opener .chno { font-size: 64pt; font-weight: 700; color: var(--teal); line-height: 1; margin: 4mm 0 2mm; }
+.opener h1 { font-size: 28pt; margin: 0 0 5mm; }
+.opener .lead p { font-size: 11pt; color: var(--body); }
+.inchapter { margin: 6mm 0; border-top: 0.75pt solid var(--teal); padding-top: 3mm; }
+.eyebrow { text-transform: uppercase; letter-spacing: 0.06em; font-size: 7.5pt; color: var(--muted); font-weight: 600; margin-bottom: 2mm; }
+.inchapter ol { columns: 2; column-gap: 8mm; font-size: 8.8pt; padding-left: 5mm; }
+.inchapter li { break-inside: avoid; }
+.inchapter li span.p { color: var(--muted); margin-left: 1.5mm; font-size: 0.9em; }
+.opener-fig img { width: 170mm; max-height: 95mm; object-fit: cover; object-position: left top; }
+
+article { margin-top: 9mm; }
+/* An article's title, line and box never end a page: they keep 45 mm of the article with them. */
+.ahead { break-inside: avoid; }
+.ahead::after { content: ""; display: block; height: 45mm; margin-bottom: -45mm; }
+h3, h4 { break-after: avoid; }
+h3::after, h4::after { content: ""; display: block; height: 18mm; margin-bottom: -18mm; }
+article + article { break-before: auto; }
+article h2 { border-top: 1.25pt solid var(--teal); padding-top: 3mm; }
+.summary { font-size: 10.6pt; color: var(--muted); margin-bottom: 3mm; }
+.meta { display: grid; grid-template-columns: 14mm 1fr; gap: 1mm 3mm; margin: 0 0 4mm; padding: 2.5mm 3mm; background: var(--surface);
+        border: 0.5pt solid var(--rule); border-radius: 1.5mm; font-size: 8.6pt; break-inside: avoid; }
+.meta dt { font-weight: 600; color: var(--muted); text-transform: uppercase; font-size: 7pt; letter-spacing: 0.05em; padding-top: 0.4mm; }
+.meta dd { margin: 0; }
+
+.callout { border-left: 2pt solid var(--blue); background: #EFF4FF; padding: 2mm 3mm; margin: 3mm 0; border-radius: 0 1.5mm 1.5mm 0; break-inside: avoid; font-size: 9pt; }
+.callout.tip { border-color: var(--teal); background: var(--tint); }
+.callout.warn { border-color: #8A3D07; background: #FFF6EB; }
+.callout.privacy { border-color: #BB2D48; background: #FFF1F3; }
+.callout p:last-child { margin-bottom: 0; }
+.code { border: 0.5pt solid var(--rule); border-radius: 1.5mm; margin: 3mm 0; break-inside: avoid; background: var(--surface); }
+.code-label { font-size: 7.5pt; color: var(--muted); padding: 1.2mm 3mm; border-bottom: 0.5pt solid var(--rule); }
+.code pre { margin: 0; padding: 2mm 3mm; white-space: pre-wrap; word-break: break-word; }
+
+table { width: 100%; border-collapse: collapse; margin: 3mm 0 4mm; font-size: 8pt; break-inside: auto; }
+thead { display: table-header-group; }
+tr { break-inside: avoid; }
+th { text-align: left; background: var(--surface); color: var(--muted); font-weight: 600; font-size: 7.6pt; border-bottom: 0.75pt solid var(--rule); padding: 1.4mm 2mm; }
+td { border-bottom: 0.5pt solid var(--rule); padding: 1.1mm 1.8mm; vertical-align: top; }
+table.checks td:first-child { white-space: nowrap; font-weight: 600; color: var(--ink); }
+td.box { white-space: nowrap; width: 18mm; line-height: 1.9; }
+.tick { display: inline-block; width: 3.2mm; height: 3.2mm; border: 0.9pt solid var(--ink); border-radius: 0.5mm; vertical-align: -0.6mm; }
+
+figure.fig { margin: 4mm 0 5mm; break-inside: avoid; }
+figure.fig img { display: block; max-width: 150mm; border: 0.5pt solid #D0D5DD; border-radius: 1mm; }
+figure.fig figcaption { font-size: 8pt; color: var(--muted); margin-top: 1.5mm; }
+.todo-box { height: 38mm; border: 0.75pt dashed #98A2B3; border-radius: 1.5mm; background: var(--surface); display: flex; flex-direction: column;
+            align-items: center; justify-content: center; gap: 1mm; color: var(--muted); text-align: center; padding: 0 10mm; }
+.todo-box span { font-weight: 600; color: var(--body); font-size: 10pt; }
+.todo-box small { font-size: 8pt; }
+
+.faq { margin-top: 10mm; border-top: 1.25pt solid var(--teal); padding-top: 3mm; }
+.faq h3 { font-size: 10pt; margin-top: 4mm; }

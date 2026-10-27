@@ -89,7 +89,7 @@ export interface MenuRow { group: string; entry: string; path: string; tabs: str
               </div>
             </div>
           }
-          @case ('ol') { <ol><ng-container *ngTemplateOutlet="itemsT; context: { $implicit: b.items }" /></ol> }
+          @case ('ol') { <ol [attr.start]="b.start ?? null"><ng-container *ngTemplateOutlet="itemsT; context: { $implicit: b.items }" /></ol> }
           @case ('ul') { <ul><ng-container *ngTemplateOutlet="itemsT; context: { $implicit: b.items }" /></ul> }
           @case ('code') {
             <div class="code" data-test="doc-code">
