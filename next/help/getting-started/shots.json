@@ -1,0 +1,137 @@
+[
+ {
+  "name": "gs-home",
+  "route": "/dashboard",
+  "as": "summit.admin",
+  "thumb": true
+ },
+ {
+  "name": "gs-sign-in",
+  "route": "/login",
+  "as": "none",
+  "thumb": true
+ },
+ {
+  "name": "gs-two-factor",
+  "route": "/account/security",
+  "as": "summit.admin",
+  "clip": "[data-test=mfa-card]",
+  "thumb": true
+ },
+ {
+  "name": "gs-my-security",
+  "route": "/account/security",
+  "as": "summit.admin"
+ },
+ {
+  "name": "gs-tour",
+  "route": "/runs/latest",
+  "as": "summit.admin",
+  "thumb": true
+ },
+ {
+  "name": "gs-tour-dark",
+  "route": "/runs/latest",
+  "as": "summit.admin",
+  "theme": "dark"
+ },
+ {
+  "name": "gs-theme-menu",
+  "route": "/dashboard",
+  "as": "summit.admin",
+  "settle": 2000,
+  "steps": [
+   {
+    "click": "button[aria-haspopup=menu][aria-label^='Theme']"
+   },
+   {
+    "waitFor": "#theme-menu"
+   },
+   {
+    "wait": 300
+   }
+  ],
+  "clip": "#theme-menu",
+  "pad": 16
+ },
+ {
+  "name": "gs-account-menu",
+  "route": "/dashboard",
+  "as": "summit.admin",
+  "settle": 1500,
+  "steps": [
+   {
+    "click": "button[aria-label='Account menu']"
+   },
+   {
+    "waitFor": "#user-menu"
+   }
+  ],
+  "clip": "#user-menu",
+  "pad": 16
+ },
+ {
+  "name": "gs-bell",
+  "route": "/dashboard",
+  "as": "summit.admin",
+  "settle": 1500,
+  "steps": [
+   {
+    "click": "[data-nav-menu='__bell'] > button"
+   },
+   {
+    "waitFor": "#notif-panel"
+   },
+   {
+    "wait": 800
+   }
+  ],
+  "clip": "#notif-panel",
+  "pad": 16
+ },
+ {
+  "name": "gs-notifications",
+  "route": "/notifications",
+  "as": "summit.admin"
+ },
+ {
+  "name": "gs-profile",
+  "route": "/profile",
+  "as": "summit.dr.patel",
+  "thumb": true
+ },
+ {
+  "name": "gs-menu-admin",
+  "route": "/dashboard",
+  "as": "riverside.admin",
+  "clip": "aside.app-sidebar",
+  "pad": 0
+ },
+ {
+  "name": "gs-menu-reviewer",
+  "route": "/dashboard",
+  "as": "riverside.reviewer",
+  "clip": "aside.app-sidebar",
+  "pad": 0,
+  "viewport": [
+   1920,
+   700
+  ]
+ },
+ {
+  "name": "gs-menu-viewer",
+  "route": "/dashboard",
+  "as": "riverside.viewer",
+  "clip": "aside.app-sidebar",
+  "pad": 0,
+  "viewport": [
+   1920,
+   700
+  ]
+ },
+ {
+  "name": "gs-home-reviewer",
+  "route": "/dashboard",
+  "as": "riverside.reviewer"
+ }
+]
