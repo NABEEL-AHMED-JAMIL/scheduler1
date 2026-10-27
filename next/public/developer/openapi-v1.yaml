@@ -675,7 +675,9 @@ paths:
         A file of the workspace's -- one it uploaded, or one a run made (the manifest's) -- answered with a 302 to its
         signed link on this API (/v1/files/{fileId}/content?token=...), valid 5 minutes. The link needs no token, so a
         portal may hand it to a browser; it opens that one file only, and never names a bucket or a storage key. The body
-        says the same for a caller that does not follow redirects. A made file past its expiry is 410.
+        says the same for a caller that does not follow redirects. A made file past its expiry is 410. A file a pipeline marked
+        sensitive made (a saved file, a report's PDF) is the pipeline's real output, never masked: an API client is refused it
+        with a 403 of type sensitive-files until a scope for it is offered -- its meta still describes it.
       security: [{ clientCredentials: [files:read] }]
       parameters: [{ $ref: '#/components/parameters/FileId' }]
       responses:
@@ -700,7 +702,7 @@ paths:
       description: >
         No access token: the link's signature is the permission, for this file only, until it expires (5 minutes). A
         link that has expired is 410 (ask GET /v1/files/{fileId} for a new one); a link that is not one this API made, or
-        names another file, is 404.
+        names another file, is 404. A file a pipeline marked sensitive made is 403 (sensitive-files), as GET /v1/files/{fileId}.
       security: []
       parameters:
         - $ref: '#/components/parameters/FileId'
@@ -714,6 +716,7 @@ paths:
             application/octet-stream:
               schema: { type: string, format: binary }
         '404': { $ref: '#/components/responses/NotFound' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '410': { $ref: '#/components/responses/Gone' }
         '503': { $ref: '#/components/responses/Unavailable' }
   /files/{fileId}/meta:
@@ -1528,6 +1531,12 @@ components:
         sha256: { type: [string, 'null'], description: "Hex; null for a file a run made before files carried one." }
         createdAt: { type: string, format: date-time }
         expiresAt: { type: [string, 'null'], format: date-time }
+        sensitive:
+          type: boolean
+          description: "Present (true) on a file a pipeline marked sensitive made: listed here, refused by GET /v1/files/{fileId} and its link (403 sensitive-files)."
+        downloadable:
+          type: boolean
+          description: "Present (false) beside sensitive: an API client cannot download it yet."
     FileLink:
       type: object
       required: [url, expiresAt]
