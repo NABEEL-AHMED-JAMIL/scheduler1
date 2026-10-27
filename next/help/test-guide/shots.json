@@ -1,0 +1,103 @@
+[
+ {
+  "name": "qa-sign-in",
+  "route": "/login",
+  "as": "none",
+  "thumb": true
+ },
+ {
+  "name": "qa-not-your-access",
+  "route": "/pipelines/list",
+  "as": "summit.viewer",
+  "settle": 1500,
+  "thumb": true
+ },
+ {
+  "name": "qa-runs-failed",
+  "route": "/runs/failed",
+  "as": "summit.admin",
+  "settle": 2000,
+  "retake": "Summit Valley: once the AI Assistant test runs are cleaned up, the error patterns read cleaner",
+  "thumb": true
+ },
+ {
+  "name": "qa-review-all",
+  "route": "/review/all",
+  "as": "summit.admin",
+  "settle": 1500,
+  "thumb": true
+ },
+ {
+  "name": "qa-catalog-masked",
+  "route": "/data/catalog",
+  "as": "summit.res.ito",
+  "settle": 2000,
+  "steps": [
+   {
+    "select": [
+     "#catalogFlag",
+     {
+      "label": "Sensitive"
+     }
+    ]
+   },
+   {
+    "wait": 1500
+   },
+   {
+    "fill": [
+     "#catalogSearch",
+     "journey"
+    ]
+   },
+   {
+    "wait": 1500
+   }
+  ],
+  "retake": "Summit Valley: the Patient 360 file (name, dob, mrn masked for the researcher) once its job has run",
+  "thumb": true
+ },
+ {
+  "name": "qa-isolation-run",
+  "route": "/pipelines/schedules/1113/runs/1881",
+  "as": "meridian.admin",
+  "settle": 1500,
+  "thumb": true
+ },
+ {
+  "name": "qa-data-policies",
+  "route": "/administration/data-policies",
+  "as": "summit.admin",
+  "settle": 1500
+ },
+ {
+  "name": "qa-sandbox",
+  "route": "/developers/api-clients",
+  "as": "summit.admin",
+  "settle": 1500,
+  "steps": [
+   {
+    "scroll": "#sandbox"
+   }
+  ],
+  "clip": "#sandbox",
+  "pad": 8
+ },
+ {
+  "name": "intake-qa-two-types",
+  "route": "/documents/types",
+  "as": "riverside.admin",
+  "viewport": [
+   1920,
+   812
+  ],
+  "steps": [
+   {
+    "waitFor": "text=patient_intake_full"
+   },
+   {
+    "wait": 800
+   }
+  ]
+ }
+]
