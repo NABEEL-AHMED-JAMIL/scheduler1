@@ -36,7 +36,10 @@ export type PageKey =
   | 'report-studio' | 'report-templates' | 'report-publish' | 'report-data' | 'report-generate' | 'report-library'
   // MIG-406: Assets & branding (the tab), the custodian of signatures and stamps (an action), and the approver who approves
   // a report version -- certifying its PDF -- and a signature or stamp picture (an action). Identity's PageKey has the same three.
-  | 'report-assets' | 'report-asset-custodian' | 'report-approve';
+  | 'report-assets' | 'report-asset-custodian' | 'report-approve'
+  // ZT-M21 (owner 2026-10-26): a capability, not a page -- downloading, viewing or previewing the files a pipeline marked
+  // sensitive keeps (and its reports). Admins and people with no profile hold it; a profile once an admin ticks it.
+  | 'sensitive-files';
 
 /**
  * F3 (MIG-400): a tab of a page several menu tabs share, grantable alone -- identity's TabKey, `<page>:<tab>`. A page held with
@@ -114,6 +117,7 @@ export const PAGE_LABELS: Record<PageKey, string> = {
   'report-assets': 'Report assets and branding',
   'report-asset-custodian': 'Upload signatures and stamps',
   'report-approve': 'Approve and sign reports',
+  'sensitive-files': 'Download sensitive files',
 };
 
 export function isPageKey(value: string | null | undefined): value is PageKey {

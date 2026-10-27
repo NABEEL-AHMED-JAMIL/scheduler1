@@ -83,7 +83,12 @@ import { ToastService } from '../../../shared/ui/toast.service';
                       <td class="whitespace-nowrap text-[color:var(--text-muted)] max-w-[16rem] truncate"
                           [title]="o.kind === 'bucket' ? (o.bucket + ' / ' + o.key) : ''">
                         @if (o.kind === 'file') {
-                          @if (o.expired) { <span class="text-warn-600">Expired</span> }
+                          @if (o.downloadable === false) {
+                            <!-- ZT-M21: a sensitive pipeline's file -- listed, its bytes the permission's. -->
+                            <span class="inline-flex items-center gap-1" data-test="sensitive-file" [title]="o.refusal || ''">
+                              <app-icon name="lock" size="0.9em" />Sensitive · needs Download sensitive files
+                            </span>
+                          } @else if (o.expired) { <span class="text-warn-600">Expired</span> }
                           @else if (o.expiresAt) { With the run · until {{ o.expiresAt | serverTime:'recent' }} }
                           @else { With the run }
                         } @else {
@@ -181,7 +186,9 @@ export class RunOutputs {
     return o.kind === 'bucket' ? 'cloud' : 'file';
   }
 
-  usable(o: RunOutput): boolean { return o.kind === 'file' ? !o.expired && !!o.runDatasetId : !!o.bucket && !!o.key; }
+  usable(o: RunOutput): boolean {
+    return o.kind === 'file' ? !o.expired && !!o.runDatasetId && o.downloadable !== false : !!o.bucket && !!o.key;
+  }
 
   readonly types = computed(() => [...new Set(this.files().map(o => this.typeOf(o)))].sort());
   private readonly shown = computed(() => {

@@ -265,6 +265,10 @@ export interface ReportVersionRow {
   review?: Review | null;
   /** Phase 7: the workspace's retention policy removed its files; its record stays. */
   expired?: boolean;
+  /** ZT-M21: made from a pipeline marked sensitive -- its files need Download sensitive files (downloadable false: refused). */
+  sensitive?: boolean;
+  downloadable?: boolean;
+  refusal?: string;
   expiredAt?: string | null;
 }
 
@@ -630,4 +634,14 @@ export function deletedWords(name: string, filesLeft: number): string {
     ? `${name} deleted. Its ${filesLeft} stored file${filesLeft === 1 ? '' : 's'} stay${filesLeft === 1 ? 's' : ''} in storage until an operator `
       + `removes ${filesLeft === 1 ? 'it' : 'them'}.`
     : `${name} deleted.`;
+}
+
+/**
+ * A version's files to open or download, the PDF first (as the people who read it open it). Phase 7: none when retention
+ * removed them. ZT-M21: none when it was made from a sensitive pipeline's data and this person lacks Download sensitive files
+ * (it stays listed, with a lock).
+ */
+export function openableOutputs(v: ReportVersionRow): OutputRow[] {
+  if (v.expired || v.downloadable === false) return [];
+  return [...v.outputs].sort((a, b) => (a.format === 'PDF' ? -1 : 0) - (b.format === 'PDF' ? -1 : 0));
 }

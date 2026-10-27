@@ -186,6 +186,24 @@ describe('Run page: the Outputs tab', () => {
     expect([...row.querySelectorAll<HTMLButtonElement>('button:not([data-test="output-more"])')].every(b => b.disabled)).toBe(true);
   });
 
+  it('lists a sensitive pipeline\'s file the person may not have, locked: no View, no Download (ZT-M21)', () => {
+    const refusal = 'This pipeline\'s files are sensitive: downloading, viewing or previewing them needs the Download sensitive files permission. Ask your workspace admin.';
+    const { el } = mount([{ ...KEPT, sensitive: true, downloadable: false, refusal }]);
+    const row = el.querySelector<HTMLElement>('.exec-file')!;
+    expect(row.textContent).toContain('customers-clean.json');
+    const lock = row.querySelector<HTMLElement>('[data-test="sensitive-file"]')!;
+    expect(lock.textContent).toContain('needs Download sensitive files');
+    expect(lock.title).toBe(refusal);
+    expect([...row.querySelectorAll<HTMLButtonElement>('button:not([data-test="output-more"])')].every(b => b.disabled)).toBe(true);
+  });
+
+  it('offers a sensitive pipeline\'s file as any to a person who holds the permission (ZT-M21)', () => {
+    const { el } = mount([{ ...KEPT, sensitive: true, downloadable: true }]);
+    const row = el.querySelector<HTMLElement>('.exec-file')!;
+    expect(row.querySelector('[data-test="sensitive-file"]')).toBeNull();
+    expect([...row.querySelectorAll<HTMLButtonElement>('button:not([data-test="output-more"])')].some(b => !b.disabled)).toBe(true);
+  });
+
   it('says so when the run recorded no files', () => {
     const { el } = mount([]);
     expect(el.textContent).toContain('No files were recorded for this run.');

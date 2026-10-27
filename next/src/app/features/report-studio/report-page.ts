@@ -19,6 +19,7 @@ import { ProblemList } from './problem-list';
 import {
   JobRow, OutputRow, REPORT_DELETE_WORDS, REPORT_KEPT_WORDS, ReportDetail, ReportVersionRow, VersionRow, bundleParts, chipWord, deletedWords, idempotencyKey,
   isRunning, pageLimitOf, recordsWord, size, stageWord,
+  openableOutputs,
 } from './report-studio.model';
 import { fileNameOf, saveBlob } from './report-files';
 import { REPORT_FILE_TITLE_ID, ReportFileDialog } from './report-file-dialog';
@@ -399,8 +400,7 @@ export class ReportPage implements OnInit {
   /** A version's files, the PDF first (as the people who read it open it). */
   outputsOf(v: ReportVersionRow): OutputRow[] {
     // Phase 7: a version whose files retention removed has nothing to open or download.
-    if (v.expired) return [];
-    return [...v.outputs].sort((a, b) => (a.format === 'PDF' ? -1 : 0) - (b.format === 'PDF' ? -1 : 0));
+    return openableOutputs(v);
   }
 
   hasPdf(v: ReportVersionRow): boolean {

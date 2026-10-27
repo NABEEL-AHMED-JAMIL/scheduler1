@@ -62,12 +62,19 @@ const TEXT_CHARS = 200_000;
               <p class="text-sm text-[color:var(--text-secondary)] truncate"><span class="mono">{{ data.label }}</span>@if (data.stepName) { · {{ data.stepName }} step }</p>
             </div>
             @if ((page()?.total ?? 0) > 0) {
-              <button type="button" class="btn btn-default btn-sm shrink-0" data-test="files-zip" [disabled]="zipping()" (click)="downloadAll()">
+              <button type="button" class="btn btn-default btn-sm shrink-0" data-test="files-zip" [disabled]="zipping() || page()?.downloadable === false"
+                      (click)="downloadAll()">
                 <app-icon name="download" />{{ zipLabel(page()?.bytes) }}
               </button>
             }
             <button type="button" class="btn btn-ghost btn-icon btn-sm shrink-0" aria-label="Close" (click)="ref.close()"><app-icon name="close" /></button>
           </div>
+          @if (page()?.downloadable === false) {
+            <!-- ZT-M21: a sensitive pipeline's files are listed; their bytes are the Download sensitive files permission's. -->
+            <p class="text-sm text-[color:var(--text-secondary)] inline-flex items-start gap-1.5" data-test="files-sensitive">
+              <app-icon name="lock" size="0.95em" class="mt-0.5 shrink-0" />{{ page()?.refusal }}
+            </p>
+          }
           @if (!shown()) {
             <div class="flex flex-wrap items-center gap-2">
               <label class="relative flex items-center flex-1 min-w-48">
@@ -114,7 +121,7 @@ const TEXT_CHARS = 200_000;
         } @else if (view() === 'grid') {
           <div class="rf-grid" data-test="files-grid">
             @for (f of page()!.files; track f.fileRef) {
-              <button type="button" class="rf-thumb" [disabled]="!!f.expired" [attr.data-file]="f.fileRef"
+              <button type="button" class="rf-thumb" [disabled]="!!f.expired || page()?.downloadable === false" [attr.data-file]="f.fileRef"
                       [attr.aria-label]="(previewKind(f) ? 'Look at ' : 'Download ') + f.name" (click)="pick(f)">
                 <span class="rf-thumb-box">
                   @if (thumbs().get(f.fileRef); as url) { <img [src]="url" alt="" /> }
@@ -247,6 +254,8 @@ export class RunItemFiles implements OnInit {
   /** The page's images as thumbnails: each read inline as a blob (the grid shows a format badge until it lands). */
   private readThumbs(files: ItemFile[]): void {
     this.releaseThumbs();
+    // ZT-M21: a sensitive pipeline's files, to a person without the permission: listed, nothing read.
+    if (this.page()?.downloadable === false) return;
     for (const f of files.filter(x => !x.expired && previewKind(x) === 'image')) {
       this.thumbReads.push(this.api.file(this.data.jobQueueId, this.data.ref, f.fileRef, true).subscribe({
         next: blob => this.thumbs.update(map => new Map(map).set(f.fileRef, URL.createObjectURL(blob))),

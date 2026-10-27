@@ -59,6 +59,18 @@ describe('Run item files', () => {
     expect(files().request.body).toEqual({ jobQueueId: 9020, ref: '5', stepKey: 'pages', page: 1, size: 15 });
   });
 
+  it('lists a sensitive pipeline\'s files to a person without the permission, reads none and says why (ZT-M21)', () => {
+    const refusal = 'This pipeline\'s files are sensitive: downloading, viewing or previewing them needs the Download sensitive files permission. Ask your workspace admin.';
+    const { el, fixture, files, http } = mount();
+    files().flush({ status: API_SUCCESS, data: { ...FILES(0), downloadable: false, refusal } });
+    fixture.detectChanges();
+    expect(el.querySelector('[data-test="files-title"]')?.textContent?.trim()).toBe('Page images · 40 files');
+    expect(el.querySelector('[data-test="files-sensitive"]')?.textContent?.trim()).toBe(refusal);
+    expect((el.querySelector('[data-test="files-zip"]') as HTMLButtonElement).disabled).toBe(true);
+    http.expectNone(r => r.url.endsWith('/sourceJob.json/runItems/file'));
+    expect([...el.querySelectorAll<HTMLButtonElement>('[data-test="files-grid"] button')].every(b => b.disabled)).toBe(true);
+  });
+
   it('names a page\'s file by what follows its document\'s name, the whole name on hover (ZT-I18)', () => {
     URL.createObjectURL = () => 'blob:thumb';
     URL.revokeObjectURL = () => {};

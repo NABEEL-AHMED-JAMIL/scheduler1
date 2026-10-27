@@ -133,6 +133,8 @@ export interface ItemData {
 
 export interface ItemFilesPage {
   ref: string; label: string; total: number; page: number; size: number; bytes?: number | null; files: ItemFile[];
+  /** ZT-M21: false for a sensitive pipeline's files when this person lacks Download sensitive files (refusal says so). */
+  downloadable?: boolean | null; refusal?: string | null;
 }
 
 export interface ItemCounts { items: number; done: number; failed: number; running: number; }

@@ -213,6 +213,11 @@ export interface RunOutput {
   expired?: boolean | null;
   bucket?: string | null;
   key?: string | null;
+  /** ZT-M21: a kept file of a pipeline marked sensitive -- its bytes need Download sensitive files. */
+  sensitive?: boolean | null;
+  /** ZT-M21: false when this person may not download, view or preview it (refusal says why). */
+  downloadable?: boolean | null;
+  refusal?: string | null;
 }
 
 /** The outputs in an answer, or null for anything that is not one. */

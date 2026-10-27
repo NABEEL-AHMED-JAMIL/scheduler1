@@ -254,6 +254,7 @@
               <tr>
                 <td>v{{ v.version }}@if (v.version === r.currentVersion) { <span class="pill pill-ok ml-1">Current</span> }
                   @if (v.config?.['markAsCopy'] === true) { <span class="pill pill-neutral ml-1" title="Generated marked as COPY: every page of its files says COPY">COPY</span> }
+                  @if (v.downloadable === false) { <span class="pill pill-neutral ml-1" data-test="sensitive-report" [title]="v.refusal || ''">Sensitive · needs Download sensitive files</span> }
                   @if (v.expired) { <span class="pill pill-neutral ml-1" [title]="'Its files were removed by the workspace\'s retention policy' + (v.expiredAt ? ' on ' + (v.expiredAt | rsTime: 'dateTime') : '') + '; its record stays.'">Removed by retention</span> }
                   @if (v.void) { <span class="pill pill-crit ml-1" [title]="'VOID: ' + v.void.reason + (v.void.by ? ' · ' + v.void.by : '')">VOID</span> }
                   @else if (canGenerate()) { <button type="button" class="btn btn-default btn-intent-crit btn-xs ml-1" (click)="voidIt(v)" [attr.aria-label]="'Mark version ' + v.version + ' VOID'" title="Mark this version VOID">Void</button> }</td>
