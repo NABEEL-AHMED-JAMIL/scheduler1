@@ -30,7 +30,14 @@ that names a workflow, from a pipeline, or from the API; they show here for whoe
 Open the request in **My requests**:
 - the header says its state (*Running*, *Approved*, *Rejected*, *Failed*, *Cancelled*), the workflow and its version, and
   when it started and ended;
-- **Request details** shows what it is about;
+- **Request details** shows what it is about, the same here, in **Approvals** and in **Review**'s side panel:
+  - a pipeline an earlier step ran reads as one line: the step, how the run ended (*Completed*, *Failed*) and **Run #2926**
+    (a link for people who can open runs), with the values kept from its answer under it. Why it went wrong shows only when
+    it did not complete;
+  - a decision an earlier step kept reads *Approved by Dr. Anika Patel · 27 Oct 2026, 00:52*, with its comment as a quote;
+  - a long text, such as an AI summary, takes the whole width; a value marked **DRAFT** was written by a model for a
+    person to check;
+  - a value hidden from you shows as a lock and ••• (*Hidden: personal data*);
 - **History** says every step in words: *Requested by …*, *waiting for the team · due …*, *approved by …*, *yes* or *no*
   for a condition, *started run #2051* for a pipeline, *saved to dataset …*, *overdue, escalated to …*, *Request approved*.
   A decision's comment shows under it.

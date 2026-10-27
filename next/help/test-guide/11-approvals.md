@@ -68,6 +68,11 @@ Tested by ______ on ______
 | QA-11.27 | A viewer and the front desk have no Review | As V and as F, go to `/review/all` | Refused | ☐ Pass ☐ Fail |
 | QA-11.28 | Another workspace's Review | As X, **Review** | None of A's runs, tasks or requests is listed | ☐ Pass ☐ Fail |
 
+## Request details
+| # | Check | Steps | Expected | Pass / Fail |
+|---|---|---|---|---|
+| QA-11.29 | A request's data reads in words | Open a request whose workflow ran a pipeline and kept an approval's decision (such as *Patient intake*), in **Approvals**, in **My requests** and from **Review**'s side panel | The pipeline is one line (its step, *Completed*, **Run #…**) with its values under it, no *Job ID*, *Give up at* or *Ok* rows; the decision reads *Approved by* and the person's name, then the day, month, year and 24-hour time with its comment as a quote; a long summary takes the width; a hidden value is a lock and ••• with *Hidden: personal data* | ☐ Pass ☐ Fail |
+
 ## Example
 At Summit Valley **Controlled substance count reconciliation** pauses at its Approval step for Avi Cohen, the pharmacist,
 and completes once he approves; **Bank statement matching** shows a rejection: the run failed with *Rejected by Claire
