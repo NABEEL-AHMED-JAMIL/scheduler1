@@ -225,7 +225,7 @@ export function sampleOf(choice: Choice, record: unknown, rows: (path: string) =
     }
     case 'combine': return combined(choice.parts, record);
     case 'fixed': return choice.value;
-    case 'blank': return 'Left blank';
+    // A blank prints the template's empty text: nothing to show beside "Left blank".
     default: return '';
   }
 }

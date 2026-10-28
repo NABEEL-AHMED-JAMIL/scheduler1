@@ -130,6 +130,9 @@ describe('Data and mapping: Generate again', () => {
     fixture.detectChanges();
     expect(m.mapping()['dob']).toEqual({ value: 'Not recorded' });
     expect(m.matches().find(x => x.field.path === 'patient_name')!.sample).toBe('Robin Fairweather');
+    m.chosen('dob', { choice: { kind: 'blank' }, columns: {} });
+    const dob = m.matches().find(x => x.field.path === 'dob')!;
+    expect([m.choiceText(dob), dob.sample, m.howText(dob)]).toEqual(['Left blank', '', 'Left blank']);
   });
 
   it('groups the fields by the template\'s own parts, and filters and searches them', () => {
