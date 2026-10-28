@@ -199,7 +199,7 @@ export function rowsOf(options: AdvancedOption[]): Row[] {
     .adv-trigger { display: flex; flex-direction: column; justify-content: center; gap: 0.125rem; width: 100%; min-height: 2.25rem;
       padding: 0.375rem 2rem 0.375rem 0.625rem; position: relative; text-align: left; background: var(--surface-raised);
       border: 1px solid var(--border-control); border-radius: var(--radius-md); color: var(--text-primary); font-size: 0.8125rem; }
-    .adv-trigger:hover:not(:disabled) { border-color: var(--border-strong); }
+    /* No hover tint: --border-strong is lighter than the control edge (3:1), so a hovered select looked disabled. */
     .adv-trigger:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
     .adv-trigger:disabled { opacity: 0.6; cursor: not-allowed; }
     .adv-trigger.is-invalid { border-color: var(--crit-text); }
@@ -221,7 +221,7 @@ export function rowsOf(options: AdvancedOption[]): Row[] {
     .adv-chevron { position: absolute; right: 0.625rem; top: 50%; transform: translateY(-50%); color: var(--text-muted); }
     .adv-panel { display: flex; flex-direction: column; background: var(--surface-raised); border: 1px solid var(--border-strong);
       border-radius: var(--radius-lg); overflow: hidden; min-width: 0; }
-    .adv-pop { width: 100%; max-width: min(40rem, 92vw); box-shadow: 0 12px 32px color-mix(in oklab, var(--shadow-color) 16%, transparent); }
+    .adv-pop { width: 100%; max-width: 92vw; box-shadow: 0 12px 32px color-mix(in oklab, var(--shadow-color) 16%, transparent); }
     .adv-search { display: flex; align-items: center; gap: 0.5rem; padding: 0 0.625rem; min-height: 2.375rem; border-bottom: 1px solid var(--border-subtle); }
     .adv-search-icon { color: var(--text-muted); flex-shrink: 0; }
     .adv-search-input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font: inherit; font-size: 0.8125rem;
@@ -319,7 +319,8 @@ export class AdvancedSelect implements ControlValueAccessor {
   private readonly listRef = viewChild<ElementRef<HTMLElement>>('list');
   private readonly panelRef = viewChild<ElementRef<HTMLElement>>('panel');
   readonly positions = POSITIONS;
-  readonly scrollStrategy = createRepositionScrollStrategy(inject(Injector));
+  private readonly injector = inject(Injector);
+  readonly scrollStrategy = createRepositionScrollStrategy(this.injector);
   /** The panel is at least the button's width (measured as it opens). */
   readonly minWidth = signal(0);
 
@@ -410,10 +411,11 @@ export class AdvancedSelect implements ControlValueAccessor {
     const at = this.filtered().findIndex(o => o.value === this.value());
     this.active.set(seed ? (this.filtered().length ? 0 : -1) : at);
     this.scrollTop.set(0);
-    queueMicrotask(() => {
+    // After the overlay has drawn the panel (a microtask ran before it existed): focus the search, show the choice.
+    afterNextRender(() => {
       this.searchRef()?.nativeElement.focus();
       this.reveal(this.active());
-    });
+    }, { injector: this.injector });
   }
 
   close(focusTrigger: boolean): void {

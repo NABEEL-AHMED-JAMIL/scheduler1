@@ -138,6 +138,17 @@ describe('AdvancedSelect', () => {
     expect(box.scrollTop()).toBeGreaterThan(0);
   });
 
+  it('opens on its choice: a long list is scrolled to it and the search box has the focus', async () => {
+    const many: AdvancedOption[] = Array.from({ length: 300 }, (_, i) => ({ value: String(i), label: `Country ${i}`, description: `Name ${i}` }));
+    const { fixture, box } = make({ options: many, value: '250' });
+    box.openPanel();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(box.active()).toBe(250);
+    expect(box.scrollTop()).toBeGreaterThan(0);
+    expect((document.activeElement as HTMLElement | null)?.getAttribute('role')).toBe('combobox');
+  });
+
   it('works as a form control, and a "none" row clears it', () => {
     const { box } = make({ allowClear: true, clearLabel: 'Leave it blank' });
     const changes: (string | number | null)[] = [];
