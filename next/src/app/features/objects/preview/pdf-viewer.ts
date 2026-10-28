@@ -1,7 +1,21 @@
 import {
-  Component, ElementRef, OnDestroy, computed, effect, input, signal, viewChild,
+  AfterViewInit, Component, ElementRef, OnDestroy, computed, effect, input, signal, viewChild,
 } from '@angular/core';
 import { Icon } from '../../../shared/ui/icon';
+
+/** The zoom's bounds, and a fit-to-width's: a page is never drawn under half size, nor fitted past 250 % (a 1920 pane). */
+export const ZOOM_MIN = 0.5;
+export const ZOOM_MAX = 3;
+export const FIT_MAX = 2.5;
+
+/**
+ * Owner 2026-10-27: the zoom that fits a page's width to the pane's -- the whole width the pane has, no padding of the
+ * viewer's own -- in hundredths, within ZOOM_MIN and FIT_MAX.
+ */
+export function fitScale(paneWidth: number, pageWidth: number): number {
+  if (!(paneWidth > 0) || !(pageWidth > 0)) return 1;
+  return Math.min(FIT_MAX, Math.max(ZOOM_MIN, Math.floor((paneWidth / pageWidth) * 100) / 100));
+}
 
 /**
  * A real PDF viewer rather than an <iframe> pointed at a blob.
@@ -17,7 +31,8 @@ import { Icon } from '../../../shared/ui/icon';
   // The tag itself is the box: a shrinkable flex column that fills whatever holds it (a flex dialog body or a
   // fixed-height div). Inline, its inner h-full had no height to take and the page scroller grew to the whole
   // PDF, so a billing document opened in its dialog could not be scrolled.
-  host: { class: 'flex flex-col flex-1 min-h-0 h-full' },
+  // Owner 2026-10-27: and as wide as its box -- the toolbar spans it, the page is fitted to its width.
+  host: { class: 'flex flex-col flex-1 min-h-0 h-full w-full min-w-0' },
   template: `
     <div class="flex flex-col flex-1 min-h-0">
       @if (pageCount()) {
@@ -40,11 +55,11 @@ import { Icon } from '../../../shared/ui/icon';
 
           <div class="seg ml-1.5" role="group" aria-label="Zoom">
             <button type="button" class="seg-btn seg-icon" (click)="zoomBy(-0.25)"
-                    [disabled]="scale() <= 0.5" title="Zoom out" aria-label="Zoom out"><app-icon name="minus" /></button>
-            <button type="button" class="seg-btn seg-value min-w-14" (click)="fit()"
+                    [disabled]="scale() <= zoomMin" title="Zoom out" aria-label="Zoom out"><app-icon name="minus" /></button>
+            <button type="button" class="seg-btn seg-value min-w-14" (click)="fit()" data-test="pdf-zoom" [attr.aria-pressed]="fitting()"
                     title="Fit to width" [attr.aria-label]="'Zoom ' + zoomLabel() + ': fit to width'">{{ zoomLabel() }}</button>
             <button type="button" class="seg-btn seg-icon" (click)="zoomBy(0.25)"
-                    [disabled]="scale() >= 3" title="Zoom in" aria-label="Zoom in"><app-icon name="plus" /></button>
+                    [disabled]="scale() >= zoomMax" title="Zoom in" aria-label="Zoom in"><app-icon name="plus" /></button>
           </div>
 
           @if (rendering()) {
@@ -53,7 +68,10 @@ import { Icon } from '../../../shared/ui/icon';
         </div>
       }
 
-      <div #scroller class="flex-1 overflow-auto p-4 flex justify-center items-start">
+      <!-- The pane's own width, no side padding: a page wider than it (zoomed in) scrolls from its left edge (safe center),
+           and the scroll bar's room is kept from the start, so a fitted page never overflows once the bar appears. -->
+      <div #scroller class="flex-1 min-w-0 overflow-auto py-3 flex items-start [justify-content:safe_center] [scrollbar-gutter:stable]"
+           data-test="pdf-scroller">
         @if (error()) {
           <div class="flex flex-col items-center justify-center gap-3 py-20 text-center">
             <app-icon name="alert" size="1.75rem" class="icon-crit" />
@@ -74,13 +92,13 @@ import { Icon } from '../../../shared/ui/icon';
             <p class="text-sm text-[color:var(--text-muted)]">Rendering PDF…</p>
           </div>
         }
-        <canvas #canvas class="rounded shadow-sm max-w-full"
+        <canvas #canvas class="rounded shadow-sm shrink-0"
                 [class.hidden]="!pageCount() || !!error() || !!pageError()"></canvas>
       </div>
     </div>
   `,
 })
-export class PdfViewer implements OnDestroy {
+export class PdfViewer implements AfterViewInit, OnDestroy {
   readonly src = input.required<string | null>();
 
   private readonly canvasRef = viewChild.required<ElementRef<HTMLCanvasElement>>('canvas');
@@ -96,6 +114,13 @@ export class PdfViewer implements OnDestroy {
   readonly pageError = signal('');
 
   readonly zoomLabel = computed(() => `${Math.round(this.scale() * 100)}%`);
+  readonly zoomMin = ZOOM_MIN;
+  readonly zoomMax = ZOOM_MAX;
+  /** The page follows the pane's width (the default, and after the zoom's value is chosen); zooming in or out leaves it. */
+  readonly fitting = signal(true);
+  private resize?: ResizeObserver;
+  private lastWidth = 0;
+  private refit: ReturnType<typeof setTimeout> | null = null;
 
   private doc: any = null;
   private renderTask: any = null;
@@ -141,13 +166,32 @@ export class PdfViewer implements OnDestroy {
     }
   }
 
+  /** The pane's width for a page: the scroller's inside (its scroll bar's room already left out). */
+  paneWidth(): number {
+    return this.scrollerRef().nativeElement.clientWidth;
+  }
+
   private async fitInternal(): Promise<void> {
     if (!this.doc) return;
-    const first = await this.doc.getPage(1);
+    this.fitting.set(true);
+    const first = await this.doc.getPage(this.page());
     const unscaled = first.getViewport({ scale: 1 });
-    const available = Math.max(240, this.scrollerRef().nativeElement.clientWidth - 32);
-    this.scale.set(Math.min(3, Math.max(0.5, Math.round((available / unscaled.width) * 100) / 100)));
-    await this.draw();
+    this.lastWidth = this.paneWidth();
+    const next = fitScale(Math.max(240, this.lastWidth), unscaled.width);
+    // The same zoom draws nothing new by itself (the effect only follows a change).
+    if (next === this.scale()) await this.draw(); else this.scale.set(next);
+  }
+
+  ngAfterViewInit(): void {
+    // A pane that changes width (a dialog opening, a panel beside it, the window) keeps a fitted page fitted.
+    if (typeof ResizeObserver === 'undefined') return;
+    this.resize = new ResizeObserver(() => {
+      const width = this.paneWidth();
+      if (!this.doc || !this.fitting() || Math.abs(width - this.lastWidth) < 2) return;
+      if (this.refit) clearTimeout(this.refit);
+      this.refit = setTimeout(() => void this.fitInternal(), 120);
+    });
+    this.resize.observe(this.scrollerRef().nativeElement);
   }
 
   private async draw(): Promise<void> {
@@ -189,13 +233,16 @@ export class PdfViewer implements OnDestroy {
   }
 
   zoomBy(delta: number): void {
-    this.scale.update(s => Math.min(3, Math.max(0.5, Math.round((s + delta) * 100) / 100)));
+    this.fitting.set(false);
+    this.scale.update(s => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round((s + delta) * 100) / 100)));
   }
 
   fit(): void { void this.fitInternal(); }
 
   ngOnDestroy(): void {
     this.destroyed = true;
+    this.resize?.disconnect();
+    if (this.refit) clearTimeout(this.refit);
     try { this.renderTask?.cancel(); } catch { /* nothing in flight */ }
     try { this.doc?.destroy(); } catch { /* already gone */ }
   }

@@ -2617,8 +2617,8 @@ a.bill-meta-chip:hover { border-color: var(--accent-mark); color: var(--text-pri
 .widget-foot:empty { display: none; }
 /* Owner #9: the preview fills the screen beside the sticky rail (60vh left a third of a 1920 screen blank under it). */
 .bill-preview { min-height: 28rem; height: calc(100vh - 13rem); display: flex; flex-direction: column; border-bottom: 1px solid var(--border-subtle); }
-/* A page fitted to the width of a 1920 pane is drawn at 213% and shows a third of it: the viewer keeps to a reading width. */
-.bill-preview > app-pdf-viewer { width: 100%; max-width: 62rem; margin-inline: auto; }
+/* Owner 2026-10-27: the viewer fills the reading pane -- its toolbar spans it, the page is fitted to its width (at most 250 %). */
+.bill-preview > app-pdf-viewer { width: 100%; }
 .bill-preview img { max-width: 100%; max-height: 100%; object-fit: contain; margin: auto; }
 .doc-row { display: flex; align-items: center; gap: .6rem; padding: .45rem 0; border-bottom: 1px solid var(--border-subtle); }
 .doc-row:last-child { border-bottom: 0; }
