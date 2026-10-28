@@ -84,6 +84,10 @@ describe('A request\'s data, by its shape', () => {
   it('reads a masked value as hidden, wherever it is', () => {
     expect(valueKind('•••')).toEqual({ kind: 'masked', text: '•••' });
     expect(valueKind('•••@•••.com')).toEqual({ kind: 'masked', text: '•••@•••.com' });
+    expect(valueKind('••• 4242')).toEqual({ kind: 'masked', text: '••• 4242' });
+    // A text with a mask inside it is still a text: the summary of a patient whose name was masked.
+    expect(valueKind(`•••, ${SUMMARY.slice(15)}`)).toMatchObject({ kind: 'long' });
+    expect(valueKind('••• says it eases with rest')).toMatchObject({ kind: 'text' });
     const a = entry('assessment');
     if (a.kind !== 'outcome') throw new Error('not an outcome');
     expect(a.fields.find(f => f.key === 'patient_name')).toMatchObject({ view: { kind: 'masked', text: '•••' } });

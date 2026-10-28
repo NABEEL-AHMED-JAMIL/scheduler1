@@ -25,7 +25,12 @@ export type ValueView =
  */
 export const MASK = '•••';
 export const MASKED_TITLE = 'Hidden: personal data';
-export const isMasked = (text: unknown): boolean => typeof text === 'string' && text.trim().startsWith(MASK);
+/**
+ * A value that IS the mask -- "•••", or the platform's partial forms "•••@•••.com" and "••• 4242" -- never a text with a mask
+ * inside it (an AI summary whose name was masked, "•••, an 84-year-old…", is still a text to read).
+ */
+const MASKED_VALUE = /^\u2022{3}(?:@\u2022{3}\.[A-Za-z.]{2,12}| [0-9A-Za-z]{2,8})?$/;
+export const isMasked = (text: unknown): boolean => typeof text === 'string' && MASKED_VALUE.test(text.trim());
 
 const IMAGE = /\.(png|jpe?g|gif|webp|svg|bmp|tiff?|heic|avif)$/i;
 const DOCUMENT = /\.(pdf|docx?|xlsx?|pptx?|csv|tsv|txt|rtf|odt|ods|json|xml|zip|eml|msg|md|parquet)$/i;
