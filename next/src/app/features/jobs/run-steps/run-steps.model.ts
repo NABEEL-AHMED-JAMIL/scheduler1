@@ -175,8 +175,11 @@ export function stepStillGoing(status: string | null | undefined): boolean {
   return status === 'Queue' || status === 'Start' || status === 'Running';
 }
 
-/** Wave 4: the formats sourceJob.json/runDataset writes a dataset in. */
-export type DatasetFormat = 'csv' | 'json' | 'jsonl' | 'pdf';
+/**
+ * Wave 4: the format sourceJob.json/runDataset is asked for. Rows are written as csv, json or jsonl; any other kept file
+ * (a report's pdf, a page image's png, a converted docx or txt) only as the file it is -- Core streams it unchanged.
+ */
+export type DatasetFormat = string;
 export const DATASET_FORMATS: { id: DatasetFormat; label: string }[] = [
   { id: 'csv', label: 'CSV' }, { id: 'json', label: 'JSON' }, { id: 'jsonl', label: 'JSONL' },
 ];
@@ -184,9 +187,23 @@ export const DATASET_FORMATS: { id: DatasetFormat; label: string }[] = [
 /** MIG-255: a report (render_pdf) is a PDF, not rows -- it downloads only as itself. */
 export const PDF_FORMAT: { id: DatasetFormat; label: string }[] = [{ id: 'pdf', label: 'PDF' }];
 
-/** The formats a kept file or dataset offers: a PDF report only as its PDF, anything else as rows. */
+/** The formats Core reads as rows (FileFormats.READABLE): only these are rewritten in another format. */
+const ROW_FORMATS = ['csv', 'json', 'jsonl', 'parquet'];
+
+/** A kept file's own format: as recorded, else its name's extension, lower case ('' when neither says). */
+export function ownFormat(name: string, format?: string | null): string {
+  const recorded = (format ?? '').trim().toLowerCase();
+  if (recorded) return recorded;
+  const dot = name.lastIndexOf('.');
+  return dot > 0 ? name.slice(dot + 1).toLowerCase() : '';
+}
+
+/** The formats a kept file or dataset offers: rows as csv, json or jsonl; anything else (a pdf, a png) only as itself. */
 export function formatsFor(name: string, format?: string | null): { id: DatasetFormat; label: string }[] {
-  return format === 'pdf' || /\.pdf$/i.test(name) ? PDF_FORMAT : DATASET_FORMATS;
+  const own = ownFormat(name, format);
+  if (own === 'pdf') return PDF_FORMAT;
+  if (!own || ROW_FORMATS.includes(own)) return DATASET_FORMATS;
+  return [{ id: own, label: own.toUpperCase() }];
 }
 
 /**

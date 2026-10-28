@@ -155,6 +155,22 @@ describe('Run page: the Outputs tab', () => {
     expect(req.request.params.get('format')).toBe('pdf');
   });
 
+  // A kept page image (pdf_pages) or any other file that is not rows downloads as the file it is, never as csv or json.
+  it('offers a kept image only as its own format, with no row formats', () => {
+    const image = { ...KEPT, runOutputId: 1004, stepKey: 'pages', task: 'pdf_pages', name: 'scan-page-01.png', format: 'png',
+      rowCount: 1, byteCount: 81615, pageCount: null, runDatasetId: 1061 };
+    const { el, http } = mount([image]);
+    const file = el.querySelector<HTMLElement>('.exec-file[data-kind="file"]')!;
+    expect(file.querySelector('[data-test="download"]')).toBeNull();
+    const buttons = [...file.querySelectorAll<HTMLButtonElement>('[data-format]')];
+    expect(buttons.map(b => b.dataset['format'])).toEqual(['png']);
+    expect(buttons[0].title).toBe('Download as PNG');
+    buttons[0].click();
+    const req = http.expectOne(r => r.url.endsWith('/sourceJob.json/runDataset'));
+    expect(req.request.params.get('runDatasetId')).toBe('1061');
+    expect(req.request.params.get('format')).toBe('png');
+  });
+
   it('downloads an upload from storage, by its alias and key', () => {
     const { el, http } = mount();
     el.querySelector<HTMLButtonElement>('.exec-file[data-kind="bucket"] button:not([data-test="visualise"]):not([data-test="view"])')!.click();

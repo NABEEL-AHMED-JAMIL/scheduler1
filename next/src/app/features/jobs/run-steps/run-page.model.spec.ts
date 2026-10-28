@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { outputChips, outputLabel, plural, runFacts, runRows, runStatusLook, runTabFromUrl, runTabUrl, startedBy, stepRows } from './run-page.model';
-import { RunOutput, StepExecution, StepTimeline } from './run-steps.model';
+import { RunOutput, StepExecution, StepTimeline, formatsFor } from './run-steps.model';
 
 /** UX review 2026-10-12, run page fix: the readings behind the run page's header, summary, tabs and steps table. */
 const step = (index: number, key: string, task: string, extra: Partial<StepExecution> = {}): StepExecution => ({
@@ -122,6 +122,20 @@ describe('run page: counts and files in words', () => {
     expect(outputChips(keep, outputs)).toMatchObject([{ name: 'run-8134.csv', kind: 'bucket', detail: 'CSV · 1 row · 349 B' }]);
     expect(outputChips(step(0, 'arrival', 'read_s3', { datasets: [{ runDatasetId: 4527, name: 'output', rowCount: 1 }] }), outputs))
       .toMatchObject([{ name: 'output', kind: 'dataset', pdf: false, detail: '1 row' }]);
+  });
+
+  it('offers a kept file in its own format: rows as csv, json or jsonl, a pdf or a page image only as itself', () => {
+    expect(formatsFor('orders.csv', 'csv').map(f => f.id)).toEqual(['csv', 'json', 'jsonl']);
+    expect(formatsFor('cohort.parquet', null).map(f => f.id)).toEqual(['csv', 'json', 'jsonl']);
+    expect(formatsFor('output', null).map(f => f.id)).toEqual(['csv', 'json', 'jsonl']);
+    expect(formatsFor('report.pdf', null)).toEqual([{ id: 'pdf', label: 'PDF' }]);
+    expect(formatsFor('ACHTERBERG-page-01.png', 'png')).toEqual([{ id: 'png', label: 'PNG' }]);
+    expect(formatsFor('notes.TXT', null)).toEqual([{ id: 'txt', label: 'TXT' }]);
+    const pages = step(3, 'pages', 'pdf_pages', { datasets: [{ runDatasetId: 7001, name: 'scan-page-01.png', rowCount: 1 }] });
+    const outputs: RunOutput[] = [{ runOutputId: 3001, stepExecutionId: pages.stepExecutionId, stepKey: 'pages', kind: 'file',
+      name: 'scan-page-01.png', format: 'png', rowCount: 1, byteCount: 81615, runDatasetId: 7001 }];
+    expect(outputChips(pages, outputs)).toMatchObject([{ name: 'scan-page-01.png', kind: 'file', pdf: false,
+      formats: [{ id: 'png', label: 'PNG' }] }]);
   });
 });
 

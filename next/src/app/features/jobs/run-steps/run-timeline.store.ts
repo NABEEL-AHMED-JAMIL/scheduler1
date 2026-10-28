@@ -182,7 +182,7 @@ export class RunTimelineStore implements OnDestroy {
         this.busy.set('');
         if (!response.body) { this.toast.error('The server returned an empty file.'); return; }
         const served = attachmentName(response.headers.get('content-disposition'));
-        StorageService.saveBlob(response.body, served || `${name.replace(/\.(csv|jsonl?|parquet|pdf)$/i, '')}.${format}`);
+        StorageService.saveBlob(response.body, served || `${name.replace(/\.[a-z0-9]{1,8}$/i, '')}.${format}`);
       },
       error: async err => {
         this.busy.set('');

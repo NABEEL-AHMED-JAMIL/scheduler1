@@ -1,6 +1,6 @@
 import { formatDuration } from '../../../shared/ui/time-format';
 import { formatSize } from '../../../shared/ui/format-size';
-import { RunOutput, StepDataset, StepExecution, StepTimeline, errorText } from './run-steps.model';
+import { DatasetFormat, PDF_FORMAT, RunOutput, StepDataset, StepExecution, StepTimeline, errorText, formatsFor } from './run-steps.model';
 
 /**
  * The run page's readings (UX review 2026-10-12, run page fix): which tab an address opens, the one status the header
@@ -144,8 +144,10 @@ export interface OutputChip {
   /** A dataset or kept file downloads through its dataset; an upload from storage. */
   kind: 'dataset' | 'file' | 'bucket';
   runDatasetId?: number | null;
-  /** The formats a dataset downloads in: a PDF only as itself. */
+  /** A PDF report (its icon is a file's). */
   pdf: boolean;
+  /** The formats it downloads in: rows as csv, json or jsonl; any other file (a pdf, a png) only as itself. */
+  formats: { id: DatasetFormat; label: string }[];
   output?: RunOutput;
   dataset?: StepDataset;
 }
@@ -157,15 +159,16 @@ export function outputChips(step: StepExecution, outputs: RunOutput[]): OutputCh
   const byDataset = new Map(mine.filter(o => o.runDatasetId != null).map(o => [o.runDatasetId!, o]));
   const chips: OutputChip[] = (step.datasets ?? []).map(d => {
     const kept = byDataset.get(d.runDatasetId);
-    const pdf = kept?.format === 'pdf' || /\.pdf$/i.test(d.name);
+    const formats = formatsFor(d.name, kept?.format);
+    const pdf = formats === PDF_FORMAT;
     return {
-      name: d.name, kind: kept ? 'file' as const : 'dataset' as const, runDatasetId: d.runDatasetId, pdf, output: kept, dataset: d,
+      name: d.name, kind: kept ? 'file' as const : 'dataset' as const, runDatasetId: d.runDatasetId, pdf, formats, output: kept, dataset: d,
       detail: kept ? outputLabel(kept) : pdf ? outputLabel({ name: d.name, format: 'pdf' })
         : d.rowCount !== null && d.rowCount !== undefined ? plural(d.rowCount, 'row') : '',
     };
   });
   for (const o of mine) {
-    if (o.kind === 'bucket') chips.push({ name: o.name, kind: 'bucket', pdf: o.format === 'pdf', output: o, detail: outputLabel(o) });
+    if (o.kind === 'bucket') chips.push({ name: o.name, kind: 'bucket', pdf: o.format === 'pdf', formats: [], output: o, detail: outputLabel(o) });
   }
   return chips;
 }

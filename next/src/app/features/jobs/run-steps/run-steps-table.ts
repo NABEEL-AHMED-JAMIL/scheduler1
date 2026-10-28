@@ -10,7 +10,7 @@ import { Avatar } from '../../../shared/ui/avatar';
 import { sidePanelConfig } from '../../../shared/ui/side-panel';
 import { RetryDialog, RetryDialogData } from '../retry/retry-dialog';
 import { RetryFrom, attemptSentence, backfillLink, backfillRetryNote, stepLabel } from '../retry/run-retry';
-import { DATASET_FORMATS, PDF_FORMAT, StepApproval, approvalOutcome, failedStep } from './run-steps.model';
+import { StepApproval, approvalOutcome, failedStep } from './run-steps.model';
 import { OutputChip, StepRow, stepRows } from './run-page.model';
 import { RunApprovalStore } from './run-approval.store';
 import { RunTimelineStore } from './run-timeline.store';
@@ -199,17 +199,18 @@ import { BlurLoader } from '../../../shared/ui/blur-loader';
                             <button type="button" class="btn btn-ghost btn-xs shrink-0" [disabled]="store.busy() !== ''"
                                     [attr.aria-label]="'Download ' + o.name + ' from step ' + r.step.key" title="Download from storage"
                                     (click)="o.output && store.downloadUpload(o.output)"><app-icon name="download" /></button>
-                          } @else if (o.pdf) {
+                          } @else if (o.formats.length === 1) {
                             <button type="button" class="btn btn-ghost btn-xs shrink-0" [disabled]="store.busy() !== '' || !!o.output?.expired"
-                                    [attr.aria-label]="'Download ' + o.name + ' from step ' + r.step.key" title="Download the PDF"
-                                    (click)="store.downloadDataset(o.runDatasetId!, 'pdf', o.name)"><app-icon name="download" /></button>
+                                    [attr.data-format]="o.formats[0].id" [attr.aria-label]="'Download ' + o.name + ' from step ' + r.step.key"
+                                    [title]="'Download the ' + o.formats[0].label"
+                                    (click)="store.downloadDataset(o.runDatasetId!, o.formats[0].id, o.name)"><app-icon name="download" /></button>
                           } @else {
                             <button type="button" class="btn btn-ghost btn-xs shrink-0" [cdkMenuTriggerFor]="formatMenu" [disabled]="store.busy() !== '' || !!o.output?.expired"
                                     [attr.aria-label]="'Download ' + o.name + ' from step ' + r.step.key" title="Download as CSV, JSON or JSONL">
                               <app-icon name="download" /></button>
                             <ng-template #formatMenu>
                               <div cdkMenu class="card shadow-xl py-1 min-w-36 text-sm">
-                                @for (f of formats; track f.id) {
+                                @for (f of o.formats; track f.id) {
                                   <button cdkMenuItem class="menu-item" [attr.data-format]="f.id"
                                           (cdkMenuItemTriggered)="store.downloadDataset(o.runDatasetId!, f.id, o.name)"><app-icon name="download" />{{ f.label }}</button>
                                 }
@@ -268,8 +269,6 @@ export class RunStepsTable {
   readonly backfillAt = backfillLink;
 
   readonly String = String;
-  readonly formats = DATASET_FORMATS;
-  readonly pdfFormat = PDF_FORMAT;
   readonly attemptSentence = attemptSentence;
 
   readonly rows = computed<StepRow[]>(() => stepRows(this.store.timeline(), this.store.outputList()));
