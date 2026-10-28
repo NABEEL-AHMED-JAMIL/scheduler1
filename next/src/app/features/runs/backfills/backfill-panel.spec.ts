@@ -5,6 +5,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { BackfillPanel, defaultRange } from './backfill-panel';
 import { API_SUCCESS } from '../../../core/api/api.config';
+import { advancedSelect } from '../../../shared/ui/advanced-select.testing';
 
 /**
  * MIG-347: "Backfill…" -- the inputs ask the server for a preview (the periods, which already completed, the estimate), and
@@ -57,9 +58,8 @@ describe('Backfill…', () => {
     vi.advanceTimersByTime(300);
     http.expectOne(r => r.url.endsWith('/backfills/preview')).flush({ status: API_SUCCESS, data: PREVIEW });
     fixture.detectChanges();
-    const region = el.querySelector<HTMLSelectElement>('#backfill-param-region')!;
-    region.value = 'south';
-    region.dispatchEvent(new Event('change'));
+    expect(el.querySelector('#backfill-param-region')).toBeTruthy();
+    advancedSelect(fixture, 'backfill-param-region').choose('south');
     fixture.detectChanges();
     vi.advanceTimersByTime(300);
     const again = http.expectOne(r => r.url.endsWith('/backfills/preview'));
