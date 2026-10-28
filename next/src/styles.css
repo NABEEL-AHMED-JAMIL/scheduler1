@@ -2064,6 +2064,10 @@ html[data-theme="contrast"]:not(.dark) {
      assistant's model select stood 19px beside 26px buttons). */
   :is(.page-head, .table-toolbar) .seg-btn { padding-block: 0.1875rem; }
   :is(.page-head, .table-toolbar) select.input { min-height: 1.75rem; }
+  /* The advanced select (shared/ui/advanced-select.ts) in the same rows: the buttons' height, its second line left out. */
+  :is(.page-head, .table-toolbar) app-advanced-select .adv-trigger { min-height: 1.75rem; padding-block: 0.125rem; }
+  :is(.page-head, .table-toolbar) app-advanced-select .adv-trigger-desc { display: none; }
+  .field-invalid app-advanced-select .adv-trigger, app-advanced-select.input-invalid .adv-trigger { border-color: var(--crit-text); }
   /* A list's toolbar (app-table-shell) held a 30px view toggle, 36px filters and 26px buttons in one
      row. Every control there is the view toggle's height, and the filters take the compact type. */
   /* Height and type only: horizontal padding is the field's own (a search box keeps pl-8 for its

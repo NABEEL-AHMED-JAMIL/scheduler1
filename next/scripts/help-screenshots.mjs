@@ -11,7 +11,8 @@
 //     "route": "/reports/templates",    where the console opens
 //     "as": "riverside.admin",          who: <workspace>.<admin|reviewer|viewer> or summit.<person> (.state/demo/rebuild.json)
 //     "steps": [ {"click": "text=New template"}, {"selectIndex": ["select", 1]}, {"waitFor": "app-designer"}, {"wait": 800}, {"fill": ["input[name=q]", "wound"]},
-//                {"hover": "css"}, {"press": "Escape"}, {"scroll": "css"} ],
+//                {"hover": "css"}, {"press": "Escape"}, {"scroll": "css"},
+//                {"pick": ["#id or app-advanced-select css", "value or name" | {"label": "name"}]} ],  (an advanced select)
 //     "clip": "css selector",           optional: only that element (with "pad" pixels around it)
 //     "viewport": [1920, 1080],         optional; default 1920 x 1080
 //     "theme": "light",                 optional; default light
@@ -98,6 +99,20 @@ function shotsToTake() {
   return only ? all.filter(s => only.includes(s.name)) : all;
 }
 
+/** An advanced select's pick (shared/ui/advanced-select.ts): open it, search, click the option by value or name. */
+async function pick(page, select, what) {
+  const host = page.locator(select).first();
+  const trigger = (await host.evaluate(e => e.tagName.toLowerCase())) === 'button' ? host : host.locator('button.adv-trigger');
+  await trigger.click({ timeout: 15_000 });
+  const listId = await trigger.getAttribute('aria-controls');
+  const text = typeof what === 'string' ? what : what.label;
+  await page.locator(`input[role="combobox"][aria-controls="${listId}"]`).fill(text);
+  const list = page.locator(`[id="${listId}"]`);
+  const byName = list.locator('[role="option"][data-value]').filter({ has: page.locator('.adv-name').getByText(text, { exact: true }) });
+  const option = typeof what === 'string' ? list.locator(`[role="option"][data-value="${text}"]`).or(byName) : byName;
+  await option.first().click({ timeout: 15_000 });
+}
+
 async function act(page, step) {
   const loc = sel => page.locator(sel).first();
   if (step.click) await loc(step.click).click({ timeout: 15_000 });
@@ -105,6 +120,7 @@ async function act(page, step) {
   if (step.hover) await loc(step.hover).hover({ timeout: 15_000 });
   if (step.fill) await loc(step.fill[0]).fill(step.fill[1], { timeout: 15_000 });
   if (step.select) await loc(step.select[0]).selectOption(step.select[1], { timeout: 15_000 });
+  if (step.pick) await pick(page, step.pick[0], step.pick[1]);
   if (step.selectIndex) await loc(step.selectIndex[0]).selectOption({ index: step.selectIndex[1] }, { timeout: 15_000 });
   if (step.press) await page.keyboard.press(step.press);
   if (step.waitFor) await loc(step.waitFor).waitFor({ state: 'visible', timeout: 30_000 });

@@ -51,15 +51,25 @@ describe('AdvancedSelect', () => {
     trigger.click();
     fixture.detectChanges();
     await Promise.resolve();
-    const search = el.querySelector('input[role="combobox"]') as HTMLInputElement;
-    const list = el.querySelector('[role="listbox"]') as HTMLElement;
+    // The panel is drawn in the overlay (the page's top layer), so no dialog's overflow clips it.
+    const pane = document.querySelector('.cdk-overlay-pane') as HTMLElement;
+    expect(pane).toBeTruthy();
+    expect(el.contains(pane)).toBe(false);
+    const search = pane.querySelector('input[role="combobox"]') as HTMLInputElement;
+    const list = pane.querySelector('[role="listbox"]') as HTMLElement;
     expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    expect(trigger.getAttribute('aria-controls')).toBe(list.id);
     expect(search.getAttribute('aria-controls')).toBe(list.id);
     expect(search.getAttribute('aria-activedescendant')).toBe(box.optionId(0));
-    expect(el.querySelectorAll('[role="option"]').length).toBe(4);
-    expect(el.querySelector('[role="option"][aria-selected="true"]')?.textContent).toContain('Fits 79 of 83');
-    expect(el.querySelector('[role="option"][aria-disabled="true"]')?.textContent).toContain('Bone fracture review');
-    expect(el.querySelector('.sr-only[role="status"]')?.textContent).toContain('4 options');
+    expect(pane.querySelectorAll('[role="option"]').length).toBe(4);
+    expect(pane.querySelector('[role="option"][aria-selected="true"]')?.textContent).toContain('Fits 79 of 83');
+    expect(pane.querySelector('[role="option"][aria-disabled="true"]')?.textContent).toContain('Bone fracture review');
+    expect(pane.querySelector('.sr-only[role="status"]')?.textContent).toContain('4 options');
+    // A press inside the panel is not "outside": the panel stays open until a pick.
+    pane.querySelector('.adv-search')!.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    expect(box.open()).toBe(true);
+    document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    expect(box.open()).toBe(false);
   });
 
   it('moves with the arrow keys, Home and End, skips what cannot be chosen, and picks with Enter', () => {
@@ -139,5 +149,46 @@ describe('AdvancedSelect', () => {
     expect(changes).toEqual(['']);
     box.setDisabledState(true);
     expect(box.isDisabled()).toBe(true);
+  });
+
+  it('hands a numeric form a number, and null for "none"; a nullable one null', () => {
+    const numeric = make({ allowClear: true, numeric: true });
+    const got: unknown[] = [];
+    numeric.box.registerOnChange(v => got.push(v));
+    numeric.box.writeValue(1028);
+    expect(numeric.box.value()).toBe('1028');
+    numeric.box.openPanel();
+    numeric.box.pick(PIPELINES[1], new Event('mousedown'));
+    numeric.box.openPanel();
+    numeric.box.pickClear(new Event('mousedown'));
+    expect(got).toEqual([1475, null]);
+    const nullable = make({ allowClear: true, nullable: true });
+    const kept: unknown[] = [];
+    nullable.box.registerOnChange(v => kept.push(v));
+    nullable.box.openPanel();
+    nullable.box.pick(PIPELINES[0], new Event('mousedown'));
+    nullable.box.openPanel();
+    nullable.box.pickClear(new Event('mousedown'));
+    expect(kept).toEqual(['1476', null]);
+  });
+
+  it('as an "Add …" menu, only emits the pick and keeps showing its placeholder', () => {
+    const { box, el, fixture } = make({ resetOnPick: true, placeholder: 'Add a pipeline' });
+    const picks: (string | undefined)[] = [];
+    box.picked.subscribe(o => picks.push(o?.value));
+    box.openPanel();
+    box.pick(PIPELINES[2], new Event('mousedown'));
+    fixture.detectChanges();
+    expect(picks).toEqual(['1028']);
+    expect(box.value()).toBe('');
+    expect(el.querySelector('button.adv-trigger')?.textContent).toContain('Add a pipeline');
+  });
+
+  it('says it is loading, not "Choose…", while its list is read', () => {
+    const { el } = make({ options: [], value: '1476', loading: true, placeholder: 'Choose a pipeline' });
+    expect(el.querySelector('button.adv-trigger')?.textContent).toContain('Loading…');
+    expect(el.querySelector('button.adv-trigger')?.textContent).not.toContain('Choose a pipeline');
+    const empty = make({ options: [], loading: true, loadingText: 'Loading pipelines…' });
+    expect(empty.el.querySelector('button.adv-trigger')?.textContent).toContain('Loading pipelines…');
   });
 });

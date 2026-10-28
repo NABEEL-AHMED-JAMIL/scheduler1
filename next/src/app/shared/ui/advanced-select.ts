@@ -1,7 +1,9 @@
 import {
-  Component, DestroyRef, ElementRef, computed, effect, forwardRef, inject, input, model, output, signal, untracked, viewChild,
+  Component, DestroyRef, ElementRef, Injector, computed, effect, forwardRef, inject, input, model, output, signal, untracked, viewChild,
 } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
+import { CdkConnectedOverlay, CdkOverlayOrigin, ConnectedPosition, createRepositionScrollStrategy } from '@angular/cdk/overlay';
 import { Icon } from './icon';
 
 /** A badge's tone: the console's pill tones. */
@@ -40,6 +42,13 @@ export const VIRTUAL_AT = 60;
 const OVERSCAN = 6;
 /** Rows a Page Up or Page Down moves. */
 const PAGE = 8;
+/** Where the panel opens: under the button, else above it; lined up on its left edge, else its right. */
+const POSITIONS: ConnectedPosition[] = [
+  { originX: 'start', originY: 'bottom', overlayX: 'start', overlayY: 'top', offsetY: 4 },
+  { originX: 'start', originY: 'top', overlayX: 'start', overlayY: 'bottom', offsetY: -4 },
+  { originX: 'end', originY: 'bottom', overlayX: 'end', overlayY: 'top', offsetY: 4 },
+  { originX: 'end', originY: 'top', overlayX: 'end', overlayY: 'bottom', offsetY: -4 },
+];
 
 /** The options a search keeps: a name that matches comes before one only its other words match, inside each group. */
 export function filterOptions(options: AdvancedOption[], query: string): AdvancedOption[] {
@@ -85,17 +94,22 @@ export function rowsOf(options: AdvancedOption[]): Row[] {
  *
  * Two forms: a button that opens a panel (the default -- it shows the choice with its description and sample), or
  * `inline`, the search and list always shown in the page (a pipeline picker). Bound as `[(value)]` or as a form control.
+ *
+ * The panel opens in the CDK overlay (the page's top layer), under the button or above it when there is no room below, so
+ * a dialog's or a card's `overflow` never clips it, as it never clips a native select. As a form control it hands the form
+ * the type the form holds: `numeric` gives a number (an id the API takes as a number) and null for "none", `nullable` gives
+ * null rather than '' for "none". `compact` is the dense rows' height (a filter bar's `.input-sm`).
  */
 @Component({
   selector: 'app-advanced-select',
-  imports: [Icon],
+  imports: [Icon, NgTemplateOutlet, CdkConnectedOverlay, CdkOverlayOrigin],
   template: `
-    <div class="adv" [class.adv-inline]="inline()">
+    <div class="adv" [class.adv-inline]="inline()" [class.adv-sm]="compact()" [class.adv-bare]="bare()">
       @if (!inline()) {
-        <button #trigger type="button" class="adv-trigger" [id]="id() || null" [disabled]="isDisabled()"
-                aria-haspopup="listbox" [attr.aria-expanded]="open()" [attr.aria-controls]="open() ? listId : null"
+        <button #trigger type="button" class="adv-trigger" cdkOverlayOrigin #origin="cdkOverlayOrigin" [id]="id() || null"
+                [disabled]="isDisabled()" aria-haspopup="listbox" [attr.aria-expanded]="open()" [attr.aria-controls]="open() ? listId : null"
                 [attr.aria-label]="ariaLabel() ? ariaLabel() + (chosen() ? ': ' + chosen()!.label : '') : null"
-                [attr.aria-labelledby]="labelledBy() || null" [attr.aria-invalid]="invalid() || null"
+                [attr.aria-labelledby]="labelledBy() || null" [attr.aria-describedby]="describedBy() || null" [attr.aria-invalid]="invalid() || null"
                 [class.is-invalid]="invalid()" (click)="toggle()" (keydown)="onTriggerKey($event)">
           @if (chosen(); as c) {
             <span class="adv-trigger-main">
@@ -103,59 +117,76 @@ export function rowsOf(options: AdvancedOption[]): Row[] {
               @if (c.sample) { <span class="adv-sample">{{ c.sample }}</span> }
             </span>
             @if (showDescription() && c.description) { <span class="adv-trigger-desc">{{ c.description }}</span> }
+          } @else if (loading()) {
+            <span class="adv-placeholder">{{ loadingText() }}</span>
+          } @else if (value() && unknownText()) {
+            <span class="adv-trigger-main"><span class="adv-name mono">{{ value() }}</span></span>
+            @if (showDescription()) { <span class="adv-trigger-desc adv-unknown">{{ unknownText() }}</span> }
           } @else {
             <span class="adv-placeholder">{{ placeholder() }}</span>
           }
           <app-icon name="chevronDown" class="adv-chevron" />
         </button>
-      }
-      @if (open() || inline()) {
-        <div class="adv-panel" [class.adv-pop]="!inline()" [style.width]="inline() ? null : panelWidth()" (mousedown)="keepFocus($event)">
-          <div class="adv-search">
-            <app-icon name="search" class="adv-search-icon" />
-            <input #search type="text" class="adv-search-input" role="combobox" aria-autocomplete="list" autocomplete="off"
-                   [attr.aria-expanded]="true" [attr.aria-controls]="listId" [attr.aria-activedescendant]="activeId()"
-                   [attr.aria-label]="searchLabel()" [placeholder]="searchPlaceholder()" [value]="query()" [disabled]="isDisabled()"
-                   (input)="onSearch($any($event.target).value)" (keydown)="onKey($event)" (blur)="onBlur($event)" />
-            <span class="adv-count" aria-hidden="true">{{ countText() }}</span>
-          </div>
-          <div #list class="adv-list" role="listbox" [id]="listId" [attr.aria-label]="ariaLabel() || searchLabel()"
-               [attr.aria-busy]="loading() || null" [style.max-height.px]="maxHeightPx()" (scroll)="onScroll($any($event.target).scrollTop)">
-            @if (allowClear() && !query().trim() && !loading()) {
-              <div role="option" class="adv-option adv-clear" [id]="listId + '-clear'" [attr.aria-selected]="!value()"
-                   [class.is-active]="active() === -1" (mousedown)="pickClear($event)">{{ clearLabel() }}</div>
-            }
-            @if (loading()) {
-              <div class="adv-state" role="status"><span class="spinner adv-spinner" aria-hidden="true"></span>{{ loadingText() }}</div>
-            } @else if (!filtered().length) {
-              <div class="adv-state">{{ query().trim() ? noMatchText() : emptyText() }}</div>
-            } @else {
-              @if (virtual()) { <div aria-hidden="true" [style.height.px]="padTop()"></div> }
-              @for (r of windowRows(); track r.key) {
-                @if (r.option; as o) {
-                  <div role="option" class="adv-option" [id]="optionId(r.index)" [attr.aria-selected]="o.value === value()"
-                       [attr.aria-disabled]="o.disabled ? 'true' : null" [class.is-active]="r.index === active()"
-                       [class.is-chosen]="o.value === value()" [class.is-disabled]="o.disabled"
-                       [class.adv-two]="twoLine()" (mousedown)="pick(o, $event)" (mousemove)="hover(r.index)">
-                    <span class="adv-option-main">
-                      <span class="adv-name" [class.mono]="o.mono">{{ o.label }}</span>
-                      @if (o.description) { <span class="adv-desc">{{ o.description }}</span> }
-                    </span>
-                    @if (o.sample) { <span class="adv-sample">{{ o.sample }}</span> }
-                    @if (o.badge) { <span class="pill adv-badge" [class]="'pill-' + (o.badgeTone || 'neutral')">{{ o.badge }}</span> }
-                    @if (o.value === value()) { <app-icon name="check" class="adv-check" /> }
-                  </div>
-                } @else {
-                  <div role="presentation" class="adv-group">{{ r.label }}</div>
-                }
-              }
-              @if (virtual()) { <div aria-hidden="true" [style.height.px]="padBottom()"></div> }
-            }
-          </div>
-          <span class="sr-only" role="status" aria-live="polite">{{ liveText() }}</span>
-        </div>
+        <ng-template cdkConnectedOverlay [cdkConnectedOverlayOrigin]="origin" [cdkConnectedOverlayOpen]="open()"
+                     [cdkConnectedOverlayPositions]="positions" [cdkConnectedOverlayMinWidth]="minWidth()"
+                     [cdkConnectedOverlayWidth]="panelWidth() || ''" [cdkConnectedOverlayPush]="true"
+                     [cdkConnectedOverlayScrollStrategy]="scrollStrategy" (detach)="close(false)">
+          <ng-container [ngTemplateOutlet]="panelTpl" />
+        </ng-template>
+      } @else {
+        <ng-container [ngTemplateOutlet]="panelTpl" />
       }
     </div>
+    <ng-template #panelTpl>
+      <div #panel class="adv-panel" [class.adv-pop]="!inline()" (mousedown)="keepFocus($event)">
+        <div class="adv-search">
+          <app-icon name="search" class="adv-search-icon" />
+          <input #search type="text" class="adv-search-input" role="combobox" aria-autocomplete="list" autocomplete="off"
+                 [attr.aria-expanded]="true" [attr.aria-controls]="listId" [attr.aria-activedescendant]="activeId()"
+                 [attr.aria-label]="searchLabel()" [placeholder]="searchPlaceholder()" [value]="query()" [disabled]="isDisabled()"
+                 (input)="onSearch($any($event.target).value)" (keydown)="onKey($event)" (blur)="onBlur($event)" />
+          <span class="adv-count" aria-hidden="true">{{ countText() }}</span>
+        </div>
+        <div #list class="adv-list" role="listbox" [id]="listId" [attr.aria-label]="ariaLabel() || searchLabel()"
+             [attr.aria-busy]="loading() || null" [style.max-height.px]="maxHeightPx()" (scroll)="onScroll($any($event.target).scrollTop)">
+          @if (allowClear() && !query().trim() && !loading()) {
+            <div role="option" class="adv-option adv-clear" [id]="listId + '-clear'" [attr.aria-selected]="!value()"
+                 [class.is-active]="active() === -1" [class.is-chosen]="!value()" [class.adv-two]="twoLine()" (mousedown)="pickClear($event)">
+              <span class="adv-option-main"><span class="adv-name">{{ clearLabel() }}</span></span>
+              @if (!value()) { <app-icon name="check" class="adv-check" /> }
+            </div>
+          }
+          @if (loading()) {
+            <div class="adv-state" role="status"><span class="spinner adv-spinner" aria-hidden="true"></span>{{ loadingText() }}</div>
+          } @else if (!filtered().length) {
+            <div class="adv-state">{{ query().trim() ? noMatchText() : emptyText() }}</div>
+          } @else {
+            @if (virtual()) { <div aria-hidden="true" [style.height.px]="padTop()"></div> }
+            @for (r of windowRows(); track r.key) {
+              @if (r.option; as o) {
+                <div role="option" class="adv-option" [id]="optionId(r.index)" [attr.data-value]="o.value" [attr.aria-selected]="o.value === value()"
+                     [attr.aria-disabled]="o.disabled ? 'true' : null" [class.is-active]="r.index === active()"
+                     [class.is-chosen]="o.value === value()" [class.is-disabled]="o.disabled"
+                     [class.adv-two]="twoLine()" [attr.title]="o.label.length > 40 ? o.label : null"
+                     (mousedown)="pick(o, $event)" (mousemove)="hover(r.index)">
+                  <span class="adv-option-main">
+                    <span class="adv-name" [class.mono]="o.mono">{{ o.label }}</span>
+                    @if (o.description) { <span class="adv-desc">{{ o.description }}</span> }
+                  </span>
+                  @if (o.sample) { <span class="adv-sample">{{ o.sample }}</span> }
+                  @if (o.badge) { <span class="pill adv-badge" [class]="'pill-' + (o.badgeTone || 'neutral')">{{ o.badge }}</span> }
+                  @if (o.value === value()) { <app-icon name="check" class="adv-check" /> }
+                </div>
+              } @else {
+                <div role="presentation" class="adv-group">{{ r.label }}</div>
+              }
+            }
+            @if (virtual()) { <div aria-hidden="true" [style.height.px]="padBottom()"></div> }
+          }
+        </div>
+        <span class="sr-only" role="status" aria-live="polite">{{ liveText() }}</span>
+      </div>
+    </ng-template>
   `,
   styles: `
     :host { display: block; min-width: 0; }
@@ -167,14 +198,19 @@ export function rowsOf(options: AdvancedOption[]): Row[] {
     .adv-trigger:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
     .adv-trigger:disabled { opacity: 0.6; cursor: not-allowed; }
     .adv-trigger.is-invalid { border-color: var(--crit-text); }
+    .adv-sm .adv-trigger { min-height: 1.75rem; padding-block: 0.125rem; font-size: 0.75rem; }
+    .adv-sm .adv-trigger-desc { display: none; }
+    .adv-bare .adv-trigger { min-height: 0; padding: 0 1.25rem 0 0; border: 0; background: transparent; font: inherit; font-weight: 600; }
+    .adv-bare .adv-trigger-desc { display: none; }
+    .adv-bare .adv-chevron { right: 0; }
     .adv-trigger-main { display: flex; align-items: baseline; gap: 0.5rem; min-width: 0; }
     .adv-trigger-desc { font-size: 0.75rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .adv-placeholder { color: var(--text-muted); }
+    .adv-unknown { color: var(--warn-text); }
     .adv-chevron { position: absolute; right: 0.625rem; top: 50%; transform: translateY(-50%); color: var(--text-muted); }
     .adv-panel { display: flex; flex-direction: column; background: var(--surface-raised); border: 1px solid var(--border-strong);
       border-radius: var(--radius-lg); overflow: hidden; min-width: 0; }
-    .adv-pop { position: absolute; z-index: 40; top: calc(100% + 0.25rem); left: 0; min-width: 100%; max-width: min(40rem, 92vw);
-      box-shadow: 0 12px 32px color-mix(in oklab, var(--shadow-color) 16%, transparent); }
+    .adv-pop { width: 100%; max-width: min(40rem, 92vw); box-shadow: 0 12px 32px color-mix(in oklab, var(--shadow-color) 16%, transparent); }
     .adv-search { display: flex; align-items: center; gap: 0.5rem; padding: 0 0.625rem; min-height: 2.375rem; border-bottom: 1px solid var(--border-subtle); }
     .adv-search-icon { color: var(--text-muted); flex-shrink: 0; }
     .adv-search-input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font: inherit; font-size: 0.8125rem;
@@ -217,6 +253,8 @@ export class AdvancedSelect implements ControlValueAccessor {
   /** The name when no label names it (also the listbox's name). */
   readonly ariaLabel = input('');
   readonly labelledBy = input('');
+  /** The id of a note that says more about the choice (aria-describedby on the button). */
+  readonly describedBy = input('');
   readonly placeholder = input('Choose…');
   readonly searchPlaceholder = input('Search');
   /** The search box's name, said by a screen reader ("Search pipelines"). */
@@ -238,6 +276,21 @@ export class AdvancedSelect implements ControlValueAccessor {
   /** How many rows the list shows before it scrolls. */
   readonly visibleRows = input(8);
   readonly disabled = input(false);
+  /** As a form control, the form holds a number: a pick gives Number(value), "none" gives null. */
+  readonly numeric = input(false);
+  /** As a form control, "none" gives the form null rather than ''. */
+  readonly nullable = input(false);
+  /** The dense rows' height (a filter bar, an inline editor): the trigger is a .btn-sm tall. */
+  readonly compact = input(false);
+  /**
+   * A value that is not among the options (a field the test data no longer has) is shown as itself, with these words under
+   * it ("Not in the test data"), rather than as the placeholder. For keys and paths only: an id is never shown as a name.
+   */
+  readonly unknownText = input('');
+  /** No border or ground of its own: a choice set in a chip or a sentence ("Brand: Workspace default"). */
+  readonly bare = input(false);
+  /** An "Add …" menu: a pick is only emitted (`picked`), and the button goes on showing its placeholder. */
+  readonly resetOnPick = input(false);
   /** A pick (also on the value). */
   readonly picked = output<AdvancedOption | null>();
   /** The search as typed (a caller that works out more about the options in view -- a pipeline's fit -- listens). */
@@ -246,6 +299,11 @@ export class AdvancedSelect implements ControlValueAccessor {
   private readonly triggerRef = viewChild<ElementRef<HTMLButtonElement>>('trigger');
   private readonly searchRef = viewChild<ElementRef<HTMLInputElement>>('search');
   private readonly listRef = viewChild<ElementRef<HTMLElement>>('list');
+  private readonly panelRef = viewChild<ElementRef<HTMLElement>>('panel');
+  readonly positions = POSITIONS;
+  readonly scrollStrategy = createRepositionScrollStrategy(inject(Injector));
+  /** The panel is at least the button's width (measured as it opens). */
+  readonly minWidth = signal(0);
 
   readonly open = signal(false);
   readonly query = signal('');
@@ -253,7 +311,7 @@ export class AdvancedSelect implements ControlValueAccessor {
   readonly scrollTop = signal(0);
   private readonly formDisabled = signal(false);
   readonly isDisabled = computed(() => this.disabled() || this.formDisabled());
-  private onChange: (v: string) => void = () => {};
+  private onChange: (v: string | number | null) => void = () => {};
   private onTouched: () => void = () => {};
 
   readonly filtered = computed(() => filterOptions(this.options(), this.query()));
@@ -287,7 +345,7 @@ export class AdvancedSelect implements ControlValueAccessor {
 
   constructor() {
     // A click outside closes the panel, as a native select does.
-    const outside = (e: MouseEvent) => { if (this.open() && !this.host.contains(e.target as Node)) this.close(false); };
+    const outside = (e: MouseEvent) => { if (this.open() && !this.inside(e.target as Node | null)) this.close(false); };
     document.addEventListener('mousedown', outside, true);
     inject(DestroyRef).onDestroy(() => document.removeEventListener('mousedown', outside, true));
     // The chosen option is where the arrow keys start in an inline list.
@@ -305,6 +363,11 @@ export class AdvancedSelect implements ControlValueAccessor {
     return `${this.listId}-${index}`;
   }
 
+  /** In the select: its button, or its panel (which the overlay draws outside the host). */
+  private inside(node: Node | null): boolean {
+    return !!node && (this.host.contains(node) || !!this.panelRef()?.nativeElement.contains(node));
+  }
+
   // ---------------------------------------------------------------- opening and closing
 
   toggle(): void {
@@ -314,6 +377,7 @@ export class AdvancedSelect implements ControlValueAccessor {
   openPanel(seed = ''): void {
     if (this.isDisabled()) return;
     this.query.set(seed);
+    this.minWidth.set(this.triggerRef()?.nativeElement.getBoundingClientRect().width ?? 0);
     this.open.set(true);
     const at = this.filtered().findIndex(o => o.value === this.value());
     this.active.set(seed ? (this.filtered().length ? 0 : -1) : at);
@@ -340,7 +404,7 @@ export class AdvancedSelect implements ControlValueAccessor {
   onBlur(e: FocusEvent): void {
     if (this.inline()) { this.onTouched(); return; }
     const to = e.relatedTarget as Node | null;
-    if (to && this.host.contains(to)) return;
+    if (to && this.inside(to)) return;
     this.close(false);
   }
 
@@ -433,14 +497,27 @@ export class AdvancedSelect implements ControlValueAccessor {
     this.commit(o.value);
   }
 
+  /** Picks the option of this value ('' for none) as a click would -- for a caller that chooses for the person, and tests. */
+  choose(v: string): void {
+    const o = this.options().find(x => x.value === v);
+    if (v && (!o || o.disabled)) return;
+    this.commit(v);
+  }
+
   pickClear(e: Event): void {
     e.preventDefault();
     this.commit('');
   }
 
   private commit(v: string): void {
+    if (this.resetOnPick()) {
+      const o = this.options().find(x => x.value === v);
+      if (o) this.picked.emit(o);
+      if (!this.inline()) this.close(true); else this.onTouched();
+      return;
+    }
     this.value.set(v);
-    this.onChange(v);
+    this.onChange(this.toForm(v));
     this.picked.emit(this.options().find(o => o.value === v) ?? null);
     if (!this.inline()) this.close(true);
     else { this.onTouched(); this.active.set(this.filtered().findIndex(o => o.value === v)); }
@@ -448,11 +525,17 @@ export class AdvancedSelect implements ControlValueAccessor {
 
   // ---------------------------------------------------------------- forms
 
+  /** The value as the form holds it: a number for a numeric form, null for "none" when the form keeps null. */
+  private toForm(v: string): string | number | null {
+    if (!v) return this.numeric() || this.nullable() ? null : '';
+    return this.numeric() ? Number(v) : v;
+  }
+
   writeValue(v: string | number | null): void {
     this.value.set(v == null ? '' : String(v));
   }
 
-  registerOnChange(fn: (v: string) => void): void { this.onChange = fn; }
+  registerOnChange(fn: (v: string | number | null) => void): void { this.onChange = fn; }
   registerOnTouched(fn: () => void): void { this.onTouched = fn; }
   setDisabledState(disabled: boolean): void { this.formDisabled.set(disabled); }
 }
