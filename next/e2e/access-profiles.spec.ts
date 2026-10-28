@@ -121,7 +121,7 @@ test.describe('access profiles', () => {
     await expect(picker).toBeVisible();
     await pickOption(picker, { label: PROFILE });
     await expect(adminPage.locator('[data-test="user-preview"]')).toContainText('After you save');
-    await adminPage.getByTestId('save-user').click();
+    await adminPage.locator('[data-test="save-user"]').click();
     await expect(adminPage.getByText(/updated/i).first()).toBeVisible();
     await adminPage.context().close();
 
