@@ -1,5 +1,5 @@
 import { instantOf } from '../../core/instant';
-import { shortTime } from './history';
+import { calendarDay, shortTime } from './history';
 
 /**
  * How a request's value reads in the Task inbox (owner, 2026-10-06: "I don't like the design for inbox"). Decided by the
@@ -50,6 +50,9 @@ export function valueKind(value: unknown): ValueView {
   const file = fileOf(text);
   if (file) return file;
   if (/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(text) && instantOf(text)) return { kind: 'text', text: shortTime(text) };
+  // ZT-I34 polish: a calendar day stays a day ("14 Feb 1942"), never a moment in a zone.
+  const day = calendarDay(text);
+  if (day) return { kind: 'text', text: day };
   if (looksLikeId(text)) return { kind: 'id', text };
   if (text.length > LONG || /\n/.test(text)) return { kind: 'long', text };
   return { kind: 'text', text };

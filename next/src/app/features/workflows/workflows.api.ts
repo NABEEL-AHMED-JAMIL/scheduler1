@@ -51,8 +51,23 @@ export interface HistoryEvent {
   at: string;
 }
 
+/**
+ * ZT-I34: what each key of a request's subject is -- a form's fields in the form's own order, with their labels, sections
+ * and which are personal data -- as workflow-service answers it; null for a subject that says nothing about its keys.
+ */
+export interface SubjectField { key: string; label?: string | null; type?: string | null; section?: string | null; personal?: boolean | null; }
+
+/**
+ * ZT-I34: whether the request holds personal data, whether it is masked for the reader now, whether they may show it,
+ * whether it is shown (each showing is written in the request's history), and whether it is the reader's own request (its
+ * submitter sees it in full).
+ */
+export interface PersonalDataState { personal: boolean; masked: boolean; canShow: boolean; shown: boolean; own?: boolean; }
+
 export interface TaskDetail extends InboxTask {
   subject: Record<string, unknown>;
+  subjectFields?: SubjectField[] | null;
+  personalData?: PersonalDataState | null;
   history: HistoryEvent[];
   tasks: { id: number; stepKey: string; name: string; state: string; actedBy?: number | null; actedFor?: number | null; actedAt?: string | null;
     comment?: string | null }[];
@@ -111,6 +126,8 @@ export interface RequestRow {
 
 export interface RequestDetail extends RequestRow {
   subject: Record<string, unknown>;
+  subjectFields?: SubjectField[] | null;
+  personalData?: PersonalDataState | null;
   tasks: InboxTask[];
   history: HistoryEvent[];
 }
@@ -139,7 +156,10 @@ export class WorkflowsApi {
   forSubject(subjectId: string): Observable<ApiResponse<(InboxTask & { list?: 'mine' | 'teams' })[]>> {
     return this.http.get<ApiResponse<(InboxTask & { list?: 'mine' | 'teams' })[]>>(`${this.inbox}/forSubject`, { params: { subjectId } });
   }
-    task(id: number): Observable<ApiResponse<TaskDetail>> { return this.http.get<ApiResponse<TaskDetail>>(`${this.inbox}/task`, { params: { id } }); }
+  /** One task; show, for someone who may see personal data, reads it with its personal data shown (recorded in its history). */
+  task(id: number, show = false): Observable<ApiResponse<TaskDetail>> {
+    return this.http.get<ApiResponse<TaskDetail>>(`${this.inbox}/task`, { params: show ? { id, show: true } : { id } });
+  }
   colleagues(tenantId?: number | null): Observable<ApiResponse<Colleague[]>> {
     return this.http.get<ApiResponse<Colleague[]>>(`${this.inbox}/colleagues`, { params: tenantId ? { tenantId } : {} });
   }
@@ -198,8 +218,8 @@ export class WorkflowsApi {
     return this.http.get<InboxPage<T>>(`${this.inbox}/${list}`, { params });
   }
 
-  request(id: number): Observable<ApiResponse<RequestDetail>> {
-    return this.http.get<ApiResponse<RequestDetail>>(`${this.inbox}/request`, { params: { id } });
+  request(id: number, show = false): Observable<ApiResponse<RequestDetail>> {
+    return this.http.get<ApiResponse<RequestDetail>>(`${this.inbox}/request`, { params: show ? { id, show: true } : { id } });
   }
 
   cancel(id: number, reason: string | null, key: string): Observable<ApiResponse<RequestRow>> {

@@ -10,6 +10,7 @@ import type { Colleague, TaskDetail } from '../workflows/workflows.api';
 import { ExtractedField, ReviewDetail, isLow, lowLine, percent } from '../documents/documents.model';
 import { AuthService } from '../../core/auth/auth.service';
 import { RequestDataView } from '../workflows/request-data-view';
+import { PersonalDataBar } from '../workflows/personal-data-bar';
 import { requestContext, requestData } from '../workflows/request-data';
 import { ReviewItem, ageOf } from './review-sources';
 import { KIND_LABEL, linkOf } from './review-home.model';
@@ -33,7 +34,7 @@ interface RunReview { reviewStatus?: string; required?: string[]; decisions?: { 
  */
 @Component({
   selector: 'app-review-item-panel',
-  imports: [SidePanel, Icon, RouterLink, ServerTimePipe, RequestDataView],
+  imports: [SidePanel, Icon, RouterLink, ServerTimePipe, RequestDataView, PersonalDataBar],
   template: `
     <app-side-panel [heading]="heading()" [subtitle]="kindLabel() + (item.from ? ' · ' + item.from : '')" data-test="review-panel">
       <dl class="grid grid-cols-[8rem_minmax(0,1fr)] gap-x-4 gap-y-2 text-sm m-0">
@@ -63,7 +64,10 @@ interface RunReview { reviewStatus?: string; required?: string[]; decisions?: { 
           <p class="text-sm m-0 text-[color:var(--text-secondary)]">{{ t.requestTitle }}@if (t.workflowName) { <span> · {{ t.workflowName }}</span> }</p>
           @if (fields().length) {
             <!-- Owner 2026-10-27: the request's data as Approvals shows it (a run's outcome, a decision, each value by its shape). -->
-            <div class="mt-3"><app-request-data [entries]="fields()" /></div>
+            <div class="mt-3">
+              <app-personal-data-bar [state]="t.personalData" [busy]="showingPersonal()" (show)="showPersonal(true)" (hide)="showPersonal(false)" />
+              <app-request-data [entries]="fields()" />
+            </div>
           }
         </section>
       }
@@ -134,8 +138,22 @@ export class ReviewItemPanel implements OnInit {
   readonly fields = computed(() => {
     const t = this.task();
     const subject = Object.fromEntries(Object.entries(t?.subject ?? {}).filter(([k]) => k !== 'link'));
-    return requestData(subject, requestContext(this.colleagues(), this.auth, t?.history)).slice(0, 12);
+    return requestData(subject, { ...requestContext(this.colleagues(), this.auth, t?.history), fields: t?.subjectFields }).slice(0, 12);
   });
+  /** ZT-I34: a Show of personal data in flight. */
+  readonly showingPersonal = signal(false);
+
+  /** ZT-I34: the task again with its personal data shown (recorded in its history), or hidden again. */
+  showPersonal(show: boolean): void {
+    if (this.showingPersonal()) return;
+    this.showingPersonal.set(true);
+    this.http.get<ApiResponse<TaskDetail>>(`${API_BASE}/taskInbox.json/task`, { params: show ? { id: this.item.id, show: true } : { id: this.item.id } })
+      .subscribe({
+        next: r => { this.showingPersonal.set(false); if (r.status === API_SUCCESS && r.data) this.task.set(r.data); else this.error.set(r.message || 'Personal data could not be shown.'); },
+        error: e => { this.showingPersonal.set(false); this.error.set(e?.error?.message || 'Personal data could not be shown.'); },
+      });
+  }
+
   /** The workspace's people, for a decision's or a username's name. */
   private readonly colleagues = signal<Colleague[]>([]);
 

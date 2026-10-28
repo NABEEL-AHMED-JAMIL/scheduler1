@@ -177,6 +177,14 @@
                             Required
                           </label>
                         </div>
+                        <div class="field">
+                          <label class="flex items-start gap-2 text-sm">
+                            <input type="checkbox" class="checkbox mt-0.5" [checked]="!!f.personal" (change)="setField(i, { personal: $any($event.target).checked })"
+                                   data-test="field-personal" />
+                            <span>Personal data
+                              <span class="block text-xs text-[color:var(--text-muted)]">A name, a date of birth, a phone, an address or a member ID. In the approval it starts, only the submitter and people with See personal data can show it.</span></span>
+                          </label>
+                        </div>
                         @if (takesPlaceholder(f.type)) {
                           <div class="field" data-placeholder-setting>
                             <label class="label" [for]="'fieldPlaceholder' + i">Placeholder <span class="font-normal normal-case text-[color:var(--text-muted)]">(optional)</span></label>

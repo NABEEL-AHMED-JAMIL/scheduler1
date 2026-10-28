@@ -21,6 +21,7 @@ import { HistoryLine, compactTime, dropOwnStep, exactTime, historyLines, relativ
 import { TaskCountService } from './task-count.service';
 import { ListItem, RowTone, appendPage, choicesOf, commonOf, dueGroup, groupRows, matchesSearch, mergeHead, nextAfter, pastGroup, splitRef, stepFrom } from './inbox-list';
 import { RequestDataView } from './request-data-view';
+import { PersonalDataBar } from './personal-data-bar';
 import { RequestDataContext, RequestEntry, entryText, requestContext, requestData, stepNamesOf } from './request-data';
 import { PageHeader } from '../../shared/ui/page-header';
 import { RefreshButton } from '../../shared/ui/refresh-button';
@@ -46,7 +47,7 @@ const perTab = <T>(value: T): PerTab<T> => ({ mine: value, teams: value, done: v
  */
 @Component({
   selector: 'app-task-inbox',
-  imports: [RunReviewCard, PipelineApprovalCard, ReportReviewCard, RequestDataView, RefreshButton, PageHeader, FormsModule, NgTemplateOutlet, RouterLink, Icon, StatusPill, Combobox, Avatar, BulkBar],
+  imports: [RunReviewCard, PipelineApprovalCard, ReportReviewCard, RequestDataView, PersonalDataBar, RefreshButton, PageHeader, FormsModule, NgTemplateOutlet, RouterLink, Icon, StatusPill, Combobox, Avatar, BulkBar],
   templateUrl: './task-inbox.html',
   host: { '(document:keydown)': 'onKey($event)' },
   styles: `
@@ -266,8 +267,12 @@ export class TaskInbox implements OnInit {
   });
 
   /** The request's data as a person reads it (request-data.ts): a run's outcome, a decision, each value by its shape. */
-  readonly taskFields = computed<RequestEntry[]>(() => requestData(this.detail()?.subject, this.dataContext(this.detail()?.history)));
-  readonly requestFields = computed<RequestEntry[]>(() => requestData(this.request()?.subject, this.dataContext(this.request()?.history)));
+  readonly taskFields = computed<RequestEntry[]>(() => requestData(this.detail()?.subject,
+    { ...this.dataContext(this.detail()?.history), fields: this.detail()?.subjectFields }));
+  readonly requestFields = computed<RequestEntry[]>(() => requestData(this.request()?.subject,
+    { ...this.dataContext(this.request()?.history), fields: this.request()?.subjectFields }));
+  /** ZT-I34: a Show of personal data in flight. */
+  readonly showing = signal(false);
 
   constructor() {
     // A selection belongs to the list it was made from: another tab, search or filter starts it again.
@@ -635,6 +640,30 @@ export class TaskInbox implements OnInit {
     });
   }
 
+  /**
+   * ZT-I34: reads the open task (or request) again with its personal data shown -- for someone holding See personal data;
+   * workflow-service writes the showing in its history -- or, with show false, hidden again.
+   */
+  showPersonal(show: boolean): void {
+    const onRequests = this.tab() === 'requests';
+    const id = onRequests ? this.selectedRequest() : this.selectedTask();
+    if (id == null || this.showing()) return;
+    this.showing.set(true);
+    const done = () => this.showing.set(false);
+    const failed = (message?: string) => { done(); this.toast.error(message || 'Personal data could not be shown.'); };
+    if (onRequests) {
+      this.api.request(id, show).subscribe({
+        next: r => { done(); if (r.status === API_SUCCESS && r.data && this.selectedRequest() === id) this.request.set(r.data); else if (r.status !== API_SUCCESS) failed(r.message); },
+        error: e => failed(e?.error?.message),
+      });
+    } else {
+      this.api.task(id, show).subscribe({
+        next: r => { done(); if (r.status === API_SUCCESS && r.data && this.selectedTask() === id) this.detail.set(r.data); else if (r.status !== API_SUCCESS) failed(r.message); },
+        error: e => failed(e?.error?.message),
+      });
+    }
+  }
+
   decide(action: Decision): void {
     const d = this.detail();
     if (!d || this.busy()) return;
@@ -833,7 +862,8 @@ export class TaskInbox implements OnInit {
   /** Owner 2026-10-21: in a history, the signed-in person by name with "(you)", so a screenshot or an export says who it was. */
   historyName(id: number | null | undefined): string {
     if (id != null && id === this.me()) {
-      const mine = this.auth.user()?.fullName || this.colleagues().find(x => x.userId === id)?.fullName;
+      // ZT-I34 polish: the directory's name first -- a session may hold only the username as its "full name".
+      const mine = this.colleagues().find(x => x.userId === id)?.fullName || this.auth.user()?.fullName;
       if (mine) return `${mine} (you)`;
     }
     return this.name(id);

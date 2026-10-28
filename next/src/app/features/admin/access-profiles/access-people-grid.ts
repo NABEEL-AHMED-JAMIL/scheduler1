@@ -133,7 +133,7 @@ export class AccessPeopleGrid {
           key,
           profile: held,
           title: held ? held.profileName : `Default${fallback ? ' · ' + fallback.profileName : ''}`,
-          subtitle: held ? (held.description ?? '') : (fallback ? 'People with no profile of their own.' : 'No default set: these people open every page.'),
+          subtitle: held ? (held.description ?? '') : (fallback ? 'People with no profile of their own.' : 'No default set: these people open every page but See personal data.'),
           opens: pages.map(page => source ? source.pageKeys.includes(page.key) : true),
           rows: [],
         };

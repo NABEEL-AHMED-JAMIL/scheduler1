@@ -27,6 +27,10 @@ import { MASKED_TITLE, isMasked } from './value-kind';
     .req-masked { display: inline-flex; align-items: center; gap: 0.3rem; color: var(--text-muted); cursor: help; }
     .inbox-long { display: block; max-width: 80ch; line-height: 1.55; }
     dt .pill { margin-left: 0.4rem; vertical-align: 0.05em; text-transform: none; letter-spacing: 0; }
+    .req-heading { margin-top: 0.5rem; padding-top: 0.75rem; border-top: 1px solid var(--border-subtle); }
+    .req-heading:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+    .req-heading-title { margin: 0; font-size: 0.8125rem; font-weight: 600; color: var(--text-primary); }
+    .req-personal { margin-left: 0.35rem; color: var(--text-muted); vertical-align: -0.05em; }
   `,
   template: `
     <ng-container *ngTemplateOutlet="list; context: { $implicit: entries(), nested: false }" />
@@ -34,8 +38,11 @@ import { MASKED_TITLE, isMasked } from './value-kind';
     <ng-template #list let-entries let-nested="nested">
       <dl class="inbox-fields" [class.req-nested]="nested" [attr.data-test]="nested ? 'request-subfields' : 'request-fields'">
         @for (e of entries; track e.key) {
+          @if (e.kind === 'heading') {
+            <div class="is-wide req-heading" data-kind="heading"><h4 class="req-heading-title">{{ e.label }}</h4></div>
+          } @else {
           <div [class.is-wide]="wide(e)" [attr.data-kind]="e.kind === 'value' ? e.view.kind : e.kind" [attr.data-key]="e.key">
-            <dt>{{ e.label }}@if (e.kind === 'value' && e.draft) {<span class="pill pill-warn" [title]="draftTitle">DRAFT</span>}</dt>
+            <dt>{{ e.label }}@if (e.kind === 'value' && e.draft) {<span class="pill pill-warn" [title]="draftTitle">DRAFT</span>}@if (e.kind === 'value' && e.personal && e.view.kind !== 'masked') {<app-icon name="lock" size="0.8em" class="req-personal" [title]="personalTitle" data-test="personal-shown" />}</dt>
             <dd>
               @switch (e.kind) {
                 @case ('outcome') {
@@ -93,6 +100,7 @@ import { MASKED_TITLE, isMasked } from './value-kind';
               }
             </dd>
           </div>
+          }
         }
       </dl>
     </ng-template>
@@ -107,6 +115,7 @@ export class RequestDataView {
   readonly entries = input<RequestEntry[]>([]);
   readonly draftTitle = DRAFT_TITLE;
   readonly maskedTitle = MASKED_TITLE;
+  readonly personalTitle = 'Personal data, shown to you';
 
   wide(e: RequestEntry): boolean {
     return e.kind !== 'value' || e.view.kind === 'table' || e.view.kind === 'long';

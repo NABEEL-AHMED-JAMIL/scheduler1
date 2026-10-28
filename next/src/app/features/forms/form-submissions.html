@@ -163,6 +163,9 @@
                   @if (s.fields) {
                     <p class="text-xs text-[color:var(--text-muted)] mt-1">Answered version {{ s.formVersion }} of the form; shown with that version's fields.</p>
                   }
+                  @if (s.personalMasked) {
+                    <p class="text-xs text-[color:var(--text-muted)] mt-1 flex items-center gap-1" data-test="personal-masked"><app-icon name="lock" size="0.9em" />Personal data is hidden for you (•••). A workspace administrator can give you See personal data.</p>
+                  }
                 </td>
               </tr>
             }

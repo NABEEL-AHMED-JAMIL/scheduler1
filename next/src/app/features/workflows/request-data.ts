@@ -2,7 +2,7 @@ import { OUTCOME_FIELDS } from './designer.model';
 import { dateTime, exactTime } from './history';
 import { ValueView, labelOf, valueKind } from './value-kind';
 import type { PageKey } from '../../core/auth/page-keys';
-import { Colleague, HistoryEvent } from './workflows.api';
+import { Colleague, HistoryEvent, SubjectField } from './workflows.api';
 
 /**
  * A workflow request's data as a person reads it (owner, 2026-10-27, task 2904): what the engine keeps on a request's
@@ -18,7 +18,10 @@ import { Colleague, HistoryEvent } from './workflows.api';
  *
  * The Approvals task, My requests' request and Review's side panel all show a request through this.
  */
-export type RequestEntry = ValueEntry | GroupEntry | OutcomeEntry | DecisionEntry;
+export type RequestEntry = ValueEntry | GroupEntry | OutcomeEntry | DecisionEntry | HeadingEntry;
+
+/** ZT-I34 polish: a form's section title over the answers under it. */
+export interface HeadingEntry { kind: 'heading'; key: string; label: string; }
 
 export interface ValueEntry {
   kind: 'value'; key: string; label: string;
@@ -27,6 +30,8 @@ export interface ValueEntry {
   view: ValueView;
   /** Written by a model for a person to check: the record it is in says DRAFT. */
   draft: boolean;
+  /** ZT-I34: the form marks it personal data (shown to the reader, or masked: the view says which). */
+  personal?: boolean;
 }
 
 export interface GroupEntry { kind: 'group'; key: string; label: string; fields: RequestEntry[]; }
@@ -68,6 +73,11 @@ export interface RequestDataContext {
   runStep?: (runId: number) => string | null;
   /** The reader may open a run's page (Schedules or the Queue). */
   canOpenRuns?: boolean;
+  /**
+   * ZT-I34: what each key of the subject is (a form's fields in the form's order: label, section, personal), as
+   * workflow-service answers it; without it a key's label is the key in words and the order the subject's.
+   */
+  fields?: SubjectField[] | null;
 }
 
 /**
@@ -107,7 +117,37 @@ const MAX_DEPTH = 2;
 
 export function requestData(subject: Record<string, unknown> | null | undefined, ctx: RequestDataContext = {}): RequestEntry[] {
   if (!subject) return [];
-  return entriesOf(Object.entries(subject).filter(([, v]) => !isAssignee(v)), ctx, 0, new Set(), false);
+  const entries = entriesOf(Object.entries(subject).filter(([, v]) => !isAssignee(v)), ctx, 0, new Set(), false);
+  return ordered(entries, ctx.fields ?? null);
+}
+
+/**
+ * ZT-I34 polish (owner 2026-10-27): what the steps kept first -- the decisions and the pipelines' outcomes -- then the form's
+ * answers in the form's own order, labels and sections, then anything else the subject holds. Without fields the answers
+ * keep the subject's order and their keys in words.
+ */
+function ordered(entries: RequestEntry[], fields: SubjectField[] | null): RequestEntry[] {
+  const kept = entries.filter(e => e.kind === 'decision' || e.kind === 'outcome');
+  const rest = entries.filter(e => e.kind !== 'decision' && e.kind !== 'outcome');
+  if (!fields?.length) return [...kept, ...rest];
+  const byKey = new Map(rest.map(e => [e.key, e]));
+  const answers: RequestEntry[] = [];
+  let section: string | null = null;
+  let sectioned = false;
+  for (const f of fields) {
+    const e = byKey.get(f.key);
+    if (!e) continue;
+    byKey.delete(f.key);
+    const label = f.label?.trim() || e.label;
+    const own = f.section?.trim() || null;
+    if (own !== section && (own || sectioned)) {
+      answers.push({ kind: 'heading', key: `heading:${answers.length}:${own ?? ''}`, label: own ?? 'Other details' });
+    }
+    section = own;
+    sectioned ||= !!own;
+    answers.push(e.kind === 'value' ? { ...e, label, personal: !!f.personal } : { ...e, label });
+  }
+  return [...kept, ...answers, ...rest.filter(e => byKey.has(e.key))];
 }
 
 /** An entry as one line of text, for a plain list. */
@@ -117,6 +157,7 @@ export function entryText(e: RequestEntry): string {
     case 'decision': return `${e.line} · ${e.at}`;
     case 'outcome': return [e.step, STATUS_WORD[e.status] ?? e.status, e.runId != null ? `Run #${e.runId}` : ''].filter(Boolean).join(' · ');
     case 'group': return e.fields.map(f => `${f.label}: ${entryText(f)}`).join(', ');
+    case 'heading': return e.label;
   }
 }
 

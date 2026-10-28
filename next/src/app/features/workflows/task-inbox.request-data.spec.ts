@@ -150,4 +150,69 @@ describe('A request\'s data on every screen that shows it', () => {
     fixture.detectChanges();
     readsTheData((fixture.nativeElement as HTMLElement).querySelector('[data-test="panel-task"]')!);
   });
+
+  // ZT-I34 (owner 2026-10-27, "mask for readers without access").
+  describe('its personal data', () => {
+    const masked = { personal: true, masked: true, canShow: true, shown: false, own: false };
+    function withPersonal(state: object, shownState: object = { ...state, masked: false, shown: true }) {
+      const api = {
+        mine: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [TASK] })),
+        teams: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [] })),
+        done: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [] })),
+        requests: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [] })),
+        task: vi.fn((_id: number, show?: boolean) => of({ status: 'SUCCESS', message: '', data: { ...DETAIL,
+          subject: show ? INTAKE_SUBJECT : { ...INTAKE_SUBJECT, last_name: '\u2022\u2022\u2022' },
+          history: show ? [...INTAKE_HISTORY, { id: 99, type: 'PersonalDataShown', actor: 4537, at: '2026-10-27T15:00:00+00:00' }] : INTAKE_HISTORY,
+          personalData: show ? shownState : state } })),
+        request: vi.fn(() => of({ status: 'SUCCESS', message: '', data: null })),
+        colleagues: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [...COLLEAGUES, { userId: 4537, fullName: 'Riverside Health admin',
+          username: 'admin@riverside.test', canAct: true }] })),
+      };
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [
+          provideZonelessChangeDetection(), provideRouter([]),
+          { provide: WorkflowsApi, useValue: api },
+          { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn() } },
+          { provide: TaskCountService, useValue: { refresh: vi.fn(), count: signal(1), overdue: signal(0), mine: signal(1), teams: signal(0), done: signal(0), requests: signal(0) } },
+          // A session whose "full name" is its username, as a token-made one is.
+          { provide: AuthService, useValue: { canOpen: () => true, user: signal({ appUserId: 4537, tenantId: 1006, username: 'admin@riverside.test',
+            fullName: 'admin@riverside.test' }) } },
+        ],
+      });
+      const fixture = TestBed.createComponent(TaskInbox);
+      fixture.detectChanges();
+      fixture.detectChanges();
+      return { api, fixture, el: fixture.nativeElement as HTMLElement };
+    }
+
+    it('says it is hidden and offers Show to someone who may; showing reads it again, and the history says so', () => {
+      const { api, fixture, el } = withPersonal(masked);
+      const bar = () => el.querySelector('[data-test="personal-data-bar"]')!;
+      expect(bar().getAttribute('data-state')).toBe('can-show');
+      expect(el.querySelector('[data-key="last_name"] .req-masked')).not.toBeNull();
+      (el.querySelector('[data-test="show-personal"]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      expect(api.task).toHaveBeenLastCalledWith(2904, true);
+      expect(bar().getAttribute('data-state')).toBe('shown');
+      expect(el.querySelector('[data-key="last_name"] dd')!.textContent!.trim()).toBe('Example');
+      const lines = [...el.querySelectorAll('[data-test="task-history"] .inbox-timeline-text')].map(l => l.textContent);
+      // The signed-in person by the directory's name, never their username.
+      expect(lines).toContain('Personal data shown to Riverside Health admin (you)');
+      (el.querySelector('[data-test="hide-personal"]') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      expect(api.task).toHaveBeenLastCalledWith(2904, false);
+      expect(bar().getAttribute('data-state')).toBe('can-show');
+    });
+
+    it('says whom to ask when the reader may not show it, and nothing when there is none', () => {
+      const hidden = withPersonal({ ...masked, canShow: false });
+      expect(hidden.el.querySelector('[data-test="personal-data-bar"]')!.textContent).toContain('A workspace administrator can give you See personal data');
+      expect(hidden.el.querySelector('[data-test="show-personal"]')).toBeNull();
+      const own = withPersonal({ ...masked, masked: false, canShow: false, own: true });
+      expect(own.el.querySelector('[data-test="personal-data-bar"]')!.getAttribute('data-state')).toBe('own');
+      const none = withPersonal({ personal: false, masked: false, canShow: false, shown: false, own: false });
+      expect(none.el.querySelector('[data-test="personal-data-bar"]')).toBeNull();
+    });
+  });
 });

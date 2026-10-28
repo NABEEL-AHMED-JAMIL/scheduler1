@@ -328,6 +328,7 @@
             @if (taskFields().length && !decidedInStudio(d) && !stepApproval(d)) {
               <section aria-labelledby="task-details-title">
                 <h3 class="section-title mb-3" id="task-details-title">Request details</h3>
+                <app-personal-data-bar [state]="d.personalData" [busy]="showing()" (show)="showPersonal(true)" (hide)="showPersonal(false)" />
                 <app-request-data [entries]="taskFields()" />
               </section>
             }
@@ -372,6 +373,7 @@
             @if (requestFields().length) {
               <section aria-labelledby="request-details-title">
                 <h3 class="section-title mb-3" id="request-details-title">Request details</h3>
+                <app-personal-data-bar [state]="r.personalData" [busy]="showing()" (show)="showPersonal(true)" (hide)="showPersonal(false)" />
                 <app-request-data [entries]="requestFields()" />
               </section>
             }

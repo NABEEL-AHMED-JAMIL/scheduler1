@@ -97,6 +97,20 @@ describe('Form submissions', () => {
     expect(screen.opened()).toBeNull();
   });
 
+  // ZT-I34 (owner 2026-10-27): Core masks the personal answers for someone without See personal data, and says so.
+  it('says when a submission\'s personal data is hidden from the reader', () => {
+    const masked = [{ ...SUBMISSIONS[0], answers: { ...SUBMISSIONS[0].answers, patient_id: '\u2022\u2022\u2022' }, personalMasked: true }];
+    const { screen, fixture, el } = render(undefined, masked);
+    screen.toggle(5002);
+    fixture.detectChanges();
+    expect(el.querySelector('[data-test="personal-masked"]')?.textContent).toContain('Personal data is hidden for you');
+    expect(screen.answerRows(masked[0])[0]).toEqual({ label: 'Patient ID', value: '\u2022\u2022\u2022' });
+    const plain = render();
+    plain.screen.toggle(5002);
+    plain.fixture.detectChanges();
+    expect(plain.el.querySelector('[data-test="personal-masked"]')).toBeNull();
+  });
+
   it('downloads the CSV under the name Core gives it', () => {
     const { api, screen } = render();
     const created = vi.fn(() => 'blob:csv');

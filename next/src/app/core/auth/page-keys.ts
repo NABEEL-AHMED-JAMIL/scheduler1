@@ -39,7 +39,11 @@ export type PageKey =
   | 'report-assets' | 'report-asset-custodian' | 'report-approve'
   // ZT-M21 (owner 2026-10-26): a capability, not a page -- downloading, viewing or previewing the files a pipeline marked
   // sensitive keeps (and its reports). Admins and people with no profile hold it; a profile once an admin ticks it.
-  | 'sensitive-files';
+  | 'sensitive-files'
+  // ZT-I34 (owner 2026-10-27): a capability, not a page -- showing a request's personal data (each showing is in the request's
+  // history). Deny by default: admins hold it, a profile once an admin ticks it, a person given it on their own -- never a person
+  // with no profile. A submitter sees their own requests without it.
+  | 'see-personal-data';
 
 /**
  * F3 (MIG-400): a tab of a page several menu tabs share, grantable alone -- identity's TabKey, `<page>:<tab>`. A page held with
@@ -118,6 +122,7 @@ export const PAGE_LABELS: Record<PageKey, string> = {
   'report-asset-custodian': 'Upload signatures and stamps',
   'report-approve': 'Approve and sign reports',
   'sensitive-files': 'Download sensitive files',
+  'see-personal-data': 'See personal data',
 };
 
 export function isPageKey(value: string | null | undefined): value is PageKey {

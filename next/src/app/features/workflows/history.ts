@@ -21,7 +21,7 @@ export interface HistoryLine {
 type Names = (id: number | null | undefined) => string;
 
 /** The events a person made: the rest (a task opening, a reminder, the end) are the workflow's, and carry no byline. */
-const BY_A_PERSON = new Set(['Started', 'Approved', 'Rejected', 'ChangesRequested', 'Done', 'Reassigned', 'Cancelled']);
+const BY_A_PERSON = new Set(['Started', 'Approved', 'Rejected', 'ChangesRequested', 'Done', 'Reassigned', 'Cancelled', 'PersonalDataShown']);
 
 export function historyLines(events: HistoryEvent[], name: Names, stepName: (key: string | null | undefined) => string): HistoryLine[] {
   const lines: HistoryLine[] = [];
@@ -57,6 +57,8 @@ export function historyLines(events: HistoryEvent[], name: Names, stepName: (key
       case 'TaskCancelled': line(`${step}: no longer needed`, 'plain'); break;
       case 'Cancelled': line(`Cancelled by ${who}`, 'bad', str(d['reason'])); break;
       case 'Failed': line('Stopped', 'bad', str(d['reason'])); break;
+      // ZT-I34: someone who may see personal data showed it; the history is where that is kept.
+      case 'PersonalDataShown': line(`Personal data shown to ${who}`, 'plain'); break;
       case 'Ended': line(`Request ${String(d['state'] ?? '').toLowerCase()}`, endTone(String(d['state'] ?? ''))); break;
       default: break;
     }
@@ -143,7 +145,20 @@ export function dateTime(iso: string | null | undefined, timeZone?: string): str
   return `${Number(part('day'))} ${MONTHS[Number(part('month')) - 1]} ${part('year')}, ${clock(at, timeZone)}`;
 }
 
-const WEEKDAYS = ['Sun','Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+/**
+ * ZT-I34 polish: a calendar day a form kept ("1942-02-14") as "14 Feb 1942" -- the day itself, never moved by a zone; null
+ * for anything that is not one.
+ */
+export function calendarDay(text: string | null | undefined): string | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec((text ?? '').trim());
+  if (!m) return null;
+  const [year, month, day] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const check = new Date(Date.UTC(year, month - 1, day));
+  if (check.getUTCFullYear() !== year || check.getUTCMonth() !== month - 1 || check.getUTCDate() !== day) return null;
+  return `${day} ${MONTHS[month - 1]} ${year}`;
+}
+
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 /** The calendar day an instant falls on, in the viewer's zone (or the one named), as days since 1970. */
 export function dayNumber(at: Date, timeZone?: string): number {

@@ -198,6 +198,23 @@ describe('Form builder -- the editor', () => {
     expect(sent.status).toBe('Active');
   });
 
+  // ZT-I34 (owner 2026-10-27): a field can be marked personal data in its settings, and the save says so.
+  it('marks a field as personal data from its settings, and saves it so', () => {
+    const { api, screen, fixture, el } = screenWith();
+    screen.newForm();
+    screen.patch({ name: 'Intake' });
+    screen.setField(0, { label: 'Date of birth' });
+    fixture.detectChanges();
+    const box = el.querySelector<HTMLInputElement>('[data-test="field-personal"]')!;
+    expect(box.checked).toBe(false);
+    box.click();
+    fixture.detectChanges();
+    expect(screen.draft()!.fields[0].personal).toBe(true);
+    screen.save();
+    const sent = (api.save.mock.calls[0] as unknown[])[0] as { fields: { personal?: boolean }[] };
+    expect(sent.fields[0].personal).toBe(true);
+  });
+
   it('builds a new form: keys follow labels, fields move and go, and it saves what the server takes', () => {
     const { api, screen } = screenWith();
     screen.newForm();

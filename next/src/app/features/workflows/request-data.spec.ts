@@ -108,4 +108,33 @@ describe('A request\'s data, by its shape', () => {
     expect(runStepOf(INTAKE_HISTORY)(2926)).toBe('Assess the intake: checks, rules and the AI summary');
     expect(runStepOf(INTAKE_HISTORY)(999)).toBeNull();
   });
+
+  // ZT-I34 polish (owner 2026-10-27): the order, the labels and the sections the form asks them in.
+  it('puts what the steps kept first, then the form\'s answers in its order, labels and sections, then the rest', () => {
+    const fields = [
+      { key: 'last_name', label: 'Last name', section: 'Patient', personal: true },
+      { key: 'first_name', label: 'First name', section: 'Patient', personal: true },
+      { key: 'medications', label: 'Medicines taken now', section: 'Medicines' },
+      { key: 'form', label: 'Form' }, { key: 'submitted_by', label: 'Submitted by' },
+    ];
+    const list = requestData(INTAKE_SUBJECT, { fields, runStep: runStepOf(INTAKE_HISTORY) });
+    expect(list.map(e => e.kind === 'heading' ? `# ${e.label}` : e.key)).toEqual([
+      'nurse', 'senior', 'assessment', 'summary_report',
+      '# Patient', 'last_name', 'first_name', '# Medicines', 'medications', '# Other details', 'form', 'submitted_by',
+      'dob']);
+    expect(list.find(e => e.key === 'medications')).toMatchObject({ label: 'Medicines taken now' });
+    expect(list.find(e => e.key === 'last_name')).toMatchObject({ personal: true });
+    expect(list.find(e => e.key === 'dob')).toMatchObject({ label: 'Dob' });
+    expect(list.find(e => e.key === 'dob')).not.toHaveProperty('personal');
+    // Without fields, the steps' first and the rest in the subject's order, with no headings.
+    expect(requestData(INTAKE_SUBJECT).map(e => e.kind)).not.toContain('heading');
+    expect(requestData(INTAKE_SUBJECT).slice(0, 4).map(e => e.key)).toEqual(['nurse', 'senior', 'assessment', 'summary_report']);
+  });
+
+  it('writes a calendar day as a day, never moved by a zone', () => {
+    expect(valueKind('1942-02-14')).toEqual({ kind: 'text', text: '14 Feb 1942' });
+    expect(valueKind('2026-10-24')).toEqual({ kind: 'text', text: '24 Oct 2026' });
+    expect(valueKind('2026-02-30')).toMatchObject({ kind: 'text', text: '2026-02-30' });
+    expect(entry('dob')).toMatchObject({ view: { kind: 'text', text: '2 Mar 1950' } });
+  });
 });

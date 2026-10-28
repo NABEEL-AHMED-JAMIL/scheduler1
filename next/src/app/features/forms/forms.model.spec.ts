@@ -77,6 +77,20 @@ describe('Forms -- the definition', () => {
     ]);
   });
 
+  // ZT-I34 (owner 2026-10-27): a field marked personal data is sent so; unmarked sends nothing about it.
+  it('sends a field marked personal data, on any type, and nothing for one that is not', () => {
+    const sent = draftForSave(draft({
+      name: 'Intake', fields: [
+        { key: 'dob', label: 'Date of birth', type: 'date', required: false, personal: true },
+        { key: 'pain', label: 'Pain', type: 'number', required: false, personal: false },
+        { key: 'notes', label: 'Notes', type: 'longText', required: false },
+      ],
+    }));
+    expect(sent.fields[0]).toMatchObject({ personal: true });
+    expect('personal' in sent.fields[1]).toBe(false);
+    expect('personal' in sent.fields[2]).toBe(false);
+  });
+
   it('UX2: sends a placeholder trimmed where an empty control shows one, and drops it elsewhere or when blank', () => {
     const sent = draftForSave(draft({
       name: 'Visit', fields: [

@@ -65,6 +65,12 @@ export interface FormField {
    * one above it starts a new group under that heading; fields with none stay ungrouped.
    */
   section?: string | null;
+  /**
+   * ZT-I34 (owner 2026-10-27): the answer is personal data (a name, a date of birth, a phone, an address, a member id). A
+   * request the submission starts shows it masked, and masks it in the request's free text, to everyone but the submitter and
+   * people holding See personal data. Absent is no.
+   */
+  personal?: boolean | null;
   /** 2026-10-26, checkboxes: the least and most options ticked (each optional; the least applies once anything is ticked). */
   minSelected?: number | null;
   maxSelected?: number | null;
@@ -124,6 +130,8 @@ export interface Submission {
   answers: Record<string, unknown>;
   /** The fields of the version it answered, when that is not the form's current one (MIG-277). */
   fields?: FormField[];
+  /** ZT-I34: its answers marked personal data are masked for the reader (they do not hold See personal data). */
+  personalMasked?: boolean | null;
   /** MIG-279: the request it started and its status now -- Pending, Overdue, Approved, Rejected ... -- or NotStarted. */
   workflowInstanceId?: number | null;
   workflowStatus?: string | null;
@@ -614,6 +622,7 @@ export function draftForSave(draft: FormDraft): FormDraft {
       help: f.help?.trim() || null,
       ...(takesPlaceholder(f.type) && f.placeholder?.trim() ? { placeholder: f.placeholder.trim() } : {}),
       ...(f.section?.trim() ? { section: f.section.trim() } : {}),
+      ...(f.personal ? { personal: true } : {}),
       options: hasOptions(f.type) ? (f.options ?? []).map(o => o.trim()).filter(o => !!o) : null,
       ...(f.type === 'checkboxes' && f.minSelected ? { minSelected: f.minSelected } : {}),
       ...(f.type === 'checkboxes' && f.maxSelected ? { maxSelected: f.maxSelected } : {}),
