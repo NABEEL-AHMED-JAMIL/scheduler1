@@ -14,6 +14,7 @@ import { WorkspacePicker } from './workspace-picker';
 import { shortHash } from './receipt-verify';
 import { AppLoading, loadErrorText } from '../../shared/ui/loading';
 import { LoadError } from '../../shared/ui/load-error';
+import { AdvancedOption, AdvancedSelect } from '../../shared/ui/advanced-select';
 
 /**
  * Owner #10 (MIG-393), Billing › Settings › Receipt stamp: the stamp every receipt carries -- the platform's image, one
@@ -23,7 +24,7 @@ import { LoadError } from '../../shared/ui/load-error';
  */
 @Component({
   selector: 'app-receipt-stamp-settings',
-  imports: [Icon, FileDropzone, ServerTimePipe, PdfViewer, AppLoading, LoadError],
+  imports: [Icon, FileDropzone, ServerTimePipe, PdfViewer, AppLoading, LoadError, AdvancedSelect],
   template: `
     <section class="card p-0 overflow-hidden" aria-labelledby="receipt-stamp-title" data-test="receipt-stamp-settings">
       <header class="flex items-start gap-3 px-5 py-4 border-b border-subtle flex-wrap">
@@ -31,10 +32,9 @@ import { LoadError } from '../../shared/ui/load-error';
           <h2 id="receipt-stamp-title" class="font-semibold text-sm flex items-center gap-2"><app-icon name="shield" size="1em" />Receipt stamp and signature</h2>
           <p class="text-xs text-[color:var(--text-muted)] mt-0.5 max-w-3xl">Every receipt is stamped and digitally signed when its payment is verified. A workspace's own stamp comes first, then the platform's; with neither, receipts carry the generated PAID stamp.</p>
         </div>
-        <select class="input w-80 max-w-full" [value]="scope()" (change)="pickScope($any($event.target).value)" aria-label="Whose stamp" data-test="stamp-scope">
-          <option value="">The platform (every workspace)</option>
-          @for (o of workspaces.options(); track o.value) { <option [value]="o.value">{{ o.label }}</option> }
-        </select>
+        <app-advanced-select class="w-80 max-w-full" [options]="scopeOptions()" [value]="scope()" (valueChange)="pickScope($event)" ariaLabel="Whose stamp"
+                             data-test="stamp-scope" [allowClear]="true" clearLabel="The platform (every workspace)"
+                             placeholder="The platform (every workspace)" searchLabel="Search the workspaces" />
       </header>
 
       <div class="grid gap-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
@@ -104,6 +104,10 @@ export class ReceiptStampSettings implements OnInit, OnDestroy {
   private readonly toast = inject(ToastService);
   private readonly dialog = inject(Dialog);
   readonly workspaces = inject(WorkspacePicker);
+  /** Each workspace (a sandbox said as one), as Whose stamp lists them. */
+  readonly scopeOptions = computed<AdvancedOption[]>(() => this.workspaces.tenants().map(t => ({ value: String(t.tenantId),
+    label: this.workspaces.labels().get(t.tenantId) ?? t.tenantName, keywords: String(t.tenantId),
+    description: t.sandboxOf ? 'Sandbox' : undefined })));
   readonly humanSize = formatSize;
   readonly short = shortHash;
 

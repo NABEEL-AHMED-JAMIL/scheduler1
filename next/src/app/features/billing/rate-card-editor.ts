@@ -14,6 +14,7 @@ import { firstOfMonth, formatUnitPrice } from './billing-format';
 import { DATA_CLASSES, RULE_KINDS, byPrecedence, kindText, ruleProblems } from './rate-rules';
 import { RatePreviewView, previewPeriods } from './rate-preview';
 import { AppLoading, InlineStatus, loadErrorText } from '../../shared/ui/loading';
+import { AdvancedOption, AdvancedSelect } from '../../shared/ui/advanced-select';
 
 /** One item as it is being edited: strings in the inputs, numbers on save. */
 interface EditItem {
@@ -50,7 +51,7 @@ function choiceOf(p: PipelineName): PipelineChoice | null {
  */
 @Component({
   selector: 'app-rate-card-editor',
-  imports: [DateField, SidePanel, Icon, Combobox, Field, RatePreviewView, AppLoading, InlineStatus],
+  imports: [DateField, SidePanel, Icon, Combobox, Field, RatePreviewView, AppLoading, InlineStatus, AdvancedSelect],
   template: `
     <app-side-panel [heading]="data.draft ? 'Draft: ' + data.draft.name : 'New version from ' + data.base.name + ' v' + data.base.version"
                     [subtitle]="data.draft ? 'A draft prices nothing until it is published as a new version.' : 'Saved as its own version; bills already drafted keep the one they were priced with.'">
@@ -139,9 +140,9 @@ function choiceOf(p: PipelineName): PipelineChoice | null {
                 <tr [attr.data-rule]="r.rule_no">
                   <td class="tabular text-xs"><div class="font-medium">{{ k + 1 }}</div><div class="text-[11px] text-[color:var(--text-muted)] mono">#{{ r.rule_no }}</div></td>
                   <td>
-                    <select class="input py-1 text-xs min-w-40" [value]="r.meter" (change)="setRule(r.key, 'meter', $any($event.target).value)" [attr.aria-label]="'Rule ' + r.rule_no + ' meter'">
-                      @for (it of items(); track it.meter) { <option [value]="it.meter" [selected]="it.meter === r.meter">{{ it.label }}</option> }
-                    </select>
+                    <app-advanced-select class="min-w-40" [compact]="true" [options]="meterOptions()" [value]="r.meter"
+                                         (valueChange)="setRule(r.key, 'meter', $event)" [ariaLabel]="'Rule ' + r.rule_no + ' meter'"
+                                         searchLabel="Search the meters" unknownText="Not a meter of this card" panelWidth="22rem" />
                   </td>
                   <td>
                     <div class="flex items-center gap-1 flex-wrap">
@@ -232,6 +233,9 @@ export class RateCardEditor {
   readonly effectiveFrom = signal(this.opened?.effective_from ?? RateCardEditor.firstOfNextMonth());
   readonly note = signal(this.opened?.note ?? '');
   readonly items = signal<EditItem[]>(this.opened ? this.openedItems(this.opened) : this.data.base.items.map(RateCardEditor.editable));
+  /** The card's meters, by name, with the service and unit under each and the meter's key beside it. */
+  readonly meterOptions = computed<AdvancedOption[]>(() => this.items().map(it => ({ value: it.meter, label: it.label, sample: it.meter,
+    description: [it.service, it.unit ? `per ${it.per > 1 ? it.per + ' ' : ''}${it.unit}` : ''].filter(Boolean).join(' · ') || undefined })));
   readonly saving = signal(false);
   readonly error = signal('');
   readonly forOptions: ComboboxOption[] = [{ value: '', label: 'Every workspace (default card)' }, ...this.data.workspaces];

@@ -11,6 +11,7 @@ import { Catalog } from './catalog';
 import { CatalogApi } from './catalog.api';
 import { CatalogPanel } from './catalog-panel';
 import { AssetDetail, CatalogAsset, LineageGraph, freshnessText, lineageSides, whereText } from './catalog.model';
+import { chooseAdvanced } from '../../shared/ui/advanced-select.testing';
 
 /**
  * Data Catalog (MIG-288): the workspace's assets with their owner, freshness, sensitive fields and quality, narrowed by
@@ -182,10 +183,9 @@ describe('Data Catalog asset panel', () => {
   });
 
   it('lets the owner or an admin correct a column, set the sensitivity and end a grant', () => {
-    const { el, fake, changed } = panel({ canEdit: true });
-    const select = el.querySelector('select#tag-region') as HTMLSelectElement;
-    select.value = 'address';
-    select.dispatchEvent(new Event('change'));
+    const { el, fake, changed, fixture } = panel({ canEdit: true });
+    expect(el.querySelector('#tag-region')!.getAttribute('aria-haspopup')).toBe('listbox');
+    chooseAdvanced(fixture, 'tag-region', 'address');
     expect(fake.tag).toHaveBeenCalledWith(1010, 'region', ['address']);
     expect(changed).toHaveBeenCalled();
     const level = el.querySelector('[data-classify]') as HTMLSelectElement;

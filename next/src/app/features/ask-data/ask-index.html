@@ -58,14 +58,10 @@
                            emptyText="No storage connection you can open yet, so no folder can be added." (retry)="loadBuckets()" />
         @for (f of folders(); track $index; let i = $index) {
           <div class="grid grid-cols-1 md:grid-cols-[minmax(0,16rem)_minmax(0,1fr)_auto] gap-2 items-center" data-test="index-folder">
-            <select class="input" [value]="f.connection" [disabled]="!enabled() || saving()" aria-label="Connection"
-                    (change)="setFolder(i, { connection: $any($event.target).value })">
-              @if (!f.connection) { <option value="" selected>{{ bucketsState.loading() ? 'Loading connections…' : 'Choose a connection' }}</option> }
-              @for (b of buckets(); track b.bucket) {
-                <option [value]="b.bucket" [selected]="b.bucket === f.connection">{{ bucketLabel(b) }}</option>
-              }
-              @if (f.connection && !buckets().length) { <option [value]="f.connection" selected>{{ f.connection }}</option> }
-            </select>
+            <app-advanced-select [options]="bucketOptions()" [value]="f.connection" [disabled]="!enabled() || saving()" ariaLabel="Connection"
+                                 (valueChange)="setFolder(i, { connection: $event })" placeholder="Choose a connection" searchLabel="Search the connections"
+                                 [loading]="bucketsState.loading()" loadingText="Loading connections…" unknownText="Not a connection you can open"
+                                 emptyText="No storage connection you can open yet." />
             <input class="input mono" [value]="f.prefix" [disabled]="!enabled() || saving()" aria-label="Folder"
                    placeholder="Folder, e.g. policies/ (empty: the whole connection)" (input)="setFolder(i, { prefix: $any($event.target).value })" />
             <button type="button" class="btn btn-ghost btn-sm" [disabled]="saving()" (click)="removeFolder(i)" aria-label="Remove folder">

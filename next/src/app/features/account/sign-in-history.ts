@@ -12,6 +12,7 @@ import { SortHeader } from '../../shared/ui/sort-header';
 import {
   AccountSecurityApi, METHOD_LABEL, OUTCOME_LABEL, SignInEvent, SignInFilter, SignInPage, deviceOf,
 } from './account-security.api';
+import { AdvancedOption, AdvancedSelect } from '../../shared/ui/advanced-select';
 
 /** How many rows a page asks for (the service answers at most 500). */
 export const HISTORY_PAGE = 50;
@@ -36,7 +37,7 @@ export function outcomeTone(outcome: string): string {
  */
 @Component({
   selector: 'app-sign-in-history',
-  imports: [TableShell, Icon, ServerTimePipe, Avatar, InlineStatus, SortHeader],
+  imports: [TableShell, Icon, ServerTimePipe, Avatar, InlineStatus, SortHeader, AdvancedSelect],
   template: `
     <app-table-shell heading="Sign-in history" [loading]="loading()" [error]="error()" [isEmpty]="!rows().length"
                      [shown]="rows().length" [total]="total()" emptyIcon="history" [columnsKey]="'sign-in-history-' + scope()"
@@ -50,11 +51,9 @@ export function outcomeTone(outcome: string): string {
                    (keydown.enter)="setSearch($any($event.target).value)" />
           </div>
         }
-        <select class="input max-w-44 min-w-0" aria-label="Filter by outcome" [value]="outcome()"
-                (change)="setOutcome($any($event.target).value)">
-          <option value="">Every outcome</option>
-          @for (o of outcomes; track o.value) { <option [value]="o.value">{{ o.label }}</option> }
-        </select>
+        <app-advanced-select class="w-44 min-w-0" ariaLabel="Filter by outcome" [options]="outcomeOptions" [value]="outcome()"
+                             (valueChange)="setOutcome($event)" [allowClear]="true" clearLabel="Every outcome" placeholder="Every outcome"
+                             searchLabel="Search the outcomes" panelWidth="16rem" />
         <select class="input max-w-44 min-w-0" aria-label="Filter by method" [value]="method()"
                 (change)="setMethod($any($event.target).value)">
           <option value="">Every method</option>
@@ -139,6 +138,7 @@ export class SignInHistory implements OnInit {
   readonly search = signal('');
 
   readonly outcomes = Object.entries(OUTCOME_LABEL).map(([value, label]) => ({ value, label }));
+  readonly outcomeOptions: AdvancedOption[] = this.outcomes.map(o => ({ value: o.value, label: o.label }));
   readonly methods = Object.entries(METHOD_LABEL).map(([value, label]) => ({ value, label }));
   readonly hasFilters = computed(() => !!(this.outcome() || this.method() || this.search()));
   readonly hasMore = computed(() => this.total() !== null && this.rows().length < (this.total() ?? 0));

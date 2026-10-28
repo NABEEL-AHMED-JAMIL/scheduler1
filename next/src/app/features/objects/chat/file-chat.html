@@ -19,15 +19,9 @@
     <div class="flex items-center gap-2 px-3.5 py-2 border-b text-xs shrink-0 border-subtle"
         >
       <label class="text-[color:var(--text-muted)]" for="agent">Agent</label>
-      <select id="agent" class="input py-1 text-xs max-w-56"
-              [value]="agentId() ?? ''"
-              (change)="onAgentChange(+$any($event.target).value)"
-              [disabled]="!agents().length">
-        @if (!agents().length) { <option value="">{{ agentsLoading() ? 'Loading agents…' : 'No usable agents' }}</option> }
-        @for (agent of agents(); track agent.aiAgentId) {
-          <option [value]="agent.aiAgentId">{{ agent.agentName }} · {{ agent.provider }}</option>
-        }
-      </select>
+      <app-advanced-select id="agent" class="w-56" [compact]="true" [options]="agentOptions()" [value]="'' + (agentId() ?? '')"
+                           (valueChange)="onAgentChange(+$event)" [disabled]="!agents().length" [loading]="agentsLoading()"
+                           loadingText="Loading agents…" placeholder="No usable agents" searchLabel="Search the agents" panelWidth="20rem" />
     </div>
     <!-- Owner 2026-10-27: the agent list says it is loading, why it failed (with Try again; it was a toast, or nothing),
          and that there is none. -->

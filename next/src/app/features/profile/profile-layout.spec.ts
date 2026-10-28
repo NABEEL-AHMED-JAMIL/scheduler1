@@ -37,7 +37,7 @@ describe('profile layout', () => {
 
   it('gives the phone number a floor, and lets it drop under the country in a narrow column', async () => {
     const ts = await read('app/shared/ui/phone-input.ts');
-    expect(classesOf(ts, 'name="phoneCountry"')).toEqual(expect.arrayContaining(['w-32', 'shrink-0']));
+    expect(classesOf(ts, 'ariaLabel="Country dialling code"')).toEqual(expect.arrayContaining(['w-32', 'shrink-0']));
     expect(classesOf(ts, 'type="tel"')).toContain('min-w-[9rem]');
     expect(ts).toContain('<div class="flex flex-wrap gap-2">');
   });

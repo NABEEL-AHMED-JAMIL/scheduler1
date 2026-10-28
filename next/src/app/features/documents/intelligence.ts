@@ -15,10 +15,7 @@ import { DataText } from '../../shared/ui/data-text';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { sidePanelConfig } from '../../shared/ui/side-panel';
 import { StorageService } from '../objects/storage.service';
-import {
-  CHANNEL_LABELS, DatasetRow, DocumentType, Extraction, IntakeRow, Mailbox, OcrDocument, RecentRow, TypeStats, lowLine, recentRows, refusalText,
-  totalsOf,
-} from './documents.model';
+import { CHANNEL_LABELS, DatasetRow, DocumentType, Extraction, IntakeRow, Mailbox, OcrDocument, RecentRow, TypeStats, lowLine, recentRows, refusalText, totalsOf, documentTypeOption } from './documents.model';
 import { DocumentTriggerRow, DocumentsApi } from './documents.service';
 import { ConfidenceBar } from './confidence-bar';
 import { ReadDocumentData, ReadDocumentDialog, ReadDocumentResult } from './read-document-dialog';
@@ -33,6 +30,7 @@ import { RefreshButton } from '../../shared/ui/refresh-button';
 import { createTableSort } from '../../shared/ui/sort';
 import { SortHeader } from '../../shared/ui/sort-header';
 import { AppLoading, InlineStatus, createLoadState, loadErrorText } from '../../shared/ui/loading';
+import { AdvancedOption, AdvancedSelect } from '../../shared/ui/advanced-select';
 
 /**
  * The page's views. overview, types and dataset are tabs of Documents (Documents in, Document types, Approved data);
@@ -71,7 +69,7 @@ const RECENT_STATES = ['In review', 'Approved', 'Auto-approved', 'Rejected', 'Fa
  */
 @Component({
   selector: 'app-document-intelligence',
-  imports: [RefreshButton, PageHeader, SortHeader, AppLoading, InlineStatus, RouterLink, Icon, TableShell, StatusPill, StatStrip, Pagination, DataText, ServerTimePipe, ConfidenceBar, CdkMenu, CdkMenuItem, CdkMenuTrigger, ManagedBanner, NeedsWorkspace, NgTemplateOutlet],
+  imports: [RefreshButton, PageHeader, SortHeader, AppLoading, InlineStatus, RouterLink, Icon, TableShell, StatusPill, StatStrip, Pagination, DataText, ServerTimePipe, ConfidenceBar, CdkMenu, CdkMenuItem, CdkMenuTrigger, ManagedBanner, NeedsWorkspace, NgTemplateOutlet, AdvancedSelect],
   templateUrl: './intelligence.html',
 })
 export class DocumentIntelligence implements OnInit {
@@ -109,6 +107,9 @@ export class DocumentIntelligence implements OnInit {
 
   readonly stats = signal<TypeStats[]>([]);
   readonly types = signal<DocumentType[]>([]);
+  /** The types by id (Approved data's dataset) and by key (Recent documents' filter), as their pickers list them. */
+  readonly typeIdOptions = computed<AdvancedOption[]>(() => this.types().map(documentTypeOption));
+  readonly typeKeyOptions = computed<AdvancedOption[]>(() => this.types().map(t => ({ ...documentTypeOption(t), value: t.typeKey })));
   readonly reads = signal<OcrDocument[]>([]);
   readonly extractions = signal<Extraction[]>([]);
   readonly loading = signal(true);

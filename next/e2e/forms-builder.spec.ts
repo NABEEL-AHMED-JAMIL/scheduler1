@@ -1,6 +1,7 @@
 import { test, expect, APIRequestContext, Browser, Page } from '@playwright/test';
 import { canSignIn, NEEDS, pageAs as signedIn, sessionFor } from './support/session';
 import { archiveForm, formIdNamed } from './support/forms';
+import { pickOption } from './support/advanced-select';
 
 /**
  * MIG-280, live: Riverside Health's administrator builds a form in the new builder -- two fields from the palette, a
@@ -48,7 +49,7 @@ test.describe('Forms: build, publish, fill, submit (live)', () => {
     // Logic: the badge number only when they have a badge.
     await page.locator('[data-tab="logic"]').click();
     const rule = page.locator('[data-logic-field="badge_number"] [data-rule="showWhen"]');
-    await rule.getByLabel('Show only when: field').selectOption('has_a_badge');
+    await pickOption(rule.getByLabel('Show only when: field'), 'has_a_badge');
     await page.locator('[data-tab="build"]').click();
     await expect(page.locator('[data-field-row="2"]')).toContainText('Shown when Has a badge is Yes');
 

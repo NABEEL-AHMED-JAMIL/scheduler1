@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { canSignIn, NEEDS, Session, sessionFor, pageWith } from './support/session';
 import { ensureObject } from './support/workspace';
+import { pickOption } from './support/advanced-select';
 import { hasFixtures, NEEDS_FIXTURES, riverside } from './support/fixtures';
 
 /**
@@ -163,7 +164,7 @@ test.describe('Document Intelligence', () => {
     // ---- the dataset: the approved document's row, with the corrected vendor as typed
     await page.goto('/documents/approved-data');
     const dataset = page.locator('[data-test="dataset"]');
-    await dataset.getByRole('combobox', { name: 'Document type' }).selectOption({ label: 'Invoice' });
+    await pickOption(dataset.getByRole('button', { name: /^Document type/ }), { label: 'Invoice' });
     const row = dataset.locator('tbody tr', { hasText: `#${extractionId}` });
     await expect(row).toBeVisible({ timeout: 20_000 });
     await expect(row).toContainText(VENDOR);

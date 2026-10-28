@@ -9,9 +9,11 @@ import { FileDropzone } from '../../shared/ui/file-dropzone';
 import { SegmentOption, Segmented } from '../../shared/ui/segmented';
 import { ObjectPicker, PickedObject, objectPickerConfig } from '../../shared/ui/object-picker';
 import { BucketSummary, StorageService } from '../objects/storage.service';
-import { DocumentType, Extraction, OCR_EXTENSIONS, OcrDocument, documentName, isWorking, refusalText, statusLabel } from './documents.model';
+import { DocumentType, Extraction, OCR_EXTENSIONS, OcrDocument, documentName, isWorking, refusalText, statusLabel, documentTypeOption } from './documents.model';
 import { DocumentsApi } from './documents.service';
 import { InlineStatus, loadErrorText } from '../../shared/ui/loading';
+import { AdvancedOption, AdvancedSelect } from '../../shared/ui/advanced-select';
+import { bucketOption } from '../../shared/ui/advanced-options';
 
 export interface ReadDocumentData {
   /** The types to extract as (the overview has them already). */
@@ -42,7 +44,7 @@ const STEPS: { id: Stage; label: string }[] = [
  */
 @Component({
   selector: 'app-read-document-dialog',
-  imports: [FormDialog, Field, Icon, FileDropzone, Segmented, InlineStatus],
+  imports: [FormDialog, Field, Icon, FileDropzone, Segmented, InlineStatus, AdvancedSelect],
   template: `
     <app-form-dialog [heading]="data.read ? 'Extract a document' : 'Read a document'"
                      [subtitle]="data.read ? readName() : 'From one of this workspace\\'s storage connections'"
@@ -52,10 +54,10 @@ const STEPS: { id: Stage; label: string }[] = [
       <div class="form-stack">
         @if (!data.read) {
           <app-field label="Storage connection" for="docBucket" [required]="true">
-            <select id="docBucket" class="input" [disabled]="locked()" [value]="bucket()" (change)="bucket.set($any($event.target).value); picked.set(null)">
-              @if (!buckets().length) { <option value="">{{ bucketsLoading() ? 'Loading…' : 'No storage connection' }}</option> }
-              @for (b of buckets(); track b.bucket) { <option [value]="b.bucket" [selected]="b.bucket === bucket()">{{ b.label || b.bucket }}</option> }
-            </select>
+            <app-advanced-select id="docBucket" [disabled]="locked()" [options]="bucketOptions()" [value]="bucket()"
+                                 (valueChange)="bucket.set($event); picked.set(null)" placeholder="Choose a storage connection"
+                                 searchLabel="Search the storage connections" [loading]="bucketsLoading()"
+                                 emptyText="No storage connection in this workspace yet." />
           </app-field>
           <!-- Owner 2026-10-27: a failed read of the connections offers Try again; none at all is said as such. -->
           <app-inline-status [error]="bucketsError()" [empty]="bucketsEmpty()" (retry)="loadBuckets()"
@@ -82,10 +84,9 @@ const STEPS: { id: Stage; label: string }[] = [
         }
 
         <app-field label="Document type" for="docType" hint="Pick one, or let the page decide: it is compared with every active type.">
-          <select id="docType" class="input" [disabled]="locked()" [value]="typeId()" (change)="typeId.set($any($event.target).value)">
-            <option value="">Work it out from the page</option>
-            @for (t of activeTypes(); track t.documentTypeId) { <option [value]="t.documentTypeId" [selected]="t.documentTypeId + '' === typeId()">{{ t.name }}{{ t.builtIn ? '' : ' (this workspace)' }}</option> }
-          </select>
+          <app-advanced-select id="docType" [disabled]="locked()" [options]="typeOptions()" [value]="typeId()" (valueChange)="typeId.set($event)"
+                               [allowClear]="true" clearLabel="Work it out from the page" placeholder="Work it out from the page"
+                               searchLabel="Search the document types" emptyText="No active document type yet." />
         </app-field>
 
         @if (stage() !== 'form') {
@@ -146,6 +147,10 @@ export class ReadDocumentDialog implements OnInit {
     { id: 'stored', label: 'A stored file', icon: 'folder', disabled: this.locked() },
   ]);
   readonly activeTypes = computed(() => this.data.types.filter(t => t.status === 'Active'));
+  /** The active types, a workspace's own marked as such (the built-in ones are everyone's). */
+  readonly typeOptions = computed<AdvancedOption[]>(() => this.activeTypes().map(t => ({ ...documentTypeOption(t),
+    badge: t.builtIn ? undefined : 'This workspace', badgeTone: 'info' as const })));
+  readonly bucketOptions = computed<AdvancedOption[]>(() => this.buckets().map(bucketOption));
   readonly readName = computed(() => this.data.read ? `${documentName(this.data.read)} · OCR document ${this.data.read.ocrDocumentId}` : '');
   readonly working = computed(() => ['upload', 'read', 'extract'].includes(this.stage()));
   readonly locked = computed(() => this.stage() !== 'form' && this.stage() !== 'failed');

@@ -10,10 +10,7 @@ import { StatusPill } from '../../shared/ui/status-pill';
 import { Pagination } from '../../shared/ui/pagination';
 import { PAGE_SIZES } from '../../shared/ui/pager';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
-import {
-  AGE_FILTERS, CLAIM_FILTERS, CONFIDENCE_FILTERS, DocumentType, Extraction, OcrDocument, QUEUE_STATUSES, documentName, lowLine,
-  refusalText, statusLabel,
-} from './documents.model';
+import { AGE_FILTERS, CLAIM_FILTERS, CONFIDENCE_FILTERS, DocumentType, Extraction, OcrDocument, QUEUE_STATUSES, documentName, lowLine, refusalText, statusLabel, documentTypeOption } from './documents.model';
 import { DocumentsApi } from './documents.service';
 import { ConfidenceBar } from './confidence-bar';
 import { PageHeader } from '../../shared/ui/page-header';
@@ -24,6 +21,7 @@ import { NeedsWorkspace } from '../../shared/ui/needs-workspace';
 import { BULK_CAP, BulkSelection } from '../../shared/ui/bulk/bulk.model';
 import { createTableSort } from '../../shared/ui/sort';
 import { SortHeader } from '../../shared/ui/sort-header';
+import { AdvancedOption, AdvancedSelect } from '../../shared/ui/advanced-select';
 
 /**
  * The review queue (MIG-272, Documents > Review queue, page key document-review): the documents Document Intelligence
@@ -33,7 +31,7 @@ import { SortHeader } from '../../shared/ui/sort-header';
  */
 @Component({
   selector: 'app-review-queue',
-  imports: [RefreshButton, PageHeader, RouterLink, Icon, TableShell, StatusPill, Pagination, ServerTimePipe, ConfidenceBar, BulkBar, NeedsWorkspace, SortHeader],
+  imports: [RefreshButton, PageHeader, RouterLink, Icon, TableShell, StatusPill, Pagination, ServerTimePipe, ConfidenceBar, BulkBar, NeedsWorkspace, SortHeader, AdvancedSelect],
   template: `
     <div class="page">
       <app-page-header>
@@ -68,10 +66,9 @@ import { SortHeader } from '../../shared/ui/sort-header';
           <select class="input max-w-36" aria-label="State" [value]="status()" (change)="set(status, $any($event.target).value)">
             @for (s of statuses; track s) { <option [value]="s" [selected]="s === status()">{{ s === 'Review' ? 'In review' : s }}</option> }
           </select>
-          <select class="input max-w-44" aria-label="Document type" [value]="typeId()" (change)="set(typeId, $any($event.target).value)">
-            <option value="">All types</option>
-            @for (t of types(); track t.documentTypeId) { <option [value]="t.documentTypeId" [selected]="t.documentTypeId + '' === typeId()">{{ t.name }}</option> }
-          </select>
+          <app-advanced-select class="w-44" ariaLabel="Document type" [options]="typeOptions()" [value]="typeId()" (valueChange)="set(typeId, $event)"
+                               [allowClear]="true" clearLabel="All types" placeholder="All types" searchLabel="Search the document types"
+                               emptyText="No document type yet." panelWidth="20rem" />
           <select class="input max-w-44" aria-label="Claimed" [value]="claimed()" (change)="set(claimed, $any($event.target).value)">
             @for (c of claims; track c.value) { <option [value]="c.value" [selected]="c.value === claimed()">{{ c.label }}</option> }
           </select>
@@ -167,6 +164,7 @@ export class ReviewQueue implements OnInit {
   readonly loading = signal(true);
   readonly error = signal('');
   readonly types = signal<DocumentType[]>([]);
+  readonly typeOptions = computed<AdvancedOption[]>(() => this.types().map(documentTypeOption));
   private readonly reads = signal<Map<number, OcrDocument>>(new Map());
 
   readonly me = computed(() => this.auth.user()?.appUserId ?? null);

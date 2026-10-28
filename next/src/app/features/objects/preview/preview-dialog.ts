@@ -15,6 +15,7 @@ import { ToastService } from '../../../shared/ui/toast.service';
 import { InlineStatus, loadErrorText } from '../../../shared/ui/loading';
 import { createTableSort } from '../../../shared/ui/sort';
 import { SortHeader } from '../../../shared/ui/sort-header';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
 
 export interface PreviewData {
   bucket: string;
@@ -47,7 +48,7 @@ const VIDEO = ['mp4', 'webm', 'ogv', 'mov', 'm4v'];
 
 @Component({
   selector: 'app-preview-dialog',
-  imports: [Icon, ServerTimePipe, AudioPlayer, PdfViewer, BlurLoader, InlineStatus, SortHeader],
+  imports: [Icon, ServerTimePipe, AudioPlayer, PdfViewer, BlurLoader, InlineStatus, SortHeader, AdvancedSelect],
   templateUrl: './preview-dialog.html',
 })
 export class PreviewDialog implements OnInit {
@@ -100,6 +101,7 @@ export class PreviewDialog implements OnInit {
 
   // ---- tables ----
   readonly table = signal<TablePreview | null>(null);
+  readonly sheetOptions = computed<AdvancedOption[]>(() => (this.table()?.sheets ?? []).map(s => ({ value: s, label: s })));
   readonly tableOffset = signal(0);
   readonly tableLimit = 100;
   readonly tableSearch = signal('');

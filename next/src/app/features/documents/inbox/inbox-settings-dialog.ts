@@ -11,6 +11,8 @@ import { InboxSettings, capProblem, limitText, megabytes } from './inbox.model';
 import { InboxApi } from './inbox.service';
 import { InlineStatus, createLoadState } from '../../../shared/ui/loading';
 import { RouterLink } from '@angular/router';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
+import { bucketOption } from '../../../shared/ui/advanced-options';
 
 export interface InboxSettingsData { settings: InboxSettings; }
 
@@ -23,7 +25,7 @@ const MB = 1048576;
  */
 @Component({
   selector: 'app-inbox-settings-dialog',
-  imports: [FormDialog, Field, Icon, InlineStatus, RouterLink],
+  imports: [FormDialog, Field, Icon, InlineStatus, RouterLink, AdvancedSelect],
   template: `
     <app-form-dialog heading="File drop settings"
                      subtitle="Where uploaded files are stored, and how large one may be."
@@ -37,13 +39,10 @@ const MB = 1048576;
       <div class="form-stack">
         <app-field label="Storage connection" for="inboxAlias" [required]="true" [error]="aliasError()"
                    hint="One of this workspace's own connections. Files land under intake/ in its bucket.">
-          <select id="inboxAlias" class="input" [value]="alias()" [disabled]="loadingBuckets()"
-                  (change)="alias.set($any($event.target).value); aliasError.set('')">
-            <option value="">{{ loadingBuckets() ? 'Reading the connections…' : 'Choose a connection' }}</option>
-            @for (o of options(); track o.value) {
-              <option [value]="o.value" [selected]="o.value === alias()">{{ o.label }}</option>
-            }
-          </select>
+          <app-advanced-select id="inboxAlias" [options]="pickOptions()" [value]="alias()" [disabled]="loadingBuckets()"
+                               [invalid]="!!aliasError()" (valueChange)="alias.set($event); aliasError.set('')" placeholder="Choose a connection"
+                               searchLabel="Search the connections" [loading]="loadingBuckets()" loadingText="Reading the connections…"
+                               emptyText="This workspace has no storage connection yet." />
         </app-field>
         <!-- Owner 2026-10-27: the connections' read says why it failed, with Try again, and an empty list links to where
              one is added. -->
@@ -85,6 +84,9 @@ export class InboxSettingsDialog {
     value: b.bucket,
     label: b.label && b.label !== b.bucket ? `${b.label} (${b.bucket})` : b.bucket,
   })));
+
+  /** The connections as their picker lists them: the name, the bucket and provider under it. */
+  readonly pickOptions = computed<AdvancedOption[]>(() => this.buckets().map(bucketOption));
 
   constructor() { this.loadBuckets(); }
 

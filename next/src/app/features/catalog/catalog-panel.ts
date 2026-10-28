@@ -16,6 +16,7 @@ import {
   AssetDetail, CatalogColumn, Grant, LineageGraph, SENSITIVITIES, TAGS, freshnessText, grantTone, isSensitive, kindText, lineageSides, nodeIcon, phiHint,
   sensitivityTone, sourceText, tagText, tagsLevel, whereText,
 } from './catalog.model';
+import { AdvancedOption, AdvancedSelect } from '../../shared/ui/advanced-select';
 
 /** What the page hands the panel: the asset to open, and a way to say the list should be read again. */
 export interface CatalogPanelData {
@@ -31,7 +32,7 @@ export interface CatalogPanelData {
  */
 @Component({
   selector: 'app-catalog-panel',
-  imports: [SidePanel, Icon, LoadError, ServerTimePipe, AppLoading, InlineStatus, BlurLoader, SortHeader],
+  imports: [SidePanel, Icon, LoadError, ServerTimePipe, AppLoading, InlineStatus, BlurLoader, SortHeader, AdvancedSelect],
   styles: `tr.is-sensitive > td { background: color-mix(in oklab, var(--color-warn-500) 7%, transparent); }`,
   template: `
     <app-side-panel [heading]="asset()?.name || data.name" [subtitle]="subtitle()">
@@ -150,10 +151,9 @@ export interface CatalogPanelData {
                       <td>
                         @if (a.canEdit) {
                           <label class="sr-only" [for]="'tag-' + c.name">What {{ c.name }} holds</label>
-                          <select class="input input-sm w-auto" [id]="'tag-' + c.name" (change)="tag(c.name, $any($event.target).value)">
-                            <option value="" [selected]="!c.tags.length">nothing sensitive</option>
-                            @for (t of tags; track t.id) { <option [value]="t.id" [selected]="c.tags.includes(t.id)">{{ t.label }}</option> }
-                          </select>
+                          <app-advanced-select class="w-44" [compact]="true" [id]="'tag-' + c.name" [options]="tagOptions" [value]="c.tags.at(-1) ?? ''"
+                                               (valueChange)="tag(c.name, $event)" [allowClear]="true" clearLabel="nothing sensitive"
+                                               placeholder="nothing sensitive" searchLabel="Search what it holds" panelWidth="16rem" />
                           @if (c.tagsReviewed) { <span class="text-xs text-[color:var(--text-muted)]"> reviewed</span> }
                         } @else {
                           @for (t of c.tags; track t) { <span class="pill pill-warn">{{ tagLabel(t) }}</span> }
@@ -241,6 +241,8 @@ export class CatalogPanel implements OnInit {
 
   readonly sensitivities = SENSITIVITIES;
   readonly tags = TAGS;
+  /** What a column may hold, each with how sensitive it makes the column. */
+  readonly tagOptions: AdvancedOption[] = TAGS.map(t => ({ value: t.id, label: t.label, badge: t.level, badgeTone: t.level === 'Restricted' ? 'crit' : 'warn' }));
   readonly tone = sensitivityTone;
   readonly grantTone = grantTone;
   readonly tagLabel = tagText;

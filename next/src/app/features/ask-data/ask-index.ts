@@ -7,6 +7,8 @@ import { AskDataApi } from './ask-data.api';
 import { AskIndexStatus, IndexFolder } from './ask-data.model';
 import { AppLoading, InlineStatus, createLoadState, loadErrorText } from '../../shared/ui/loading';
 import { LoadError } from '../../shared/ui/load-error';
+import { AdvancedOption, AdvancedSelect } from '../../shared/ui/advanced-select';
+import { bucketOption } from '../../shared/ui/advanced-options';
 
 /**
  * MIG-281: the workspace's search index, as its administrator chooses it on the Ask your data page -- on or off, Document
@@ -16,7 +18,7 @@ import { LoadError } from '../../shared/ui/load-error';
  */
 @Component({
   selector: 'app-ask-index',
-  imports: [Icon, ServerTimePipe, AppLoading, InlineStatus, LoadError],
+  imports: [Icon, ServerTimePipe, AppLoading, InlineStatus, LoadError, AdvancedSelect],
   templateUrl: './ask-index.html',
 })
 export class AskIndex implements OnInit {
@@ -36,6 +38,7 @@ export class AskIndex implements OnInit {
   readonly saving = signal(false);
   readonly saveError = signal<string | null>(null);
   readonly buckets = signal<{ bucket: string; label?: string | null }[]>([]);
+  readonly bucketOptions = computed<AdvancedOption[]>(() => this.buckets().map(bucketOption));
 
   readonly enabled = signal(false);
   readonly documents = signal(true);

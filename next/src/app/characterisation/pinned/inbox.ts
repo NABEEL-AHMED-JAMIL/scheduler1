@@ -170,7 +170,8 @@ export const PINNED: Record<string, unknown> = {
     "buttons": [
       "Cancel",
       "Save changes",
-      "Turn off"
+      "Turn off",
+      "UI-REVIEW LocalStack S3 (fake keys)ui-review-s3 · S3"
     ],
     "columns": [],
     "fields": [

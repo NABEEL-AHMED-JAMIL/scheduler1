@@ -49,7 +49,7 @@ describe('Form fill', () => {
     const id = el.querySelector<HTMLInputElement>('[data-field="patient_id"]')!;
     expect(id.getAttribute('placeholder')).toBe('e.g. P-00017');
     expect(el.querySelector('[data-field="length_cm"]')?.getAttribute('placeholder')).toBe('e.g. 2.5');
-    expect(el.querySelector('[data-field="wound_location"] option[value=""]')?.textContent?.trim()).toBe('Choose a site');
+    expect(el.querySelector('[data-field="wound_location"] .adv-placeholder')?.textContent?.trim()).toBe('Choose a site');
     const note = id.closest('.field')!.querySelector('.field-note')!;
     expect(note.textContent?.trim()).toBe('As on the wristband');
     expect(id.getAttribute('aria-describedby')?.split(' ')).toContain(note.id);

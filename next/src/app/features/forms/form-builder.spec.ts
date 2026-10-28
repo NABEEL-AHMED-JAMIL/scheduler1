@@ -330,7 +330,7 @@ describe('Form builder -- the editor', () => {
     choice.value = 'Choose a site';
     choice.dispatchEvent(new Event('input'));
     fixture.detectChanges();
-    expect(el.querySelector('#canvas-1-wound_location option')?.textContent?.trim()).toBe('Choose a site');
+    expect(el.querySelector('#canvas-1-wound_location .adv-placeholder')?.textContent?.trim()).toBe('Choose a site');
 
     screen.save();
     const sent = (api.save.mock.calls[0] as unknown[])[0] as { fields: FormField[] };

@@ -7,16 +7,14 @@ import { Icon } from '../../shared/ui/icon';
 import { Field } from '../../shared/ui/field';
 import { StatusPill } from '../../shared/ui/status-pill';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
-import {
-  DocumentType, ListSource, TypeVersionRow, RULE_KINDS, RULE_LABELS, RuleKind, TypeDefinition, TypeField, TypeRule, TypeTable, blankDefinition, blankRule, blankTable,
-  autoApproveVerdict, definitionProblems, definitionToSave, editableDefinition, listText, refusalText, statusOf, textList,
-} from './documents.model';
+import { DocumentType, ListSource, TypeVersionRow, RULE_KINDS, RULE_LABELS, RuleKind, TypeDefinition, TypeField, TypeRule, TypeTable, blankDefinition, blankRule, blankTable, autoApproveVerdict, definitionProblems, definitionToSave, editableDefinition, listText, refusalText, statusOf, textList, documentTypeOption } from './documents.model';
 import { DocumentsApi, TypeSave } from './documents.service';
 import { FieldListEditor } from './field-list-editor';
 import { AppLoading, InlineStatus } from '../../shared/ui/loading';
 import { LoadError } from '../../shared/ui/load-error';
 import { createTableSort } from '../../shared/ui/sort';
 import { SortHeader } from '../../shared/ui/sort-header';
+import { AdvancedOption, AdvancedSelect } from '../../shared/ui/advanced-select';
 
 export interface TypePanelData {
   /** null: a new type. */
@@ -30,6 +28,11 @@ export interface TypePanelData {
 /** view: as saved; edit: the workspace's own type; copy: a built-in one being customised; version: an older version. */
 type Mode = 'view' | 'edit' | 'copy' | 'new' | 'version';
 
+/** A table, column or field of a type: its name, and its key in monospace when the name is not the key. */
+function keyed(f: { key: string; label?: string | null }): AdvancedOption {
+  return { value: f.key, label: f.label || f.key, sample: f.label && f.label !== f.key ? f.key : undefined, keywords: f.key };
+}
+
 /**
  * A document type in the wide side panel (MIG-272): what it extracts -- fields, line-item tables -- the rules a document
  * of it must keep, the auto-approve threshold, what the model is told, and its versions.
@@ -41,7 +44,7 @@ type Mode = 'view' | 'edit' | 'copy' | 'new' | 'version';
  */
 @Component({
   selector: 'app-type-panel',
-  imports: [SidePanel, Icon, Field, StatusPill, ServerTimePipe, FieldListEditor, AppLoading, InlineStatus, LoadError, SortHeader],
+  imports: [SidePanel, Icon, Field, StatusPill, ServerTimePipe, FieldListEditor, AppLoading, InlineStatus, LoadError, SortHeader, AdvancedSelect],
   template: `
     <app-side-panel [heading]="heading()" [subtitle]="subtitle()">
       <div class="flex flex-col gap-4 min-w-0" data-test="type-panel">
@@ -170,16 +173,18 @@ type Mode = 'view' | 'edit' | 'copy' | 'new' | 'version';
                 </div>
                 <div class="grid gap-2 sm:grid-cols-2">
                   @if (uses(r, 'table')) {
-                    <select class="input text-xs" [disabled]="!editing()" [attr.aria-label]="'Rule ' + (i + 1) + ' table'" (change)="patchRule(i, { table: $any($event.target).value || null })">
-                      <option value="">{{ r.rule === 'matches' || r.rule === 'checkDigit' || r.rule === 'lookup' ? 'No table (a field)' : 'Pick a table' }}</option>
-                      @for (t of def().tables; track t.key) { <option [value]="t.key" [selected]="t.key === r.table">{{ t.label || t.key }}</option> }
-                    </select>
+                    <app-advanced-select [compact]="true" [disabled]="!editing()" [ariaLabel]="'Rule ' + (i + 1) + ' table'" [options]="tableOptions()"
+                                         [value]="r.table ?? ''" (valueChange)="patchRule(i, { table: $event || null })" [allowClear]="true"
+                                         [clearLabel]="r.rule === 'matches' || r.rule === 'checkDigit' || r.rule === 'lookup' ? 'No table (a field)' : 'Pick a table'"
+                                         [placeholder]="r.rule === 'matches' || r.rule === 'checkDigit' || r.rule === 'lookup' ? 'No table (a field)' : 'Pick a table'"
+                                         unknownText="Not a table of this type" searchLabel="Search the tables" emptyText="This type has no tables." />
                   }
                   @if (uses(r, 'column')) {
-                    <select class="input text-xs" [disabled]="!editing()" [attr.aria-label]="'Rule ' + (i + 1) + ' column'" (change)="patchRule(i, { column: $any($event.target).value || null })">
-                      <option value="">{{ r.rule === 'rowProduct' ? 'The product column' : 'Pick a column' }}</option>
-                      @for (c of columnsOf(r.table); track c.key) { <option [value]="c.key" [selected]="c.key === r.column">{{ c.label || c.key }}</option> }
-                    </select>
+                    <app-advanced-select [compact]="true" [disabled]="!editing()" [ariaLabel]="'Rule ' + (i + 1) + ' column'"
+                                         [options]="columnOptions()[r.table ?? ''] ?? []" [value]="r.column ?? ''" (valueChange)="patchRule(i, { column: $event || null })"
+                                         [allowClear]="true" [clearLabel]="r.rule === 'rowProduct' ? 'The product column' : 'Pick a column'"
+                                         [placeholder]="r.rule === 'rowProduct' ? 'The product column' : 'Pick a column'" unknownText="Not a column of the table"
+                                         searchLabel="Search the columns" emptyText="Pick a table first: its columns are listed here." />
                   }
                   @if (uses(r, 'columns')) {
                     <input class="input mono text-xs" [value]="list(r.columns)" placeholder="quantity, unit_price" [readOnly]="!editing()" [attr.aria-label]="'Rule ' + (i + 1) + ' columns that multiply'" (change)="patchRule(i, { columns: split($any($event.target).value) })" />
@@ -191,17 +196,18 @@ type Mode = 'view' | 'edit' | 'copy' | 'new' | 'version';
                     <input class="input text-xs" type="number" min="1" max="3650" step="1" [value]="r.withinDays ?? ''" placeholder="Within days (all when empty)" [readOnly]="!editing()" [attr.aria-label]="'Rule ' + (i + 1) + ' within days'" (input)="patchRule(i, { withinDays: num($any($event.target).value) })" />
                   }
                   @if (uses(r, 'field')) {
-                    <select class="input text-xs" [disabled]="!editing()" [attr.aria-label]="'Rule ' + (i + 1) + ' field'" (change)="patchRule(i, { field: $any($event.target).value || null })">
-                      <option value="">{{ fieldPrompt(r) }}</option>
-                      @for (f of def().fields; track f.key) { <option [value]="f.key" [selected]="f.key === r.field">{{ f.label || f.key }}</option> }
-                    </select>
+                    <app-advanced-select [compact]="true" [disabled]="!editing()" [ariaLabel]="'Rule ' + (i + 1) + ' field'" [options]="fieldOptions()"
+                                         [value]="r.field ?? ''" (valueChange)="patchRule(i, { field: $event || null })" [allowClear]="true"
+                                         [clearLabel]="fieldPrompt(r)" [placeholder]="fieldPrompt(r)" unknownText="Not a field of this type"
+                                         searchLabel="Search the fields" emptyText="This type has no fields yet." />
                   }
                   @if (uses(r, 'before')) {
                     @for (end of ends; track end) {
-                      <select class="input text-xs" [disabled]="!editing()" [attr.aria-label]="'Rule ' + (i + 1) + ' ' + end + ' date'" (change)="patchRule(i, end === 'before' ? { before: $any($event.target).value || null } : { after: $any($event.target).value || null })">
-                        <option value="">{{ end === 'before' ? 'The earlier date' : 'The later date' }}</option>
-                        @for (f of dateFields(); track f.key) { <option [value]="f.key" [selected]="f.key === (end === 'before' ? r.before : r.after)">{{ f.label || f.key }}</option> }
-                      </select>
+                      <app-advanced-select [compact]="true" [disabled]="!editing()" [ariaLabel]="'Rule ' + (i + 1) + ' ' + end + ' date'" [options]="dateFieldOptions()"
+                                           [value]="(end === 'before' ? r.before : r.after) ?? ''"
+                                           (valueChange)="patchRule(i, end === 'before' ? { before: $event || null } : { after: $event || null })" [allowClear]="true"
+                                           [clearLabel]="end === 'before' ? 'The earlier date' : 'The later date'" [placeholder]="end === 'before' ? 'The earlier date' : 'The later date'"
+                                           unknownText="Not a date field of this type" searchLabel="Search the date fields" emptyText="This type has no date field." />
                     }
                   }
                   @if (uses(r, 'tolerance')) {
@@ -211,10 +217,10 @@ type Mode = 'view' | 'edit' | 'copy' | 'new' | 'version';
                     <input class="input mono text-xs" [value]="r.pattern ?? ''" placeholder="[A-Z]{2}[0-9]{6}" [readOnly]="!editing()" [attr.aria-label]="'Rule ' + (i + 1) + ' pattern'" (input)="patchRule(i, { pattern: $any($event.target).value })" />
                   }
                   @if (uses(r, 'groupBy')) {
-                    <select class="input text-xs" [disabled]="!editing()" [attr.aria-label]="'Rule ' + (i + 1) + ' group by'" (change)="patchRule(i, { groupBy: $any($event.target).value || null })">
-                      <option value="">Compared with every approved document</option>
-                      @for (f of def().fields; track f.key) { @if (f.key !== r.field) { <option [value]="f.key" [selected]="f.key === r.groupBy">Only those with the same {{ f.label || f.key }}</option> } }
-                    </select>
+                    <app-advanced-select [compact]="true" [disabled]="!editing()" [ariaLabel]="'Rule ' + (i + 1) + ' group by'" [options]="groupByOptions()[i] ?? []"
+                                         [value]="r.groupBy ?? ''" (valueChange)="patchRule(i, { groupBy: $event || null })" [allowClear]="true"
+                                         clearLabel="Compared with every approved document" placeholder="Compared with every approved document"
+                                         unknownText="Not a field of this type" searchLabel="Search the fields" />
                     <select class="input text-xs" [disabled]="!editing()" [attr.aria-label]="'Rule ' + (i + 1) + ' direction'" (change)="patchRule(i, { direction: $any($event.target).value || null })">
                       <option value="" [selected]="!r.direction || r.direction === 'both'">Unusually high or low</option>
                       <option value="high" [selected]="r.direction === 'high'">Unusually high only</option>
@@ -243,9 +249,9 @@ type Mode = 'view' | 'edit' | 'copy' | 'new' | 'version';
                       <datalist [id]="'rule-buckets-' + i">@for (b of buckets(); track b.alias) { <option [value]="b.alias">{{ b.label }}</option> }</datalist>
                       <input class="input mono text-xs" [value]="r.list?.key ?? ''" placeholder="reference/purchase_orders.csv" [readOnly]="!editing()" [attr.aria-label]="'Rule ' + (i + 1) + ' list file'" (input)="patchList(i, { key: $any($event.target).value })" />
                     } @else {
-                      <select class="input text-xs" [disabled]="!editing()" [attr.aria-label]="'Rule ' + (i + 1) + ' list document type'" (change)="patchList(i, { documentTypeId: +$any($event.target).value })">
-                        @for (t of otherTypes(); track t.documentTypeId) { <option [value]="t.documentTypeId" [selected]="t.documentTypeId === r.list.documentTypeId">{{ t.name }}</option> }
-                      </select>
+                      <app-advanced-select [compact]="true" [disabled]="!editing()" [ariaLabel]="'Rule ' + (i + 1) + ' list document type'" [options]="otherTypeOptions()"
+                                           [value]="'' + (r.list.documentTypeId ?? '')" (valueChange)="patchList(i, { documentTypeId: +$event })"
+                                           searchLabel="Search the document types" emptyText="No other active document type." />
                     }
                     <input class="input mono text-xs" [value]="r.list?.column ?? ''" [placeholder]="r.list?.documentTypeId == null ? 'Column (e.g. po_number)' : 'Field key (e.g. vendor_id)'" [readOnly]="!editing()" [attr.aria-label]="'Rule ' + (i + 1) + ' list column'" (input)="patchList(i, { column: $any($event.target).value })" />
                   </div>
@@ -371,11 +377,20 @@ export class TypePanel implements OnInit {
   });
   readonly problems = computed(() => definitionProblems(this.name(), this.typeKey(), this.def()));
   readonly dateFields = computed(() => this.def().fields.filter(f => f.type === 'date'));
+  // The rules' pickers (owner 2026-10-27): the type's own tables, columns and fields by name, each key in monospace beside it.
+  readonly tableOptions = computed<AdvancedOption[]>(() => this.def().tables.map(keyed));
+  readonly columnOptions = computed<Record<string, AdvancedOption[]>>(() => Object.fromEntries(this.def().tables.map(t => [t.key, t.columns.map(keyed)])));
+  readonly fieldOptions = computed<AdvancedOption[]>(() => this.def().fields.map(keyed));
+  readonly dateFieldOptions = computed<AdvancedOption[]>(() => this.dateFields().map(keyed));
+  /** A rule's "compared with": every field but the one it measures, by rule. */
+  readonly groupByOptions = computed<AdvancedOption[][]>(() => this.def().rules.map(r => this.def().fields.filter(f => f.key !== r.field)
+    .map(f => ({ ...keyed(f), label: `Only those with the same ${f.label || f.key}` }))));
   /** MIG-319: the workspace's buckets, read the first time a lookup rule is edited. */
   readonly buckets = signal<{ alias: string; label: string }[]>([]);
   private bucketsAsked = false;
   /** A lookup's dataset may be any active type this workspace sees but this one. */
   readonly otherTypes = computed(() => this.data.types.filter(t => t.status === 'Active' && t.documentTypeId !== this.type()?.documentTypeId));
+  readonly otherTypeOptions = computed<AdvancedOption[]>(() => this.otherTypes().map(documentTypeOption));
 
   ngOnInit(): void {
     if (this.data.documentTypeId == null) {

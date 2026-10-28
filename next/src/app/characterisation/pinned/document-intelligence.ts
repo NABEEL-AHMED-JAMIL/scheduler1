@@ -12,6 +12,9 @@ export const PINNED: Record<string, unknown> = {
       "Close",
       "Customise",
       "Name",
+      "Rule 1 column: Amount",
+      "Rule 1 field: Order total",
+      "Rule 1 table: Ordered items",
       "Saved",
       "Version",
       "v1",
@@ -63,11 +66,8 @@ export const PINNED: Record<string, unknown> = {
       "Name",
       "Required",
       "Required Key",
-      "Rule 1 column",
-      "Rule 1 field",
       "Rule 1 kind",
       "Rule 1 message",
-      "Rule 1 table",
       "Rule 1 tolerance",
       "Table 1 key",
       "Table 1 label",
@@ -223,7 +223,9 @@ export const PINNED: Record<string, unknown> = {
       "A stored file",
       "Cancel",
       "Read and extract",
-      "Upload a file"
+      "UI-REVIEW LocalStack S3 (fake keys)ui-review-s3 · S3",
+      "Upload a file",
+      "Work it out from the page"
     ],
     "columns": [],
     "fields": [
@@ -255,6 +257,7 @@ export const PINNED: Record<string, unknown> = {
       "CSV",
       "Columns",
       "Document",
+      "Document type: Purchase order",
       "JSON Lines",
       "More actions",
       "Order date",
@@ -276,9 +279,7 @@ export const PINNED: Record<string, unknown> = {
         "Ordered items"
       ]
     ],
-    "fields": [
-      "Document type"
-    ],
+    "fields": [],
     "links": [
       "/documents",
       "/documents/approved-data",
@@ -413,6 +414,7 @@ export const PINNED: Record<string, unknown> = {
       "Columns",
       "Confidence",
       "Document",
+      "Document type",
       "Fields",
       "More actions",
       "Received",
@@ -433,7 +435,6 @@ export const PINNED: Record<string, unknown> = {
       ]
     ],
     "fields": [
-      "Document type",
       "Search documents",
       "State"
     ],
@@ -486,6 +487,7 @@ export const PINNED: Record<string, unknown> = {
       "Columns",
       "Confidence",
       "Document",
+      "Document type",
       "Fields",
       "More actions",
       "Received",
@@ -506,7 +508,6 @@ export const PINNED: Record<string, unknown> = {
       ]
     ],
     "fields": [
-      "Document type",
       "Search documents",
       "State"
     ],
@@ -557,6 +558,7 @@ export const PINNED: Record<string, unknown> = {
       "Claimed",
       "Columns",
       "Document",
+      "Document type",
       "Least sure",
       "Refresh",
       "Start reviewing",
@@ -580,7 +582,6 @@ export const PINNED: Record<string, unknown> = {
     "fields": [
       "Claimed",
       "Confidence",
-      "Document type",
       "Select all documents on this page that can be decided",
       "Select ocr-live-check.png",
       "State",

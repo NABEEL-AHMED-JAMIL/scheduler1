@@ -6,6 +6,7 @@ import { Icon } from '../../shared/ui/icon';
 import { AnswerValue, Answers, FormField, TableRow, UploadRef, placeholderOf, requiredNow, sectionGroups, selectionText, tickedOf,
   visibleFields } from './forms.model';
 import { SignaturePad } from './signature-pad';
+import { AdvancedOption, AdvancedSelect } from '../../shared/ui/advanced-select';
 
 /** One answer changed: the field's key and what it holds now (text as typed, a yes/no as a boolean, rows, uploads). */
 export interface AnswerChange {
@@ -36,7 +37,7 @@ const IMAGE_MIME: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpe
 
 @Component({
   selector: 'app-form-renderer',
-  imports: [DateField, Field, Icon, NgTemplateOutlet, SignaturePad],
+  imports: [DateField, Field, Icon, NgTemplateOutlet, SignaturePad, AdvancedSelect],
   template: `
     <div class="flex flex-col gap-4 min-w-0">
       @for (g of groups(); track $index; let gi = $index) {
@@ -77,11 +78,10 @@ const IMAGE_MIME: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpe
                           <td>
                             @switch (c.type) {
                               @case ('choice') {
-                                <select class="input input-sm" [disabled]="disabled()" [attr.aria-label]="c.label + ', row ' + (r + 1)"
-                                        (change)="setCell(f.key, r, c.key, $any($event.target).value)">
-                                  <option value="" [selected]="!row[c.key]">—</option>
-                                  @for (o of c.options ?? []; track o) { <option [value]="o" [selected]="row[c.key] === o">{{ o }}</option> }
-                                </select>
+                                <app-advanced-select class="min-w-32" [compact]="true" [disabled]="disabled()" [ariaLabel]="c.label + ', row ' + (r + 1)"
+                                                     [options]="pickOptions()[f.key + '.' + c.key] ?? []" [value]="$any(row[c.key]) || ''"
+                                                     (valueChange)="setCell(f.key, r, c.key, $event)" [allowClear]="true" clearLabel="—" placeholder="—"
+                                                     [searchLabel]="'Search ' + c.label" panelWidth="16rem" />
                               }
                               @case ('yesNo') {
                                 <select class="input input-sm" [disabled]="disabled()" [attr.aria-label]="c.label + ', row ' + (r + 1)"
@@ -166,11 +166,10 @@ const IMAGE_MIME: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpe
                   @for (v of valuesOf(f.key); track v) { <option [value]="v"></option> }
                 </datalist>
               } @else {
-                <select class="input" [id]="idPrefix() + '-' + f.key" [disabled]="disabled()" [attr.data-field]="f.key"
-                        (change)="set(f.key, $any($event.target).value)">
-                  <option value="" [selected]="!text(f.key)">{{ valuesOf(f.key).length ? (f.placeholder || 'Choose…') : 'Nothing to choose from yet' }}</option>
-                  @for (v of valuesOf(f.key); track v) { <option [value]="v" [selected]="text(f.key) === v">{{ v }}</option> }
-                </select>
+                <app-advanced-select [id]="idPrefix() + '-' + f.key" [disabled]="disabled()" [attr.data-field]="f.key"
+                                     [options]="lookupOptions()[f.key] ?? []" [value]="text(f.key)" (valueChange)="set(f.key, $event)"
+                                     [allowClear]="!isRequired(f)" clearLabel="None" [placeholder]="f.placeholder || 'Choose…'"
+                                     [searchLabel]="'Search ' + f.label" emptyText="Nothing to choose from yet." />
               }
             }
             @case ('checkboxes') {
@@ -190,13 +189,10 @@ const IMAGE_MIME: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpe
                         [attr.data-field]="f.key" [attr.placeholder]="placeholder(f)" (input)="set(f.key, $any($event.target).value)"></textarea>
             }
             @case ('choice') {
-              <select class="input" [id]="idPrefix() + '-' + f.key" [disabled]="disabled()" [attr.data-field]="f.key"
-                      (change)="set(f.key, $any($event.target).value)">
-                <option value="" [selected]="!text(f.key)">{{ placeholder(f) }}</option>
-                @for (o of f.options ?? []; track o) {
-                  <option [value]="o" [selected]="text(f.key) === o">{{ o }}</option>
-                }
-              </select>
+              <app-advanced-select [id]="idPrefix() + '-' + f.key" [disabled]="disabled()" [attr.data-field]="f.key"
+                                   [options]="pickOptions()[f.key] ?? []" [value]="text(f.key)" (valueChange)="set(f.key, $event)"
+                                   [allowClear]="!isRequired(f)" clearLabel="None" [placeholder]="placeholder(f) || 'Choose…'"
+                                   [searchLabel]="'Search ' + f.label" emptyText="This question has no choices yet." />
             }
             @case ('yesNo') {
               <div class="flex items-center gap-4 text-sm" role="radiogroup" [id]="idPrefix() + '-' + f.key" [attr.aria-label]="f.label"
@@ -275,6 +271,20 @@ export class FormRenderer {
   spans(f: FormField): boolean {
     return SPANNING.includes(f.type);
   }
+
+  /** A choice question's and a table's choice columns' options, by field key (and "key.column"), as their pickers list them. */
+  readonly pickOptions = computed<Record<string, AdvancedOption[]>>(() => {
+    const out: Record<string, AdvancedOption[]> = {};
+    const opts = (list: string[] | null | undefined) => (list ?? []).map(o => ({ value: o, label: o }));
+    for (const f of this.fields()) {
+      if (f.type === 'choice') out[f.key] = opts(f.options);
+      for (const c of f.columns ?? []) if (c.type === 'choice') out[f.key + '.' + c.key] = opts(c.options);
+    }
+    return out;
+  });
+  /** A lookup's values, by field key. */
+  readonly lookupOptions = computed<Record<string, AdvancedOption[]>>(() => Object.fromEntries(Object.entries(this.lookupValues())
+    .map(([key, values]) => [key, values.map(v => ({ value: v, label: v }))])));
 
   /** The field's own placeholder, else its type's default ("Enter case number", "e.g. SYN-nnn", "Choose…"). */
   placeholder(f: FormField): string | null {

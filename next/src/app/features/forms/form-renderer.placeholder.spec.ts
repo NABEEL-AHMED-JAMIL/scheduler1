@@ -39,15 +39,15 @@ describe('UX2: a field\'s placeholder and help text', () => {
     expect(el.querySelector('textarea#fill-notes')?.getAttribute('placeholder')).toBe('What you saw');
     expect(el.querySelector('#fill-length_cm')?.getAttribute('placeholder')).toBe('e.g. 2.5');
     expect(el.querySelector('app-date-field button#fill-seen_on')?.textContent).toContain('Day of the visit');
-    expect(el.querySelector('#fill-site option[value=""]')?.textContent?.trim()).toBe('Choose a site');
-    expect(el.querySelector('#fill-ward option[value=""]')?.textContent?.trim()).toBe('Pick the ward');
+    expect(el.querySelector('#fill-site .adv-placeholder')?.textContent?.trim()).toBe('Choose a site');
+    expect(el.querySelector('#fill-ward .adv-placeholder')?.textContent?.trim()).toBe('Pick the ward');
     for (const f of FIELDS) expect(el.querySelector(`label[for="fill-${f.key}"]`)?.textContent).toContain(f.label);
   });
 
   it('shows a default for its type when a field has none: "Enter ..." on a box, "Choose…" on a list, "Pick a date" on a day', () => {
     const { el } = render();
     expect(el.querySelector('#fill-plain')?.getAttribute('placeholder')).toBe('Enter plain');
-    expect(el.querySelector('#fill-plain_site option[value=""]')?.textContent?.trim()).toBe('Choose…');
+    expect(el.querySelector('#fill-plain_site .adv-placeholder')?.textContent?.trim()).toBe('Choose…');
     const { el: day } = render([{ key: 'd', label: 'D', type: 'date', required: false }]);
     expect(day.querySelector('button#fill-d')?.textContent).toContain('Pick a date');
   });
@@ -74,7 +74,7 @@ describe('UX2: a field\'s placeholder and help text', () => {
     expect(ph('pain')).toBe('1–10');
     expect(ph('mail')).toBe('name@example.com');
     expect(ph('phone')).toBe('e.g. +1 555 0100');
-    expect(el.querySelector('#fill-site option[value=""]')?.textContent?.trim()).toBe('Choose…');
+    expect(el.querySelector('#fill-site .adv-placeholder')?.textContent?.trim()).toBe('Choose…');
     expect(el.querySelector('button#fill-seen')?.textContent).toContain('Pick a date');
     expect(el.querySelector('#fill-ok input[placeholder]')).toBeNull();
     // A placeholder is never the only name: every label stays, and the help is still what the box is described by.
@@ -95,7 +95,7 @@ describe('UX2: a field\'s placeholder and help text', () => {
     ]);
     expect(el.querySelector('#fill-case_id')?.getAttribute('placeholder')).toBe('e.g. WC-2026-0142');
     expect(el.querySelector('#fill-patient_id')?.getAttribute('placeholder')).toBe('e.g. SYN-014');
-    expect(el.querySelector('#fill-site option[value=""]')?.textContent?.trim()).toBe('Choose the wound site');
+    expect(el.querySelector('#fill-site .adv-placeholder')?.textContent?.trim()).toBe('Choose the wound site');
     expect(el.querySelector('#fill-blank')?.getAttribute('placeholder')).toBe('Enter ward');
   });
 

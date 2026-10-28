@@ -17,6 +17,7 @@ import { StorageService } from '../storage.service';
 import { DictationService } from '../../../shared/ui/dictation.service';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { AppLoading, InlineStatus, loadErrorText } from '../../../shared/ui/loading';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
 
 interface ChatMessage {
   role: 'user' | 'assistant' | 'error';
@@ -78,7 +79,7 @@ export function agentAcceptsFile(agent: Agent, fileName: string): boolean {
 
 @Component({
   selector: 'app-file-chat',
-  imports: [Icon, Markdown, Avatar, DecimalPipe, AppLoading, InlineStatus],
+  imports: [Icon, Markdown, Avatar, DecimalPipe, AppLoading, InlineStatus, AdvancedSelect],
   templateUrl: './file-chat.html',
 })
 export class FileChat implements OnInit, OnDestroy {
@@ -100,6 +101,9 @@ export class FileChat implements OnInit, OnDestroy {
   readonly agentsLoading = signal(true);
   readonly agentsError = signal('');
   readonly agentId = signal<number | null>(null);
+  /** The usable agents, each with its model provider and the files it reads (all when it names none). */
+  readonly agentOptions = computed<AdvancedOption[]>(() => this.agents().map(a => ({ value: '' + a.aiAgentId, label: a.agentName, sample: a.provider,
+    description: a.targetFileTypes?.trim() ? `Reads ${targetFileTypesList(a.targetFileTypes).join(', ')} files` : undefined })));
   readonly messages = signal<ChatMessage[]>([]);
   readonly draft = signal('');
   readonly preparing = signal(true);

@@ -32,9 +32,8 @@
     @if (kind() === 'table' && table(); as t) {
       @if (t.sheets.length > 1) {
         <label class="text-xs text-[color:var(--text-muted)] flex items-center gap-1.5">Sheet
-          <select class="input py-1 text-xs w-40" [value]="t.sheet" (change)="pickSheet($any($event.target).value)" aria-label="Sheet">
-            @for (s of t.sheets; track s) { <option [value]="s" [selected]="s === t.sheet">{{ s }}</option> }
-          </select>
+          <app-advanced-select class="w-40" [compact]="true" [options]="sheetOptions()" [value]="t.sheet ?? ''" (valueChange)="pickSheet($event)"
+                               ariaLabel="Sheet" searchLabel="Search the sheets" panelWidth="16rem" />
         </label>
       }
       <div class="search-field max-w-48">

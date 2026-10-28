@@ -16,6 +16,7 @@ import { RefreshButton } from '../../shared/ui/refresh-button';
 import { createTableSort } from '../../shared/ui/sort';
 import { SortHeader } from '../../shared/ui/sort-header';
 import { AppLoading, loadErrorText } from '../../shared/ui/loading';
+import { AdvancedOption, AdvancedSelect } from '../../shared/ui/advanced-select';
 
 /**
  * Forms › Submissions (Wave 5 Forms lite; page 'form-submissions'): what a form collected, newest first -- who sent it
@@ -42,7 +43,7 @@ export function defaultForm(forms: FormSummary[]): FormSummary | undefined {
 
 @Component({
   selector: 'app-form-submissions',
-  imports: [RefreshButton, PageHeader, SortHeader, AppLoading, StatStrip, Icon, TableShell, LoadError, ServerTimePipe, RouterLink],
+  imports: [RefreshButton, PageHeader, SortHeader, AppLoading, StatStrip, Icon, TableShell, LoadError, ServerTimePipe, RouterLink, AdvancedSelect],
   templateUrl: './form-submissions.html',
 })
 export class FormSubmissions implements OnInit {
@@ -54,6 +55,8 @@ export class FormSubmissions implements OnInit {
   readonly formId = input<string | undefined>(undefined);
 
   readonly forms = signal<FormSummary[]>([]);
+  readonly formOptions = computed<AdvancedOption[]>(() => this.forms().map(f => ({ value: '' + f.formId, label: f.name,
+    description: `${f.fieldCount} field${f.fieldCount === 1 ? '' : 's'} · v${f.version}`, badge: f.status !== 'Active' ? f.status : undefined })));
   readonly formsLoading = signal(true);
   readonly formsError = signal('');
   readonly selected = signal<number | null>(null);

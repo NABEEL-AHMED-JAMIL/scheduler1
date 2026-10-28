@@ -14,6 +14,7 @@ export const PINNED: Record<string, unknown> = {
       "Minimise",
       "Regenerate",
       "Send",
+      "UI-REVIEW Summarise a CSV run in one paragraphOllamaReads ui-review files",
       "View"
     ],
     "columns": [],
@@ -36,6 +37,7 @@ export const PINNED: Record<string, unknown> = {
       "Minimise",
       "Send",
       "Summarise this file",
+      "UI-REVIEW Summarise a CSV run in one paragraphOllamaReads ui-review files",
       "View",
       "What are the key points?"
     ],

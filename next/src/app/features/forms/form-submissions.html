@@ -10,11 +10,8 @@
       <div class="flex flex-wrap items-center gap-2">
         @if (forms().length) {
           <label class="sr-only" for="submissionsForm">Form</label>
-          <select id="submissionsForm" class="input w-auto" (change)="choose(+$any($event.target).value)">
-            @for (f of forms(); track f.formId) {
-              <option [value]="f.formId" [selected]="selected() === f.formId">{{ f.name }}{{ f.status !== 'Active' ? ' (' + f.status + ')' : '' }}</option>
-            }
-          </select>
+          <app-advanced-select id="submissionsForm" class="w-64" [options]="formOptions()" [value]="'' + (selected() ?? '')"
+                               (valueChange)="choose(+$event)" ariaLabel="Form" searchLabel="Search the forms" panelWidth="22rem" />
           <app-refresh-button [loading]="loading()" (refresh)="load()" />
           <button type="button" class="btn btn-default btn-sm" (click)="exportCsv()" [disabled]="exporting() || !submissions().length" data-export>
             <app-icon name="download" />{{ exporting() ? 'Exporting…' : 'Export CSV' }}

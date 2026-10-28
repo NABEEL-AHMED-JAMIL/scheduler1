@@ -31,6 +31,7 @@ import { WorkflowSummary, WorkflowsApi } from '../workflows/workflows.api';
 import { PageHeader } from '../../shared/ui/page-header';
 import { RefreshButton } from '../../shared/ui/refresh-button';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
+import { AdvancedOption, AdvancedSelect } from '../../shared/ui/advanced-select';
 
 /** A field while it is being built: whether its key still follows its label (a new field's does, a saved one's never). */
 type BuilderField = FormField & { autoKey?: boolean };
@@ -47,7 +48,7 @@ type BuilderDraft = Omit<FormDraft, 'fields'> & { fields: BuilderField[] };
  */
 @Component({
   selector: 'app-form-builder',
-  imports: [CdkMenu, CdkMenuItem, CdkMenuTrigger, RefreshButton, PageHeader, Icon, TableShell, ManagedBanner, ServerTimePipe, RouterLink, FormRenderer, FormShare],
+  imports: [CdkMenu, CdkMenuItem, CdkMenuTrigger, RefreshButton, PageHeader, Icon, TableShell, ManagedBanner, ServerTimePipe, RouterLink, FormRenderer, FormShare, AdvancedSelect],
   templateUrl: './form-builder.html',
 })
 export class FormBuilder implements OnInit {
@@ -158,6 +159,26 @@ export class FormBuilder implements OnInit {
   readonly sourceForms = signal<Record<number, FormSummary>>({});
   /** The forms a lookup may read: every other form of the workspace. */
   readonly otherForms = computed(() => this.forms().filter(f => f.formId !== this.draft()?.formId));
+  // The editor's pickers (owner 2026-10-27): stable lists for the advanced select.
+  readonly fieldTypeOptions: AdvancedOption[] = FIELD_TYPES.map(t => ({ value: t.value, label: t.label }));
+  readonly otherFormOptions = computed<AdvancedOption[]>(() => this.otherForms().map(f => ({ value: '' + f.formId, label: f.name,
+    description: `${f.fieldCount} field${f.fieldCount === 1 ? '' : 's'} · v${f.version}`, badge: f.status !== 'Active' ? f.status : undefined })));
+  /** A lookup's fields, by the form it reads (once that form has been read). */
+  readonly sourceFieldOptions = computed<Record<number, AdvancedOption[]>>(() => Object.fromEntries(Object.entries(this.sourceForms())
+    .map(([id, form]) => [id, lookupSources(form?.fields).map(o => ({ value: o.key, label: o.label || o.key, sample: o.key }))])));
+  /** A field's logic may read only the fields before it, by field. */
+  readonly earlierFieldOptions = computed<AdvancedOption[][]>(() => {
+    const fields = this.draft()?.fields ?? [];
+    return fields.map((_, i) => fields.slice(0, i).map(e => ({ value: e.key, label: e.label || e.key, sample: e.key, description: typeLabel(e.type) })));
+  });
+  readonly jobOptions = computed<AdvancedOption[]>(() => this.jobs().map(j => ({ value: '' + j.jobId, label: j.jobName, keywords: '' + j.jobId,
+    badge: j.jobStatus !== 'Active' ? j.jobStatus : undefined, badgeTone: 'neutral' as const })));
+  /** The active workflows; one the form names that is no longer active is kept and said. */
+  readonly workflowOptions = computed<AdvancedOption[]>(() => {
+    const list: AdvancedOption[] = this.workflows().map(w => ({ value: w.key, label: w.name, description: w.description || undefined, sample: 'v' + w.currentVersion }));
+    const key = this.draft()?.workflowKey;
+    return key && !list.some(o => o.value === key) ? [...list, { value: key, label: key, badge: 'Not active', badgeTone: 'warn' }] : list;
+  });
   /** The preview's lookups: what the saved form's lookups offer now (a new or changed lookup shows its values once saved). */
   readonly previewLookups = signal<Record<string, string[]>>({});
 

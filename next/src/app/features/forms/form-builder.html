@@ -167,9 +167,8 @@
                         </div>
                         <div class="field">
                           <label class="label" [for]="'fieldType' + i">Type</label>
-                          <select class="input" [id]="'fieldType' + i" (change)="setField(i, { type: $any($event.target).value })">
-                            @for (t of fieldTypes; track t.value) { <option [value]="t.value" [selected]="f.type === t.value">{{ t.label }}</option> }
-                          </select>
+                          <app-advanced-select [id]="'fieldType' + i" [options]="fieldTypeOptions" [value]="f.type"
+                                               (valueChange)="setField(i, { type: $any($event) })" searchLabel="Search the field types" />
                         </div>
                         <div class="field">
                           <label class="flex items-center gap-2 text-sm">
@@ -301,22 +300,16 @@
                         @if (f.type === 'lookup') {
                           <div class="field">
                             <label class="label" [for]="'lookupForm' + i">Offers the answers of</label>
-                            <select class="input" [id]="'lookupForm' + i" (change)="setLookupForm(i, $any($event.target).value)">
-                              <option value="" [selected]="!f.lookup?.formId">Pick a form…</option>
-                              @for (o of otherForms(); track o.formId) {
-                                <option [value]="o.formId" [selected]="f.lookup?.formId === o.formId">{{ o.name }}</option>
-                              }
-                            </select>
+                            <app-advanced-select [id]="'lookupForm' + i" [options]="otherFormOptions()" [value]="'' + (f.lookup?.formId ?? '')"
+                                                 (valueChange)="setLookupForm(i, $event)" placeholder="Pick a form…" searchLabel="Search the forms"
+                                                 emptyText="No other form in this workspace yet." />
                           </div>
                           <div class="field">
                             <label class="label" [for]="'lookupField' + i">Field</label>
-                            <select class="input" [id]="'lookupField' + i" [disabled]="!f.lookup?.formId"
-                                    (change)="setField(i, { lookup: { formId: f.lookup?.formId ?? null, field: $any($event.target).value } })">
-                              <option value="" [selected]="!f.lookup?.field">Pick a field…</option>
-                              @for (o of sourceFields(f.lookup?.formId); track o.key) {
-                                <option [value]="o.key" [selected]="f.lookup?.field === o.key">{{ o.label }}</option>
-                              }
-                            </select>
+                            <app-advanced-select [id]="'lookupField' + i" [disabled]="!f.lookup?.formId" [options]="sourceFieldOptions()[f.lookup?.formId ?? 0] ?? []"
+                                                 [value]="f.lookup?.field ?? ''" (valueChange)="setField(i, { lookup: { formId: f.lookup?.formId ?? null, field: $event } })"
+                                                 placeholder="Pick a field…" searchLabel="Search the form's fields" unknownText="Not a field of that form"
+                                                 emptyText="That form has no field whose answers can be offered." />
                           </div>
                         }
                       </div>
@@ -345,13 +338,10 @@
                         <div class="field sm:col-span-2" [attr.data-rule]="which.key">
                           <span class="label">{{ which.label }}</span>
                           <div class="grid gap-2 sm:grid-cols-[1fr_10rem_1fr] items-center">
-                            <select class="input input-sm" [attr.aria-label]="which.label + ': field'"
-                                    (change)="setRule(i, which.key, { field: $any($event.target).value })">
-                              <option value="" [selected]="!ruleOf(f, which.key)">{{ which.none }}</option>
-                              @for (e of d.fields.slice(0, i); track e.key) {
-                                <option [value]="e.key" [selected]="ruleOf(f, which.key)?.field === e.key">{{ e.label || e.key }}</option>
-                              }
-                            </select>
+                            <app-advanced-select [compact]="true" [ariaLabel]="which.label + ': field'" [options]="earlierFieldOptions()[i] ?? []"
+                                                 [value]="ruleOf(f, which.key)?.field ?? ''" (valueChange)="setRule(i, which.key, { field: $event })"
+                                                 [allowClear]="true" [clearLabel]="which.none" [placeholder]="which.none" unknownText="Not an earlier field"
+                                                 searchLabel="Search the earlier fields" />
                             @if (ruleOf(f, which.key); as r) {
                               <select class="input input-sm" [attr.aria-label]="which.label + ': test'"
                                       (change)="setRule(i, which.key, { op: $any($event.target).value })">
@@ -409,12 +399,9 @@
                   </div>
                   <div class="field">
                     <label class="label" for="formJob">When submitted, start</label>
-                    <select id="formJob" class="input" (change)="setJob($any($event.target).value)">
-                      <option value="" [selected]="!d.jobId">Nothing: keep the submission</option>
-                      @for (j of jobs(); track j.jobId) {
-                        <option [value]="j.jobId" [selected]="d.jobId === j.jobId">{{ j.jobName }}{{ j.jobStatus !== 'Active' ? ' (' + j.jobStatus + ')' : '' }}</option>
-                      }
-                    </select>
+                    <app-advanced-select id="formJob" [options]="jobOptions()" [value]="'' + (d.jobId ?? '')" (valueChange)="setJob($event)"
+                                         [allowClear]="true" clearLabel="Nothing: keep the submission" placeholder="Nothing: keep the submission"
+                                         searchLabel="Search the schedules" emptyText="No schedule in this workspace yet." />
                     <p class="field-note text-[color:var(--text-muted)]">
                       The submission is written to the workspace inbox as JSON and the schedule runs with it: a pipeline whose
                       Read CSV/JSON/Parquet step names no file reads it as one row.
@@ -422,15 +409,9 @@
                   </div>
                   <div class="field">
                     <label class="label" for="formWorkflow">Approval</label>
-                    <select id="formWorkflow" class="input" (change)="patch({ workflowKey: $any($event.target).value || null })">
-                      <option value="" [selected]="!d.workflowKey">None: no approval</option>
-                      @for (w of workflows(); track w.key) {
-                        <option [value]="w.key" [selected]="d.workflowKey === w.key">{{ w.name }}</option>
-                      }
-                      @if (d.workflowKey && !hasWorkflow(d.workflowKey)) {
-                        <option [value]="d.workflowKey" selected>{{ d.workflowKey }} (not active)</option>
-                      }
-                    </select>
+                    <app-advanced-select id="formWorkflow" [options]="workflowOptions()" [value]="d.workflowKey ?? ''" (valueChange)="patch({ workflowKey: $event || null })"
+                                         [allowClear]="true" clearLabel="None: no approval" placeholder="None: no approval"
+                                         searchLabel="Search the workflows" emptyText="No active workflow a form can start yet." />
                     <p class="field-note text-[color:var(--text-muted)]">
                       Each submission starts this workflow; its status (Pending, Approved, Rejected, Overdue) shows on Submissions.
                       <a class="link-inline" routerLink="/workflows/designer">Workflow designer</a>

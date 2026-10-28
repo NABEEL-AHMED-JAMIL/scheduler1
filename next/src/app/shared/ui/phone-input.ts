@@ -1,5 +1,6 @@
 import { Component, computed, effect, input, model, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { AdvancedOption, AdvancedSelect } from './advanced-select';
 import {
   AsYouType, CountryCode, getCountries, getCountryCallingCode, parsePhoneNumberFromString,
 } from 'libphonenumber-js';
@@ -17,20 +18,17 @@ import {
  */
 @Component({
   selector: 'app-phone-input',
-  imports: [FormsModule],
+  imports: [FormsModule, AdvancedSelect],
   template: `
     <!-- A fixed country width and a floor under the number: at 1024 the number box was 101px and
          a typed number scrolled out of view. In a column too narrow for both, the number wraps
          under the country instead of overflowing. -->
     <div class="flex flex-wrap gap-2">
-      <select class="input w-32 shrink-0" [ngModel]="country()" name="phoneCountry"
-              [ngModelOptions]="{standalone: true}"
-              (ngModelChange)="onCountryChange($event)"
-              [attr.aria-label]="'Country dialling code'">
-        @for (c of countries; track c.code) {
-          <option [value]="c.code">{{ c.flag }} {{ c.code }} +{{ c.dial }}</option>
-        }
-      </select>
+      <!-- The button stays as short as the select was (flag, code, dial code); the list names each country and finds it
+           by its name, its code or its dial code. -->
+      <app-advanced-select class="w-32 shrink-0" [options]="countryOptions" [value]="country()" (valueChange)="onCountryChange($any($event))"
+                           ariaLabel="Country dialling code" [showDescription]="false" panelWidth="20rem"
+                           searchLabel="Search the countries" searchPlaceholder="Country, code or +dial code" />
       <input class="input flex-1 min-w-[9rem]" type="tel" inputmode="tel" [id]="inputId()"
              [ngModel]="national()" name="phoneNational"
              [ngModelOptions]="{standalone: true}"
@@ -66,6 +64,11 @@ export class PhoneInput {
       name: PhoneInput.nameOf(code),
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
+
+  /** The countries as the picker lists them: "🇵🇰 PK" with "Pakistan" under it and "+92" beside it. */
+  readonly countryOptions: AdvancedOption[] = this.countries.map(c => ({
+    value: c.code, label: `${c.flag} ${c.code}`, description: c.name, sample: `+${c.dial}`, keywords: `${c.name} ${c.code} ${c.dial}`,
+  }));
 
   /** A real example for the chosen country, so the expected shape is obvious before typing. */
   readonly placeholder = computed(() => {

@@ -112,10 +112,10 @@
                        [emptyMessage]="types().length ? 'No approved documents of this type yet. When one is approved, by a reviewer or on its own, its values land here as a row.' : 'No document types yet, so there is no approved data. Add one under Document types.'"
                        emptyIcon="table" (retry)="retryDataset()">
         <ng-container toolbar>
-          <select class="input max-w-48" aria-label="Document type" [value]="datasetType()" (change)="pickDatasetType($any($event.target).value)">
-            @if (!types().length) { <option value="">{{ typesState.loading() ? 'Loading types…' : 'No document type yet' }}</option> }
-            @for (t of types(); track t.documentTypeId) { <option [value]="t.documentTypeId" [selected]="t.documentTypeId + '' === datasetType()">{{ t.name }}</option> }
-          </select>
+          <app-advanced-select class="w-48" ariaLabel="Document type" [options]="typeIdOptions()" [value]="datasetType()"
+                               (valueChange)="pickDatasetType($event)" placeholder="Choose a document type" searchLabel="Search the document types"
+                               [loading]="typesState.loading() && !types().length" loadingText="Loading types…"
+                               emptyText="No document type yet: add one under Document types." panelWidth="20rem" />
           <button type="button" class="btn btn-default btn-sm" [disabled]="!!downloading() || !datasetTotal()" (click)="download('csv')">
             <app-icon [name]="downloading() === 'csv' ? 'refresh' : 'download'" [class.spin]="downloading() === 'csv'" />CSV
           </button>
@@ -219,10 +219,9 @@
                        [emptyMessage]="hasFilters() ? 'No document matches the current filters.' : 'No documents yet. Upload one as a PDF or an image: ' + exampleTypes + '.'"
                        emptyIcon="file" (retry)="load()">
         <ng-container toolbar>
-          <select class="input max-w-40" aria-label="Document type" [value]="typeFilter()" (change)="typeFilter.set($any($event.target).value)">
-            <option value="">All types</option>
-            @for (t of types(); track t.documentTypeId) { <option [value]="t.typeKey" [selected]="t.typeKey === typeFilter()">{{ t.name }}</option> }
-          </select>
+          <app-advanced-select class="w-40" ariaLabel="Document type" [options]="typeKeyOptions()" [value]="typeFilter()"
+                               (valueChange)="typeFilter.set($event)" [allowClear]="true" clearLabel="All types" placeholder="All types"
+                               searchLabel="Search the document types" emptyText="No document type yet." panelWidth="20rem" />
           <select class="input max-w-40" aria-label="State" [value]="stateFilter()" (change)="stateFilter.set($any($event.target).value)">
             <option value="">All states</option>
             @for (s of states; track s) { <option [value]="s" [selected]="s === stateFilter()">{{ s }}</option> }

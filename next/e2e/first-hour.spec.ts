@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { api, authOf, canSignIn, NEEDS, pageAs, Session, sessionFor, sessionOf } from './support/session';
 import { bestEffort, deleteObject, deleteTopic, removeMade } from './support/workspace';
 import { hasFixtures, NEEDS_FIXTURES, riverside } from './support/fixtures';
+import { pickOption } from './support/advanced-select';
 
 /**
  * MIG-324: a new organisation's first hour, as its first administrator, through the console only and timed:
@@ -147,7 +148,7 @@ test.describe('a new organisation\'s first hour (MIG-324)', () => {
     if (await setUp.isVisible()) {
       await setUp.click();
       const dialog = page.getByRole('dialog').last();
-      await dialog.locator('select').first().selectOption({ label: `${STORAGE} (${ALIAS})` });
+      await pickOption(dialog.locator('#inboxAlias'), ALIAS);
       // (A workspace has one inbox: a second set's walk finds it on, on the first set's storage.)
       await dialog.getByRole('button', { name: 'Turn on the inbox' }).click();
       await expect(page.getByText('Drop files here')).toBeVisible();
@@ -237,7 +238,7 @@ test.describe('a new organisation\'s first hour (MIG-324)', () => {
       await read.locator('#stepKey').fill('orders');
       await read.locator('#cfg-bucket').fill(arrival.alias ?? arrival.bucket);
       await read.locator('#cfg-key').fill(key);
-      await read.locator('#cfg-format').selectOption('csv');
+      await pickOption(read.locator('#cfg-format'), { label: 'csv' });
       await read.getByRole('button', { name: 'Apply' }).click();
       await page.locator('#addStep').click();
       await page.locator('#addStep').fill('save');
@@ -245,7 +246,7 @@ test.describe('a new organisation\'s first hour (MIG-324)', () => {
       const keep = page.getByRole('dialog', { name: /^Step 2/ });
       await keep.locator('#stepKey').fill('result');
       await keep.locator('#cfg-fileName').fill('orders.csv');
-      await keep.locator('#cfg-format').selectOption('csv');
+      await pickOption(keep.locator('#cfg-format'), { label: 'csv' });
       await keep.getByRole('button', { name: 'Apply' }).click();
       // One save bar saves the details and the steps (B2); the first steps of a legacy pipeline are confirmed in a dialog.
       await page.getByRole('button', { name: 'Save', exact: true }).click();

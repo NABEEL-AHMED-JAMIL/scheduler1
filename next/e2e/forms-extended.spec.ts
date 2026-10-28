@@ -1,6 +1,7 @@
 import { test, expect, APIRequestContext, Browser, Page } from '@playwright/test';
 import { canSignIn, NEEDS, pageAs as signedIn, Session, sessionFor, sessionOf, signInWithPassword, tokenFor } from './support/session';
 import { lendPages } from './support/workspace';
+import { pickOption } from './support/advanced-select';
 import { archiveForm, makeForm, submitForm } from './support/forms';
 import { hasFixtures, NEEDS_FIXTURES, riverside } from './support/fixtures';
 
@@ -67,7 +68,7 @@ test.describe('Forms: lookup, rules, table, file, signature (live)', () => {
     await page.goto(`/forms/${form}/fill`);
     await expect(page.getByRole('heading', { level: 1, name: VISIT })).toBeVisible();
 
-    await page.locator('[data-field="patient"]').selectOption('SYN-001');
+    await pickOption(page.locator('[data-field="patient"]'), 'SYN-001');
     await expect(page.locator('[data-field="antibiotic"]')).toHaveCount(0);
     await page.locator('[data-field="infected"]').getByLabel('Yes').check();
     await expect(page.locator('[data-field="antibiotic"]')).toBeVisible();

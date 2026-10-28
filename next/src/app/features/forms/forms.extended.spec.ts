@@ -10,6 +10,7 @@ import {
   Answers, FormDraft, FormField, FormSummary, answerProblems, answerText, answersForSubmit, definitionProblems, draftForSave, holds,
   ruleText, visibleFields,
 } from './forms.model';
+import { advancedSelects } from '../../shared/ui/advanced-select.testing';
 
 /**
  * MIG-277 in the console: tables, files, signatures, lookups and show/required rules -- checked here the way Core checks
@@ -135,8 +136,9 @@ describe('Forms -- filling in the new types', () => {
 
   it('offers the lookup\'s values, adds table rows, and shows a rule\'s field only when it holds', () => {
     const { page, fixture, el } = render();
-    const options = Array.from(el.querySelectorAll('[data-field="patient"] option')).map(o => o.textContent!.trim());
-    expect(options).toEqual(['Choose…', 'P-100', 'P-200']);
+    const patient = advancedSelects(fixture).find(b => b.searchLabel() === 'Search Patient')!;
+    expect([patient.placeholder(), ...patient.options().map(o => o.label)]).toEqual(['Choose…', 'P-100', 'P-200']);
+    expect(el.querySelector('[data-field="patient"] button.adv-trigger')).not.toBeNull();
     expect(el.querySelector('[data-field="antibiotic"]')).toBeNull();
     page.change({ key: 'infected', value: true });
     fixture.detectChanges();

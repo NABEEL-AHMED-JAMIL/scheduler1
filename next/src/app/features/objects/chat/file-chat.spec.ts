@@ -406,7 +406,7 @@ describe('a prepare that failed on the agent chosen for the reader', () => {
     expect(panel.html().textContent).toContain('This agent only handles json files.');
 
     const composer = panel.html().querySelector('textarea') as HTMLTextAreaElement;
-    const picker = panel.html().querySelector('select') as HTMLSelectElement;
+    const picker = panel.html().querySelector('#agent') as HTMLButtonElement;
     expect(composer.disabled).toBe(false);
     expect(picker.disabled).toBe(false);
     // Both agents are offered, which is the whole point of the fallback.
