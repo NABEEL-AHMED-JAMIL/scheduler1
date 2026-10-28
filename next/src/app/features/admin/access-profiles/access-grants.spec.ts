@@ -110,7 +110,9 @@ describe('Grant pages and tabs', () => {
     expect(api.changes).toHaveBeenCalled();
     const log = el.querySelector('[data-testid="change-log"]')!.textContent!;
     expect(log).toContain('Opened a tab');
-    expect(log).toContain('jobs:backfills');
+    // Owner 2026-10-27: the tab by its menu name, never its key.
+    expect(log).toContain('Schedules › Backfills');
+    expect(log).not.toContain('jobs:backfills');
     expect(log).toContain("Delegate");
   });
 
