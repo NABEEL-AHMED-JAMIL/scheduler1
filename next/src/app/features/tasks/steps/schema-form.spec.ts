@@ -3,6 +3,14 @@ import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { SchemaForm } from './schema-form';
 import { JsonSchema } from './steps.model';
+import { AdvancedSelect } from '../../../shared/ui/advanced-select';
+import { advancedSelect, advancedSelects } from '../../../shared/ui/advanced-select.testing';
+
+/** What a picker lists, as the old native select read: its empty choice first, a value not in the list with why. */
+function shown(b: AdvancedSelect): string[] {
+  return [b.allowClear() ? b.clearLabel() : b.placeholder(),
+    ...b.options().map(o => (o.badge === 'Not found' && o.description ? `${o.label} (${o.description.charAt(0).toLowerCase()}${o.description.slice(1)})` : o.label))];
+}
 
 /**
  * MIG-249: a step's settings, drawn from its task's JSON Schema (the Task Registry's configSchema, MIG-231): text,
@@ -47,12 +55,13 @@ function form(value: Record<string, unknown> | null, problems: { field: string; 
 
 describe('SchemaForm', () => {
   it('draws a labelled control for every setting, with its description and whether it is required', () => {
-    const { el, box } = form({ path: 'in/a.csv', format: 'json', header: true, limit: 5, columns: ['a', 'b'] });
+    const { el, box, fixture } = form({ path: 'in/a.csv', format: 'json', header: true, limit: 5, columns: ['a', 'b'] });
     const labels = Array.from(el.querySelectorAll('.label')).map(l => l.textContent!.replace(/\s+/g, ' ').trim());
     expect(labels).toEqual(['Path *(required)', 'format', 'header', 'limit', 'columns', 'renames', 'options', 'quote', 'anything']);
     expect(el.textContent).toContain('Inside the connection.');
     expect(box('path').value).toBe('in/a.csv');
-    expect((el.querySelector('#cfg-format') as HTMLSelectElement).value).toBe('1');
+    expect(advancedSelect(fixture, 'cfg-format').value()).toBe('1');
+    expect(el.querySelector('#cfg-format')!.textContent).toContain('json');
     expect(box('header').checked).toBe(true);
     expect(box('limit').value).toBe('5');
     expect((el.querySelector('#cfg-columns') as HTMLTextAreaElement).value).toBe('a\nb');
@@ -74,10 +83,8 @@ describe('SchemaForm', () => {
   });
 
   it('picks a choice by its value, whatever its type', () => {
-    const { fixture, el, last } = form({});
-    const select = el.querySelector<HTMLSelectElement>('#cfg-format')!;
-    select.value = '0';
-    select.dispatchEvent(new Event('change'));
+    const { fixture, last } = form({});
+    advancedSelect(fixture, 'cfg-format').choose('0');
     fixture.detectChanges();
     expect(last()).toEqual({ format: 'csv' });
   });
@@ -162,10 +169,11 @@ describe('SchemaForm -- the registry\'s widgets', () => {
   }
 
   it('offers the earlier steps for a step setting', () => {
-    const { el, set, last } = widgets({ with: 'gone' });
-    const options = Array.from(el.querySelectorAll<HTMLOptionElement>('#cfg-with option')).map(o => o.textContent!.trim());
-    expect(options).toEqual(['Choose…', 'read', 'shape', 'gone (not an earlier step)']);
-    set('with', 'read', 'change');
+    const { fixture, last } = widgets({ with: 'gone' });
+    const box = advancedSelect(fixture, 'cfg-with');
+    expect(shown(box)).toEqual(['Choose…', 'read', 'shape', 'gone (not an earlier step)']);
+    box.choose('read');
+    fixture.detectChanges();
     expect(last()).toMatchObject({ with: 'read' });
   });
 
@@ -270,21 +278,21 @@ describe('SchemaForm -- a prompt setting', () => {
 
   it('offers the prompts by name and stores the chosen id as a number', () => {
     const { el, fixture, changes } = promptForm([{ id: 41, label: 'Wound assessment' }, { id: 42, label: 'Summary' }], { promptId: 42 });
-    const select = el.querySelector<HTMLSelectElement>('#cfg-promptId')!;
-    expect(select.tagName).toBe('SELECT');
-    expect(Array.from(select.options).map(o => o.textContent!.trim())).toEqual(['Choose a prompt…', 'Wound assessment', 'Summary']);
-    expect(select.value).toBe('42');
-    select.value = '41';
-    select.dispatchEvent(new Event('change'));
+    const select = advancedSelect(fixture, 'cfg-promptId');
+    expect(el.querySelector('#cfg-promptId')!.getAttribute('aria-haspopup')).toBe('listbox');
+    expect(shown(select)).toEqual(['Choose a prompt…', 'Wound assessment', 'Summary']);
+    expect(select.value()).toBe('42');
+    expect(el.querySelector('#cfg-promptId')!.textContent).toContain('Summary');
+    select.choose('41');
     fixture.detectChanges();
     expect(changes[changes.length - 1]).toEqual({ promptId: 41 });
   });
 
   it('keeps a prompt that is no longer listed, by its id', () => {
-    const { el } = promptForm([{ id: 41, label: 'Wound assessment' }], { promptId: 99 });
-    const select = el.querySelector<HTMLSelectElement>('#cfg-promptId')!;
-    expect(Array.from(select.options).map(o => o.textContent!.trim())).toContain('Prompt 99 (not an active prompt here)');
-    expect(select.value).toBe('99');
+    const { fixture } = promptForm([{ id: 41, label: 'Wound assessment' }], { promptId: 99 });
+    const select = advancedSelect(fixture, 'cfg-promptId');
+    expect(shown(select)).toContain('Prompt 99 (not an active prompt here)');
+    expect(select.value()).toBe('99');
   });
 });
 
@@ -306,42 +314,38 @@ describe('SchemaForm -- a document-type setting', () => {
     const changes: Record<string, unknown>[] = [];
     fixture.componentInstance.valueChange.subscribe(v => changes.push(v));
     fixture.detectChanges();
-    const select = (fixture.nativeElement as HTMLElement).querySelector<HTMLSelectElement>('#cfg-documentTypeId')!;
+    const select = advancedSelects(fixture)[0];
     return { select, fixture, changes };
   }
 
   it('offers the types by name, empty as the documents that started the run, and stores the id as a number', () => {
     const { select, fixture, changes } = typeForm([{ id: 1007, label: 'Intake form' }, { id: 1008, label: 'Referral letter' }], { documentTypeId: 1008 });
-    expect(select.tagName).toBe('SELECT');
-    expect(Array.from(select.options).map(o => o.textContent!.trim()))
-      .toEqual(['The documents that started the run', 'Intake form', 'Referral letter']);
-    expect(select.value).toBe('1008');
-    select.value = '1007';
-    select.dispatchEvent(new Event('change'));
+    expect(shown(select)).toEqual(['The documents that started the run', 'Intake form', 'Referral letter']);
+    expect(select.value()).toBe('1008');
+    select.choose('1007');
     fixture.detectChanges();
     expect(changes.at(-1)).toEqual({ documentTypeId: 1007 });
-    select.value = '';
-    select.dispatchEvent(new Event('change'));
+    select.choose('');
     expect(changes.at(-1)).toEqual({});
   });
 
   it('asks for a choice when the type is required', () => {
     const { select } = typeForm([{ id: 1007, label: 'Intake form' }], null,
       { ...TYPE_SCHEMA, required: ['documentTypeId'] });
-    expect(select.options[0].textContent!.trim()).toBe('Choose a document type…');
+    expect(shown(select)[0]).toBe('Choose a document type…');
+    expect(select.allowClear()).toBe(false);
   });
 
   it('keeps a saved type the workspace no longer has, by its id', () => {
     const { select } = typeForm([{ id: 1007, label: 'Intake form' }], { documentTypeId: 1099 });
-    expect(Array.from(select.options).map(o => o.textContent!.trim())).toContain('Document type 1099 (not in this workspace)');
-    expect(select.value).toBe('1099');
+    expect(shown(select)).toContain('Document type 1099 (not in this workspace)');
+    expect(select.value()).toBe('1099');
   });
 
   it('reaches a document-type setting inside a group', () => {
     const { fixture } = typeForm([{ id: 1007, label: 'Intake form' }], { source: { documentTypeId: 1007 } },
       { type: 'object', properties: { source: TYPE_SCHEMA } });
-    const nested = (fixture.nativeElement as HTMLElement).querySelector<HTMLSelectElement>('#cfg-source-documentTypeId')!;
-    expect(nested.value).toBe('1007');
+    expect(advancedSelect(fixture, 'cfg-source-documentTypeId').value()).toBe('1007');
   });
 });
 
@@ -359,11 +363,9 @@ describe('SchemaForm -- a schedule setting (MIG-424, Run pipeline)', () => {
     const changes: Record<string, unknown>[] = [];
     fixture.componentInstance.valueChange.subscribe(v => changes.push(v));
     fixture.detectChanges();
-    const select = (fixture.nativeElement as HTMLElement).querySelector<HTMLSelectElement>('#cfg-jobId')!;
-    expect(Array.from(select.options).map(o => o.textContent!.trim()))
-      .toEqual(['Choose a pipeline…', 'Care plan (#2850)', 'Schedule 2851 (not one of this workspace\'s)']);
-    select.value = '2850';
-    select.dispatchEvent(new Event('change'));
+    const select = advancedSelect(fixture, 'cfg-jobId');
+    expect(shown(select)).toEqual(['Choose a pipeline…', 'Care plan (#2850)', 'Schedule 2851 (not one of this workspace\'s)']);
+    select.choose('2850');
     expect(changes.at(-1)).toEqual({ jobId: 2850 });
   });
 });

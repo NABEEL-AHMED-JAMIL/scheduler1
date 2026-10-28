@@ -276,10 +276,8 @@
                         <label class="flex items-center gap-2 text-sm"><input type="checkbox" [ngModel]="s.rejectNeedsComment" (ngModelChange)="set('rejectNeedsComment', $event)" />A rejection needs a reason</label>
                         <div>
                           <label class="label" for="st-onreject">If rejected</label>
-                          <select id="st-onreject" class="input" [ngModel]="s.onReject || 'end'" (ngModelChange)="set('onReject', $event)">
-                            <option value="end">The request ends, rejected</option>
-                            @for (t of targets(); track t.key) { @if (t.key !== s.key) { <option [value]="t.key">Go to {{ t.label }}</option> } }
-                          </select>
+                          <app-advanced-select id="st-onreject" [options]="rejectOptions()" [value]="s.onReject || 'end'" (valueChange)="set('onReject', $event)"
+                                               searchLabel="Search the steps" unknownText="Not a step of this workflow" />
                         </div>
                       }
                     }
@@ -307,17 +305,13 @@
                       <div class="grid grid-cols-2 gap-3">
                         <div>
                           <label class="label" for="st-yes">If yes, go to</label>
-                          <select id="st-yes" class="input" [ngModel]="s.whenTrue || 'end'" (ngModelChange)="set('whenTrue', $event)">
-                            <option value="end">End</option>
-                            @for (t of targets(); track t.key) { @if (t.key !== s.key) { <option [value]="t.key">{{ t.label }}</option> } }
-                          </select>
+                          <app-advanced-select id="st-yes" [options]="branchOptions()" [value]="s.whenTrue || 'end'" (valueChange)="set('whenTrue', $event)"
+                                               searchLabel="Search the steps" unknownText="Not a step of this workflow" />
                         </div>
                         <div>
                           <label class="label" for="st-no">If no, go to</label>
-                          <select id="st-no" class="input" [ngModel]="s.whenFalse || 'end'" (ngModelChange)="set('whenFalse', $event)">
-                            <option value="end">End</option>
-                            @for (t of targets(); track t.key) { @if (t.key !== s.key) { <option [value]="t.key">{{ t.label }}</option> } }
-                          </select>
+                          <app-advanced-select id="st-no" [options]="branchOptions()" [value]="s.whenFalse || 'end'" (valueChange)="set('whenFalse', $event)"
+                                               searchLabel="Search the steps" unknownText="Not a step of this workflow" />
                         </div>
                       </div>
                     }
@@ -401,10 +395,9 @@
                             <div class="grid grid-cols-2 gap-2 mt-2">
                               <div>
                                 <label class="label" for="st-run-from">From</label>
-                                <select id="st-run-from" class="input" [ngModel]="s.results.from || 'final'" (ngModelChange)="setResults('from', $event)" [disabled]="!canEdit()" data-test="wf-run-from">
-                                  <option value="final">Its final output</option>
-                                  @for (st of selectedPipeline()?.steps ?? []; track st.key) { <option [value]="st.key">Step: {{ st.name || st.key }}</option> }
-                                </select>
+                                <app-advanced-select id="st-run-from" [options]="runFromOptions()" [value]="s.results.from || 'final'"
+                                                     (valueChange)="setResults('from', $event)" [disabled]="!canEdit()" data-test="wf-run-from"
+                                                     searchLabel="Search the pipeline's steps" unknownText="Not a step of the pipeline" />
                               </div>
                               <div>
                                 <label class="label" for="st-run-take">Keep</label>
@@ -489,10 +482,9 @@
                       @if (requestOf(s)?.environments?.length) {
                         <div>
                           <label class="label" for="st-env">Environment</label>
-                          <select id="st-env" class="input" [ngModel]="s.environmentId ?? ''" (ngModelChange)="set('environmentId', numberOrNull($event))">
-                            <option value="">The collection's default</option>
-                            @for (e of requestOf(s)!.environments; track e.id) { <option [value]="e.id">{{ e.label }}</option> }
-                          </select>
+                          <app-advanced-select id="st-env" [options]="environmentOptions()" [value]="'' + (s.environmentId ?? '')"
+                                               (valueChange)="set('environmentId', numberOrNull($event))" [allowClear]="true"
+                                               clearLabel="The collection's default" placeholder="The collection's default" searchLabel="Search the environments" />
                         </div>
                       }
                       <div>
@@ -548,11 +540,8 @@
                     @if (s.type !== 'condition') {
                       <div>
                         <label class="label" for="st-next">Then</label>
-                        <select id="st-next" class="input" [ngModel]="s.next || ''" (ngModelChange)="set('next', $event || null)">
-                          <option value="">The step below</option>
-                          <option value="end">End the request</option>
-                          @for (t of targets(); track t.key) { @if (t.key !== s.key) { <option [value]="t.key">Go to {{ t.label }}</option> } }
-                        </select>
+                        <app-advanced-select id="st-next" [options]="nextOptions()" [value]="s.next || ''" (valueChange)="set('next', $event || null)"
+                                             searchLabel="Search the steps" unknownText="Not a step of this workflow" />
                       </div>
                     }
 
@@ -730,10 +719,9 @@
       </select>
     }
     @if (who?.kind === 'team') {
-      <select class="input" [ngModel]="who.value || ''" (ngModelChange)="setWho(field, 'team', $event)" [disabled]="!canEdit()" [attr.aria-label]="label + ': team'">
-        <option value="" disabled>Pick a team</option>
-        @for (g of teams(); track g.id) { <option [value]="'' + g.id">{{ g.name }}</option> }
-      </select>
+      <app-advanced-select [options]="teamOptions()" [value]="who.value || ''" (valueChange)="setWho(field, 'team', $event)" [disabled]="!canEdit()"
+                           [ariaLabel]="label + ': team'" placeholder="Pick a team" searchLabel="Search the teams" [loading]="teamsLoading()"
+                           loadingText="Loading teams…" emptyText="No teams yet: make one in Administration › Teams." />
       @if (teamsLoading() || teamsError()) {
         <app-inline-status [loading]="teamsLoading()" [error]="teamsError()" label="Loading teams…" (retry)="loadTeams()" />
       } @else if (!teams().length) {

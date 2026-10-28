@@ -234,17 +234,11 @@
                               (input)="syncFormToTags()"></textarea>
                   }
                   @case ('select') {
-                    <select [id]="'ff-' + controlName(field)" class="input"
-                            [formControlName]="controlName(field)"
-                            (change)="syncFormToTags()">
-                      <option value="">None</option>
-                      <!-- Tracked by index rather than by the choice itself: a form is free to
-                           offer two options with the same label, and tracking on the string
-                           collided on Angular's duplicate-key check. -->
-                      @for (choice of fieldChoices(field); track $index) {
-                        <option [value]="choice.value">{{ choice.label }}</option>
-                      }
-                    </select>
+                    <!-- A value no choice holds (a renamed choice) is shown as itself, "Not one of the choices", never as blank. -->
+                    <app-advanced-select [id]="'ff-' + controlName(field)" [formControlName]="controlName(field)"
+                                         [options]="fieldChoiceOptions()[controlName(field)] ?? []" (picked)="syncFormToTags()"
+                                         [allowClear]="true" clearLabel="None" placeholder="None" unknownText="Not one of the choices"
+                                         [ariaLabel]="field.label" [searchLabel]="'Search ' + field.label" emptyText="This field has no choices yet." />
                   }
                   @case ('checkbox') {
                     <label class="flex items-center gap-2 text-sm">

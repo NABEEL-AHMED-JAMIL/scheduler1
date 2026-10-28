@@ -8,12 +8,19 @@ import { ReportStudioApi, studioError } from '../../report-studio/report-studio.
 import { SourceRef, TemplateDetail, TemplateRow } from '../../report-studio/report-studio.model';
 import { StepsApi } from './steps.service';
 import { InlineStatus, createLoadState } from '../../../shared/ui/loading';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
 
 /** The three settings this editor owns; the step's other settings stay in its form. */
 export const REPORT_DESIGN_KEYS = ['design', 'templateId', 'templateVersion'];
 
 /** The generate_report step's design settings as this editor writes them. */
 export interface ReportDesignSettings { design: 'STEP' | 'TEMPLATE'; templateId?: string; templateVersion?: string; }
+
+/** "The latest published version", then each version pinned, newest first. */
+function versionChoices(versions: number[]): AdvancedOption[] {
+  return [{ value: 'latest', label: 'The latest published version', description: 'A newer version is used as soon as it is published' },
+    ...versions.map(v => ({ value: '' + v, label: `Version ${v}`, badge: 'Pinned', badgeTone: 'neutral' as const }))];
+}
 
 /**
  * Report Studio phase 5 (plan 1.11.1, owner 2026-10-19): where a generate_report step's report comes from.
@@ -26,7 +33,7 @@ export interface ReportDesignSettings { design: 'STEP' | 'TEMPLATE'; templateId?
  */
 @Component({
   selector: 'app-report-step-design',
-  imports: [FormsModule, Icon, InlineStatus],
+  imports: [FormsModule, Icon, InlineStatus, AdvancedSelect],
   template: `
     <div class="space-y-3" data-report-step-design>
       <div class="seg" role="radiogroup" aria-label="Where the report comes from">
@@ -70,10 +77,8 @@ export interface ReportDesignSettings { design: 'STEP' | 'TEMPLATE'; templateId?
               </div>
             }
             <label class="field"><span class="label">Version the step runs</span>
-              <select class="input max-w-72" [ngModel]="version()" (ngModelChange)="setVersion($event)" [disabled]="disabled()" aria-label="Version the step runs">
-                <option value="latest">The latest published version</option>
-                @for (v of publishedVersions(d); track v) { <option [value]="'' + v">Version {{ v }} (pinned)</option> }
-              </select></label>
+              <app-advanced-select class="max-w-72" [options]="designVersionOptions()" [value]="version()" (valueChange)="setVersion($event)"
+                                   [disabled]="disabled()" ariaLabel="Version the step runs" searchLabel="Search the versions" /></label>
           </div>
         } @else {
           <p class="text-sm text-[color:var(--text-secondary)]">
@@ -85,19 +90,16 @@ export interface ReportDesignSettings { design: 'STEP' | 'TEMPLATE'; templateId?
         }
       } @else {
         <label class="field"><span class="label">Template</span>
-          <select class="input" [ngModel]="templateId() ?? ''" (ngModelChange)="pickTemplate($event)" [disabled]="disabled()" aria-label="Template" data-template-pick>
-            <option value="">{{ templatesState.pending() ? 'Loading templates…' : 'Pick a published template' }}</option>
-            @for (t of templates(); track t.templateId) { <option [value]="t.templateId">{{ t.name }} · v{{ t.currentPublishedVersion }}</option> }
-          </select></label>
+          <app-advanced-select [options]="templateOptions()" [value]="templateId() ?? ''" (valueChange)="pickTemplate($event)" [disabled]="disabled()"
+                               ariaLabel="Template" data-template-pick placeholder="Pick a published template" searchLabel="Search the templates"
+                               [loading]="templatesState.pending()" loadingText="Loading templates…" emptyText="No published template yet." /></label>
         <app-inline-status [loading]="templatesState.loading()" [error]="templatesState.error()" label="Loading templates…"
                            [empty]="templatesState.loaded() && !templates().length" emptyText="No published template yet."
                            (retry)="loadTemplates()" />
         @if (templateId()) {
           <label class="field"><span class="label">Version</span>
-            <select class="input max-w-72" [ngModel]="version()" (ngModelChange)="setVersion($event)" [disabled]="disabled()" aria-label="Template version">
-              <option value="latest">The latest published version</option>
-              @for (v of pickedVersions(); track v) { <option [value]="'' + v">Version {{ v }} (pinned)</option> }
-            </select></label>
+            <app-advanced-select class="max-w-72" [options]="pickedVersionOptions()" [value]="version()" (valueChange)="setVersion($event)"
+                                 [disabled]="disabled()" ariaLabel="Template version" searchLabel="Search the versions" /></label>
         }
       }
       @if (problem() && !(mode() === 'STEP' ? design() : templateId())) {
@@ -148,6 +150,17 @@ export class ReportStepDesign implements OnInit {
     const t = this.templates().find(x => x.templateId === this.templateId());
     return t?.currentPublishedVersion ? Array.from({ length: t.currentPublishedVersion }, (_, i) => t.currentPublishedVersion! - i) : [];
   });
+
+  /** The versions a step may run: the latest published, or one pinned (newest first). */
+  readonly designVersionOptions = computed<AdvancedOption[]>(() => {
+    const d = this.design();
+    return versionChoices(d ? this.publishedVersions(d) : []);
+  });
+  readonly pickedVersionOptions = computed<AdvancedOption[]>(() => versionChoices(this.pickedVersions()));
+  readonly templateOptions = computed<AdvancedOption[]>(() => this.templates().map(t => ({
+    value: t.templateId, label: t.name, sample: t.currentPublishedVersion ? 'v' + t.currentPublishedVersion : undefined,
+    description: t.category || t.description || undefined,
+  })));
 
   ngOnInit(): void {
     if (this.mode() === 'STEP' && this.templateId()) this.loadDesign(this.templateId()!);

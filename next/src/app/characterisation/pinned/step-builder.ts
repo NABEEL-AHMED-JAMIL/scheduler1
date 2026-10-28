@@ -416,7 +416,8 @@ export const PINNED: Record<string, unknown> = {
       "Apply",
       "Cancel",
       "Close",
-      "Edit as JSON"
+      "Edit as JSON",
+      "The latest output before this step"
     ],
     "columns": [],
     "fields": [

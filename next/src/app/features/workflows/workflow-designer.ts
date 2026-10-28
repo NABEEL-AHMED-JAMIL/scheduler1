@@ -25,6 +25,7 @@ import { AppLoading, InlineStatus, loadErrorText } from '../../shared/ui/loading
 import { LoadError } from '../../shared/ui/load-error';
 import { StepsApi } from '../tasks/steps/steps.service';
 import { ApiRequestChoice } from '../tasks/steps/steps.model';
+import { AdvancedOption, AdvancedSelect } from '../../shared/ui/advanced-select';
 
 /** MIG-424: a parameter a pipeline declares, as Run with... offers it. */
 export interface PipelineParameter {
@@ -70,7 +71,7 @@ export function isBuiltIn(w: Pick<WorkflowSummary, 'builtIn' | 'createdBy'>): bo
  */
 @Component({
   selector: 'app-workflow-designer',
-  imports: [PageHeader, FormsModule, NgTemplateOutlet, RouterLink, Icon, StatusPill, Combobox, ManagedBanner, FlowGraph, AppLoading, InlineStatus, LoadError],
+  imports: [PageHeader, FormsModule, NgTemplateOutlet, RouterLink, Icon, StatusPill, Combobox, ManagedBanner, FlowGraph, AppLoading, InlineStatus, LoadError, AdvancedSelect],
   templateUrl: './workflow-designer.html',
   host: { '(document:keydown)': 'onKey($event)' },
 })
@@ -231,6 +232,16 @@ export class WorkflowDesigner implements OnInit {
 
   /** Where a step may go next: any other step, or the end. */
   readonly targets = computed(() => this.steps().map(s => ({ key: s.key, label: s.name || s.key })));
+  /** The steps the selected one may go to (not itself), its key under a name that is not the key. */
+  private readonly otherSteps = computed<AdvancedOption[]>(() => this.targets().filter(t => t.key !== this.step()?.key)
+    .map(t => ({ value: t.key, label: t.label, description: t.label !== t.key ? t.key : undefined, keywords: t.key })));
+  private goTo(first: AdvancedOption[]): AdvancedOption[] {
+    return [...first, ...this.otherSteps().map(o => ({ ...o, label: 'Go to ' + o.label, group: 'Steps' }))];
+  }
+  readonly rejectOptions = computed<AdvancedOption[]>(() => this.goTo([{ value: 'end', label: 'The request ends, rejected' }]));
+  readonly branchOptions = computed<AdvancedOption[]>(() => [{ value: 'end', label: 'End' }, ...this.otherSteps().map(o => ({ ...o, group: 'Steps' }))]);
+  readonly nextOptions = computed<AdvancedOption[]>(() => this.goTo([{ value: '', label: 'The step below' }, { value: 'end', label: 'End the request' }]));
+  readonly teamOptions = computed<AdvancedOption[]>(() => this.teams().map(g => ({ value: '' + g.id, label: g.name })));
 
   readonly workflowProblems = computed(() => this.problems().filter(p => problemStep(p) === null));
 
@@ -253,6 +264,11 @@ export class WorkflowDesigner implements OnInit {
   }
 
   readonly variablePlaceholder = '{{amount}}';
+  /** The selected Call API step's request's environments. */
+  readonly environmentOptions = computed<AdvancedOption[]>(() => {
+    const s = this.step();
+    return (s ? this.requestOf(s)?.environments ?? [] : []).map(e => ({ value: '' + e.id, label: e.label }));
+  });
 
   // ---- MIG-424: a Run pipeline step's parameters and results ----------------------------------------------------------
 
@@ -274,6 +290,9 @@ export class WorkflowDesigner implements OnInit {
     const found = this.pipelineFields()[s.jobId];
     return found && found !== 'missing' && found !== 'loading' ? found : null;
   });
+  /** A Run pipeline step's results: from its final output, or from one of the pipeline's steps. */
+  readonly runFromOptions = computed<AdvancedOption[]>(() => [{ value: 'final', label: 'Its final output' },
+    ...(this.selectedPipeline()?.steps ?? []).map(st => ({ value: st.key, label: st.name || st.key, sample: st.key, group: 'Steps', keywords: st.key }))]);
 
   /** The selected Run pipeline step's pipeline is still being read: no parameter is "Not declared" yet. */
   readonly pipelineLoading = computed(() => {

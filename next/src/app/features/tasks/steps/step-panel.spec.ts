@@ -3,6 +3,7 @@ import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { StepPanel, StepPanelData } from './step-panel';
+import { advancedSelect } from '../../../shared/ui/advanced-select.testing';
 
 /**
  * MIG-249: the selected step in the wide side panel -- its key and name, what it reads, how often it is tried, how long
@@ -68,9 +69,9 @@ describe('StepPanel', () => {
   });
 
   it('offers only earlier steps as what the step reads', () => {
-    const { el } = open({ earlierKeys: ['read', 'shape'] });
-    const options = Array.from(el.querySelectorAll<HTMLOptionElement>('#stepInput option')).map(o => o.textContent!.trim());
-    expect(options).toEqual(['The latest output before this step', 'read', 'shape']);
+    const { fixture } = open({ earlierKeys: ['read', 'shape'] });
+    const input = advancedSelect(fixture, 'stepInput');
+    expect([input.clearLabel(), ...input.options().map(o => o.label)]).toEqual(['The latest output before this step', 'read', 'shape']);
   });
 
   it('edits a task with no schema as raw JSON', () => {
@@ -106,13 +107,14 @@ describe('StepPanel', () => {
   });
 
   it('hands back retry, timeout and on-error as numbers and words, and leaves out what was cleared', () => {
-    const { type, button, ref } = open({ step: { key: 'keep', task: 'select', config: { columns: ['a'] }, timeoutSeconds: 30, name: 'Keep' } });
+    const { type, button, ref, fixture } = open({ step: { key: 'keep', task: 'select', config: { columns: ['a'] }, timeoutSeconds: 30, name: 'Keep' } });
     type('#stepName', '');
     type('#stepTries', '3');
     type('#stepDelay', '5');
     type('#stepTimeout', '');
     type('#stepOnError', 'skip_rest', 'change');
-    type('#stepInput', 'read', 'change');
+    advancedSelect(fixture, 'stepInput').choose('read');
+    fixture.detectChanges();
     button('Apply')!.click();
     expect(ref.close).toHaveBeenCalledWith({
       key: 'keep', task: 'select', input: 'read', config: { columns: ['a'] }, retry: { maxAttempts: 3, delaySeconds: 5 }, onError: 'skip_rest',
@@ -138,7 +140,7 @@ describe('StepPanel', () => {
   });
 
   it('hands the form the earlier steps and the columns this step reads, and says the task\'s own defaults', () => {
-    const { el } = open({
+    const { el, fixture } = open({
       step: { key: 'both', task: 'join', config: { with: 'read', on: [] } },
       index: 2, earlierKeys: ['read', 'keep'], columns: ['id', 'patient'],
       task: { code: 'join', name: 'Join', kind: 'Process', runsInEngine: true, retry: { maxAttempts: 2, delaySeconds: 5 }, timeoutSeconds: 120,
@@ -147,7 +149,9 @@ describe('StepPanel', () => {
           left: { type: 'string', title: 'Left column', format: 'column' },
         } } },
     });
-    expect(Array.from(el.querySelectorAll<HTMLOptionElement>('#cfg-with option')).map(o => o.value)).toEqual(['', 'read', 'keep']);
+    const withStep = advancedSelect(fixture, 'cfg-with');
+    expect(withStep.options().map(o => o.value)).toEqual(['read', 'keep']);
+    expect(withStep.value()).toBe('read');
     const left = el.querySelector<HTMLInputElement>('#cfg-left')!;
     expect(Array.from(el.querySelectorAll(`#${left.getAttribute('list')} option`)).map(o => o.getAttribute('value'))).toEqual(['id', 'patient']);
     expect(el.textContent).toContain('Blank: 2 tries, the task\'s default.');
@@ -157,13 +161,12 @@ describe('StepPanel', () => {
 
 describe('StepPanel -- MIG-245', () => {
   it('passes the prompts it was handed to the settings form', () => {
-    const { el } = open({ step: { key: 'assess', task: 'ai_prompt', config: { promptId: 41 } },
+    const { el, fixture } = open({ step: { key: 'assess', task: 'ai_prompt', config: { promptId: 41 } },
       task: { code: 'ai_prompt', description: 'Runs a saved prompt per row.', runsInEngine: true,
         configSchema: { type: 'object', properties: { promptId: { type: 'integer', format: 'prompt' } } } } as any,
       prompts: [{ id: 41, label: 'Wound assessment' }] });
-    const select = el.querySelector<HTMLSelectElement>('#cfg-promptId')!;
-    expect(select.value).toBe('41');
-    expect(select.selectedOptions[0].textContent!.trim()).toBe('Wound assessment');
+    expect(advancedSelect(fixture, 'cfg-promptId').value()).toBe('41');
+    expect(el.querySelector('#cfg-promptId')!.textContent).toContain('Wound assessment');
   });
 
   // ZT-S4: Validate's warnings for this step, above its settings, as a warning rather than a problem.

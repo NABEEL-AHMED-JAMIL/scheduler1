@@ -229,6 +229,7 @@ export const PINNED: Record<string, unknown> = {
       "Map",
       "Outputs",
       "Refresh",
+      "Step",
       "Steps",
       "Timing",
       "Warnings 0",
@@ -237,8 +238,7 @@ export const PINNED: Record<string, unknown> = {
     "columns": [],
     "fields": [
       "Search log entries",
-      "Search the log",
-      "Step"
+      "Search the log"
     ],
     "links": [
       "/billing/usage?run=7331",
@@ -406,6 +406,7 @@ export const PINNED: Record<string, unknown> = {
       "Recent runs",
       "Schedule",
       "Summary",
+      "UI-REVIEW Summarise a CSV run in one paragraph",
       "Where it writes"
     ],
     "columns": [],

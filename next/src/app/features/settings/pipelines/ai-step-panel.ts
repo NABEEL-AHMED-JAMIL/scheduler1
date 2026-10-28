@@ -6,6 +6,7 @@ import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config
 import { SidePanel } from '../../../shared/ui/side-panel';
 import { Combobox } from '../../../shared/ui/combobox';
 import { Prompt } from '../../ai/prompts/prompt-model';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
 
 /** What the panel hands back when the person is done. */
 export interface AiStepConfig {
@@ -25,7 +26,7 @@ export interface AiStepConfig {
  */
 @Component({
   selector: 'app-ai-step-panel',
-  imports: [SidePanel, Combobox, RouterLink],
+  imports: [SidePanel, Combobox, RouterLink, AdvancedSelect],
   template: `
     <app-side-panel [heading]="'AI step · <' + data.tagKey + '>'" [subtitle]="runIn() === 'worker' ? 'The worker runs it as the task runs; the answer is written to this tag.' : 'Runs before dispatch; the answer is written to this tag.'">
       <div class="form-stack">
@@ -76,19 +77,13 @@ export interface AiStepConfig {
                         @if (v.description) { <div class="text-xs text-[color:var(--text-muted)]">{{ v.description }}</div> }</td>
                       <td>
                         <div class="flex flex-col gap-1">
-                          <!-- selected on the option, not value on the select: the options render
-                               after the select's value would be set, and the browser then resets it. -->
-                          <select class="input min-w-0 flex-1" [attr.aria-label]="'Field for ' + v.name"
-                                  (change)="setSource(v.name, $any($event.target).value)">
-                            <option value="" [selected]="!tagOf(v.name)">{{ v.required ? '— pick a field —' : '(not sent)' }}</option>
-                            @for (f of data.fieldsAbove; track f.tagKey) { <option [value]="f.tagKey" [selected]="f.tagKey === tagOf(v.name)">{{ f.label }} &lt;{{ f.tagKey }}&gt;</option> }
-                            @if (runIn() === 'worker' && hasInputFolder()) {
-                              <!-- The worker loops over the task's input folder: one run per object, each
-                                   answer written to the output folder. -->
-                              <option value="object:text" [selected]="map()[v.name] === 'object:text'">Each input object — its contents</option>
-                              <option value="object:name" [selected]="map()[v.name] === 'object:name'">Each input object — its key</option>
-                            }
-                          </select>
+                          <!-- The fields above this step; with the worker and an input folder, each input object too (one run
+                               per object, each answer written to the output folder). -->
+                          <app-advanced-select class="min-w-0 flex-1" [ariaLabel]="'Field for ' + v.name" [options]="sourceOptions()"
+                                               [value]="tagOf(v.name)" (valueChange)="setSource(v.name, $event)" [allowClear]="!v.required"
+                                               clearLabel="(not sent)" [placeholder]="v.required ? '— pick a field —' : '(not sent)'"
+                                               unknownText="Not a field above this step" searchLabel="Search the fields above"
+                                               emptyText="Nothing sits above this step yet." panelWidth="22rem" />
                           @if (runIn() === 'worker' && tagOf(v.name) && !isObject(v.name)) {
                             <select class="input" [value]="asFile(v.name) ? 'file' : 'text'" [attr.aria-label]="'How to send ' + v.name" (change)="setAs(v.name, $any($event.target).value)"
                                     title="Send the tag's text, or the contents of the object the tag names">
@@ -150,6 +145,14 @@ export class AiStepPanel {
   readonly loopsObjects = computed(() => Object.values(this.map()).some(v => v.startsWith('object:')));
   /** The per-object loop needs the pipeline to say where its objects are. */
   readonly hasInputFolder = computed(() => this.data.fieldsAbove.some(f => f.tagKey === 'input_folder'));
+  /** What a prompt's variable may read: a field above this step (its tag in monospace), or each input object in a worker loop. */
+  readonly sourceOptions = computed<AdvancedOption[]>(() => [
+    ...this.data.fieldsAbove.map(f => ({ value: f.tagKey, label: f.label, sample: `<${f.tagKey}>`, keywords: f.tagKey, group: 'Fields above this step' })),
+    ...(this.runIn() === 'worker' && this.hasInputFolder() ? [
+      { value: 'object:text', label: 'Each input object — its contents', group: 'The input folder' },
+      { value: 'object:name', label: 'Each input object — its key', group: 'The input folder' },
+    ] : []),
+  ]);
   asFile(variable: string): boolean { return (this.map()[variable] || '').startsWith('file:'); }
   setAs(variable: string, mode: string): void {
     const tag = this.tagOf(variable);

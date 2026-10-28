@@ -27,7 +27,7 @@ import {
   DocumentTrigger, batchProblem as documentBatchProblem, triggerOf as documentTriggerOf,
 } from '../documents/document-trigger';
 import { DocumentsApi } from '../../documents/documents.service';
-import { DocumentType } from '../../documents/documents.model';
+import { DocumentType, documentTypeOption } from '../../documents/documents.model';
 import { AiStepChoice, ModelPicks, choiceBody, picksChanged, picksOf, stepsOf } from '../ai-models/ai-model-choice';
 import { AiModelPicks } from '../ai-models/ai-model-picks';
 import { ManagedBanner } from '../../../shared/ui/managed-banner';
@@ -37,6 +37,7 @@ import { openBackfill } from '../../runs/backfills/backfill-open';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { StatusPill } from '../../../shared/ui/status-pill';
 import { ActionsBar } from '../../../shared/ui/actions-bar';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
 
 const FREQUENCIES = [
   { value: 'Mint',    label: 'Every N minutes', choice: 'Minutes', unit: 'minute' },
@@ -112,7 +113,7 @@ function endAfterStart(group: AbstractControl): ValidationErrors | null {
 
 @Component({
   selector: 'app-job-edit',
-  imports: [ActionsBar, PageHeader, StatusPill, Icon, ReactiveFormsModule, RouterLink, Field, Combobox, LoadError, AppLoading, InlineStatus, AiModelPicks, ManagedBanner, DateField, TimeField],
+  imports: [ActionsBar, PageHeader, StatusPill, Icon, ReactiveFormsModule, RouterLink, Field, Combobox, LoadError, AppLoading, InlineStatus, AiModelPicks, ManagedBanner, DateField, TimeField, AdvancedSelect],
   templateUrl: './job-edit.html',
   /*
    * The weekday picker is the one multi-select .seg: several days can be on at once, so "on" has
@@ -211,6 +212,7 @@ export class JobEdit implements OnInit {
   readonly days = DAYS;
   readonly notifyOptions = NOTIFY_OPTIONS;
   readonly monthDays = Array.from({ length: 31 }, (_, i) => i + 1);
+  readonly monthDayOptions: AdvancedOption[] = this.monthDays.map(d => ({ value: String(d), label: `day ${d}` }));
 
   readonly tasks = signal<any[]>([]);
   /**
@@ -324,6 +326,14 @@ export class JobEdit implements OnInit {
       options.push({ id: chosen, label: `Document type ${chosen} (not in this workspace)` });
     }
     return options;
+  });
+  /** The same choices as the advanced select lists them: each type's key and what it reads under its name. */
+  readonly documentTypeChoices = computed<AdvancedOption[]>(() => {
+    const types = this.documentTypes() ?? [];
+    return this.documentTypeOptions().map(o => {
+      const t = types.find(x => Number(x.documentTypeId) === o.id);
+      return t ? documentTypeOption(t) : { value: String(o.id), label: o.label, badge: 'Not found', badgeTone: 'warn' as const };
+    });
   });
   /** The chosen type's name, for the summary beside the form. */
   readonly documentTypeLabel = computed(() => {

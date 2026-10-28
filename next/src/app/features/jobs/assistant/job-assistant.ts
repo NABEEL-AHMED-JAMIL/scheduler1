@@ -21,6 +21,7 @@ import { PageHeader } from '../../../shared/ui/page-header';
 import { createTableSort } from '../../../shared/ui/sort';
 import { SortHeader } from '../../../shared/ui/sort-header';
 import { InlineStatus, createLoadState } from '../../../shared/ui/loading';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
 
 interface Turn {
   /** Monotonic, so two turns in the same millisecond cannot collide as @for track keys. */
@@ -49,7 +50,7 @@ const RUN_INTENTS: ReadonlySet<Intent> = new Set<Intent>(['summary', 'stats', 'f
  */
 @Component({
   selector: 'app-job-assistant',
-  imports: [PageHeader, SortHeader, InlineStatus, Icon, ServerTimePipe, RouterLink, StatusPill, Donut, RankedBar, StatStrip],
+  imports: [PageHeader, SortHeader, InlineStatus, Icon, ServerTimePipe, RouterLink, StatusPill, Donut, RankedBar, StatStrip, AdvancedSelect],
   templateUrl: './job-assistant.html',
   /*
    * In a panel the host has to be a flex item that can shrink, or the layout chain breaks
@@ -127,6 +128,10 @@ export class JobAssistant {
    */
   readonly agents = signal<{ aiAgentId: number; agentName: string }[]>([]);
   readonly agentId = signal<number | null>(null);
+  readonly agentOptions = computed<AdvancedOption[]>(() => [
+    { value: '0', label: 'No AI — only this schedule\'s own record' },
+    ...this.agents().map(a => ({ value: '' + a.aiAgentId, label: a.agentName, group: 'Saved prompts' })),
+  ]);
   readonly asking = signal(false);
 
   private loadAgents(): void {

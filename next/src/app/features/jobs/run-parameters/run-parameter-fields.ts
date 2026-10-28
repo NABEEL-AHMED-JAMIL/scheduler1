@@ -3,6 +3,7 @@ import { Field } from '../../../shared/ui/field';
 import { DateField } from '../../../shared/ui/date-field';
 import { TimeField } from '../../../shared/ui/time-field';
 import { ParameterValues, RunParameter, defaultText, parameterLabel, valueProblems } from './run-parameters';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
 
 /**
  * MIG-347: a run's parameter values, one input per declared parameter by its type -- a date, a date and time, text, a
@@ -11,7 +12,7 @@ import { ParameterValues, RunParameter, defaultText, parameterLabel, valueProble
  */
 @Component({
   selector: 'app-run-parameter-fields',
-  imports: [Field, DateField, TimeField],
+  imports: [Field, DateField, TimeField, AdvancedSelect],
   template: `
     <div class="form-grid" data-test="run-parameters">
       @for (p of parameters(); track p.name) {
@@ -44,11 +45,9 @@ import { ParameterValues, RunParameter, defaultText, parameterLabel, valueProble
               </select>
             }
             @case ('choice') {
-              <select [id]="idPrefix() + '-' + p.name" class="input" [value]="values()[p.name] || ''" [disabled]="disabled()"
-                      (change)="set(p.name, $any($event.target).value)">
-                @if (!hasDefault(p)) { <option value="">Pick one</option> }
-                @for (c of p.choices || []; track c) { <option [value]="c" [selected]="values()[p.name] === c">{{ c }}</option> }
-              </select>
+              <app-advanced-select [id]="idPrefix() + '-' + p.name" [options]="choiceOptions()[p.name] ?? []" [value]="values()[p.name] || ''"
+                                   [disabled]="disabled()" (valueChange)="set(p.name, $event)" [allowClear]="!hasDefault(p)" clearLabel="Pick one"
+                                   placeholder="Pick one" [ariaLabel]="p.label || p.name" searchLabel="Search the choices" />
             }
             @default {
               <input [id]="idPrefix() + '-' + p.name" class="input" type="text" maxlength="500" [value]="values()[p.name] || ''"
@@ -65,6 +64,9 @@ export class RunParameterFields {
   readonly values = model.required<ParameterValues>();
   readonly idPrefix = input('param');
   readonly disabled = input(false);
+  /** Each choice parameter's choices, by name, as its picker lists them. */
+  readonly choiceOptions = computed<Record<string, AdvancedOption[]>>(() => Object.fromEntries(this.parameters()
+    .filter(p => p.type === 'choice').map(p => [p.name, (p.choices || []).map(c => ({ value: c, label: c }))])));
   /** The server's sentence for a refused value, when it named one; the inputs' own checks otherwise. */
   readonly problems = computed(() => valueProblems(this.parameters(), this.values()));
 

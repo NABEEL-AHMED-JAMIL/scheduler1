@@ -11,6 +11,7 @@ import { REPORT_DESIGN_KEYS, ReportDesignSettings, ReportStepDesign } from './re
 import {
   LIMITS, ON_ERRORS, ApiRequestChoice, BucketChoice, DocumentTypeChoice, JsonSchema, PromptChoice, WebhookChoice, Step, StepProblem, StepTaskEntry, canonicalStep, fieldsOf, onErrorLabel, parseJson, problemsAt, taskLabel,
   validKey, ScheduleChoice, plainHint } from './steps.model';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
 
 export interface StepPanelData {
   step: Step;
@@ -56,7 +57,7 @@ type ConfigMode = 'form' | 'json';
  */
 @Component({
   selector: 'app-step-panel',
-  imports: [SidePanel, Icon, Field, SchemaForm, FormRow, Section, ReportStepDesign, CallApiPreview],
+  imports: [SidePanel, Icon, Field, SchemaForm, FormRow, Section, ReportStepDesign, CallApiPreview, AdvancedSelect],
   templateUrl: './step-panel.html',
 })
 export class StepPanel {
@@ -85,6 +86,8 @@ export class StepPanel {
     : this.data.task?.configSchema;
   readonly hasForm = !!this.formSchema && fieldsOf(this.formSchema).length > 0;
   /** The step the report reads: the one its input names, else the one before it. */
+  /** The steps before this one, nearest last, as the Input picker lists them. */
+  readonly inputOptions: AdvancedOption[] = this.data.earlierKeys.map(k => ({ value: k, label: k, mono: true }));
   readonly upstreamKey = this.data.step.input ?? (this.data.earlierKeys.length ? this.data.earlierKeys[this.data.earlierKeys.length - 1] : null);
   readonly configMode = signal<ConfigMode>(this.hasForm ? 'form' : 'json');
   readonly configText = signal(this.jsonOf(this.data.step.config));

@@ -85,15 +85,10 @@
         <div class="flex flex-wrap items-center gap-x-2 gap-y-1 mb-2.5" data-test="agent-picker">
           <label class="text-sm font-medium text-[color:var(--text-primary)]"
                  [attr.for]="'assistant-agent-' + jobId()">Other questions are answered by</label>
-          <select class="input max-w-64 shrink-0" [attr.id]="'assistant-agent-' + jobId()"
-                  [attr.aria-describedby]="'assistant-agent-help-' + jobId()"
-                  [value]="agentId()"
-                  (change)="agentId.set(+$any($event.target).value || null)">
-            @for (agent of agents(); track agent.aiAgentId) {
-              <option [value]="agent.aiAgentId">{{ agent.agentName }}</option>
-            }
-            <option [value]="0">No AI — only this schedule's own record</option>
-          </select>
+          <app-advanced-select class="w-64 max-w-full shrink-0" [id]="'assistant-agent-' + jobId()"
+                               [describedBy]="'assistant-agent-help-' + jobId()" [options]="agentOptions()"
+                               [value]="agentId() == null ? '0' : '' + agentId()" (valueChange)="agentId.set(+$event || null)"
+                               searchLabel="Search the saved prompts" panelWidth="20rem" />
           <span class="text-xs text-[color:var(--text-muted)] basis-full" [attr.id]="'assistant-agent-help-' + jobId()">
             The buttons below answer from this schedule's record and runs. A question they do not cover goes to the saved prompt chosen here.
           </span>

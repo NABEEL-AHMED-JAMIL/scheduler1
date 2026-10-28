@@ -129,10 +129,9 @@
                   </app-field>
                   <app-field label="Nested under" [for]="'tagParent' + i" class="fr-6" [control]="row.get('tagParent')" [submitted]="submitted()"
                              hint="Another field's tag, or the document root.">
-                    <select [id]="'tagParent' + i" class="input" formControlName="tagParent">
-                      <option value="">(root)</option>
-                      @for (key of parentChoices(i); track key) { <option [value]="key">{{ key }}</option> }
-                    </select>
+                    <app-advanced-select [id]="'tagParent' + i" formControlName="tagParent" [options]="rowOptions()[i]?.parents ?? []"
+                                         [allowClear]="true" clearLabel="(root)" placeholder="(root)" unknownText="Not another field's tag"
+                                         searchLabel="Search the tags" emptyText="No other field yet." />
                   </app-field>
                 </app-form-row>
                 <app-form-row>
@@ -140,10 +139,9 @@
                     <!-- A dropdown's default has to BE one of its choices: picked from them, never typed. -->
                     <app-field label="Default value" [for]="'defaultValue' + i" class="fr-6" [control]="row.get('defaultValue')" [submitted]="submitted()"
                                hint="The choice a new task starts on.">
-                      <select [id]="'defaultValue' + i" class="input" formControlName="defaultValue">
-                        <option value="">(none)</option>
-                        @for (choice of defaultValueOptions(i); track $index) { <option [value]="choice.value">{{ choice.label }}</option> }
-                      </select>
+                      <app-advanced-select [id]="'defaultValue' + i" formControlName="defaultValue" [options]="rowOptions()[i]?.choices ?? []"
+                                           [allowClear]="true" clearLabel="(none)" placeholder="(none)" unknownText="Not one of the choices"
+                                           searchLabel="Search the choices" emptyText="No choices yet: add them below." />
                     </app-field>
                   } @else {
                     <app-field label="Default value" [for]="'defaultValue' + i" class="fr-6" [control]="row.get('defaultValue')" [submitted]="submitted()">

@@ -7,6 +7,7 @@ import { RunWithDialog } from './run-with-dialog';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { API_SUCCESS } from '../../../core/api/api.config';
 import { choiceBody, optionLabel, picksChanged, picksOf, stepsOf } from './ai-model-choice';
+import { advancedSelect } from '../../../shared/ui/advanced-select.testing';
 
 /**
  * MIG-251: "Run with…" from a schedule's row -- run now, with a model chosen per AI step for this run only
@@ -45,11 +46,14 @@ describe('Run with…', () => {
     const { fixture, ask, el } = openDialog();
     ask.flush({ status: API_SUCCESS, data: CHOICES });
     fixture.detectChanges();
-    const select = el.querySelector<HTMLSelectElement>('[data-step="summary"] select')!;
-    const options = [...select.options].map(o => o.textContent!.trim());
-    expect(options).toEqual(['The step\'s default', 'OpenAI prod · gpt-4.1 (default)', 'Claude · claude-x', 'Old · legacy — connection off']);
-    expect(select.value).toBe('8');
-    expect(select.options[3].disabled).toBe(true);
+    const select = advancedSelect(fixture, 'Model for Summarise the file');
+    expect(el.querySelector('[data-step="summary"] app-advanced-select')).not.toBeNull();
+    expect(select.clearLabel()).toBe('The step\'s default');
+    expect(select.options().map(o => o.keywords)).toEqual(['OpenAI prod · gpt-4.1 (default)', 'Claude · claude-x', 'Old · legacy — connection off']);
+    expect(select.options().map(o => [o.label, o.description, o.badge])).toEqual([['gpt-4.1', 'OpenAI prod', 'Default'], ['claude-x', 'Claude', undefined],
+      ['legacy', 'Old', 'Connection off']]);
+    expect(select.value()).toBe('8');
+    expect(select.options()[2].disabled).toBe(true);
     expect(el.querySelector('[data-step="tags"]')!.textContent).toContain('could not be reached');
   });
 
@@ -57,9 +61,7 @@ describe('Run with…', () => {
     const { fixture, http, ask, el, close, toast } = openDialog();
     ask.flush({ status: API_SUCCESS, data: CHOICES });
     fixture.detectChanges();
-    const select = el.querySelector<HTMLSelectElement>('[data-step="summary"] select')!;
-    select.value = '7';
-    select.dispatchEvent(new Event('change'));
+    advancedSelect(fixture, 'Model for Summarise the file').choose('7');
     fixture.detectChanges();
     button(el, 'Run')!.click();
     const run = http.expectOne(r => r.url.endsWith('/sourceJob.json/runSourceJobWith'));

@@ -128,15 +128,11 @@
                        [hint]="documentTypes()?.length === 0
                          ? 'This workspace has no document types yet: add one in Document Intelligence.'
                          : 'An approved document of this type starts a run, whether a reviewer approved it or it was approved automatically.'">
-              <select id="documentTypeId" class="input" [class.input-invalid]="submitted() && !!documentTypeError()"
-                      (change)="pickDocumentType($any($event.target).value)">
-                <option value="" [selected]="documentTypeId() === null">
-                  {{ documentTypesError() ? 'The document types could not be read' : documentTypes() === null ? 'Loading document types…' : 'Choose a document type…' }}
-                </option>
-                @for (type of documentTypeOptions(); track type.id) {
-                  <option [value]="'' + type.id" [selected]="documentTypeId() === type.id">{{ type.label }}</option>
-                }
-              </select>
+              <app-advanced-select id="documentTypeId" [invalid]="submitted() && !!documentTypeError()" [options]="documentTypeChoices()"
+                                   [value]="'' + (documentTypeId() ?? '')" (valueChange)="pickDocumentType($event)" placeholder="Choose a document type…"
+                                   searchLabel="Search the document types" [loading]="documentTypes() === null && !documentTypesError()"
+                                   loadingText="Loading document types…"
+                                   [emptyText]="documentTypesError() ? 'The document types could not be read.' : 'No document types yet: add one in Document Intelligence.'" />
               <app-inline-status [loading]="documentTypes() === null && !documentTypesError()" [error]="documentTypesError()"
                                  label="Loading document types…" (retry)="retryDocumentTypes()" />
             </app-field>
@@ -195,10 +191,9 @@
                 <span>{{ unit() }}</span>
                 @if (frequencyValue() === 'Monthly') {
                   <span>on</span>
-                  <select id="dayOfMonth" class="input w-auto" formControlName="dayOfMonth" aria-label="Day of month">
-                    <option [ngValue]="null">the start date's day</option>
-                    @for (day of monthDays; track day) { <option [ngValue]="day">day {{ day }}</option> }
-                  </select>
+                  <app-advanced-select id="dayOfMonth" class="w-48" [compact]="true" formControlName="dayOfMonth" ariaLabel="Day of month"
+                                       [numeric]="true" [options]="monthDayOptions" [allowClear]="true" clearLabel="the start date's day"
+                                       placeholder="the start date's day" searchLabel="Search the days" searchPlaceholder="Type a day, 1 to 31" />
                 }
                 <span>{{ timeWord() }}</span>
                 <app-time-field inputId="startTime" label="Start time" formControlName="startTime" />

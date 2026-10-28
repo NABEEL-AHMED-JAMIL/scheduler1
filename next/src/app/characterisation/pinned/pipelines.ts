@@ -60,6 +60,7 @@ export const PINNED: Record<string, unknown> = {
       "About these settings"
     ],
     "buttons": [
+      "(root)",
       "Add field",
       "Cancel",
       "Clear",

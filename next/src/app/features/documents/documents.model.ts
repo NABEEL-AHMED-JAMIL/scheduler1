@@ -9,6 +9,7 @@
  * number, a money amount or a date -- so a reviewer compares the page with what was really kept.
  */
 import { HttpErrorResponse } from '@angular/common/http';
+import type { AdvancedOption } from '../../shared/ui/advanced-select';
 
 // ---------------------------------------------------------------------------------------------- vocabularies
 
@@ -300,6 +301,16 @@ export interface ReviewDetail extends Extraction {
 export interface TypeVersionRow { version: number; name?: string | null; createdBy?: number | null; dateCreated?: string | null; }
 
 /** A document type, as /documentType.json lists it (fetchById adds its versions). */
+/** A document type as an advanced-select option: its name, its key and what it reads under it, an inactive one marked. */
+export function documentTypeOption(t: DocumentType): AdvancedOption {
+  const reads = [t.fieldCount ? `${t.fieldCount} field${t.fieldCount === 1 ? '' : 's'}` : '', t.tableCount ? `${t.tableCount} table${t.tableCount === 1 ? '' : 's'}` : ''];
+  return {
+    value: String(t.documentTypeId), label: t.name, keywords: t.typeKey,
+    description: [t.typeKey, t.builtIn ? 'built in' : '', ...reads].filter(Boolean).join(' · ') || undefined,
+    badge: t.status && t.status !== 'Active' ? 'Inactive' : undefined, badgeTone: 'neutral',
+  };
+}
+
 export interface DocumentType {
   documentTypeId: number;
   tenantId?: number | null;

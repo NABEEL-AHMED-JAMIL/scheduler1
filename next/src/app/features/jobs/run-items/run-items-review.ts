@@ -5,6 +5,7 @@ import { Team, TeamsApi } from '../../../core/teams/teams.api';
 import { plural } from '../run-steps/run-page.model';
 import { Reviewers } from './run-items.model';
 import { InlineStatus, loadErrorText } from '../../../shared/ui/loading';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
 
 /** What the dialog asks about: how many items are going, and their first names. */
 export interface ReviewDialogData { count: number; labels: string[]; }
@@ -24,7 +25,7 @@ export const ROLES: { value: string; label: string }[] = [
  */
 @Component({
   selector: 'app-run-items-review',
-  imports: [InlineStatus],
+  imports: [InlineStatus, AdvancedSelect],
   template: `
     <div class="card shadow-2xl w-[30rem] max-w-[calc(100vw-2rem)] overflow-hidden" role="dialog" aria-labelledby="rir-title" data-test="items-review-dialog">
       <div class="px-5 pt-4 pb-3 flex flex-col gap-3">
@@ -40,10 +41,9 @@ export const ROLES: { value: string; label: string }[] = [
         </fieldset>
         @if (kind() === 'team') {
           <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Team</span>
-            <select class="select" [value]="team()" (change)="team.set($any($event.target).value)" data-test="review-team">
-              <option value="">{{ teamsLoading() ? 'Loading teams…' : teamsError() ? 'The teams could not be read' : teams().length ? 'Pick a team' : 'This workspace has no team' }}</option>
-              @for (t of teams(); track t.teamId) { <option [value]="t.teamId">{{ t.name }} ({{ t.memberCount }})</option> }
-            </select>
+            <app-advanced-select [options]="teamOptions()" [value]="'' + team()" (valueChange)="team.set($event)" data-test="review-team"
+                                 ariaLabel="Team" placeholder="Pick a team" searchLabel="Search the teams" [loading]="teamsLoading()"
+                                 loadingText="Loading teams…" [emptyText]="teamsError() ? 'The teams could not be read.' : 'This workspace has no team.'" />
             <!-- Owner 2026-10-27: loading, why the teams could not be read (Try again), or that there is none. -->
             <app-inline-status [loading]="teamsLoading()" [error]="teamsError()" [empty]="!teamsLoading() && !teamsError() && !teams().length"
                                label="Loading teams…" emptyText="This workspace has no team yet: send it to a role instead." (retry)="loadTeams()" />
@@ -78,6 +78,8 @@ export class RunItemsReview implements OnInit {
   readonly role = signal('TENANT_ADMIN');
   readonly note = signal('');
   readonly teams = signal<Team[]>([]);
+  readonly teamOptions = computed<AdvancedOption[]>(() => this.teams().map(t => ({ value: '' + t.teamId, label: t.name,
+    description: `${t.memberCount} member${t.memberCount === 1 ? '' : 's'}` })));
   readonly teamsLoading = signal(true);
   /** Why the teams could not be read: a failure is not "This workspace has no team" (owner 2026-10-27). */
   readonly teamsError = signal('');

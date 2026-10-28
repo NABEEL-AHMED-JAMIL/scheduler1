@@ -77,11 +77,8 @@
       } @else {
         <label class="field">
           <span class="label">Workflow</span>
-          <select class="input input-sm" [value]="newKey()" (change)="newKey.set($any($event.target).value)" data-test="new-request-workflow">
-            @for (w of startableWorkflows()!; track w.key) {
-              <option [value]="w.key" [selected]="w.key === newKey()">{{ w.name }}</option>
-            }
-          </select>
+          <app-advanced-select [compact]="true" [options]="startableOptions()" [value]="newKey()" (valueChange)="newKey.set($event)"
+                               data-test="new-request-workflow" ariaLabel="Workflow" searchLabel="Search the workflows" />
         </label>
         <label class="field">
           <span class="label">Title</span>
@@ -130,13 +127,9 @@
               <option [value]="c.value" [selected]="c.value === statusFilter()">{{ c.value }} ({{ c.count }})</option>
             }
           </select>
-          <select class="input input-sm" aria-label="Filter by workflow" [value]="workflowFilter()"
-                  (change)="workflowFilter.set($any($event.target).value)" data-test="workflow-filter">
-            <option value="">Any workflow</option>
-            @for (c of workflowChoices(); track c.value) {
-              <option [value]="c.value" [selected]="c.value === workflowFilter()">{{ c.value }} ({{ c.count }})</option>
-            }
-          </select>
+          <app-advanced-select class="min-w-44" [compact]="true" ariaLabel="Filter by workflow" [options]="workflowFilterOptions()" [value]="workflowFilter()"
+                               (valueChange)="workflowFilter.set($event)" data-test="workflow-filter" [allowClear]="true" clearLabel="Any workflow"
+                               placeholder="Any workflow" searchLabel="Search the workflows" emptyText="No workflow in this list." panelWidth="18rem" />
         </div>
         <div class="inbox-count">
           @if (canPick() && pagePicks().length) {

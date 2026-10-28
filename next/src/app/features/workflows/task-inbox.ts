@@ -28,6 +28,7 @@ import { RefreshButton } from '../../shared/ui/refresh-button';
 import { BulkBar } from '../../shared/ui/bulk/bulk-bar';
 import { BulkReviewApi } from '../../shared/ui/bulk/bulk-review.api';
 import { BULK_CAP, BulkAnswer, BulkMatch, BulkSelection } from '../../shared/ui/bulk/bulk.model';
+import { AdvancedOption, AdvancedSelect } from '../../shared/ui/advanced-select';
 
 export type InboxTab = 'mine' | 'teams' | 'done' | 'requests';
 
@@ -47,7 +48,7 @@ const perTab = <T>(value: T): PerTab<T> => ({ mine: value, teams: value, done: v
  */
 @Component({
   selector: 'app-task-inbox',
-  imports: [RunReviewCard, PipelineApprovalCard, ReportReviewCard, RequestDataView, PersonalDataBar, RefreshButton, PageHeader, FormsModule, NgTemplateOutlet, RouterLink, Icon, StatusPill, Combobox, Avatar, BulkBar],
+  imports: [RunReviewCard, PipelineApprovalCard, ReportReviewCard, RequestDataView, PersonalDataBar, RefreshButton, PageHeader, FormsModule, NgTemplateOutlet, RouterLink, Icon, StatusPill, Combobox, Avatar, BulkBar, AdvancedSelect],
   templateUrl: './task-inbox.html',
   host: { '(document:keydown)': 'onKey($event)' },
   styles: `
@@ -222,6 +223,7 @@ export class TaskInbox implements OnInit {
   readonly groupsShown = computed(() => groupRows(this.shown()));
   readonly statusChoices = computed(() => choicesOf(this.items().map(i => i.status)));
   readonly workflowChoices = computed(() => choicesOf(this.items().map(i => i.workflow)).sort((a, b) => a.value.localeCompare(b.value)));
+  readonly workflowFilterOptions = computed<AdvancedOption[]>(() => this.workflowChoices().map(c => ({ value: c.value, label: c.value, sample: String(c.count) })));
   private readonly shownIds = computed(() => this.shown().map(i => i.id));
   readonly selectedId = computed(() => this.tab() === 'requests' ? this.selectedRequest() : this.selectedTask());
 
@@ -554,6 +556,8 @@ export class TaskInbox implements OnInit {
    */
   readonly newOpen = signal(false);
   readonly startableWorkflows = signal<StartableWorkflow[] | null>(null);
+  readonly startableOptions = computed<AdvancedOption[]>(() => (this.startableWorkflows() ?? []).map(w => ({ value: w.key, label: w.name,
+    description: w.description || undefined, sample: w.currentVersion ? 'v' + w.currentVersion : undefined, keywords: w.key })));
   readonly newKey = signal('');
   readonly newTitle = signal('');
   readonly newFields = signal<{ name: string; value: string }[]>([{ name: '', value: '' }]);

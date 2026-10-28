@@ -4,6 +4,7 @@ import { DateField } from '../../../shared/ui/date-field';
 import { TimeField } from '../../../shared/ui/time-field';
 import { PARAMETER_TYPES, ParameterType, RunParameter } from '../../jobs/run-parameters/run-parameters';
 import { Problem } from './steps.model';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
 
 const NAME = /^[a-z][a-z0-9_]{0,39}$/;
 /** The server's limit (RunParameters.MAX_PARAMETERS). */
@@ -17,7 +18,7 @@ export const MAX_PARAMETERS = 20;
  */
 @Component({
   selector: 'app-parameter-editor',
-  imports: [Icon, DateField, TimeField],
+  imports: [Icon, DateField, TimeField, AdvancedSelect],
   styles: `
     .param-table { width: 100%; border-collapse: collapse; font-size: 13px; }
     .param-table th { text-align: left; font-size: 11px; font-weight: 600; color: var(--text-muted); padding: 0 0.375rem 0.375rem; white-space: nowrap; }
@@ -53,11 +54,10 @@ export const MAX_PARAMETERS = 20;
                       </select>
                     }
                     @case ('choice') {
-                      <select class="input" [value]="text(p.default)" [disabled]="disabled()" [attr.aria-label]="'Default of ' + (p.name || 'parameter')"
-                              (change)="patch(i, { default: $any($event.target).value || null })">
-                        <option value="">None</option>
-                        @for (c of p.choices || []; track c) { <option [value]="c" [selected]="text(p.default) === c">{{ c }}</option> }
-                      </select>
+                      <app-advanced-select class="min-w-24" [options]="choiceOptions()[i] ?? []" [value]="text(p.default)" [disabled]="disabled()"
+                                           [ariaLabel]="'Default of ' + (p.name || 'parameter')" (valueChange)="patch(i, { default: $event || null })"
+                                           [allowClear]="true" clearLabel="None" placeholder="None" searchLabel="Search the choices"
+                                           emptyText="No choices yet: write them under Choices." panelWidth="16rem" />
                     }
                     @case ('date') {
                       <!-- The console's own date control: a day as 1 Jan 1900, never the browser's order. -->
@@ -109,6 +109,8 @@ export const MAX_PARAMETERS = 20;
 export class ParameterEditor {
   readonly parameters = input.required<RunParameter[]>();
   readonly disabled = input(false);
+  /** Each choice parameter's choices, by row, as its Default picker lists them. */
+  readonly choiceOptions = computed<AdvancedOption[][]>(() => this.parameters().map(p => (p.choices || []).map(c => ({ value: c, label: c }))));
   /** The server's problems with the definition; those under parameters[i] are shown on row i. */
   readonly problems = input<Problem[]>([]);
   readonly changed = output<RunParameter[]>();

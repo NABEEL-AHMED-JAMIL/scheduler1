@@ -1,6 +1,7 @@
-import { Component, input, model } from '@angular/core';
+import { Component, computed, input, model } from '@angular/core';
 import { Icon } from '../../../shared/ui/icon';
 import { AiStepChoice, ModelPicks, optionLabel } from './ai-model-choice';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
 
 /**
  * MIG-251: one row per AI step of a job -- the step, where it runs, and the model it runs on -- for the schedule
@@ -9,7 +10,7 @@ import { AiStepChoice, ModelPicks, optionLabel } from './ai-model-choice';
  */
 @Component({
   selector: 'app-ai-model-picks',
-  imports: [Icon],
+  imports: [Icon, AdvancedSelect],
   template: `
     <div class="space-y-3">
       @for (step of steps(); track step.stepKey) {
@@ -29,15 +30,10 @@ import { AiStepChoice, ModelPicks, optionLabel } from './ai-model-choice';
           } @else if (!step.options?.length) {
             <p class="text-xs text-[color:var(--text-muted)]">Runs on its prompt's model; no other model is allowed for this step.</p>
           } @else {
-            <select class="input" [id]="idPrefix() + '-' + step.stepKey"
-                    [attr.aria-label]="'Model for ' + (step.label || step.stepKey)"
-                    (change)="pick(step.stepKey, $any($event.target).value)">
-              <option value="" [selected]="!picks()[step.stepKey]">The step's default</option>
-              @for (option of step.options; track option.modelOptionId) {
-                <option [value]="'' + option.modelOptionId" [disabled]="option.connectionActive === false"
-                        [selected]="picks()[step.stepKey] === '' + option.modelOptionId">{{ label(option) }}</option>
-              }
-            </select>
+            <app-advanced-select [id]="idPrefix() + '-' + step.stepKey" [ariaLabel]="'Model for ' + (step.label || step.stepKey)"
+                                 [options]="modelOptions()[step.stepKey] ?? []" [value]="picks()[step.stepKey] || ''"
+                                 (valueChange)="pick(step.stepKey, $event)" [allowClear]="true" clearLabel="The step's default"
+                                 placeholder="The step's default" searchLabel="Search the models" />
           }
         </div>
       }
@@ -51,6 +47,15 @@ export class AiModelPicks {
   readonly idPrefix = input('ai-model');
 
   readonly label = optionLabel;
+  /** Each step's models: the model in monospace with its connection under it, a connection that is off listed and not picked. */
+  readonly modelOptions = computed<Record<string, AdvancedOption[]>>(() => Object.fromEntries(this.steps().map(step => [step.stepKey,
+    (step.options ?? []).map(o => ({
+      value: '' + o.modelOptionId, label: o.effectiveModel || o.model || 'model', mono: true,
+      description: [o.connectionName ?? '', o.provider ?? ''].filter(Boolean).join(' · ') || undefined,
+      badge: o.connectionActive === false ? 'Connection off' : o.isDefault ? 'Default' : undefined,
+      badgeTone: o.connectionActive === false ? 'warn' as const : 'neutral' as const,
+      disabled: o.connectionActive === false, keywords: optionLabel(o),
+    }))])));
 
   pick(stepKey: string, option: string): void {
     this.picks.update(picks => ({ ...picks, [stepKey]: option }));

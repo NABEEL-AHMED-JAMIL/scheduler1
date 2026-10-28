@@ -6,6 +6,7 @@ import { InlineStatus, createLoadState } from '../../../shared/ui/loading';
 import {
   ApiRequestChoice, BucketChoice, DocumentTypeChoice, FieldKind, FieldSpec, JsonSchema, PromptChoice, ScheduleChoice, StepProblem, WebhookChoice, coerce, fieldsOf, isMapSchema, mapValueKind, parseJson, withValue,
 } from './steps.model';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
 
 interface MapRow { key: string; value: unknown; }
 
@@ -28,7 +29,7 @@ interface MapRow { key: string; value: unknown; }
  */
 @Component({
   selector: 'app-schema-form',
-  imports: [Field, Icon, InlineStatus],
+  imports: [Field, Icon, InlineStatus, AdvancedSelect],
   template: `
     @if (isMap()) {
       <div class="flex flex-col gap-2 min-w-0">
@@ -82,12 +83,9 @@ interface MapRow { key: string; value: unknown; }
           }
           @case ('enum') {
             <app-field [label]="f.label" [for]="idOf(f)" [required]="f.required" [hint]="f.description" [error]="errorOf(f)">
-              <select [id]="idOf(f)" class="input" [value]="choiceIndex(f)" [disabled]="disabled()" (change)="pick(f, $any($event.target).value)">
-                <option value="">{{ f.required ? 'Choose…' : 'None' }}</option>
-                @for (option of f.options; track $index) {
-                  <option [value]="'' + $index" [selected]="choiceIndex(f) === '' + $index">{{ optionLabel(f, $index, option) }}</option>
-                }
-              </select>
+              <app-advanced-select [id]="idOf(f)" [options]="pickOptions()[f.name] ?? []" [value]="choiceIndex(f)" [disabled]="disabled()"
+                                   (valueChange)="pick(f, $event)" [allowClear]="!f.required" clearLabel="None" [placeholder]="f.required ? 'Choose…' : 'None'"
+                                   [ariaLabel]="f.label" [searchLabel]="'Search ' + f.label" />
             </app-field>
           }
           @case ('multi') {
@@ -105,102 +103,67 @@ interface MapRow { key: string; value: unknown; }
           }
           @case ('step') {
             <app-field [label]="f.label" [for]="idOf(f)" [required]="f.required" [hint]="f.description" [error]="errorOf(f)">
-              <select [id]="idOf(f)" class="input" [value]="textOf(f)" [disabled]="disabled()" (change)="set(f.name, $any($event.target).value || undefined)">
-                <option value="">{{ f.required ? 'Choose…' : 'None' }}</option>
-                @for (key of steps(); track key) { <option [value]="key" [selected]="textOf(f) === key">{{ key }}</option> }
-                @if (textOf(f) && !steps().includes(textOf(f))) {
-                  <option [value]="textOf(f)" selected>{{ textOf(f) }} (not an earlier step)</option>
-                }
-              </select>
+              <app-advanced-select [id]="idOf(f)" [options]="pickOptions()[f.name] ?? []" [value]="textOf(f)" [disabled]="disabled()"
+                                   (valueChange)="set(f.name, $event || undefined)" [allowClear]="!f.required" clearLabel="None"
+                                   [placeholder]="f.required ? 'Choose…' : 'None'" [ariaLabel]="f.label" searchLabel="Search the earlier steps"
+                                   emptyText="No earlier step: this is the first." />
             </app-field>
           }
           @case ('prompt') {
             <app-field [label]="f.label" [for]="idOf(f)" [required]="f.required" [hint]="f.description" [error]="errorOf(f)">
-              <select [id]="idOf(f)" class="input" [value]="textOf(f)" [disabled]="disabled()"
-                      (change)="set(f.name, $any($event.target).value === '' ? undefined : +$any($event.target).value)">
-                <option value="">{{ f.required ? 'Choose a prompt…' : 'None' }}</option>
-                @for (p of prompts(); track p.id) { <option [value]="'' + p.id" [selected]="textOf(f) === '' + p.id">{{ p.label }}</option> }
-                @if (textOf(f) && !promptListed(f)) {
-                  <option [value]="textOf(f)" selected>Prompt {{ textOf(f) }} (not an active prompt here)</option>
-                }
-              </select>
+              <app-advanced-select [id]="idOf(f)" [options]="pickOptions()[f.name] ?? []" [value]="textOf(f)" [disabled]="disabled()"
+                                   (valueChange)="set(f.name, $event === '' ? undefined : +$event)" [allowClear]="!f.required" clearLabel="None"
+                                   [placeholder]="f.required ? 'Choose a prompt…' : 'None'" [ariaLabel]="f.label" searchLabel="Search the prompts"
+                                   emptyText="No active prompt in this workspace yet (AI › Prompts)." />
             </app-field>
           }
           @case ('webhook') {
             <app-field [label]="f.label" [for]="idOf(f)" [required]="f.required" [error]="errorOf(f)"
                        [hint]="f.description || webhookHint">
-              <select [id]="idOf(f)" class="input" [value]="textOf(f)" [disabled]="disabled()"
-                      (change)="set(f.name, $any($event.target).value === '' ? undefined : +$any($event.target).value)">
-                <option value="">{{ f.required ? 'Choose a webhook…' : 'None' }}</option>
-                @for (w of webhooks(); track w.id) {
-                  <option [value]="'' + w.id" [selected]="textOf(f) === '' + w.id" [disabled]="!w.ready && textOf(f) !== '' + w.id">{{ w.label }}</option>
-                }
-                @if (textOf(f) && !webhookListed(f)) {
-                  <option [value]="textOf(f)" selected>Webhook {{ textOf(f) }} (not one of this workspace's webhooks)</option>
-                }
-              </select>
+              <app-advanced-select [id]="idOf(f)" [options]="pickOptions()[f.name] ?? []" [value]="textOf(f)" [disabled]="disabled()"
+                                   (valueChange)="set(f.name, $event === '' ? undefined : +$event)" [allowClear]="!f.required" clearLabel="None"
+                                   [placeholder]="f.required ? 'Choose a webhook…' : 'None'" [ariaLabel]="f.label" searchLabel="Search the webhooks"
+                                   emptyText="No webhook in this workspace yet (Developers › API Clients)." />
             </app-field>
           }
           @case ('api-request') {
             <!-- Owner #25: one of the workspace's saved API requests, grouped by collection, with its method. -->
             <app-field [label]="f.label" [for]="idOf(f)" [required]="f.required" [error]="errorOf(f)"
                        [hint]="f.description || apiRequestHint">
-              <select [id]="idOf(f)" class="input" [value]="textOf(f)" [disabled]="disabled()" data-test="api-request-select"
-                      (change)="set(f.name, $any($event.target).value === '' ? undefined : +$any($event.target).value)">
-                <option value="">{{ f.required ? 'Choose an API request…' : 'None' }}</option>
-                @for (group of apiRequestGroups(); track group.collection) {
-                  <optgroup [label]="group.collection">
-                    @for (r of group.requests; track r.id) {
-                      <option [value]="'' + r.id" [selected]="textOf(f) === '' + r.id" [disabled]="!r.enabled && textOf(f) !== '' + r.id">
-                        {{ r.method }} · {{ r.label.slice(group.collection.length + 3) }}{{ r.enabled ? '' : ' (disabled)' }}</option>
-                    }
-                  </optgroup>
-                }
-                @if (textOf(f) && !apiRequestListed(f)) {
-                  <option [value]="textOf(f)" selected>Request {{ textOf(f) }} (not one of this workspace's saved requests)</option>
-                }
-              </select>
+              <app-advanced-select [id]="idOf(f)" [options]="pickOptions()[f.name] ?? []" [value]="textOf(f)" [disabled]="disabled()"
+                                   data-test="api-request-select" (valueChange)="set(f.name, $event === '' ? undefined : +$event)" [allowClear]="!f.required" clearLabel="None"
+                                   [placeholder]="f.required ? 'Choose an API request…' : 'None'" [ariaLabel]="f.label"
+                                   searchLabel="Search the API requests" searchPlaceholder="Search by name, collection or method"
+                                   emptyText="No saved API request in this workspace yet (Connections › API collections)." />
             </app-field>
           }
           @case ('api-environment') {
             <!-- Owner #25: an environment of the chosen request's collection; none is the collection's default. -->
             <app-field [label]="f.label" [for]="idOf(f)" [required]="f.required" [error]="errorOf(f)" [hint]="f.description || ''">
-              <select [id]="idOf(f)" class="input" [value]="textOf(f)" [disabled]="disabled()"
-                      (change)="set(f.name, $any($event.target).value === '' ? undefined : +$any($event.target).value)">
-                <option value="">The collection's default</option>
-                @for (e of environmentChoices(); track e.id) { <option [value]="'' + e.id" [selected]="textOf(f) === '' + e.id">{{ e.label }}</option> }
-                @if (textOf(f) && !environmentListed(f)) {
-                  <option [value]="textOf(f)" selected>Environment {{ textOf(f) }}</option>
-                }
-              </select>
+              <app-advanced-select [id]="idOf(f)" [options]="pickOptions()[f.name] ?? []" [value]="textOf(f)" [disabled]="disabled()"
+                                   (valueChange)="set(f.name, $event === '' ? undefined : +$event)" [allowClear]="true" clearLabel="The collection's default"
+                                   placeholder="The collection's default" [ariaLabel]="f.label" searchLabel="Search the environments"
+                                   emptyText="The request's collection has no environments." />
             </app-field>
           }
           @case ('schedule') {
             <!-- MIG-424: one of the workspace's schedules (a pipeline to call), stored as its id. -->
             <app-field [label]="f.label" [for]="idOf(f)" [required]="f.required" [error]="errorOf(f)"
                        [hint]="f.description || scheduleHint">
-              <select [id]="idOf(f)" class="input" [value]="textOf(f)" [disabled]="disabled()" data-test="schedule-select"
-                      (change)="set(f.name, $any($event.target).value === '' ? undefined : +$any($event.target).value)">
-                <option value="">{{ f.required ? 'Choose a pipeline…' : 'None' }}</option>
-                @for (j of schedules(); track j.id) { <option [value]="'' + j.id" [selected]="textOf(f) === '' + j.id">{{ j.label }}</option> }
-                @if (textOf(f) && !scheduleListed(f)) {
-                  <option [value]="textOf(f)" selected>Schedule {{ textOf(f) }} (not one of this workspace's)</option>
-                }
-              </select>
+              <app-advanced-select [id]="idOf(f)" [options]="pickOptions()[f.name] ?? []" [value]="textOf(f)" [disabled]="disabled()"
+                                   data-test="schedule-select" (valueChange)="set(f.name, $event === '' ? undefined : +$event)" [allowClear]="!f.required" clearLabel="None"
+                                   [placeholder]="f.required ? 'Choose a pipeline…' : 'None'" [ariaLabel]="f.label" searchLabel="Search the pipelines"
+                                   emptyText="No pipeline schedule in this workspace yet." />
             </app-field>
           }
           @case ('document-type') {
             <!-- MIG-364: one of the workspace's document types, stored as its id; empty is the documents that started the run. -->
             <app-field [label]="f.label" [for]="idOf(f)" [required]="f.required" [error]="errorOf(f)"
                        [hint]="f.description || documentTypeHint">
-              <select [id]="idOf(f)" class="input" [value]="textOf(f)" [disabled]="disabled()"
-                      (change)="set(f.name, $any($event.target).value === '' ? undefined : +$any($event.target).value)">
-                <option value="">{{ f.required ? 'Choose a document type…' : 'The documents that started the run' }}</option>
-                @for (t of documentTypes(); track t.id) { <option [value]="'' + t.id" [selected]="textOf(f) === '' + t.id">{{ t.label }}</option> }
-                @if (textOf(f) && !documentTypeListed(f)) {
-                  <option [value]="textOf(f)" selected>Document type {{ textOf(f) }} (not in this workspace)</option>
-                }
-              </select>
+              <app-advanced-select [id]="idOf(f)" [options]="pickOptions()[f.name] ?? []" [value]="textOf(f)" [disabled]="disabled()"
+                                   (valueChange)="set(f.name, $event === '' ? undefined : +$event)" [allowClear]="!f.required" clearLabel="The documents that started the run"
+                                   [placeholder]="f.required ? 'Choose a document type…' : 'The documents that started the run'" [ariaLabel]="f.label"
+                                   searchLabel="Search the document types" emptyText="No document type in this workspace yet (Documents › Document types)." />
             </app-field>
           }
           @case ('column') {
@@ -272,15 +235,10 @@ interface MapRow { key: string; value: unknown; }
                 @if (reviewersChoice(f) === 'team') {
                   <!-- Owner 2026-10-27: "No team yet" only once the teams have answered; loading and a failed read say so. -->
                   <app-field label="Team" [for]="idOf(f) + '-team'" [hint]="teamsState.loaded() && !teamChoices().length ? 'No team yet: make one in Administration › Teams.' : ''">
-                    <select [id]="idOf(f) + '-team'" class="input" [disabled]="disabled()" (change)="pickTeam(f, $any($event.target).value)">
-                      <option value="" [selected]="!reviewersTeam(f)">{{ teamsState.loading() ? 'Loading teams…' : 'Choose a team…' }}</option>
-                      @for (t of teamChoices(); track t.teamId) {
-                        <option [value]="'' + t.teamId" [selected]="reviewersTeam(f) === '' + t.teamId">{{ t.name }}</option>
-                      }
-                      @if (reviewersTeam(f) && !knownTeam(f)) {
-                        <option [value]="reviewersTeam(f)" selected>Team {{ reviewersTeam(f) }}{{ teamsState.loaded() ? " (not in this workspace's list)" : '' }}</option>
-                      }
-                    </select>
+                    <app-advanced-select [id]="idOf(f) + '-team'" [options]="pickOptions()[f.name + ':team'] ?? []" [value]="reviewersTeam(f)"
+                                         [disabled]="disabled()" (valueChange)="pickTeam(f, $event)" placeholder="Choose a team…" ariaLabel="Team"
+                                         searchLabel="Search the teams" [loading]="teamsState.loading()" loadingText="Loading teams…"
+                                         emptyText="No team yet: make one in Administration › Teams." />
                     <app-inline-status [loading]="teamsState.loading()" [error]="teamsState.error()" label="Loading teams…" (retry)="loadTeams()" />
                   </app-field>
                 }
@@ -404,6 +362,56 @@ export class SchemaForm {
   readonly valueChange = output<Record<string, unknown>>();
 
   readonly fields = computed(() => fieldsOf(this.schema()));
+  /**
+   * Each picker's options, by field name (owner 2026-10-27, "all select should be advance"): one stable list per select.
+   * A saved value the lists do not hold is kept as an option and says why ("not an earlier step"), as the old select did.
+   */
+  readonly pickOptions = computed<Record<string, AdvancedOption[]>>(() => {
+    const out: Record<string, AdvancedOption[]> = {};
+    const kept = (list: AdvancedOption[], value: string, label: string, why: string): AdvancedOption[] =>
+      value && !list.some(o => o.value === value) ? [...list, { value, label, description: why, badge: 'Not found', badgeTone: 'warn' }] : list;
+    for (const f of this.fields()) {
+      const now = this.textOf(f);
+      switch (f.kind) {
+        case 'enum':
+          out[f.name] = f.options.map((o, i) => ({ value: String(i), label: this.optionLabel(f, i, o),
+            description: f.optionLabels?.[i] && this.optionText(o) !== f.optionLabels[i] ? this.optionText(o) : undefined }));
+          break;
+        case 'step':
+          out[f.name] = kept(this.steps().map(k => ({ value: k, label: k, mono: true })), now, now, 'Not an earlier step');
+          break;
+        case 'prompt':
+          out[f.name] = kept(this.prompts().map(x => ({ value: '' + x.id, label: x.label, keywords: '' + x.id })), now, `Prompt ${now}`, 'Not an active prompt here');
+          break;
+        case 'webhook':
+          out[f.name] = kept(this.webhooks().map(w => ({ value: '' + w.id, label: w.label, keywords: '' + w.id, disabled: !w.ready && now !== '' + w.id,
+            badge: w.ready ? undefined : 'Not ready', badgeTone: 'warn' as const,
+            description: w.ready ? undefined : 'Inactive, or not subscribed to run.step.sent' })), now, `Webhook ${now}`, 'Not one of this workspace\'s webhooks');
+          break;
+        case 'api-request':
+          out[f.name] = kept(this.apiRequests().map(r => ({ value: '' + r.id, label: r.label.slice(r.collection.length + 3) || r.label, group: r.collection,
+            sample: r.method, keywords: `${r.collection} ${r.method} ${r.id}`, disabled: !r.enabled && now !== '' + r.id,
+            badge: r.enabled ? undefined : 'Disabled', badgeTone: 'neutral' as const })), now, `Request ${now}`, 'Not one of this workspace\'s saved requests');
+          break;
+        case 'api-environment':
+          out[f.name] = kept(this.environmentChoices().map(e => ({ value: '' + e.id, label: e.label })), now, `Environment ${now}`, 'Not in the request\'s collection');
+          break;
+        case 'schedule':
+          out[f.name] = kept(this.schedules().map(j => ({ value: '' + j.id, label: j.label, keywords: '' + j.id })), now, `Schedule ${now}`, 'Not one of this workspace\'s');
+          break;
+        case 'document-type':
+          out[f.name] = kept(this.documentTypes().map(t => ({ value: '' + t.id, label: t.label, keywords: '' + t.id })), now, `Document type ${now}`, 'Not in this workspace');
+          break;
+        case 'reviewers': {
+          const team = this.reviewersTeam(f);
+          out[f.name + ':team'] = kept(this.teamChoices().map(t => ({ value: '' + t.teamId, label: t.name })), this.teamsState.loading() ? '' : team, `Team ${team}`,
+            this.teamsState.loaded() ? 'Not in this workspace\'s list' : '');
+          break;
+        }
+      }
+    }
+    return out;
+  });
   private readonly injector = inject(Injector);
   /** The workspace's teams by name, read only when a form asks who reviews. */
   readonly teamChoices = signal<{ teamId: number; name: string }[]>([]);

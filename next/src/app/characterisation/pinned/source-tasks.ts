@@ -18,13 +18,15 @@ export const PINNED: Record<string, unknown> = {
     "buttons": [
       "Copy it",
       "Create and add steps",
-      "Open the AI Assistant"
+      "Open the AI Assistant",
+      "Pipeline to copy",
+      "service-1 reference worker"
     ],
     "columns": [],
     "fields": [
       "Name *",
       "Name of the copy",
-      "Pipeline to copyChoose…Reference: CSV check and summariseUI-REVIEW Clean customers CSV check",
+      "Pipeline to copyChoose…",
       "Read the daily admissions file, flag readmissions within 30 days, and keep a dataset for the dashboard.",
       "Readmission risk (daily)",
       "Topic (optional)",

@@ -13,6 +13,8 @@ import { LogNames, LogSegment, logSegments, nameIds, pathParts } from './log-seg
 import {
   AuditEntry, LOG_LEVELS, RUN_LOG_STYLES, LogLevel, LogLine, auditLines, filterLines, levelClass, levelCounts, logText, mergeLines, nextError, stepLines,
 } from './run-log.model';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
+import { runStatusTone } from '../../../shared/ui/advanced-options';
 
 /** Lines drawn at once when they wrap (a wrapped line has no fixed height to window by); Show earlier adds as many. */
 export const WRAP_WINDOW = 2000;
@@ -32,7 +34,7 @@ const LEVEL_WORDS: Record<LogLevel, string> = { ERROR: 'Errors', WARN: 'Warnings
  */
 @Component({
   selector: 'app-run-log',
-  imports: [Icon, ServerTimePipe, RouterLink, NgTemplateOutlet, AppLoading, LoadError],
+  imports: [Icon, ServerTimePipe, RouterLink, NgTemplateOutlet, AppLoading, LoadError, AdvancedSelect],
   // The log's look is shared with the step log panel (RUN_LOG_STYLES); it is written for the console's dark ground.
   encapsulation: ViewEncapsulation.None,
   styles: RUN_LOG_STYLES,
@@ -53,12 +55,9 @@ const LEVEL_WORDS: Record<LogLevel, string> = { ERROR: 'Errors', WARN: 'Warnings
             </button>
           }
         </div>
-        <select class="input w-auto max-w-72 text-xs" aria-label="Step" data-test="log-step" (change)="step.set($any($event.target).value || null)">
-          <option value="" [selected]="!step()">Every step</option>
-          @for (s of store.timeline()?.steps ?? []; track s.index) {
-            <option [value]="s.key" [selected]="s.key === step()">{{ s.index + 1 }} · {{ s.name || s.key }}</option>
-          }
-        </select>
+        <app-advanced-select class="w-56 max-w-72" [compact]="true" ariaLabel="Step" data-test="log-step" [options]="stepOptions()"
+                             [value]="step() ?? ''" (valueChange)="step.set($event || null)" [allowClear]="true" clearLabel="Every step"
+                             placeholder="Every step" searchLabel="Search the steps" emptyText="This run has no steps yet." panelWidth="20rem" />
         <ng-content select="[toolbar]" />
         <div class="ml-auto flex items-center gap-1">
           @if (errorCount()) {
@@ -152,6 +151,11 @@ export class RunLog {
   readonly levels = signal<ReadonlySet<LogLevel>>(new Set());
   /** One step's lines (its key), or null for the whole run. Set by the page when "Open in Log" names a step. */
   readonly step = model<string | null>(null);
+  /** The run's steps, in order, as the Step filter lists them (with how each ended). */
+  readonly stepOptions = computed<AdvancedOption[]>(() => (this.store.timeline()?.steps ?? []).map(s => ({
+    value: s.key, label: `${s.index + 1} · ${s.name || s.key}`, sample: s.name && s.name !== s.key ? s.key : undefined,
+    badge: s.status || undefined, badgeTone: runStatusTone(s.status), keywords: s.key,
+  })));
   readonly wrap = signal(false);
   readonly current = signal(-1);
   readonly windowSize = signal(WRAP_WINDOW);

@@ -1,5 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
 import { api, authOf, canSignIn, NEEDS, pageAs, Session, sessionFor } from './support/session';
+import { pickOption } from './support/advanced-select';
 
 /**
  * A model as a pipeline step, end to end, as a tenant administrator: a model connection is added
@@ -124,9 +125,9 @@ test.describe('AI prompts in pipelines', () => {
     await page.locator('.ai-step-line').getByRole('button', { name: 'Configure' }).click();
     await expect(page.getByRole('heading', { name: 'AI step · <summary>' })).toBeVisible();
     await pick(page, 'aiStepPrompt', STAMP, PROMPT);
-    const map = page.locator('.side-panel tbody select');
-    await map.nth(0).selectOption('claim_id');
-    await map.nth(1).selectOption('document');
+    const map = page.locator('.side-panel tbody app-advanced-select');
+    await pickOption(map.nth(0), 'claim_id');
+    await pickOption(map.nth(1), 'document');
     await expect(page.locator('.side-panel-foot')).toContainText('Ready');
     await page.getByRole('button', { name: 'Apply' }).click();
     await expect(page.locator('.ai-step-line')).toContainText(PROMPT);

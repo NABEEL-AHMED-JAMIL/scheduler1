@@ -29,10 +29,10 @@
       <app-form-row>
         <app-field class="fr-12" label="Reads" for="stepInput" [error]="problemsAt('input')"
                    hint="Another step's output, from earlier in the pipeline. The first step reads the pipeline's source.">
-          <select id="stepInput" class="input" [value]="s.input ?? ''" [disabled]="readOnly" (change)="patch({ input: $any($event.target).value })">
-            <option value="">The latest output before this step</option>
-            @for (key of data.earlierKeys; track key) { <option [value]="key" [selected]="s.input === key">{{ key }}</option> }
-          </select>
+          <app-advanced-select id="stepInput" [options]="inputOptions" [value]="s.input ?? ''" [disabled]="readOnly"
+                               (valueChange)="patch({ input: $event })" [allowClear]="true" clearLabel="The latest output before this step"
+                               placeholder="The latest output before this step" searchLabel="Search the earlier steps"
+                               emptyText="No earlier step: this is the first." />
         </app-field>
       </app-form-row>
       }

@@ -9,6 +9,8 @@ import { PageHeader } from '../../../shared/ui/page-header';
 import { InlineStatus, createLoadState } from '../../../shared/ui/loading';
 import { PIPELINE_FIELDS, Topic } from '../../ai/assistant/create-pipeline';
 import { pipelineIdOf } from '../../ai/assistant/flow.model';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
+import { idOf, idValue } from '../../../shared/ui/advanced-options';
 
 /** A pipeline the copy may start from: its task, and the registry pipeline that holds its steps. */
 export interface CopySource { taskDetailId: number; taskName: string; pipelineId?: string | null; taskStatus?: string; }
@@ -31,7 +33,7 @@ export const STEP_PAYLOAD = '<data></data>';
  */
 @Component({
   selector: 'app-new-pipeline',
-  imports: [Icon, RouterLink, PageHeader, InlineStatus],
+  imports: [Icon, RouterLink, PageHeader, InlineStatus, AdvancedSelect],
   template: `
     <div class="page">
       <app-page-header title="New pipeline" subtitle="Start from what it should do. A schedule, triggers and a review come after it is made." />
@@ -90,11 +92,10 @@ export const STEP_PAYLOAD = '<data></data>';
             <div class="mt-2 flex flex-col gap-1">
               <label class="label" for="newPipelineTopic">Topic (optional)</label>
               <!-- Owner 2026-10-27: the list says it is loading, empty or could not be read, instead of an empty select. -->
-              <select id="newPipelineTopic" class="input" [value]="topicId() ?? ''" (change)="topicId.set(+$any($event.target).value || null)">
-                @if (topicsState.pending()) { <option value="">Loading topics…</option> }
-                @else if (!topics().length) { <option value="">The workspace's own topic</option> }
-                @for (t of topics(); track t.sourceTaskTypeId) { <option [value]="'' + t.sourceTaskTypeId">{{ t.serviceName }}</option> }
-              </select>
+              <app-advanced-select id="newPipelineTopic" [options]="topicOptions()" [value]="idValue(topicId())" (valueChange)="topicId.set(idOf($event))"
+                                   [allowClear]="true" clearLabel="The workspace's own topic" placeholder="The workspace's own topic"
+                                   searchLabel="Search the topics" [loading]="topicsState.pending()" loadingText="Loading topics…"
+                                   emptyText="No topic yet: the workspace's own is used." />
               <app-inline-status [loading]="topicsState.loading()" [error]="topicsState.error()" label="Loading topics…"
                                  [empty]="topicsState.loaded() && !topics().length" emptyText="No topic yet: the workspace's own is used."
                                  (retry)="loadTopics()" />
@@ -117,11 +118,10 @@ export const STEP_PAYLOAD = '<data></data>';
             changes the other. The copy starts inactive.</p>
           <label class="flex flex-col gap-1">
             <span class="label">Pipeline to copy</span>
-            <select id="newPipelineCopyFrom" class="input" data-test="copy-from" [value]="copyFrom() ?? ''" (focus)="chosen.set('copy')"
-                    (change)="pickCopy(+$any($event.target).value || null)">
-              <option value="">{{ sourcesState.pending() ? 'Loading pipelines…' : 'Choose…' }}</option>
-              @for (p of copyable(); track p.taskDetailId) { <option [value]="'' + p.taskDetailId">{{ p.taskName }}</option> }
-            </select>
+            <app-advanced-select id="newPipelineCopyFrom" data-test="copy-from" [options]="copyOptions()" [value]="idValue(copyFrom())"
+                                 (focusin)="chosen.set('copy')" (valueChange)="pickCopy(idOf($event))" placeholder="Choose…"
+                                 ariaLabel="Pipeline to copy" searchLabel="Search the pipelines" [loading]="sourcesState.pending()"
+                                 loadingText="Loading pipelines…" emptyText="No pipeline with steps to copy yet." />
             <app-inline-status [loading]="sourcesState.loading()" [error]="sourcesState.error()" label="Loading pipelines…"
                                [empty]="sourcesState.loaded() && !copyable().length" emptyText="No pipeline with steps to copy yet."
                                (retry)="loadSources()" />
@@ -167,6 +167,12 @@ export class NewPipeline implements OnInit {
   readonly canAssistant = computed(() => this.auth.canOpen('ai-prompts'));
   /** A pipeline with steps of its own (a registry pipeline) can be copied; an XML-only task has none to copy. */
   readonly copyable = computed(() => this.sources().filter(p => !!p.pipelineId && p.taskStatus !== 'Delete'));
+  readonly idValue = idValue;
+  readonly idOf = idOf;
+  readonly topicOptions = computed<AdvancedOption[]>(() => this.topics().map(t => ({ value: '' + t.sourceTaskTypeId, label: t.serviceName,
+    mono: true, badge: t.status && t.status !== 'Active' ? t.status : undefined })));
+  readonly copyOptions = computed<AdvancedOption[]>(() => this.copyable().map(p => ({ value: '' + p.taskDetailId, label: p.taskName,
+    description: p.taskStatus ? `${p.taskStatus} · #${p.taskDetailId}` : `#${p.taskDetailId}`, keywords: '' + p.taskDetailId })));
 
   /** A platform administrator's own sign-in: no workspace to put a pipeline in (they open one first). */
   readonly noWorkspace = computed(() => !this.auth.user()?.tenantId);

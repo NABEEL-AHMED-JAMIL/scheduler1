@@ -1,6 +1,7 @@
 import { test, expect, APIRequestContext, Page, Response } from '@playwright/test';
 import { api, authOf, canSignIn, NEEDS, pageAs, Session, sessionFor } from './support/session';
 import { makeJob, makePipeline, makeTask, removeMade } from './support/workspace';
+import { pickOption } from './support/advanced-select';
 import { hasFixtures, NEEDS_FIXTURES, riverside } from './support/fixtures';
 
 /**
@@ -210,7 +211,7 @@ test.describe('Step builder', () => {
     expect(await filterPanel.locator(`#${await column.getAttribute('list')} option`).evaluateAll(os => os.map(o => o.getAttribute('value'))))
       .toEqual(['patient']);
     await column.fill('patient');
-    await filterPanel.locator('#cfg-conditions-0-operator').selectOption({ label: 'not_null' });
+    await pickOption(filterPanel.locator('#cfg-conditions-0-operator'), { label: 'not_null' });
     await filterPanel.getByRole('button', { name: 'Apply' }).click();
     await expect.poll(() => cards(page)).toEqual(['read', 'keep', 'kept']);
     expect((await save(page)).format).toBe('json');

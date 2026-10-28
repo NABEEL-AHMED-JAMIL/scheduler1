@@ -35,6 +35,7 @@ import { ActionsBar } from '../../../shared/ui/actions-bar';
 import { AppLoading, InlineStatus, createLoadState, loadErrorText } from '../../../shared/ui/loading';
 import { createTableSort } from '../../../shared/ui/sort';
 import { SortHeader } from '../../../shared/ui/sort-header';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
 
 /**
  * The page's tabs (MIG-249; UX review 2026-10-12, B2): Details is the pipeline's own form; Steps, Settings, History,
@@ -62,7 +63,7 @@ export function yesNoAsCheckbox(field: PipelineField): PipelineField {
 @Component({
   selector: 'app-task-edit',
   imports: [ActionsBar, PageHeader, StatusPill, Icon, ReactiveFormsModule, RouterLink, Field, Combobox, LoadError, StepBuilder, ManagedBanner,
-    CdkMenu, CdkMenuItem, CdkMenuTrigger, Section, EmptyState, ServerTimePipe, AppLoading, InlineStatus, SortHeader],
+    CdkMenu, CdkMenuItem, CdkMenuTrigger, Section, EmptyState, ServerTimePipe, AppLoading, InlineStatus, SortHeader, AdvancedSelect],
   templateUrl: './task-edit.html',
   // UX review 2026-10-12 (B2/B3): this screen's own rules, in its lazy chunk rather than the console's first download.
   styles: `
@@ -854,6 +855,22 @@ export class TaskEdit implements OnInit {
    * something, anything -- overwrote an answer the operator never saw. Carrying it as a labelled
    * option shows what the task actually holds instead of hiding it.
    */
+  /**
+   * Each select field's choices as its advanced select lists them, by control name (one value once: two choices may
+   * share a label, and the first of two with one value stands for both).
+   */
+  readonly fieldChoiceOptions = computed<Record<string, AdvancedOption[]>>(() => {
+    const out: Record<string, AdvancedOption[]> = {};
+    for (const field of this.formFields()) {
+      if (field.fieldType !== 'select') continue;
+      const seen = new Set<string>();
+      out[this.controlName(field)] = parseFieldChoices(field.fieldOptions)
+        .filter(c => !seen.has(c.value) && !!seen.add(c.value))
+        .map(c => ({ value: c.value, label: c.label, description: c.label !== c.value ? c.value : undefined }));
+    }
+    return out;
+  });
+
   fieldChoices(field: PipelineField): FieldChoice[] {
     const choices = parseFieldChoices(field.fieldOptions);
     const current = String(this.formData.get(this.controlName(field))?.value ?? '').trim();

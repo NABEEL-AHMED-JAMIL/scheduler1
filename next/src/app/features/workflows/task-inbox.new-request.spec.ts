@@ -8,6 +8,7 @@ import { ToastService } from '../../shared/ui/toast.service';
 import { TaskInbox } from './task-inbox';
 import { TaskCountService } from './task-count.service';
 import { WorkflowsApi } from './workflows.api';
+import { advancedSelect } from '../../shared/ui/advanced-select.testing';
 
 /**
  * ZT-S2: a person who makes requests starts one from My requests > New request -- a workflow they may start, a title and
@@ -54,8 +55,8 @@ describe('My requests > New request (ZT-S2)', () => {
     button.click();
     fixture.detectChanges();
     expect(api.startable).toHaveBeenCalled();
-    const options = Array.from(el.querySelectorAll('[data-test="new-request-workflow"] option')).map(o => o.textContent?.trim());
-    expect(options).toEqual(['Month-end close', 'Write-off']);
+    expect(el.querySelector('[data-test="new-request-workflow"] button.adv-trigger')).not.toBeNull();
+    expect(advancedSelect(fixture, 'Workflow').options().map(o => o.label)).toEqual(['Month-end close', 'Write-off']);
   });
 
   it('starts the request with its title and fields (numbers as numbers), then opens it', () => {

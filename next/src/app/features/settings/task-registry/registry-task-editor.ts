@@ -25,6 +25,7 @@ import { AiStepConfig, AiStepPanel } from '../pipelines/ai-step-panel';
 import {
   FIELD_TYPES, FieldChoice, Pipeline, PipelineField, parseFieldChoices, serializeFieldChoices, validateSelectChoices,
 } from '../pipelines/pipeline.model';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
 
 /**
  * Settings › Task Registry › New / Edit registry task (owner #18, 2026-10-19): a page of its own, wide, instead of the
@@ -37,7 +38,7 @@ import {
  */
 @Component({
   selector: 'app-registry-task-editor',
-  imports: [ReactiveFormsModule, RouterLink, PageHeader, Section, FormRow, Field, Combobox, Icon, ActionsBar, StatusPill, AppLoading, InlineStatus],
+  imports: [ReactiveFormsModule, RouterLink, PageHeader, Section, FormRow, Field, Combobox, Icon, ActionsBar, StatusPill, AppLoading, InlineStatus, AdvancedSelect],
   templateUrl: './registry-task-editor.html',
   styles: `
     .rte-layout { display: grid; gap: 1.25rem; }
@@ -273,6 +274,16 @@ export class RegistryTaskEditor implements OnInit, HasUnsavedChanges {
   }
 
   /** What the Default value dropdown offers for a select; a stale default is carried as a last entry, not dropped. */
+  /** Each field row's pickers' options (its parent's tags, its choices), rebuilt as the form changes. */
+  readonly rowOptions = computed<{ parents: AdvancedOption[]; choices: AdvancedOption[] }[]>(() => {
+    this.revision();
+    return this.fields.controls.map((_, i) => ({
+      parents: [...new Set(this.parentChoices(i))].map(k => ({ value: k, label: k, mono: true })),
+      choices: [...new Map(this.choicesFor(i).map(c => [c.value, c] as const)).values()]
+        .map(c => ({ value: c.value, label: c.label, description: c.label !== c.value ? c.value : undefined })),
+    }));
+  });
+
   defaultValueOptions(index: number): FieldChoice[] {
     const choices = this.choicesFor(index);
     const current = String(this.fields.at(index).get('defaultValue')?.value ?? '').trim();

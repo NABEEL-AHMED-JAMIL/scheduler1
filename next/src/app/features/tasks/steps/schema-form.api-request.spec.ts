@@ -7,6 +7,7 @@ import { SchemaForm } from './schema-form';
 import { ApiRequestChoice, JsonSchema, fieldsOf, usesApiRequest } from './steps.model';
 import { StepsApi } from './steps.service';
 import { DocumentsApi } from '../../documents/documents.service';
+import { advancedSelect } from '../../../shared/ui/advanced-select.testing';
 
 /**
  * Owner #25: a step that names a saved API request (Read API, Enrich, Call API) picks it from the workspace's requests,
@@ -47,22 +48,23 @@ describe('an api-request setting', () => {
   });
 
   it('offers the requests by collection with their methods, a disabled one greyed, and answers the id', () => {
-    const { el, changes } = form({});
-    const select = el.querySelector<HTMLSelectElement>('#cfg-requestId')!;
-    expect([...select.querySelectorAll('optgroup')].map(g => g.label)).toEqual(['Referrals', 'Labs']);
-    const options = [...select.querySelectorAll('option')].map(o => [o.textContent!.trim(), o.disabled]);
-    expect(options).toEqual([['Choose an API request…', false], ['POST · Create referral', false],
-      ['PUT · Update referral (disabled)', true], ['GET · Results', false]]);
-    select.value = '12';
-    select.dispatchEvent(new Event('change'));
+    const { fixture, changes } = form({});
+    const select = advancedSelect(fixture, 'cfg-requestId');
+    expect(select.placeholder()).toBe('Choose an API request…');
+    expect([...new Set(select.options().map(o => o.group))]).toEqual(['Referrals', 'Labs']);
+    const options = select.options().map(o => [`${o.sample} · ${o.label}${o.badge ? ' (' + o.badge.toLowerCase() + ')' : ''}`, !!o.disabled]);
+    expect(options).toEqual([['POST · Create referral', false], ['PUT · Update referral (disabled)', true], ['GET · Results', false]]);
+    select.choose('13');
+    expect(changes.length).toBe(0);
+    select.choose('12');
     expect(changes.at(-1)).toEqual({ requestId: 12 });
   });
 
   it('offers the chosen request\'s environments, and names a saved one that is not listed', () => {
-    const { el } = form({ requestId: 12, environmentId: 99 });
-    const env = el.querySelector<HTMLSelectElement>('#cfg-environmentId')!;
-    expect([...env.querySelectorAll('option')].map(o => o.textContent!.trim()))
-      .toEqual(["The collection's default", 'Sandbox (default)', 'Live', 'Environment 99']);
+    const { fixture } = form({ requestId: 12, environmentId: 99 });
+    const env = advancedSelect(fixture, 'cfg-environmentId');
+    expect([env.clearLabel(), ...env.options().map(o => o.label)]).toEqual(["The collection's default", 'Sandbox (default)', 'Live', 'Environment 99']);
+    expect(env.value()).toBe('99');
   });
 });
 
