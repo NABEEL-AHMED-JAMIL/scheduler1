@@ -117,7 +117,7 @@ test.describe('access profiles', () => {
     await row.getByRole('button', { name: 'Actions' }).click();
     await adminPage.getByRole('menuitem', { name: /Edit/ }).click();
     await expect(adminPage).toHaveURL(/\/administration\/users\/\d+$/);
-    const picker = adminPage.locator('#ue-profile');
+    const picker = adminPage.locator('#ue-page-profile');
     await expect(picker).toBeVisible();
     await pickOption(picker, { label: PROFILE });
     await expect(adminPage.getByTestId('user-preview')).toContainText('After you save');

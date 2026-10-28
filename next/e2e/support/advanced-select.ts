@@ -35,7 +35,9 @@ export async function pickOption(select: Locator, what: AdvancedPick): Promise<v
     option = typeof what === 'string' ? list.locator(`[role="option"][data-value="${text.replace(/"/g, '\\"')}"]`).or(byName) : byName;
   }
   await option.first().click();
-  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  // The button's name now carries the choice ("Image: Riverside logo"), so a locator found by its old name no longer
+  // matches it: the pick is done when its list has closed.
+  await expect(list).toBeHidden();
 }
 
 /** Picks the "none" row (the select's `clearLabel`). */
@@ -44,7 +46,7 @@ export async function clearOption(select: Locator): Promise<void> {
   await trigger.click();
   const listId = await trigger.getAttribute('aria-controls');
   await trigger.page().locator(`[id="${listId}-clear"]`).click();
-  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  await expect(trigger.page().locator(`[id="${listId}"]`)).toBeHidden();
 }
 
 /** The name an advanced select shows for its choice (a native select's `inputValue` read the value; this reads the name). */

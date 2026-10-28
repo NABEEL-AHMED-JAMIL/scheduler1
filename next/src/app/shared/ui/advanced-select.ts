@@ -1,5 +1,5 @@
 import {
-  Component, DestroyRef, ElementRef, Injector, computed, effect, forwardRef, inject, input, model, output, signal, untracked, viewChild,
+  Component, DestroyRef, ElementRef, Injector, afterNextRender, computed, effect, forwardRef, inject, input, model, output, signal, untracked, viewChild,
 } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
@@ -106,11 +106,12 @@ export function rowsOf(options: AdvancedOption[]): Row[] {
   template: `
     <div class="adv" [class.adv-inline]="inline()" [class.adv-sm]="compact()" [class.adv-bare]="bare()">
       @if (!inline()) {
-        <button #trigger type="button" class="adv-trigger" cdkOverlayOrigin #origin="cdkOverlayOrigin" [id]="id() || null"
+        <button #trigger type="button" class="adv-trigger" cdkOverlayOrigin #origin="cdkOverlayOrigin" [attr.id]="id() || null"
                 [disabled]="isDisabled()" aria-haspopup="listbox" [attr.aria-expanded]="open()" [attr.aria-controls]="open() ? listId : null"
                 [attr.aria-label]="ariaLabel() ? ariaLabel() + (chosen() ? ': ' + chosen()!.label : '') : null"
-                [attr.aria-labelledby]="labelledBy() || null" [attr.aria-describedby]="describedBy() || null" [attr.aria-invalid]="invalid() || null"
+                [attr.aria-labelledby]="labelledBy() || autoLabelledBy() || null" [attr.aria-describedby]="describedBy() || null" [attr.aria-invalid]="invalid() || null"
                 [class.is-invalid]="invalid()" (click)="toggle()" (keydown)="onTriggerKey($event)">
+          <span class="adv-trigger-value" [id]="valueId">
           @if (chosen(); as c) {
             <span class="adv-trigger-main">
               <span class="adv-name" [class.mono]="c.mono">{{ c.label }}</span>
@@ -128,6 +129,7 @@ export function rowsOf(options: AdvancedOption[]): Row[] {
           } @else {
             <span class="adv-placeholder">{{ placeholder() }}</span>
           }
+          </span>
           <app-icon name="chevronDown" class="adv-chevron" />
         </button>
         <ng-template cdkConnectedOverlay [cdkConnectedOverlayOrigin]="origin" [cdkConnectedOverlayOpen]="open()"
@@ -208,6 +210,7 @@ export function rowsOf(options: AdvancedOption[]): Row[] {
     :host-context(.page-head) .adv-trigger-desc, :host-context(.table-toolbar) .adv-trigger-desc { display: none; }
     :host-context(.field-invalid) .adv-trigger, :host(.input-invalid) .adv-trigger { border-color: var(--crit-text); }
     .adv-cleared { color: var(--text-primary); }
+    .adv-trigger-value { display: contents; }
     .adv-bare .adv-trigger { min-height: 0; padding: 0 1.25rem 0 0; border: 0; background: transparent; font: inherit; font-weight: 600; }
     .adv-bare .adv-trigger-desc { display: none; }
     .adv-bare .adv-chevron { right: 0; }
@@ -251,6 +254,13 @@ export function rowsOf(options: AdvancedOption[]): Row[] {
 export class AdvancedSelect implements ControlValueAccessor {
   private static next = 0;
   readonly listId = `adv-list-${++AdvancedSelect.next}`;
+  /** The button's shown choice, which its name reads after its label's words. */
+  readonly valueId = `${this.listId}-value`;
+  /**
+   * Named by a `<label for>`, the button is named "label, then the choice" (aria-labelledby the label and the shown
+   * choice), as a native select is: a label alone named it "Drill" whatever it held, and a second button "Drill" beside it.
+   */
+  readonly autoLabelledBy = signal('');
   private readonly host = inject(ElementRef<HTMLElement>).nativeElement as HTMLElement;
 
   readonly options = input<AdvancedOption[]>([]);
@@ -352,6 +362,7 @@ export class AdvancedSelect implements ControlValueAccessor {
   });
 
   constructor() {
+    afterNextRender(() => this.nameFromLabel());
     // A click outside closes the panel, as a native select does.
     const outside = (e: MouseEvent) => { if (this.open() && !this.inside(e.target as Node | null)) this.close(false); };
     document.addEventListener('mousedown', outside, true);
@@ -365,6 +376,15 @@ export class AdvancedSelect implements ControlValueAccessor {
         if (this.inline() && this.active() < 0) this.active.set(opts.findIndex(o => o.value === v));
       });
     });
+  }
+
+  private nameFromLabel(): void {
+    const id = this.id();
+    if (!id || this.ariaLabel() || this.labelledBy()) return;
+    const label = Array.from(document.querySelectorAll<HTMLLabelElement>('label[for]')).find(l => l.htmlFor === id);
+    if (!label) return;
+    if (!label.id) label.id = `${this.listId}-label`;
+    this.autoLabelledBy.set(`${label.id} ${this.valueId}`);
   }
 
   optionId(index: number): string {

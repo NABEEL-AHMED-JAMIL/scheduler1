@@ -134,7 +134,8 @@ test.describe('Executions', () => {
     await expect(panel.locator('.run-log-line').first()).toContainText(/Try 1 of \d+\./);
     await panel.getByRole('button', { name: 'Open in Log' }).click();
     await expect(page).toHaveURL(new RegExp(`/runs/${ENGINE.run}/logs$`));
-    await expect(page.getByRole('combobox', { name: 'Step', exact: true })).toHaveValue(read.key);
+    // The Step filter is the advanced select: its button names the chosen step (and its key beside a name).
+    await expect(page.getByRole('button', { name: /^Step: / })).toContainText(read.key);
     await expect(page.locator('app-run-log .run-log-line', { hasText: /Try 1 of \d+\./ }).first()).toBeVisible();
     await page.context().close();
   });

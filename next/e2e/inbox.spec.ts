@@ -127,7 +127,7 @@ test.describe('Inbox (live storage-service)', () => {
     await page.getByRole('region', { name: 'Settings' }).getByRole('button', { name: 'Change' }).click();
     const dialog = page.getByRole('dialog');
     await expect(dialog.getByRole('heading', { name: 'File drop settings' })).toBeVisible();
-    await expect(dialog.getByLabel(/Storage connection/)).toHaveValue(riverside().storageAlias);
+    await expect(dialog.locator('#inboxAlias')).toContainText(riverside().storageAlias);
     await expect(dialog.getByRole('button', { name: 'Turn off' })).toBeVisible();
     await shot(page, info, 'inbox-settings');
     await dialog.getByRole('button', { name: 'Cancel' }).click();

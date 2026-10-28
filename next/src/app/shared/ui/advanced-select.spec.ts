@@ -172,6 +172,33 @@ describe('AdvancedSelect', () => {
     expect(kept).toEqual(['1476', null]);
   });
 
+  it('is named by its <label for> and then its choice, as a native select is', async () => {
+    const label = document.createElement('label');
+    label.htmlFor = 'pick-pipeline';
+    label.textContent = 'Pipeline';
+    document.body.appendChild(label);
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ imports: [AdvancedSelect] });
+    const fixture = TestBed.createComponent(AdvancedSelect);
+    fixture.componentRef.setInput('options', PIPELINES);
+    fixture.componentRef.setInput('id', 'pick-pipeline');
+    fixture.componentRef.setInput('value', '1028');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const trigger = (fixture.nativeElement as HTMLElement).querySelector('button.adv-trigger')!;
+    expect(trigger.id).toBe('pick-pipeline');
+    const [labelId, valueId] = trigger.getAttribute('aria-labelledby')!.split(' ');
+    expect(document.getElementById(labelId)).toBe(label);
+    expect(document.getElementById(valueId)?.textContent).toContain('X-ray triage outcomes');
+    label.remove();
+  });
+
+  it('puts no id on its button when it is given none (not "null")', () => {
+    const { el } = make();
+    expect(el.querySelector('button.adv-trigger')!.hasAttribute('id')).toBe(false);
+  });
+
   it('as an "Add …" menu, only emits the pick and keeps showing its placeholder', () => {
     const { box, el, fixture } = make({ resetOnPick: true, placeholder: 'Add a pipeline' });
     const picks: (string | undefined)[] = [];

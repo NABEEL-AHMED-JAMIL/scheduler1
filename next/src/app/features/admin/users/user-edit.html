@@ -115,8 +115,8 @@
                 </dl>
                 @if (isMember()) {
                   @if (profiles().length) {
-                    <app-field label="Page access profile" for="ue-profile" hint="Which pages they open. Profiles are made on Page access.">
-                      <app-advanced-select id="ue-profile" formControlName="pageAccessProfileId" data-test="profile-picker" [numeric]="true"
+                    <app-field label="Page access profile" for="ue-page-profile" hint="Which pages they open. Profiles are made on Page access.">
+                      <app-advanced-select id="ue-page-profile" formControlName="pageAccessProfileId" data-test="profile-picker" [numeric]="true"
                                            [options]="profileOptions()" [allowClear]="true" [clearLabel]="defaultLabel()" [placeholder]="defaultLabel()"
                                            searchLabel="Search the access profiles" />
                     </app-field>

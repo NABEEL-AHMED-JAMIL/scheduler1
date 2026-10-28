@@ -360,7 +360,7 @@ test('clicking a bar narrows the board, and the rolled-up bar is not a button',
     await page.locator('.dash-filter-pill').click();
     const builder = page.locator('app-filter-builder');
     await expect(builder).toBeVisible();
-    await expect(builder.getByLabel('Column for condition 1')).toHaveValue('sub_category');
+    await expect(builder.getByLabel('Column for condition 1')).toContainText('sub_category');
     await expect(builder.getByLabel('Value for condition 1')).toHaveValue(value);
 
     await page.waitForTimeout(20000);
