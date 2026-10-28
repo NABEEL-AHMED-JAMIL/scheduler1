@@ -132,4 +132,26 @@ describe('Run item panel', () => {
     reader.detail();
     expect(reader.el.querySelector('[data-test="item-retry"]')).toBeNull();
   });
+
+  // ZT-I35 (live run #2950): a step's long name was cut off in its row; now its short name, and the whole name under it.
+  it('names a step by its short name with its whole name as a muted line, and a report file by its number', () => {
+    const report = 'The Patient intake summary (published template, signed on approval, QR verify)';
+    const { el, detail } = mount();
+    detail('2', {
+      item: { ...DETAIL().item, status: 'done', failedStep: null, reason: null },
+      steps: [{ index: 2, key: 'report', name: report, status: 'left_out', note: 'Not in this step\'s output: the item ends here.', hasData: false, files: 1 },
+        { index: 5, key: 'keep_outcome', name: 'Outcome row to the bucket', status: 'not_run', hasData: false }],
+      files: [{ fileRef: '1267', name: 'Patient_intake_S-1151_v1.pdf', role: 'output', stepKey: 'report', stepName: report, format: 'pdf',
+        report: { reportId: '01M5Y3GYFKZRAV9KKQ74D413D6', number: 'RPT-0086', version: 1, pages: 4 } }],
+      fileCount: 1,
+    });
+    const rows = [...el.querySelectorAll('[data-test="item-steps"] li')];
+    expect(rows[0].querySelector('[data-test="step-name"]')?.textContent?.replace(/:.*$/, '').trim()).toBe('Patient intake summary');
+    expect(rows[0].querySelector('[data-test="step-desc"]')?.textContent?.trim()).toBe(report);
+    expect(rows[1].querySelector('[data-test="step-name"]')?.textContent?.replace(/:.*$/, '').trim()).toBe('Outcome row to the bucket');
+    expect(rows[1].querySelector('[data-test="step-desc"]')).toBeNull();
+    expect(el.querySelector('[data-test="item-files"] [data-file="1267"] span:last-child')?.textContent?.trim())
+      .toBe('Patient_intake_S-1151_v1.pdf · RPT-0086 v1');
+  });
 });
+

@@ -1,4 +1,5 @@
 import { plural } from '../run-steps/run-page.model';
+import { stepShortName } from '../run-items/run-items.model';
 
 /**
  * A schedule's Items tab (MIG-421): every run that processed an item -- found by its name or key, or by a value such as
@@ -127,7 +128,7 @@ export function headline(page: AcrossPage | null | undefined): { title: string; 
 
 /** The status pill of an item in a run. */
 export function rowLook(row: Pick<AcrossRow, 'status' | 'failedStep' | 'flag' | 'children'>): { label: string; tone: 'ok' | 'warn' | 'crit' | 'brand' } {
-  if (row.status === 'failed') return { label: row.failedStep?.name ? `Failed at ${row.failedStep.name}` : 'Failed', tone: 'crit' };
+  if (row.status === 'failed') return { label: row.failedStep?.name ? `Failed at ${stepShortName(row.failedStep)}` : 'Failed', tone: 'crit' };
   if (row.status === 'running') return { label: 'Running', tone: 'brand' };
   if ((row.children?.failed ?? 0) > 0) return { label: `${plural(row.children!.failed, 'page')} failed`, tone: 'warn' };
   if (row.flag === 'check') return { label: 'Check by hand', tone: 'warn' };
@@ -159,7 +160,7 @@ export function ticked(current: number[], run: number): number[] {
 /** "Compare #8814 with #8701 · Insight JSON · 3 fields changed". */
 export function compareTitle(c: Comparison): { title: string; sub: string } {
   const changedSteps = c.steps.filter(s => s.changes.length);
-  const where = changedSteps.length === 1 ? `${changedSteps[0].name} · ` : changedSteps.length > 1 ? `${plural(changedSteps.length, 'step')} · ` : '';
+  const where = changedSteps.length === 1 ? `${stepShortName(changedSteps[0])} · ` : changedSteps.length > 1 ? `${plural(changedSteps.length, 'step')} · ` : '';
   return {
     title: `Compare #${c.a.jobQueueId} with #${c.b.jobQueueId}`,
     sub: c.changed ? `${where}${plural(c.changed, 'field')} changed` : 'Nothing changed in the data both runs kept',
@@ -177,10 +178,10 @@ export function beforeText(ch: Change): string {
 
 /** ZT-I23: the steps that only carried on changes said at an earlier step, with how many ("Save file: 3 carried on"). */
 export function carriedSteps(c: Comparison): { name: string; carried: number }[] {
-  return c.steps.filter(s => !s.changes.length && (s.carried ?? 0) > 0).map(s => ({ name: s.name, carried: s.carried ?? 0 }));
+  return c.steps.filter(s => !s.changes.length && (s.carried ?? 0) > 0).map(s => ({ name: stepShortName(s), carried: s.carried ?? 0 }));
 }
 
 /** The unchanged steps, by name, for the note under the diff ("The transcript is the same word for word"). */
 export function sameSteps(c: Comparison): string[] {
-  return c.steps.filter(s => s.same).map(s => s.name);
+  return c.steps.filter(s => s.same).map(s => stepShortName(s));
 }

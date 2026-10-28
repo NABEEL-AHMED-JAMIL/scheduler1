@@ -16,7 +16,8 @@ import { RunItemsApi, refusalText } from './run-items.api';
 import {
   CellLook, FILTER_LABEL, ItemFilter, ItemStep, ItemsPage, MAX_ZIP_ITEMS, NO_SELECTION, RunItem, Selection, SelectionAnswer, cellLook,
   fieldText, filterCount, filtersOf, isSelected, itemLook, itemPanelConfig, itemStats, itemSub, itemTime, itemsQuery, pageState,
-  retriedSentence, retryLabel, retryRefusal, selectedCount, selectionBody, stepColumns, toggled, withPage, zipItemsLabel,
+  retriedSentence, retryLabel, retryRefusal, selectedCount, selectionBody, stepColumns, stepDescription, stepShortName, toggled, withPage,
+  zipItemsLabel,
 } from './run-items.model';
 import { ItemPanelData, RunItemPanel } from './run-item-panel';
 import { ItemFilesData, RunItemFiles } from './run-item-files';
@@ -40,9 +41,9 @@ export const CHILD_PAGE = 15;
   imports: [Icon, StatStrip, Pagination, EmptyState, CdkMenu, CdkMenuItemCheckbox, CdkMenuTrigger],
   styles: `
     .ri-table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
-    .ri-table th { text-align: left; font-weight: 600; font-size: 0.6875rem; letter-spacing: 0.04em; text-transform: uppercase;
-                   color: var(--text-muted); padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border-subtle); white-space: nowrap;
-                   background: var(--surface-sunken); }
+    /* ZT-I35: headers in the design's sentence case, a step by its short name (its whole name on hover). */
+    .ri-table th { text-align: left; font-weight: 600; font-size: 0.75rem; color: var(--text-secondary); padding: 0.5rem 0.75rem;
+                   border-bottom: 1px solid var(--border-subtle); white-space: nowrap; background: var(--surface-sunken); }
     .ri-table td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border-subtle); vertical-align: middle; }
     .ri-table tbody tr:last-child td { border-bottom: 0; }
     .ri-table tr.is-failed > td { background: color-mix(in oklab, var(--crit-soft) 35%, var(--surface-raised)); }
@@ -52,6 +53,13 @@ export const CHILD_PAGE = 15;
     .ri-sub { font-size: 0.75rem; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 22rem; }
     .ri-child-name { padding-left: 1.5rem; }
     .ri-cell-none { color: var(--text-muted); }
+    /* ZT-I35: a step's files as a chip -- its one file's type and name, or the count. */
+    .ri-chip { display: inline-flex; align-items: center; gap: 0.375rem; max-width: 15rem; height: 1.625rem; padding: 0 0.5rem;
+               border: 1px solid var(--border-control); border-radius: var(--radius-md); font-size: 0.75rem; font-weight: 500;
+               background: var(--surface-raised); color: var(--text-primary); }
+    .ri-chip:hover { background: var(--surface-sunken); }
+    .ri-chip:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+    .ri-chip > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
     .ri-search { width: min(24rem, 100%); }
     .ri-field { max-width: 16rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     /* ZT-I15: at 1024 the table scrolls inside its card; Open stays at its right edge, over the row's own background. */
@@ -160,7 +168,7 @@ export const CHILD_PAGE = 15;
                   <th scope="col" class="text-right">#</th>
                   <th scope="col">Item</th>
                   <th scope="col">Status</th>
-                  @for (s of columns(); track s.key) { <th scope="col" [attr.data-step]="s.key">{{ s.name }}</th> }
+                  @for (s of columns(); track s.key) { <th scope="col" [attr.data-step]="s.key" [attr.title]="desc(s) || null">{{ short(s) }}</th> }
                   @for (f of fields(); track f) {
                     <th scope="col" [attr.data-field-col]="f">
                       <span class="inline-flex items-center gap-1">{{ f }}@if (isMasked(f)) { <app-icon name="lock" size="0.85em" label="Masked" title="Masked for you" /> }</span>
@@ -195,11 +203,15 @@ export const CHILD_PAGE = 15;
                         @let c = cell(item, s);
                         @switch (c.kind) {
                           @case ('view') { <button type="button" class="link-inline text-xs font-medium" [title]="c.title"
-                                                   [attr.aria-label]="s.name + ' for ' + item.label + ': view'" (click)="open(item, s.key)">{{ c.text }}</button> }
-                          @case ('files') { <button type="button" class="link-inline text-xs font-medium" [title]="c.title"
-                                                    [attr.aria-label]="s.name + ' for ' + item.label + ': ' + c.text" (click)="openFiles(item, s)">{{ c.text }}</button> }
+                                                   [attr.aria-label]="short(s) + ' for ' + item.label + ': view'" (click)="open(item, s.key)">{{ c.text }}</button> }
+                          @case ('file') { <button type="button" class="ri-chip" [title]="c.title" data-test="cell-file"
+                                                   [attr.aria-label]="short(s) + ' for ' + item.label + ': ' + c.text" (click)="openFiles(item, s)">
+                                             <app-icon [name]="c.icon ?? 'file'" size="0.95em" class="icon-muted shrink-0" /><span>{{ c.text }}</span></button> }
+                          @case ('files') { <button type="button" class="ri-chip" [title]="c.title" data-test="cell-files"
+                                                    [attr.aria-label]="short(s) + ' for ' + item.label + ': ' + c.text" (click)="openFiles(item, s)">
+                                              <app-icon [name]="c.icon ?? 'layers'" size="0.95em" class="icon-muted shrink-0" /><span>{{ c.text }}</span></button> }
                           @case ('failed') { <button type="button" class="link-inline text-xs text-crit-500" [title]="c.title"
-                                                     [attr.aria-label]="s.name + ' failed for ' + item.label" (click)="open(item, s.key)">{{ c.text }}</button> }
+                                                     [attr.aria-label]="short(s) + ' failed for ' + item.label" (click)="open(item, s.key)">{{ c.text }}</button> }
                           @case ('shared') { <span class="text-xs text-[color:var(--text-secondary)]" [title]="c.title">{{ c.text }}</span> }
                           @case ('done') { <span class="text-xs text-[color:var(--text-secondary)]" [title]="c.title">{{ c.text }}</span> }
                           @default { <span class="ri-cell-none" [title]="c.title">—</span> }
@@ -227,8 +239,11 @@ export const CHILD_PAGE = 15;
                           <td class="whitespace-nowrap">
                             @let c = cell(child, s);
                             @switch (c.kind) {
-                              @case ('view') { <button type="button" class="link-inline text-xs font-medium" [attr.aria-label]="s.name + ' for ' + child.label + ': view'" (click)="open(child, s.key)">{{ c.text }}</button> }
-                              @case ('files') { <button type="button" class="link-inline text-xs font-medium" [attr.aria-label]="s.name + ' for ' + child.label + ': ' + c.text" (click)="openFiles(child, s)">{{ c.text }}</button> }
+                              @case ('view') { <button type="button" class="link-inline text-xs font-medium" [attr.aria-label]="short(s) + ' for ' + child.label + ': view'" (click)="open(child, s.key)">{{ c.text }}</button> }
+                              @case ('file') { <button type="button" class="ri-chip" [title]="c.title" [attr.aria-label]="short(s) + ' for ' + child.label + ': ' + c.text" (click)="openFiles(child, s)">
+                                <app-icon [name]="c.icon ?? 'file'" size="0.95em" class="icon-muted shrink-0" /><span>{{ c.text }}</span></button> }
+                              @case ('files') { <button type="button" class="ri-chip" [title]="c.title" [attr.aria-label]="short(s) + ' for ' + child.label + ': ' + c.text" (click)="openFiles(child, s)">
+                                <app-icon [name]="c.icon ?? 'layers'" size="0.95em" class="icon-muted shrink-0" /><span>{{ c.text }}</span></button> }
                               @case ('failed') { <span class="text-xs text-crit-500">{{ c.text }}</span> }
                               @case ('none') { <span class="ri-cell-none" [title]="c.title">—</span> }
                               @default { <span class="text-xs text-[color:var(--text-secondary)]" [title]="c.title">{{ c.text }}</span> }
@@ -397,6 +412,9 @@ export class RunItems implements OnInit {
   sub(item: RunItem): string { return itemSub(item); }
   time(item: RunItem): string { return itemTime(item.durationMs); }
   cell(item: RunItem, step: ItemStep): CellLook { return cellLook(item.cells?.[step.key]); }
+  /** ZT-I35: a step by its short name; its whole name, when that says more, on hover. */
+  readonly short = stepShortName;
+  readonly desc = stepDescription;
   field(item: RunItem, f: string): string { return fieldText(item.fields?.[f]); }
   isMasked(f: string): boolean { return (this.data()?.masked ?? []).includes(f); }
 

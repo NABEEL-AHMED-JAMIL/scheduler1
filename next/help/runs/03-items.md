@@ -22,6 +22,10 @@ why, and retry only that one.
 - **Search an item, or a value like risk = High**: an item's name, or a value of any field.
 - One row per item: its name and folder, its status (*Done*, or *Failed at* the step), and a column per step with
   **View** for that step's data. **Columns** chooses the fields shown; **Download CSV** takes the list.
+- A column is headed by the step's short name (*Patient intake summary*); point at the header for the step's whole
+  description.
+- A step that made files shows them in its column: its one file by its type and name (*Patient_intake_S-1151_v1.pdf*),
+  or how many (*40 files*). Choose it to open the step's files. A dash means the step made nothing for the item.
 - A row with **sub-items** (a document's pages, for example) opens them with **Show the pages of** the item.
 
 > **Privacy:** A value the Data Catalog holds as sensitive shows as **Masked for you** unless your access lets you read it.
@@ -30,13 +34,25 @@ why, and retry only that one.
 1. Choose **Open** on the item's row.
 2. The panel shows the item's **Steps for this item**: each step's status and time, **Why it failed** for a failed item,
    and **Data at each step** (**View the data at** a step, **Copy** it).
-3. **Files for this item** lists what each step kept for it, such as the page images, with **View** and **Download**.
+3. **Files for this item** lists what each step kept for it, such as the page images; a report says its number and
+   version (*RPT-0086 v1*). Choose a file to open the step's files.
 4. For a scanned page, **Page image beside the text read** shows the page and the text the step read side by side, and how
    sure it was.
 5. **Previous item** and **Next item** move through the list; **All runs of this item** finds the item in the schedule's
    other runs; **Retry this item** runs a failed item again from the step it failed at.
 
 ![One item open](run-item-panel "An item's panel: its steps, its data at each step and the files kept for it")
+
+## A step's files
+A step's files open beside the list, titled with the item and the step (*1151 · Patient intake summary*), with the
+step's whole description under the title.
+- **One file** shows as one card: a picture of it (an image itself, a PDF's first page, or its type's icon), with its
+  **Type**, **Size** and **Pages** beside it, and **Open**, **Download**.
+- A **report** also shows its **Report** number and version and its **Approval**: *Signed ✓ by* the approver and when, or
+  *Waiting for approval*. **Verify** opens the report in **Reports › Library** and checks the signature of
+  its signed copy. The copy the run kept is the PDF as it was made, before it was signed.
+- **Two files or more** show as a **Grid** of pictures or a **List**, with **Search file names**, fifteen at a time, and
+  **Download all (zip)**.
 
 **Earlier versions** lists the item's attempts (*Attempt 2 · Done · current*, *Attempt 1 · Failed · earlier*) when it was
 retried.

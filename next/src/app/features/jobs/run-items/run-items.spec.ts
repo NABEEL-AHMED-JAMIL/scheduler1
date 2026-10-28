@@ -66,7 +66,39 @@ describe('Run items tab', () => {
     const failed = el.querySelector('tr[data-ref="2"]')!;
     expect(failed.querySelector('[data-test="item-status"]')?.textContent?.trim()).toBe('Failed at AI prompt');
     expect(failed.querySelector('[data-cell="report"]')?.textContent?.trim()).toBe('—');
-    expect(el.querySelector('tr[data-ref="1"] [data-cell="pages"]')?.textContent?.trim()).toBe('40 files ›');
+    expect(el.querySelector('tr[data-ref="1"] [data-cell="pages"]')?.textContent?.trim()).toBe('40 files');
+  });
+
+  /**
+   * ZT-I35 (live run #2950, "Patient intake · summary report", item 1151): its headers were the steps' long names in
+   * capitals, cut off, and the PDF's cell a dash though the PDF was there (Core had said the step "left out" the item).
+   */
+  it('heads a step by its short name, its whole name on hover, and shows a step\'s file as a chip, never a dash', () => {
+    const report = 'The Patient intake summary (published template, signed on approval, QR verify)';
+    const intake = PAGE({
+      steps: [
+        { index: 0, key: 'assessed', name: 'The assessed intake', task: 'read_file', role: 'pass' },
+        { index: 2, key: 'report', name: report, task: 'generate_report', role: 'each' },
+        { index: 3, key: 'json', name: 'The intake JSON (what the EHR would take)', task: 'save_file', role: 'each' },
+        { index: 5, key: 'keep_outcome', name: 'Outcome row to the bucket', task: 'upload_bucket', role: 'pass' },
+      ],
+      items: [{ ref: '1', key: '1151', label: '1151', position: 1, status: 'done', fileCount: 2, cells: {
+        report: { status: 'left_out', files: 1, file: { fileRef: 1267, name: 'Patient_intake_S-1151_v1.pdf', format: 'pdf' } },
+        json: { status: 'left_out', files: 1, file: { fileRef: 1268, name: 'intake-S-1151.json', format: 'json' } } } }],
+    });
+    const { el, opened } = mount(intake);
+    const heads = [...el.querySelectorAll<HTMLElement>('thead th[data-step]')];
+    expect(heads.map(th => th.textContent?.trim())).toEqual(['Assessed intake', 'Patient intake summary', 'Intake JSON', 'Outcome row to the bucket']);
+    expect(heads[1].getAttribute('title')).toBe(report);
+    expect(heads[3].hasAttribute('title')).toBe(false);
+    const pdf = el.querySelector<HTMLButtonElement>('tr[data-ref="1"] [data-cell="report"] [data-test="cell-file"]')!;
+    expect(pdf.textContent?.trim()).toBe('Patient_intake_S-1151_v1.pdf');
+    expect(pdf.getAttribute('aria-label')).toBe('Patient intake summary for 1151: Patient_intake_S-1151_v1.pdf');
+    expect(el.querySelector('tr[data-ref="1"] [data-cell="json"]')?.textContent?.trim()).toBe('intake-S-1151.json');
+    expect(el.querySelector('tr[data-ref="1"] [data-cell="keep_outcome"]')?.textContent?.trim()).toBe('—');
+    pdf.click();
+    expect(opened).toHaveLength(1);
+    expect((opened[0] as { config: { data: Record<string, unknown> } }).config.data).toMatchObject({ ref: '1', label: '1151', stepKey: 'report', stepName: report });
   });
 
   it('keeps a wide table inside its card at 1024: the scroll box holds its hidden header, and Open stays in view (ZT-I15)', () => {

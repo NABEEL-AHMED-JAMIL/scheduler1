@@ -13,7 +13,7 @@ import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { DateRange, DateRangePicker, presetRange } from '../../../shared/ui/date-range';
 import { RunItemsApi, refusalText } from '../run-items/run-items.api';
-import { fieldText } from '../run-items/run-items.model';
+import { fieldText, stepDescription, stepShortName } from '../run-items/run-items.model';
 import {
   AcrossPage, AcrossRow, AcrossStatus, Comparison, acrossQuery, afterText, beforeText, carriedSteps, compareTitle, headline, reportText, rowLook,
   sameSteps, ticked, versionText,
@@ -201,7 +201,10 @@ function dayStart(day: string, plusDays = 0): string | null {
                 }
                 @for (s of changedSteps(c); track s.key) {
                   <div class="flex flex-col gap-2" [attr.data-compare-step]="s.key">
-                    <h3 class="text-xs font-semibold uppercase tracking-wide text-[color:var(--text-secondary)]">{{ s.name }}</h3>
+                    <div>
+                      <h3 class="text-sm font-semibold" data-test="compare-step-name">{{ short(s) }}</h3>
+                      @if (desc(s); as more) { <p class="text-xs text-[color:var(--text-muted)] break-words">{{ more }}</p> }
+                    </div>
                     @for (ch of s.changes; track ch.path) {
                       <div class="si-diff" [class.is-case-only]="ch.caseOnly" [attr.data-change]="ch.path">
                         <div class="si-path mono">{{ ch.path }}
@@ -216,10 +219,10 @@ function dayStart(day: string, plusDays = 0): string | null {
                   </div>
                 }
                 @for (s of carried(c); track s.name) {
-                  <p class="text-xs text-[color:var(--text-muted)]" data-test="compare-carried">{{ s.name }}: carries {{ s.carried === 1 ? 'the change' : 'the ' + s.carried + ' changes' }} above on, nothing new.</p>
+                  <p class="text-xs text-[color:var(--text-muted)]" data-test="compare-carried">{{ short(s) }}: carries {{ s.carried === 1 ? 'the change' : 'the ' + s.carried + ' changes' }} above on, nothing new.</p>
                 }
                 @for (s of oneSided(c); track s.key) {
-                  <p class="text-xs text-[color:var(--text-secondary)]">{{ s.name }}: {{ s.note }}</p>
+                  <p class="text-xs text-[color:var(--text-secondary)]">{{ short(s) }}: {{ s.note }}</p>
                 }
                 <p class="text-[color:var(--text-secondary)] leading-relaxed" data-test="compare-pipeline">{{ c.pipeline.note }}
                   @if (same(c).length) { {{ sameLine(c) }} }</p>
@@ -324,6 +327,9 @@ export class ScheduleItems implements OnInit {
   }
   changedSteps(c: Comparison) { return c.steps.filter(s => s.changes.length); }
   carried(c: Comparison) { return carriedSteps(c); }
+  /** ZT-I35: a step by its short name; its whole name, when it says more, as a muted line. */
+  readonly short = stepShortName;
+  readonly desc = stepDescription;
   oneSided(c: Comparison) { return c.steps.filter(s => !s.changes.length && s.note); }
 
   load(): void {

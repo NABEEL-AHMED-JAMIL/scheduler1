@@ -10,8 +10,8 @@ import { copyText } from '../../../shared/ui/clipboard.util';
 import { prettyJson } from '../run-steps/run-output-view';
 import { RunItemsApi, refusalText } from './run-items.api';
 import {
-  ItemData, ItemDetail, ItemDetailStep, ItemFile, ItemVersion, RetryBody, dataTable, formatBadge, itemLook, itemPanelConfig, itemTime,
-  retriedSentence,
+  ItemData, ItemDetail, ItemDetailStep, ItemFile, ItemVersion, RetryBody, dataTable, fileIcon, formatBadge, itemLook, itemPanelConfig, itemTime,
+  retriedSentence, stepDescription, stepShortName,
 } from './run-items.model';
 import { ItemFilesData, RunItemFiles } from './run-item-files';
 
@@ -64,7 +64,7 @@ export function firstDataStep(detail: ItemDetail, asked: string | null | undefin
 
 /** The steps that did not run for the item, for the "not made" chip (a failed step left them out). */
 export function notMade(detail: ItemDetail): string[] {
-  return detail.item.status === 'failed' ? detail.steps.filter(s => s.status === 'not_run').map(s => s.name) : [];
+  return detail.item.status === 'failed' ? detail.steps.filter(s => s.status === 'not_run').map(s => stepShortName(s)) : [];
 }
 
 /**
@@ -85,6 +85,7 @@ export function notMade(detail: ItemDetail): string[] {
     .ip-steps > li + li { border-top: 1px solid var(--border-subtle); }
     .ip-steps > li.is-failed { background: color-mix(in oklab, var(--crit-soft) 35%, var(--surface-raised)); }
     .ip-note { color: var(--text-secondary); }
+    .ip-desc { display: block; font-size: 0.75rem; line-height: 1.35; color: var(--text-muted); overflow-wrap: anywhere; }
     .ip-note.is-failed { color: var(--crit-text); }
     .ip-dot { width: 1.375rem; height: 1.375rem; border-radius: var(--radius-full); display: inline-flex; align-items: center; justify-content: center; }
     .ip-dot.is-ok { background: var(--ok-soft); color: var(--ok-text); }
@@ -139,7 +140,7 @@ export function notMade(detail: ItemDetail): string[] {
                 }
                 @if (data.canRetry && !earlier() && d.item.status !== 'running' && d.retry.possible && d.retry.fromStep) {
                   <button type="button" class="btn btn-default btn-sm" data-test="item-retry-from" [disabled]="retrying()" (click)="retry('failed_step')">
-                    Retry from {{ d.retry.fromStep }}</button>
+                    Retry from {{ fromStepName(d) }}</button>
                 } @else if (data.canRetry && d.retry.why && d.item.status === 'failed') {
                   <span class="text-xs text-[color:var(--text-muted)]" data-test="item-retry-why">{{ d.retry.why }}</span>
                 }
@@ -210,13 +211,16 @@ export function notMade(detail: ItemDetail): string[] {
               @for (s of d.steps; track s.key) {
                 <li [class.is-failed]="s.status === 'failed'" [attr.data-step]="s.key">
                   <span class="ip-dot" [class]="'ip-dot is-' + dotTone(s)" aria-hidden="true"><app-icon [name]="dotIcon(s)" size="0.8em" /></span>
-                  <span class="font-medium truncate" [title]="s.name">{{ s.name }}<span class="sr-only">: {{ stateWord(s) }}</span></span>
+                  <span class="min-w-0">
+                    <span class="font-medium block" data-test="step-name">{{ short(s) }}<span class="sr-only">: {{ stateWord(s) }}</span></span>
+                    @if (desc(s); as more) { <span class="ip-desc" data-test="step-desc">{{ more }}</span> }
+                  </span>
                   <span class="ip-note truncate" [class.is-failed]="s.status === 'failed'" [title]="noteOf(s)">{{ noteOf(s) }}</span>
                   <span class="text-right tabular text-[color:var(--text-secondary)]">{{ s.durationMs === null || s.durationMs === undefined ? '' : time(s.durationMs) }}</span>
                   <span class="text-right">
                     @if (s.hasData) {
                       <button type="button" class="link-inline text-xs font-medium" [attr.aria-pressed]="dataStep() === s.key"
-                              [attr.aria-label]="'View the data at ' + s.name" (click)="showData(s.key)">View</button>
+                              [attr.aria-label]="'View the data at ' + short(s)" (click)="showData(s.key)">View</button>
                     } @else { <span class="text-[color:var(--text-muted)]">—</span> }
                   </span>
                 </li>
@@ -286,7 +290,7 @@ export function notMade(detail: ItemDetail): string[] {
               @for (f of d.files; track f.fileRef) {
                 <button type="button" class="ip-chip" [disabled]="!!f.expired" [attr.data-file]="f.fileRef"
                         [attr.aria-label]="'Open ' + f.name + (f.role === 'input' ? ', the input' : '')" (click)="openFile(f)">
-                  <span class="pill pill-neutral mono">{{ badge(f) }}</span><span>{{ f.name }}{{ f.role === 'input' ? ' · input' : '' }}{{ f.expired ? ' · expired' : '' }}</span>
+                  <app-icon [name]="icon(f)" size="0.95em" class="icon-muted shrink-0" /><span class="pill pill-neutral mono">{{ badge(f) }}</span><span>{{ f.name }}{{ f.role === 'input' ? ' · input' : '' }}{{ f.report ? ' · ' + f.report.number + ' v' + f.report.version : '' }}{{ f.expired ? ' · expired' : '' }}</span>
                 </button>
               }
               @if (d.fileCount > d.files.length) {
@@ -355,12 +359,19 @@ export class RunItemPanel implements OnInit {
     return parts.join(' · ');
   });
   readonly dataSteps = computed<SegmentOption<string>[]>(() =>
-    (this.detail()?.steps ?? []).filter(s => s.hasData).map(s => ({ id: s.key, label: s.name })));
+    (this.detail()?.steps ?? []).filter(s => s.hasData).map(s => ({ id: s.key, label: stepShortName(s) })));
   readonly notMade = computed(() => { const d = this.detail(); return d ? notMade(d) : []; });
   readonly json = computed(() => prettyJson(this.stepData()?.rows ?? []));
   readonly table = computed(() => dataTable(this.stepData() ?? { columns: [], rows: [] }));
 
   readonly badge = formatBadge;
+  readonly icon = fileIcon;
+  /** ZT-I35: a step by its short name; the whole name, when it says more, as a muted line under it. */
+  readonly short = stepShortName;
+  readonly desc = stepDescription;
+  fromStepName(d: ItemDetail): string {
+    return stepShortName({ key: d.steps.find(s => s.index === d.retry.fromStepIndex)?.key, name: d.retry.fromStep });
+  }
   time(ms: number): string { return itemTime(ms); }
   masked(column: string): boolean { return (this.stepData()?.masked ?? []).includes(column); }
   isShown(v: ItemVersion): boolean { return v.current ? this.attempt() === null : this.attempt() === v.attempt; }

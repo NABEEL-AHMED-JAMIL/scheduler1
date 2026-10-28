@@ -23,6 +23,8 @@ export interface ItemCell {
   sharedBy?: number | null;
   reused?: boolean | null;
   hasData?: boolean | null;
+  /** ZT-I35: the step's one file for the item (files is 1), for its chip in the table. */
+  file?: { fileRef?: number | string | null; name: string; format?: string | null } | null;
 }
 
 export interface ItemStepRef { index: number; key: string; name: string; }
@@ -111,8 +113,12 @@ export interface ItemDetailStep {
 
 export interface ItemFile {
   fileRef: string; name: string; role: 'input' | 'output'; stepKey?: string | null; stepName?: string | null;
-  format?: string | null; bytes?: number | null; previewable?: boolean | null; expired?: boolean | null; fileId?: number | null;
+  format?: string | null; bytes?: number | null; previewable?: boolean | null; expired?: boolean | null; fileId?: number | string | null;
+  /** ZT-I35: a report PDF's Report Studio report -- its id, number ("RPT-0086"), version and pages. */
+  report?: ItemFileReport | null;
 }
+
+export interface ItemFileReport { reportId: string; number: string; version: number; pages?: number | null; }
 
 export interface ItemVersion { attempt: number; status: ItemStatus; current: boolean; endedAt?: string | null; reason?: string | null; }
 
@@ -158,7 +164,7 @@ export type Tone = 'ok' | 'warn' | 'crit' | 'brand' | 'neutral';
 /** The status pill an item shows: "Done", "Failed at AI prompt", "1 page failed" (amber) for a document with a bad page. */
 export function itemLook(item: Pick<RunItem, 'status' | 'failedStep' | 'children'>, childNoun = 'page'): { label: string; tone: Tone } {
   if (item.status === 'failed') {
-    return { label: item.failedStep?.name ? `Failed at ${item.failedStep.name}` : 'Failed', tone: 'crit' };
+    return { label: item.failedStep?.name || item.failedStep?.key ? `Failed at ${stepShortName(item.failedStep)}` : 'Failed', tone: 'crit' };
   }
   if (item.status === 'running') return { label: 'Running', tone: 'brand' };
   const bad = item.children?.failed ?? 0;
@@ -168,28 +174,91 @@ export function itemLook(item: Pick<RunItem, 'status' | 'failedStep' | 'children
   return { label: 'Done', tone: 'ok' };
 }
 
-/** What a step's cell offers for an item: open the panel at the step, open its files, or only say how it went. */
+/**
+ * What a step's cell offers for an item: open the panel at the step, open its files, or only say how it went. ZT-I35: a
+ * step that made files shows them -- its one file as a chip (its type's icon and its name), more as "2 files" -- whatever
+ * its status says; a dash only when it made nothing and did not run for the item.
+ */
 export interface CellLook {
-  kind: 'view' | 'files' | 'failed' | 'shared' | 'none' | 'done';
+  kind: 'view' | 'files' | 'file' | 'failed' | 'shared' | 'none' | 'done';
   text: string;
   title: string;
+  /** kind 'file': the type's icon. */
+  icon?: string;
 }
 
 export function cellLook(cell: ItemCell | null | undefined): CellLook {
-  if (!cell || cell.status === 'not_run') return { kind: 'none', text: '—', title: 'Not run for this item' };
+  if (!cell) return { kind: 'none', text: '—', title: 'Not run for this item' };
+  const files = cell.files ?? 0;
+  if (files > 1) return { kind: 'files', text: `${files.toLocaleString('en-GB')} files`, title: 'See the files this step made for the item' };
+  if (files === 1 && cell.file?.name) {
+    return { kind: 'file', text: cell.file.name, title: `${cell.file.name}: see the file this step made for the item`, icon: fileIcon(cell.file) };
+  }
+  if (files === 1) return { kind: 'files', text: '1 file', title: 'See the file this step made for the item', icon: 'file' };
+  if (cell.status === 'not_run') return { kind: 'none', text: '—', title: 'Not run for this item' };
   if (cell.status === 'left_out') return { kind: 'none', text: '—', title: 'Left out for this item' };
   if (cell.status === 'shared') {
     const n = cell.sharedBy ?? 0;
     return { kind: 'shared', text: n ? `Shared by ${n.toLocaleString('en-GB')}` : 'Shared', title: 'Made once for the run and used by these items' };
   }
-  const files = cell.files ?? 0;
-  if (files > 1) return { kind: 'files', text: `${files.toLocaleString('en-GB')} files ›`, title: 'See the files this step made for the item' };
   if (cell.hasData) {
     return { kind: 'view', text: 'View', title: cell.status === 'failed' ? 'This step failed: see why and what it had' : 'See what this step had for the item' };
   }
-  if (files === 1) return { kind: 'files', text: '1 file ›', title: 'See the file this step made for the item' };
   if (cell.status === 'failed') return { kind: 'failed', text: 'Failed', title: 'This step failed for the item' };
   return { kind: 'done', text: 'Done', title: 'Done, with nothing kept to show' };
+}
+
+// ------------------------------------------------------------------------------------------------ ZT-I35: step names
+
+/** Words a step key says in capitals ("json" is JSON). */
+const ACRONYMS = new Set(['json', 'jsonl', 'csv', 'pdf', 'html', 'xml', 'ocr', 'ai', 'qr', 'ehr', 'id', 'ids', 'url', 'api', 'sql', 's3', 'sftp',
+  'ftp', 'png', 'jpg', 'llm', 'kpi', 'hl7', 'fhir', 'pii', 'phi', 'sms']);
+/** The longest name a header or a title shows as it is. */
+const SHORT = 32;
+
+/** A step key in words: "keep_outcome" is "Keep outcome", "json" is "JSON", "splitPages" is "Split pages". */
+export function humanKey(key: string | null | undefined): string {
+  const words = (key ?? '').replace(/([a-z0-9])([A-Z])/g, '$1 $2').split(/[\s_.\-]+/).filter(Boolean)
+    .map(w => ACRONYMS.has(w.toLowerCase()) ? w.toUpperCase() : w.toLowerCase());
+  if (!words.length) return '';
+  const first = words[0];
+  words[0] = first === first.toUpperCase() ? first : first.charAt(0).toUpperCase() + first.slice(1);
+  return words.join(' ');
+}
+
+const isShort = (s: string) => s.length <= SHORT && !/[()]/.test(s);
+/** "The intake JSON" is "Intake JSON": a name's leading article, dropped. */
+const withoutArticle = (s: string) => {
+  const m = /^(the|a|an)\s+(\S.*)$/i.exec(s);
+  return m ? m[2].charAt(0).toUpperCase() + m[2].slice(1) : s;
+};
+
+/**
+ * A step's short name for a column header or a title: its name when that is short ("Outcome row to the bucket"), else the
+ * name without what it adds in brackets ("The Patient intake summary (published template, …)" is "Patient intake summary"),
+ * else its key in words ("Report"). Never cut in the middle of a word.
+ */
+export function stepShortName(step: { key?: string | null; name?: string | null } | null | undefined): string {
+  const name = (step?.name ?? '').replace(/\s+/g, ' ').trim();
+  const key = humanKey(step?.key);
+  if (!name) return key || 'Step';
+  const plain = withoutArticle(name);
+  if (isShort(plain)) return plain;
+  const head = withoutArticle(name.replace(/\s*\([^)]*\)?\s*$/, '').split(/\s+[—–-]\s+|[:;]\s+/)[0].trim());
+  if (head && isShort(head)) return head;
+  if (key) return key;
+  const words: string[] = [];
+  for (const w of head.split(' ')) {
+    if ([...words, w].join(' ').length > SHORT - 1) break;
+    words.push(w);
+  }
+  return words.length ? `${words.join(' ').replace(/[,;:.]+$/, '')}…` : head.split(' ')[0] || 'Step';
+}
+
+/** A step's whole name when its short name leaves something out (the muted line or the tooltip under it); else ''. */
+export function stepDescription(step: { key?: string | null; name?: string | null } | null | undefined): string {
+  const name = (step?.name ?? '').replace(/\s+/g, ' ').trim();
+  return name && name !== stepShortName(step) && withoutArticle(name) !== stepShortName(step) ? name : '';
 }
 
 /** The steps the table gives a column: every step that works on items, not the one that found them. */
@@ -219,13 +288,14 @@ export function itemSub(item: Pick<RunItem, 'folder' | 'children' | 'key' | 'lab
 export interface ItemStat { label: string; value: string; foot: string; tone?: Tone; }
 
 export function itemStats(summary: ItemsSummary, runDuration: string): ItemStat[] {
-  const failedAt = (summary.failedAt ?? []).filter(f => f.count > 0);
+  // ZT-I35: a step by its short name here too.
+  const failedAt = (summary.failedAt ?? []).filter(f => f.count > 0).map(f => ({ ...f, step: stepShortName({ name: f.step }) }));
   const failedFoot = !summary.failed ? 'none failed'
     : failedAt.length === 1 ? (summary.failed === 1 ? `at ${failedAt[0].step}` : `${summary.failed === 2 ? 'both' : 'all'} at ${failedAt[0].step}`)
     : failedAt.length ? failedAt.map(f => `${f.count} at ${f.step}`).join(', ') : 'see the failed items';
   const sub = summary.subItems ? ` · ${plural(summary.subItems, 'sub-item')}` : '';
   return [
-    { label: 'Items', value: summary.items.toLocaleString('en-GB'), foot: (summary.source ? `found by ${summary.source}` : 'in this run') + sub },
+    { label: 'Items', value: summary.items.toLocaleString('en-GB'), foot: (summary.source ? `found by ${stepShortName({ name: summary.source })}` : 'in this run') + sub },
     { label: 'Done', value: summary.done.toLocaleString('en-GB'), foot: summary.running ? `${summary.running.toLocaleString('en-GB')} still running` : 'every step finished', tone: 'ok' },
     { label: 'Failed', value: summary.failed.toLocaleString('en-GB'), foot: failedFoot, tone: summary.failed ? 'crit' : undefined },
     { label: 'Duration', value: runDuration, foot: summary.averageMs ? `about ${itemTime(summary.averageMs)} an item` : 'for the whole run' },
@@ -378,6 +448,49 @@ export function previewKind(f: Pick<ItemFile, 'format' | 'name' | 'previewable'>
   if (IMAGE.includes(badge)) return 'image';
   if (badge === 'PDF') return 'pdf';
   if (TEXT.includes(badge)) return 'text';
+  return null;
+}
+
+const TABLE = ['CSV', 'TSV', 'XLSX', 'XLS', 'PARQUET'];
+const CODE = ['JSON', 'JSONL', 'NDJSON', 'XML', 'HTML', 'YAML', 'YML'];
+const AUDIO = ['M4A', 'MP3', 'WAV', 'OGG', 'FLAC', 'AAC'];
+
+/** ZT-I35: the icon a file's type shows when there is no picture of it. */
+export function fileIcon(f: Pick<ItemFile, 'format' | 'name'>): string {
+  const badge = formatBadge(f);
+  if (IMAGE.includes(badge)) return 'image';
+  if (TABLE.includes(badge)) return 'table';
+  if (CODE.includes(badge)) return 'code';
+  if (AUDIO.includes(badge)) return 'volume';
+  if (['TXT', 'MD', 'LOG', 'VTT', 'SRT'].includes(badge)) return 'text';
+  return 'file';
+}
+
+/** ZT-I35: "RPT-0086 · version 1". */
+export function reportLine(r: ItemFileReport | null | undefined): string {
+  return r ? `${r.number} · version ${r.version}` : '';
+}
+
+/** A report version's approval, as far as the file's facts need it (Report Studio's version row). */
+export interface ReportVersionFacts {
+  approval?: { approverName?: string | null; approvedAt?: string | null; signed?: boolean | null } | null;
+  review?: { state?: string | null; firstApproval?: unknown } | null;
+  void?: { reason?: string | null } | null;
+}
+
+/**
+ * ZT-I35: where a report version stands -- signed by whom (and when), approved but not signed, waiting for approval, or
+ * void; null when Report Studio says nothing of it (not asked for approval, or not ours to read).
+ */
+export function reportState(v: ReportVersionFacts | null | undefined):
+  { kind: 'signed' | 'approved' | 'waiting' | 'void' | 'rejected'; by?: string; at?: string | null; tone: Tone } | null {
+  if (!v) return null;
+  if (v.void) return { kind: 'void', tone: 'crit' };
+  const a = v.approval;
+  if (a?.signed) return { kind: 'signed', by: a.approverName || 'an approver', at: a.approvedAt ?? null, tone: 'ok' };
+  if (a) return { kind: 'approved', by: a.approverName || 'an approver', at: a.approvedAt ?? null, tone: 'neutral' };
+  if (v.review?.state === 'OPEN') return { kind: 'waiting', tone: 'warn' };
+  if (v.review?.state === 'REJECTED') return { kind: 'rejected', tone: 'crit' };
   return null;
 }
 

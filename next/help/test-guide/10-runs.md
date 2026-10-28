@@ -51,6 +51,7 @@ Tested by ______ on ______
 | QA-10.17 | Retry only the failed item | Fix its cause; **Retry this item** (or **Retry failed items (1)**) | Only that item runs again, from the step it failed at; the done items are untouched; the item's **Earlier versions** list *Attempt 2 · Done · current* and *Attempt 1 · Failed · earlier* | ☐ Pass ☐ Fail |
 | QA-10.18 | Act on several items | Tick two items; **Export CSV**, then **Download zip** | The CSV holds the two rows; the zip has a folder for each item with its files | ☐ Pass ☐ Fail |
 | QA-10.19 | Find an item across runs and compare | The schedule's **Items** tab: **Find an item** by its name; tick **Compare** on two rows | **Compare two runs** shows the item's fields side by side, what changed in the data and what changed in the pipeline between them | ☐ Pass ☐ Fail |
+| QA-10.26 | An item's report and its files | A run of a pipeline that makes a report per item: on the Items tab, read the columns, then choose the report's file in its column | Each column is the step's short name (its whole description on hover); the report step's cell shows the PDF's name, never a dash. The panel is titled *item · step*, shows the PDF's first page in one card with **Type**, **Size**, **Pages**, **Report** (*RPT-… · version 1*) and **Approval** (*Signed ✓ by* whom and when, or *Waiting for approval*), and **Open**, **Download** and, when signed, **Verify**; no Grid, List or **Download all** for one file | ☐ Pass ☐ Fail |
 
 ## Who sees which runs
 | # | Check | Steps | Expected | Pass / Fail |

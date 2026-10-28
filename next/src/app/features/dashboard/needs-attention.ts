@@ -8,12 +8,13 @@ import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { ToastService } from '../../shared/ui/toast.service';
 import { confirmWith } from '../../shared/ui/confirm';
 import { RunItemsApi, refusalText } from '../jobs/run-items/run-items.api';
-import { AttentionRun, retriedSentence } from '../jobs/run-items/run-items.model';
+import { AttentionRun, retriedSentence, stepShortName } from '../jobs/run-items/run-items.model';
 import { plural } from '../jobs/run-steps/run-page.model';
 
 /** "2 items failed at AI prompt": how many, and the steps they failed at. */
 export function attentionLine(run: AttentionRun): string {
-  const steps = (run.failedAt ?? []).filter(Boolean);
+  // ZT-I35: a step by its short name.
+  const steps = (run.failedAt ?? []).filter(Boolean).map(name => stepShortName({ name }));
   return `${plural(run.failed, 'item')} failed${steps.length ? ` at ${steps.join(', ')}` : ''}`;
 }
 
