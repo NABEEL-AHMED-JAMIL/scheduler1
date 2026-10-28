@@ -202,8 +202,8 @@ function dayStart(day: string, plusDays = 0): string | null {
                 @for (s of changedSteps(c); track s.key) {
                   <div class="flex flex-col gap-2" [attr.data-compare-step]="s.key">
                     <div>
-                      <h3 class="text-sm font-semibold" data-test="compare-step-name">{{ short(s) }}</h3>
-                      @if (desc(s); as more) { <p class="text-xs text-[color:var(--text-muted)] break-words">{{ more }}</p> }
+                      <h3 class="text-sm font-semibold" data-test="compare-step-name">{{ stepShort(s) }}</h3>
+                      @if (stepDesc(s); as more) { <p class="text-xs text-[color:var(--text-muted)] break-words">{{ more }}</p> }
                     </div>
                     @for (ch of s.changes; track ch.path) {
                       <div class="si-diff" [class.is-case-only]="ch.caseOnly" [attr.data-change]="ch.path">
@@ -219,10 +219,10 @@ function dayStart(day: string, plusDays = 0): string | null {
                   </div>
                 }
                 @for (s of carried(c); track s.name) {
-                  <p class="text-xs text-[color:var(--text-muted)]" data-test="compare-carried">{{ short(s) }}: carries {{ s.carried === 1 ? 'the change' : 'the ' + s.carried + ' changes' }} above on, nothing new.</p>
+                  <p class="text-xs text-[color:var(--text-muted)]" data-test="compare-carried">{{ stepShort(s) }}: carries {{ s.carried === 1 ? 'the change' : 'the ' + s.carried + ' changes' }} above on, nothing new.</p>
                 }
                 @for (s of oneSided(c); track s.key) {
-                  <p class="text-xs text-[color:var(--text-secondary)]">{{ short(s) }}: {{ s.note }}</p>
+                  <p class="text-xs text-[color:var(--text-secondary)]">{{ stepShort(s) }}: {{ s.note }}</p>
                 }
                 <p class="text-[color:var(--text-secondary)] leading-relaxed" data-test="compare-pipeline">{{ c.pipeline.note }}
                   @if (same(c).length) { {{ sameLine(c) }} }</p>
@@ -328,8 +328,8 @@ export class ScheduleItems implements OnInit {
   changedSteps(c: Comparison) { return c.steps.filter(s => s.changes.length); }
   carried(c: Comparison) { return carriedSteps(c); }
   /** ZT-I35: a step by its short name; its whole name, when it says more, as a muted line. */
-  readonly short = stepShortName;
-  readonly desc = stepDescription;
+  readonly stepShort = stepShortName;
+  readonly stepDesc = stepDescription;
   oneSided(c: Comparison) { return c.steps.filter(s => !s.changes.length && s.note); }
 
   load(): void {

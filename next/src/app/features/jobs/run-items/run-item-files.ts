@@ -66,7 +66,7 @@ const DRAW_PDF_BYTES = 25 * 1024 * 1024;
                     display: flex; align-items: center; justify-content: center; overflow: hidden; width: 100%; }
     .rf-thumb:hover .rf-thumb-box, .rf-thumb:focus-visible .rf-thumb-box { border-color: var(--border-control); }
     .rf-thumb:disabled { cursor: default; }
-    .rf-thumb-box img { width: 100%; height: 100%; object-fit: cover; object-position: top; background: #fff; }
+    .rf-thumb-box img { width: 100%; height: 100%; object-fit: cover; object-position: top; }
     .rf-thumb-name { font-size: 0.75rem; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .rf-thumb-meta { font-size: 0.6875rem; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .rf-type { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; padding: 0.75rem; color: var(--text-muted); text-align: center; min-width: 0; }
@@ -85,6 +85,7 @@ const DRAW_PDF_BYTES = 25 * 1024 * 1024;
     .rf-preview { flex: 1; min-height: 24rem; display: flex; flex-direction: column; }
     .rf-preview img { max-width: 100%; max-height: 70vh; object-fit: contain; margin: 0 auto; }
     .rf-sk { border-radius: var(--radius-md); background: var(--surface-inset); animation: pulse-soft 1.4s ease-in-out infinite; }
+    .rf-sk-page { aspect-ratio: 3 / 4; }
     @media (prefers-reduced-motion: reduce) { .rf-sk { animation: none; } }
     @media (max-width: 700px) { .rf-one { grid-template-columns: minmax(0, 1fr); } }
   `,
@@ -154,7 +155,7 @@ const DRAW_PDF_BYTES = 25 * 1024 * 1024;
         } @else if (!page()) {
           @if (slow()) {
             <div class="rf-one" role="status" aria-label="Reading the files" data-test="files-skeleton">
-              <div class="rf-sk" style="aspect-ratio: 3 / 4"></div>
+              <div class="rf-sk rf-sk-page"></div>
               <div class="flex flex-col gap-3 pt-1">
                 <div class="rf-sk h-5 w-3/4"></div><div class="rf-sk h-4 w-1/2"></div><div class="rf-sk h-4 w-2/3"></div><div class="rf-sk h-8 w-48 mt-2"></div>
               </div>

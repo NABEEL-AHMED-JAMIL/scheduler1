@@ -32,7 +32,8 @@ export async function drawPdfFirstPage(pdf: Blob, width: number): Promise<PdfFir
     canvas.height = Math.round(viewport.height);
     const context = canvas.getContext('2d');
     if (!context) throw new Error('No canvas to draw on.');
-    context.fillStyle = '#ffffff';
+    // The page's paper, as pdf.js prints it.
+    context.fillStyle = 'white';
     context.fillRect(0, 0, canvas.width, canvas.height);
     await page.render({ canvasContext: context, viewport }).promise;
     const png = await new Promise<Blob | null>(done => canvas.toBlob(done, 'image/png'));

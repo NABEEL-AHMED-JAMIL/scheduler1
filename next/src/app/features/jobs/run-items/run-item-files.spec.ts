@@ -178,9 +178,9 @@ describe('Run item files', () => {
     expect(el.querySelector('[data-test="files-one"] [data-test="file-thumb"]')?.getAttribute('src')).toBe('blob:report-thumb');
     expect(drawn).toHaveLength(0);
     http.expectNone(r => r.url.endsWith('/sourceJob.json/runItems/file'));
-    const facts = el.querySelector('[data-test="file-facts"]')!.textContent!.replace(/\s+/g, ' ');
-    expect(facts).toContain('Type PDF');
-    expect(facts).toContain('Size 505.8 KB');
+    const facts = [...el.querySelectorAll('[data-test="file-facts"] dt')].map(dt => `${dt.textContent?.trim()}: ${dt.nextElementSibling?.textContent?.replace(/\s+/g, ' ').trim()}`);
+    expect(facts.slice(0, 4)).toEqual(['Type: PDF', 'Size: 505.8 KB', 'Pages: 4', 'Report: RPT-0086 · version 1']);
+    expect(facts[4]).toMatch(/^Approval: Signed ✓ by Riverside Health reviewer · /);
     expect(el.querySelector('[data-test="file-pages"]')?.textContent?.trim()).toBe('4');
     expect(el.querySelector('[data-test="file-report"]')?.textContent?.trim()).toBe('RPT-0086 · version 1');
     const state = el.querySelector('[data-test="file-state"]')!.textContent!.replace(/\s+/g, ' ').trim();
