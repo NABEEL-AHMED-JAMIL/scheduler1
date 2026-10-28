@@ -80,6 +80,9 @@ const READS: Record<string, [verb: string, thing: string]> = {
   'assistant result rows': ['Read', 'assistant result rows'],
   'schedules export': ['Downloaded', 'schedules export'],
   'pipelines export': ['Downloaded', 'pipelines export'],
+  // workflow-service's audited reads (a task, a request) in a managed session.
+  'approval task': ['Opened', 'approval task'],
+  'approval request': ['Opened', 'approval request'],
 };
 
 /** A row that is a data read, not a change: Identity names what was read. */
@@ -94,7 +97,7 @@ export function readText(a: Pick<ManagedAction, 'readKind' | 'readId'>): string 
   const key = kind.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').toLowerCase();
   const id = a.readId === null || a.readId === undefined || a.readId === '' ? '' : ` ${a.readId}`;
   const known = READS[key];
-  return known ? `${known[0]} ${known[1]}${id}` : `Read ${kind}${id}`;
+  return known ? `${known[0]} ${known[1]}${id}` : `Read ${words(kind)}${id}`;
 }
 
 /** How many rows a page asks for: the service's default is 100 and its most 500. */

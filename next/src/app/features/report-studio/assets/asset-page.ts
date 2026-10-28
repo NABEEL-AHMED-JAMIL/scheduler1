@@ -1,3 +1,4 @@
+import { codeWords } from '../../../shared/ui/plain-words';
 import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
 import { Dialog } from '@angular/cdk/dialog';
 import { FormsModule } from '@angular/forms';
@@ -240,8 +241,10 @@ export class AssetPage implements OnInit {
     const words: Record<string, string> = {
       'asset.uploaded': 'Uploaded', 'asset.version.uploaded': 'New version uploaded', 'asset.approved': 'Version approved', 'asset.rejected': 'Version rejected',
       'asset.retired': 'Retired', 'asset.renamed': 'Details changed', 'grant.added': 'Use granted', 'grant.revoked': 'Grant ended', 'asset.placed': 'Placed on a template',
+      'asset.deleted': 'Deleted',
     };
-    return words[action] ?? action;
+    // Owner 2026-10-27: an action with no words yet reads as words ("asset.foo.bar": "Foo bar"), never its code.
+    return words[action] ?? codeWords(action.replace(/^asset\./, ''));
   }
 
   detailOf(d: Record<string, unknown>): string {

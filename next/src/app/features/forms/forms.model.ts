@@ -6,6 +6,8 @@
  * Owner decision 2026-09-30: a form is shared inside its workspace only -- there are no public or expiring links yet.
  */
 
+import { codeWords } from '../../shared/ui/plain-words';
+
 export type FieldType = 'text' | 'longText' | 'number' | 'date' | 'choice' | 'yesNo' | 'email' | 'table' | 'file' | 'signature' | 'lookup'
   | 'checkboxes';
 export type ColumnType = 'text' | 'number' | 'date' | 'choice' | 'yesNo' | 'email';
@@ -773,7 +775,8 @@ export function approvalTone(status: string | null | undefined): 'ok' | 'crit' |
 }
 
 export function approvalText(status: string | null | undefined): string {
-  return status === 'NotStarted' ? 'Not started' : status ?? '';
+  // Owner 2026-10-27: a status with no words of its own ("ChangesRequested") reads as words, never its code.
+  return status === 'NotStarted' ? 'Not started' : codeWords(status ?? '');
 }
 
 export function formTone(status: string): 'ok' | 'warn' | 'neutral' {

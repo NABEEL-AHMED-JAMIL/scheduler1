@@ -1,3 +1,4 @@
+import { codeWords } from '../../../shared/ui/plain-words';
 import { Component, LOCALE_ID, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Dialog } from '@angular/cdk/dialog';
@@ -210,7 +211,10 @@ export class JobHistory {
     this.load();
   }
 
-  triggerWord(trigger: string): string { return TRIGGER_WORDS[trigger] ? `started by ${TRIGGER_WORDS[trigger]}` : trigger; }
+  // Owner 2026-10-27: a trigger with no words yet reads as words ("started by event route"), never its code.
+  triggerWord(trigger: string): string {
+    return TRIGGER_WORDS[trigger] ? `started by ${TRIGGER_WORDS[trigger]}` : trigger ? `started by ${codeWords(trigger).toLowerCase()}` : trigger;
+  }
 
   private loadFacets(): void {
     this.facetsRequest?.unsubscribe();

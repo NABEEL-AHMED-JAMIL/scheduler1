@@ -158,11 +158,13 @@
           @case ('activity') {
             <section class="card">
               <ul class="divide-y divide-[color:var(--border-subtle)]">
-                @for (a of r.activity; track $index) {
-                  <li class="p-3 flex flex-wrap items-baseline gap-2">
-                    <span class="font-medium">{{ activityWord(a.action) }}</span>
-                    <span class="text-xs text-[color:var(--text-muted)]">{{ detail(a.detail) }}</span>
+                @for (a of r.activity; track $index; let i = $index) {
+                  @let line = activity()[i];
+                  <li class="p-3 flex flex-wrap items-baseline gap-2" data-test="activity-line">
+                    <span class="font-medium">{{ line.text }}</span>
+                    @if (line.detail) { <span class="text-xs text-[color:var(--text-muted)]">{{ line.detail }}</span> }
                     <span class="text-xs text-[color:var(--text-muted)] ml-auto whitespace-nowrap">{{ a.at | rsTime: 'recent' }}</span>
+                    @if (line.note) { <blockquote class="inbox-quote basis-full m-0">{{ line.note }}</blockquote> }
                   </li>
                 } @empty { <li class="p-4 text-sm text-[color:var(--text-muted)]">Nothing yet.</li> }
               </ul>

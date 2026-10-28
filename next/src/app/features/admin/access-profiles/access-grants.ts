@@ -3,6 +3,9 @@ import { API_SUCCESS } from '../../../core/api/api.config';
 import { instantOf } from '../../../core/instant';
 import { AccessDelegation } from '../../../core/auth/access-delegation';
 import { Icon } from '../../../shared/ui/icon';
+import { codeWords } from '../../../shared/ui/plain-words';
+import { PAGE_LABELS, isPageKey } from '../../../core/auth/page-keys';
+import { NAV } from '../../../core/nav/nav-tree';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { AccessChange, AccessPerson, AccessProfilesService, Delegation, EffectiveAccess } from './access-profiles.service';
 
@@ -28,16 +31,35 @@ export function actionLabel(action: string): string {
     case 'TEAM_ARCHIVED': return 'Archived a team';
     case 'TEAM_MEMBER_ADDED': return 'Added to a team';
     case 'TEAM_MEMBER_REMOVED': return 'Removed from a team';
-    // Anything newer: its code read as words (SOME_NEW_THING -> "Some new thing"), never the code itself.
-    default: return /^[A-Z][A-Z0-9_]+$/.test(action) ? action.charAt(0) + action.slice(1).toLowerCase().replace(/_/g, ' ') : action;
+    // Anything newer: its code read as words (SOME_NEW_THING -> "Some new thing", page.granted -> "Page granted"), never the code.
+    default: return codeWords(action);
   }
 }
 
-/** A change's detail: a page or tab key as it is, a team role (LEAD, MEMBER) as a word. */
+/**
+ * A change's detail: a page by its name ("task-inbox" reads "Task inbox"), a tab as page › tab ("queue:by-date" reads
+ * "Queue › By date"), a team role (LEAD, MEMBER) as a word -- never the key's code.
+ */
 export function changeDetail(c: { action: string; key: string | null; after: string | null }): string {
   const role: Record<string, string> = { LEAD: 'Lead', MEMBER: 'Member' };
   if (c.action.startsWith('TEAM_')) return [c.key, c.after ? role[c.after] ?? c.after : null].filter(Boolean).join(' · ');
-  return c.key || (c.after ?? '');
+  const key = c.key || (c.after ?? '');
+  const [page, tab] = key.split(':');
+  const pageName = isPageKey(page) ? PAGE_LABELS[page] : codeWords(page);
+  return tab ? `${pageName} › ${tabLabel(key) ?? codeWords(tab)}` : isPageKey(key) ? PAGE_LABELS[key] : key;
+}
+
+/** A tab's label on the menu ("queue:by-date" is "By date"), or null when the menu has none. */
+function tabLabel(tabKey: string): string | null {
+  for (const item of NAV) {
+    for (const child of item.children ?? []) {
+      const found = (child.tabs ?? []).find(t => t.tabKey === tabKey);
+      if (found) return found.label;
+    }
+    const found = (item.tabs ?? []).find(t => t.tabKey === tabKey);
+    if (found) return found.label;
+  }
+  return null;
 }
 
 /** "21 Oct 2026, 20:45" in the browser's own zone, 24-hour. */
@@ -217,7 +239,7 @@ function stamp(value: string | null | undefined): string {
                 <td>{{ c.actorName || '—' }}@if (c.delegateId) { <span class="pill pill-neutral ml-1">Delegate</span> }</td>
                 <td>{{ label(c.action) }}</td>
                 <td>{{ c.targetName || '—' }}</td>
-                <td class="text-xs" [class.mono]="!c.action.startsWith('TEAM_')">{{ detail(c) }}</td>
+                <td class="text-xs" [title]="c.key || ''">{{ detail(c) }}</td>
                 <td class="whitespace-nowrap">{{ c.expiresAt ? when(c.expiresAt) : '' }}</td>
                 <td class="text-xs">{{ c.reason }}</td>
               </tr>

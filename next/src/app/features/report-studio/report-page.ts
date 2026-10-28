@@ -15,6 +15,8 @@ import { LoadError } from '../../shared/ui/load-error';
 import { confirmWith } from '../../shared/ui/confirm';
 import { copyText } from '../../shared/ui/clipboard.util';
 import { AuthService } from '../../core/auth/auth.service';
+import { ActivityLine, activityDetail, activityLine } from './report-activity';
+import { Person } from './assets.model';
 import { ReportStudioApi, studioError } from './report-studio.api';
 import { ProblemList } from './problem-list';
 import {
@@ -132,6 +134,10 @@ export class ReportPage implements OnInit {
 
   ngOnInit(): void {
     this.load();
+    if (!this.askedPeople && (this.auth.canOpen('report-assets') || this.auth.canOpen('report-approve'))) {
+      this.askedPeople = true;
+      this.api.people().subscribe({ next: p => this.people.set(p), error: () => { /* names from the entries alone */ } });
+    }
   }
 
   load(): void {
@@ -438,16 +444,22 @@ export class ReportPage implements OnInit {
     return typeof name === 'string' && name ? name : v.createdBy ? 'A workspace member' : '—';
   }
 
+  /** The Activity in words (report-activity.ts): what happened and who, its facts, and why when the entry says. */
+  readonly activity = computed<ActivityLine[]>(() => {
+    const people = this.people();
+    const me = this.auth.user()?.appUserId;
+    const nameOf = (id: number) => (id === me ? 'you' : people.find(p => p.userId === id)?.name ?? null);
+    return (this.r()?.activity ?? []).map(a => activityLine(a, nameOf));
+  });
+  /** The workspace's people, for who acted; read when the reader may (Report assets' people), else names come from the entries. */
+  private readonly people = signal<Person[]>([]);
+  private askedPeople = false;
+
   activityWord(action: string): string {
-    const words: Record<string, string> = {
-      'report.created': 'Report created', 'report.requested': 'Generation requested', 'report.generated': 'Version made',
-      'report.failed': 'Generation failed', 'report.downloaded': 'Downloaded', 'report.archived': 'Archived',
-    };
-    return words[action] ?? action;
+    return activityLine({ action, at: '', detail: {} }).text;
   }
 
   detail(d: Record<string, unknown>): string {
-    return Object.entries(d).filter(([k]) => ['version', 'format', 'code', 'templateVersion'].includes(k))
-      .map(([k, v]) => `${k} ${v}`).join(' · ');
+    return activityDetail(d);
   }
 }

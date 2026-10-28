@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { codeName, plainHint } from './plain-words';
+import { codeName, codeWords, plainHint } from './plain-words';
 import { fieldsOf, optionWords } from '../../features/tasks/steps/steps.model';
 import { actionLabel, changeDetail } from '../../features/admin/access-profiles/access-grants';
 
@@ -45,6 +45,18 @@ describe('Plain words on screen (ZT-U8)', () => {
     expect(actionLabel('TEAM_MEMBER_ADDED')).toBe('Added to a team');
     expect(actionLabel('SOMETHING_NEW')).toBe('Something new');
     expect(changeDetail({ action: 'TEAM_MEMBER_ADDED', key: 'Physicians', after: 'LEAD' })).toBe('Physicians · Lead');
-    expect(changeDetail({ action: 'PAGE_GRANTED', key: 'reports', after: null })).toBe('reports');
+    // Owner 2026-10-27: a page and a tab by their names, never their keys; an action Page access has no words for yet as words.
+    expect(changeDetail({ action: 'PAGE_GRANTED', key: 'reports', after: null })).toBe('Run analytics');
+    expect(changeDetail({ action: 'TAB_GRANTED', key: 'queue:by-date', after: null })).toBe('Runs by date › By date');
+    expect(changeDetail({ action: 'PAGE_GRANTED', key: 'see-personal-data', after: null })).toBe('See personal data');
+    expect(actionLabel('page.access.renamed')).toBe('Page access renamed');
+  });
+
+  it('reads any code as words (codeWords)', () => {
+    expect(codeWords('report.approved.signed')).toBe('Report approved signed');
+    expect(codeWords('SOME_NEW_THING')).toBe('Some new thing');
+    expect(codeWords('aiPrompt')).toBe('AI prompt');
+    expect(codeWords('api-call')).toBe('API call');
+    expect(codeWords('Already words')).toBe('Already words');
   });
 });

@@ -1,3 +1,4 @@
+import { codeWords } from '../../../shared/ui/plain-words';
 import { Component, inject, signal } from '@angular/core';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { API_SUCCESS } from '../../../core/api/api.config';
@@ -79,7 +80,8 @@ export class ClientHistoryPanel {
   }
 
   action(code: string): string {
-    return ACTIONS[code] ?? code;
+    // Owner 2026-10-27: an action with no words yet reads as words, never its code.
+    return ACTIONS[code] ?? codeWords(code);
   }
 
   who(id: number): string {
