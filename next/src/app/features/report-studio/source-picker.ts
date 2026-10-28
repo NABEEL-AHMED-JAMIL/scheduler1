@@ -300,7 +300,8 @@ export class ReportSourcePicker implements OnInit {
   // The lists as the advanced selects show them (owner 2026-10-27, "all select should be advance").
   readonly jobOptions = computed<AdvancedOption[]>(() => this.jobs().map(j => {
     const [name, ...pipeline] = j.label.split(' · ');
-    return { value: String(j.jobId), label: name, description: pipeline.join(' · ') || undefined, keywords: String(j.jobId) };
+    return { value: String(j.jobId), label: name, description: pipeline.length ? 'Pipeline: ' + pipeline.join(' · ') : undefined,
+      sample: '#' + j.jobId, keywords: String(j.jobId) };
   }));
   readonly runOptions = computed<AdvancedOption[]>(() => this.runs().map(r => runOption(r, rsTime(r.startTime, 'dateTime'))));
   readonly stepRunOptions = computed<AdvancedOption[]>(() => this.stepRuns().map(r => runOption(r, rsTime(r.startTime, 'dateTime'))));
