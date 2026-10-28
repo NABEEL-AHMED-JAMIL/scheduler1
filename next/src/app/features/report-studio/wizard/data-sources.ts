@@ -161,9 +161,11 @@ export class DataSources implements OnInit {
 
   private readonly visibleSchedules = computed(() => {
     const t = this.tenantId();
+    // This report's own pipeline first, then those whose newest run fits the template best, then the most recent.
+    const fit = (id: number) => { const f = this.fits()[id]; return f?.state === 'read' ? f.fit ?? 0 : -1; };
     return this.schedules().filter(s => !t || s.tenantId == null || s.tenantId === t)
       .sort((a, b) => Number(b.jobId === this.pipelineJobId()) - Number(a.jobId === this.pipelineJobId())
-        || String(b.lastJobRun ?? '').localeCompare(String(a.lastJobRun ?? '')));
+        || fit(b.jobId) - fit(a.jobId) || String(b.lastJobRun ?? '').localeCompare(String(a.lastJobRun ?? '')));
   });
 
   readonly pipelineOptions = computed<AdvancedOption[]>(() => {

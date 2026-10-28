@@ -263,6 +263,19 @@ describe('Data sources', () => {
     expect(opt.description).toContain('Last run #3096');
   });
 
+  it('lists the pipelines that fit best first, after the report\'s own', () => {
+    const { fixture } = setup({ version: null });
+    const ds = fixture.debugElement.query(x => x.componentInstance instanceof DataSources).componentInstance as DataSources;
+    (ds as unknown as { schedules: { set: (v: unknown) => void } }).schedules.set([
+      { jobId: 1, jobName: 'Newest, unrelated', lastJobRun: '2026-10-27T15:00:00' },
+      { jobId: 2, jobName: 'Older, fits', lastJobRun: '2026-10-20T10:00:00' },
+      { jobId: 3, jobName: 'Fits some', lastJobRun: '2026-10-21T10:00:00' }]);
+    ds.fits.set({ 1: { state: 'read', fit: 0, rows: 1, columns: 2, runId: 9 }, 2: { state: 'read', fit: 4, rows: 1, columns: 9, runId: 8 },
+      3: { state: 'read', fit: 2, rows: 1, columns: 5, runId: 7 } });
+    expect(ds.pipelineOptions().map(o => o.label)).toEqual(['Older, fits', 'Fits some', 'Newest, unrelated']);
+    expect(ds.pipelineOptions()[0]).toEqual(expect.objectContaining({ badge: 'Fits 4 of 4', badgeTone: 'ok' }));
+  });
+
   it('on Generate again offers the same data, a newer run, a file and pasted JSON', () => {
     const { fixture } = setup();
     const ds = fixture.debugElement.query(x => x.componentInstance instanceof DataSources).componentInstance as DataSources;

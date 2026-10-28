@@ -305,11 +305,16 @@ export class DataMapping implements OnInit {
     return `${got} of ${m.columns.length} column${m.columns.length === 1 ? '' : 's'} matched`;
   }
 
+  /** A list's columns read under another name, or not found: the ones a person may want to see. */
+  columnDiffs(m: FieldMatch): FieldMatch['columns'] {
+    return m.columns.filter(c => c.source !== c.column);
+  }
+
   fieldKind(f: TemplateField): string {
     if (f.conditionOnly) return 'decides what shows';
     if (f.picture) return 'a picture';
     if (f.list && !f.rootRow) return 'a list';
-    return f.rootRow ? "each row's" : '';
+    return f.rootRow ? 'a column of every row' : '';
   }
 
   open(path: string): void {

@@ -28,7 +28,7 @@
         }
       </div>
     } @else if (isList() && guide().readsRows) {
-      <p class="rsdm-muted">The template lists the data's rows: all {{ i.records }} go in one report.</p>
+      <p class="rsdm-muted">@if (i.records === 1) { The template lists the data's rows: its one row is in the report. } @else { The template lists the data's rows: all {{ i.records }} go in one report. }</p>
     }
     @if (columnsShown().length) {
       <div class="rsdm-cols">
@@ -136,10 +136,11 @@
                     <span class="rsdm-how" [class.is-ok]="m.state === 'matched'" [class.is-crit]="m.state === 'needs'">{{ howText(m) }}</span>
                     @if (m.columns.length && m.state === 'matched') {
                       <span class="rsdm-row-cols">
-                        <span class="rsdm-muted">{{ columnsText(m) }}:</span>
-                        @for (c of m.columns; track c.column) {
-                          <span class="rsdm-colmap" [class.is-missing]="!c.source">{{ c.label }} <span class="mono">← {{ c.source || 'nothing' }}</span></span>
+                        <span class="rsdm-muted">{{ columnsText(m) }}@if (columnDiffs(m).length) {:} @else {, each by the same name}</span>
+                        @for (c of columnDiffs(m); track c.column) {
+                          <span class="rsdm-colmap" [class.is-missing]="!c.source">{{ c.label }} <span class="mono">← {{ c.source || 'nothing (prints empty)' }}</span></span>
                         }
+                        @if (columnDiffs(m).length && columnDiffs(m).length < m.columns.length) { <span class="rsdm-muted">the rest by the same name</span> }
                       </span>
                     }
                     @if (editing() === m.field.path && m.state !== 'needs') {

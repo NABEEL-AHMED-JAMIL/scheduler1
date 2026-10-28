@@ -1,4 +1,4 @@
-import { Component, DestroyRef, ElementRef, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import { Component, DestroyRef, ElementRef, computed, effect, inject, input, signal, untracked, viewChild } from '@angular/core';
 import { Icon } from '../../../shared/ui/icon';
 import { AppLoading } from '../../../shared/ui/loading';
 import { ReportStudioApi, studioError } from '../report-studio.api';
@@ -40,11 +40,13 @@ export function pageOf(doc: CanvasDoc | null, id: string | null): number {
       }
       @if (drawing()) { <app-loading shape="inline" label="Drawing…" /> }
     </div>
-    <div class="rsmp-frame" [style.height.px]="frameHeight()">
+    <div #frame class="rsmp-frame" [style.height.px]="frameHeight()">
       @if (doc(); as d) {
-        <div class="rsmp-paper" [style.width.px]="pageWidthPx()" [style.transform]="'scale(' + scale() + ')'">
-          <app-rs-page-frame [html]="d.pages[page()] ?? ''" [css]="d.css" [page]="page() + 1" [pages]="d.pages.length" [heightMm]="pageMm().height"
-                             [selected]="focus()" [flagged]="marked()" (measured)="measured.set($event)" />
+        <div class="rsmp-space" [style.height.px]="contentHeight()">
+          <div class="rsmp-paper" [style.width.px]="pageWidthPx()" [style.transform]="'scale(' + scale() + ')'">
+            <app-rs-page-frame [html]="d.pages[page()] ?? ''" [css]="d.css" [page]="page() + 1" [pages]="d.pages.length" [heightMm]="pageMm().height"
+                               [selected]="focus()" [flagged]="marked()" (measured)="measured.set($event)" />
+          </div>
         </div>
       } @else if (thumb()) {
         <img class="rsmp-thumb" [src]="thumb()" alt="The template's first page" />
@@ -60,8 +62,9 @@ export function pageOf(doc: CanvasDoc | null, id: string | null): number {
     .rsmp-title { flex: 1; font-size: 0.875rem; font-weight: 600; }
     .rsmp-pager { display: flex; align-items: center; gap: 0.375rem; }
     .rsmp-muted { font-size: 0.75rem; color: var(--text-secondary); }
-    .rsmp-frame { position: relative; overflow: hidden; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--paper);
-      min-height: 12rem; }
+    .rsmp-frame { position: relative; overflow-x: hidden; overflow-y: auto; border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+      background: var(--paper); min-height: 12rem; }
+    .rsmp-space { position: relative; }
     .rsmp-paper { position: absolute; top: 0; left: 0; transform-origin: top left; }
     .rsmp-thumb { display: block; width: 100%; height: auto; }
     .rsmp-blank { display: flex; align-items: center; justify-content: center; height: 100%; min-height: 12rem; padding: 1rem; text-align: center;
@@ -92,8 +95,12 @@ export class MappingPreview {
   readonly pageMm = computed(() => (this.definition() ? pageSizeMm(this.definition()!) : { width: 210, height: 297 }));
   readonly pageWidthPx = computed(() => this.pageMm().width * PX_PER_MM);
   readonly scale = computed(() => Math.min(1, this.width() / this.pageWidthPx()));
-  readonly frameHeight = computed(() => (this.doc()
-    ? Math.max(this.pageMm().height * PX_PER_MM, this.measured()) * this.scale() : null));
+  /** The whole drawn page, scaled (a long report runs past one sheet: it scrolls inside the panel). */
+  readonly contentHeight = computed(() => Math.max(this.pageMm().height * PX_PER_MM, this.measured()) * this.scale());
+  /** The panel is one sheet tall at most, so the preview reads as a page beside the fields. */
+  readonly frameHeight = computed(() => (this.doc() ? Math.min(this.contentHeight(), this.pageMm().height * PX_PER_MM * this.scale()) : null));
+  private readonly frameRef = viewChild<ElementRef<HTMLElement>>('frame');
+  private readonly pageRef = viewChild(PageFrame);
   private timer: ReturnType<typeof setTimeout> | null = null;
   private seq = 0;
 
@@ -118,7 +125,19 @@ export class MappingPreview {
       const want = pageOf(d, this.focus());
       const first = want >= 0 ? want : this.marked().map(id => pageOf(d, id)).find(p => p >= 0) ?? -1;
       if (first >= 0) untracked(() => this.page.set(first));
+      // ...and scrolls to where it prints.
+      const id = this.focus() ?? this.marked()[0] ?? null;
+      untracked(() => setTimeout(() => this.reveal(id), 60));
     });
+  }
+
+  /** Scrolls the panel so a component's box is in view, near the top. */
+  private reveal(id: string | null): void {
+    const frame = this.frameRef()?.nativeElement;
+    const el = id ? this.pageRef()?.element(id) : null;
+    if (!frame || !el) return;
+    const top = el.getBoundingClientRect().top - frame.getBoundingClientRect().top + frame.scrollTop;
+    frame.scrollTo?.({ top: Math.max(0, top - 24), behavior: 'smooth' });
   }
 
   turn(by: number): void {
