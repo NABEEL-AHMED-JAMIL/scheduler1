@@ -163,7 +163,11 @@ test.describe('Executions', () => {
     expect(uploaded.suggestedFilename()).toBe(uploadOut.name);
 
     // The kept file, as csv: named by the server, and its first line is the dataset's header.
-    const [csv] = await Promise.all([page.waitForEvent('download'), kept.locator('[data-format="csv"]').click()]);
+    // A file with several formats offers them in its Download menu; one with a single format downloads straight away.
+    const menu = kept.locator('[data-test="download"]');
+    if (await menu.count()) await menu.click();
+    const asCsv = (await menu.count()) ? page.getByRole('menuitem').and(page.locator('[data-format="csv"]')) : kept.locator('[data-format="csv"]');
+    const [csv] = await Promise.all([page.waitForEvent('download'), asCsv.click()]);
     expect(csv.suggestedFilename()).toBe(KEPT_FILE);
     const text = readFileSync(await csv.path(), 'utf8');
     expect(text.split(/\r?\n/)[0].split(',').map((c: string) => c.replace(/^"|"$/g, ''))).toEqual(keptDataset.columns);

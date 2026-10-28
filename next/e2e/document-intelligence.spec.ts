@@ -77,7 +77,13 @@ async function settled<T extends { status: string }>(read: () => Promise<T>, wha
  * check's) is used again, so a run adds at most one, and Documents in labels each as "Extraction n of m of this file".
  */
 async function seed(request: APIRequestContext, s: Session): Promise<number> {
-  const types = await call<{ documentTypeId: number; typeKey: string; builtIn: boolean; status: string }[]>(request, s, 'GET', '/documentType.json/fetchAll');
+  type Type = { documentTypeId: number; typeKey: string; builtIn: boolean; status: string };
+  let types = await call<Type[]>(request, s, 'GET', '/documentType.json/fetchAll');
+  if (!types.some(t => t.typeKey === 'invoice')) {
+    // A workspace without an invoice type (a rebuilt one) gets it from the starter catalog, as its administrator would.
+    await call(request, s, 'POST', '/documentType.json/starters/add', { typeKeys: ['invoice'] });
+    types = await call<Type[]>(request, s, 'GET', '/documentType.json/fetchAll');
+  }
   const invoice = types.find(t => t.typeKey === 'invoice' && !t.builtIn && t.status === 'Active') ?? types.find(t => t.typeKey === 'invoice');
   expect(invoice, 'the invoice document type').toBeTruthy();
   const asked = await call<{ ocrDocumentId: number; status: string }>(request, s, 'POST', '/documentOcr.json/request', { bucket: BUCKET(), key: KEY });
