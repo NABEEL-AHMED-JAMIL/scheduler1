@@ -92,7 +92,7 @@ describe('AuthService.canOpen', () => {
     const profileless = service();
     expect(profileless.canOpen('developer-portal')).toBe(false);
     expect(profileless.canOpen('reports')).toBe(true);
-    expect(EXPLICIT_PAGES).toEqual(['developer-portal']);
+    expect(EXPLICIT_PAGES).toEqual(['developer-portal', 'sensitive-files', 'see-personal-data']);
     expect(PAGE_LABELS['developer-portal']).toBe('Developer portal');
   });
 

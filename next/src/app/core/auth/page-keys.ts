@@ -38,7 +38,8 @@ export type PageKey =
   // a report version -- certifying its PDF -- and a signature or stamp picture (an action). Identity's PageKey has the same three.
   | 'report-assets' | 'report-asset-custodian' | 'report-approve'
   // ZT-M21 (owner 2026-10-26): a capability, not a page -- downloading, viewing or previewing the files a pipeline marked
-  // sensitive keeps (and its reports). Admins and people with no profile hold it; a profile once an admin ticks it.
+  // sensitive keeps (and its reports). Deny by default (owner 2026-10-27): admins hold it, a profile once an admin ticks it,
+  // a person given it on their own -- never a person with no profile.
   | 'sensitive-files'
   // ZT-I34 (owner 2026-10-27): a capability, not a page -- showing a request's personal data (each showing is in the request's
   // history). Deny by default: admins hold it, a profile once an admin ticks it, a person given it on their own -- never a person

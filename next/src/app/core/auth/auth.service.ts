@@ -12,9 +12,10 @@ const STORAGE_KEY = 'etl_auth_user';
 /**
  * MIG-336: the pages a tenant user holds only when their access profile names them -- not by having no profile at all.
  * Owner decision: the API docs (the developer portal) are for administrators and developers, so a workspace administrator
- * grants them to a developer by profile; everyone else does not see them.
+ * grants them to a developer by profile; everyone else does not see them. ZT-I34 (owner 2026-10-27): See personal data and
+ * Download sensitive files are given, never assumed, as identity's PageKey.DENIED_BY_DEFAULT says.
  */
-export const EXPLICIT_PAGES: readonly PageKey[] = ['developer-portal'];
+export const EXPLICIT_PAGES: readonly PageKey[] = ['developer-portal', 'sensitive-files', 'see-personal-data'];
 
 /** The login page's `reason` for a session signed out because its password changed. */
 export const PASSWORD_CHANGED_REASON = 'password-changed';
