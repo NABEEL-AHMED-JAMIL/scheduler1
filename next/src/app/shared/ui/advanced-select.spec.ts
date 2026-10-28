@@ -140,7 +140,7 @@ describe('AdvancedSelect', () => {
 
   it('works as a form control, and a "none" row clears it', () => {
     const { box } = make({ allowClear: true, clearLabel: 'Leave it blank' });
-    const changes: string[] = [];
+    const changes: (string | number | null)[] = [];
     box.registerOnChange(v => changes.push(v));
     box.writeValue(1475 as unknown as string);
     expect(box.chosen()?.label).toBe('Patient intake · assess');
