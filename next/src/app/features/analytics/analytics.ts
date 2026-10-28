@@ -60,6 +60,7 @@ import { AppLoading, InlineStatus, loadErrorText } from '../../shared/ui/loading
 import { LoadError } from '../../shared/ui/load-error';
 import { createTableSort } from '../../shared/ui/sort';
 import { SortHeader } from '../../shared/ui/sort-header';
+import { AdvancedOption, AdvancedSelect } from '../../shared/ui/advanced-select';
 
 /**
  * The tabs a dataset is read through -- document 02's ten.
@@ -630,7 +631,7 @@ export const CANVAS_WRAP_KEY = 'result:canvas';
     Icon, TableShell, SqlEditor, BarChart, Donut, RankedBar, Histogram, FilterBuilder, DataGrid,
     DatasetRegistry, RouterLink, ColumnCard, DatasetOverview, StatStrip, FormDialog,
     CdkMenu, CdkMenuItem, CdkMenuTrigger, DataText, WrapToggle,
-    WidgetChart, KindPicker, ThemePicker, ChartPalette, AppLoading, InlineStatus, LoadError, SortHeader,
+    WidgetChart, KindPicker, ThemePicker, ChartPalette, AppLoading, InlineStatus, LoadError, SortHeader, AdvancedSelect,
   ],
   templateUrl: './analytics.html',
   host: { '(document:keydown.escape)': 'onEscape()' },
@@ -815,6 +816,12 @@ export class Analytics implements OnInit {
     provider: item.provider,
     issue: this.connectionIssue(item.provider),
   })));
+
+  /** The connection picker's rows (owner 2026-10-27, "all select should be advance"): one the reader cannot open is inert, its reason under it. */
+  readonly connectionPick = computed<AdvancedOption[]>(() => this.connectionOptions().map(o => ({
+    value: o.bucket, label: o.label || o.bucket, keywords: o.bucket,
+    description: [o.label && o.label !== o.bucket ? o.bucket : '', o.provider, o.issue].filter(Boolean).join(' · ') || undefined,
+    disabled: !!o.issue, badge: o.issue ? 'Cannot read' : undefined, badgeTone: 'warn' as const })));
 
   readonly readableConnections = computed(() => this.connectionOptions().filter(o => !o.issue));
 
@@ -2441,6 +2448,11 @@ export class Analytics implements OnInit {
     return [...files, ...folders].filter(option => option.path !== current);
   });
 
+  /** The second dataset's picker: the folder's other readable files, then every file of a kind in it. */
+  readonly secondPick = computed<AdvancedOption[]>(() => this.secondOptions().map(o => o.path.includes('*')
+    ? { value: o.path, label: o.label, sample: o.path.slice(o.path.lastIndexOf('/') + 1), group: 'Every file of a kind' }
+    : { value: o.path, label: o.label, description: o.path !== o.label ? o.path : undefined, group: 'Files' }));
+
   /**
    * A saved query that was written against a different file from the one open.
    *
@@ -2830,6 +2842,11 @@ export class Analytics implements OnInit {
 
   readonly chartValueOptions = computed(() =>
     this.chartColumns().filter(c => c.numbers > 0 && c.name !== this.labelColumn()?.name));
+  /** The chart's label column and its value column; each value column says how much of it is numbers. */
+  readonly chartLabelPick = computed<AdvancedOption[]>(() => this.chartLabelOptions().map(c => ({
+    value: c.name, label: c.name, mono: true, description: `${c.distinct.toLocaleString()} distinct value${c.distinct === 1 ? '' : 's'}` })));
+  readonly chartValuePick = computed<AdvancedOption[]>(() => this.chartValueOptions().map(c => ({
+    value: c.name, label: c.name, mono: true, description: `A number in ${c.numbers.toLocaleString()} of ${c.rows.toLocaleString()} rows` })));
 
   /**
    * The marks of a categorical chart, and everything that was left out getting there.
@@ -3771,6 +3788,18 @@ export class Analytics implements OnInit {
    * control was enabled because measureField() is not empty. A blank picker over a non-empty
    * request is the one state that cannot be reasoned about from the screen.
    */
+  /** Each dimension slot's columns, by slot (one list per picker, not one per change detection). */
+  readonly dimensionPicks = computed<Record<number, AdvancedOption[]>>(() =>
+    Object.fromEntries(this.dimensionSlots().map((_, slot) => [slot, this.dimensionOptions(slot).map(c => this.columnPick(c))])));
+  readonly measurePick = computed<AdvancedOption[]>(() => this.measureFieldOptions().map(c => this.columnPick(c)));
+
+  /** A column as the pickers list it: its name, its type on the right; a name the dataset lacks is inert and says so. */
+  private columnPick(c: { name: string; type: string; missing: boolean }): AdvancedOption {
+    return c.missing
+      ? { value: c.name, label: c.name, mono: true, disabled: true, description: 'Not a column of this dataset', badge: 'Not found', badgeTone: 'warn' }
+      : { value: c.name, label: c.name, mono: true, sample: this.shortType(c.type) || undefined, keywords: c.type };
+  }
+
   measureFieldOptions(): { name: string; type: string; missing: boolean }[] {
     const options = this.columns()
       .map(column => ({ name: column.name, type: column.type, missing: false }));
@@ -3873,6 +3902,14 @@ export class Analytics implements OnInit {
   /** What is on screen: the server's grouping where there is one, the root before the first run. */
   readonly effectiveDimensions = computed(() =>
     this.groupingAnswered() ? this.groupedBy() : this.dimensions());
+  /** Drill: the dimensions on screen; then by: the other columns, each with its type. */
+  readonly drillDimPick = computed<AdvancedOption[]>(() => {
+    const types = new Map(this.columns().map(c => [c.name, c.type]));
+    return this.effectiveDimensions().map(name => ({ value: name, label: name, mono: true, sample: types.has(name) ? this.shortType(types.get(name)!) : undefined }));
+  });
+  readonly drillNextPick = computed<AdvancedOption[]>(() => this.columns()
+    .filter(c => !this.effectiveDimensions().includes(c.name))
+    .map(c => ({ value: c.name, label: c.name, mono: true, sample: this.shortType(c.type) || undefined, keywords: c.type })));
 
   setDimension(slot: number, name: string): void {
     const next = [...this.dimensions()];

@@ -2,6 +2,7 @@ import { expect as expectNow, Page } from '@playwright/test';
 import { openFromMenu } from './support/menu';
 import { defaultSession, NO_SESSION, signedIn, test } from './support/session';
 import { analyticsFixtures } from './support/analytics-fixtures';
+import { pickOption } from './support/advanced-select';
 
 /**
  * The alias of the storage connection that holds the fixtures: E2E_CONNECTION, else what
@@ -48,7 +49,7 @@ async function openFixture(page: Page) {
   await page.goto('/objects/analytics');
   // The files are a panel now (owner, 2026-09-28): Choose a file opens it on the connection picker.
   await page.getByRole('button', { name: 'Choose a file' }).click();
-  await page.locator('#a-conn').selectOption(CONNECTION);
+  await pickOption(page.locator('#a-conn'), CONNECTION);
   await page.getByRole('button', { name: /analytics-benchmark/ }).click();
   await page.getByRole('button', { name: new RegExp(DATASET.replace('.', '\\.')) }).click();
   await expect(page.getByText('150K rows')).toBeVisible({ timeout: 45_000 });   // the count reads the whole file from S3
@@ -111,12 +112,12 @@ test('5 — a drill narrows, and the breadcrumb takes you back where you started
   await openFixture(page);
   await page.getByRole('tab', { name: 'Canvas', exact: true }).click();
 
-  await page.locator('#a-dim-0').selectOption('region');
+  await pickOption(page.locator('#a-dim-0'), 'region');
   await page.getByRole('button', { name: /Run analysis/ }).click();
   await expect(page.locator('h4', { hasText: /by region/ })).toBeVisible();
 
-  await page.locator('#a-drill-next').selectOption('customer');
-  await page.locator('#a-drill-dim').selectOption('region');
+  await pickOption(page.locator('#a-drill-next'), 'customer');
+  await pickOption(page.locator('#a-drill-dim'), 'region');
   await page.getByRole('button', { name: 'Drill', exact: true }).first().click();
   await expect(page.locator('h4', { hasText: /by customer/ })).toBeVisible();
   await expect(page.getByText('Filtered to', { exact: true })).toBeVisible();
@@ -168,11 +169,11 @@ test('10 — a Canvas drill narrows the Data tab, and says so', async ({ page })
   // number of rows in one region, over the whole file, not a filtered view of the hundred in hand.
   await openFixture(page);
   await page.getByRole('tab', { name: 'Canvas', exact: true }).click();
-  await page.locator('#a-dim-0').selectOption('region');
+  await pickOption(page.locator('#a-dim-0'), 'region');
   await page.getByRole('button', { name: /Run analysis/ }).click();
   await expect(page.locator('h4', { hasText: /by region/ })).toBeVisible();
 
-  await page.locator('#a-drill-dim').selectOption('region');
+  await pickOption(page.locator('#a-drill-dim'), 'region');
   await page.getByRole('button', { name: 'Drill', exact: true }).first().click();
   await expect(page.getByText('Filtered to', { exact: true })).toBeVisible();
 
@@ -199,7 +200,7 @@ test('11 — a date column can be bucketed by month, and the heading says so', a
   await page.goto('/objects/analytics');
   // The files are a panel now (owner, 2026-09-28): Choose a file opens it on the connection picker.
   await page.getByRole('button', { name: 'Choose a file' }).click();
-  await page.locator('#a-conn').selectOption(CONNECTION);
+  await pickOption(page.locator('#a-conn'), CONNECTION);
   await page.getByRole('button', { name: /analytics-samples/ }).click();
   await page.getByRole('button', { name: /orders\.csv/ }).click();
   await expect(page.getByText('250K rows')).toBeVisible({ timeout: 45_000 });   // the count reads the whole file from S3
@@ -207,14 +208,14 @@ test('11 — a date column can be bucketed by month, and the heading says so', a
 
   // A text column is offered no bucket: the server refuses a grain on one, rightly, and the
   // picker must not walk anybody into that.
-  await page.locator('#a-dim-0').selectOption('region');
+  await pickOption(page.locator('#a-dim-0'), 'region');
   await expect(page.locator('#a-grain-0')).toHaveCount(0);
 
-  await page.locator('#a-dim-0').selectOption('order_date');
+  await pickOption(page.locator('#a-dim-0'), 'order_date');
   await expect(page.locator('#a-grain-0')).toBeVisible();
   await page.locator('#a-grain-0').selectOption('MONTH');
   await page.locator('#a-agg').selectOption('SUM');
-  await page.locator('#a-measure-field').selectOption('amount');
+  await pickOption(page.locator('#a-measure-field'), 'amount');
   await page.getByRole('button', { name: /Run analysis/ }).click();
 
   // Two years of orders: 24 months, not 730 days.

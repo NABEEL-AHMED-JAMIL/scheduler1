@@ -6,8 +6,10 @@ import { FormDialog } from '../../../shared/ui/form-dialog';
 import { Field } from '../../../shared/ui/field';
 import { Icon } from '../../../shared/ui/icon';
 import { ComboboxOption } from '../../../shared/ui/combobox';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
+import { idOf, idValue } from '../../../shared/ui/advanced-options';
 import {
-  ContractRow, DIRECTIONS, Proposal, SENSITIVITIES, SchemaField, contractSaveOf, directionLabel, parseSample, requiredPaths,
+  ContractRow, DIRECTIONS, Proposal, SENSITIVITIES, SchemaField, contractSaveOf, directionLabel, parseSample, requiredPaths, workspaceChoices,
 } from './sources.model';
 import { SourcesApi } from './sources.service';
 import { createTableSort } from '../../../shared/ui/sort';
@@ -29,7 +31,7 @@ export interface ContractSampleData {
  */
 @Component({
   selector: 'app-contract-sample-dialog',
-  imports: [FormDialog, Field, Icon, SortHeader],
+  imports: [FormDialog, Field, Icon, SortHeader, AdvancedSelect],
   template: `
     <app-form-dialog [heading]="data.contract ? 'New version of ' + data.contract.name : 'New data contract'"
                      [subtitle]="subtitle" size="wide" [confirmLabel]="data.contract ? 'Save version' : 'Save v1'"
@@ -38,10 +40,9 @@ export interface ContractSampleData {
         @if (!data.contract) {
           @if (data.tenants) {
             <app-field label="Workspace" for="csTenant" [required]="true">
-              <select id="csTenant" class="input" [value]="tenantId() ?? ''" (change)="tenantId.set($any($event.target).value ? +$any($event.target).value : null)">
-                <option value="">Pick a workspace</option>
-                @for (t of data.tenants; track t.value) { <option [value]="t.value" [selected]="t.value === (tenantId() + '')">{{ t.label }}</option> }
-              </select>
+              <app-advanced-select id="csTenant" [options]="tenantChoices" [value]="idValue(tenantId())" (valueChange)="tenantId.set(idOf($event))"
+                                   placeholder="Pick a workspace" searchLabel="Search the workspaces" searchPlaceholder="Search by name or number"
+                                   emptyText="No workspace to choose." />
             </app-field>
           }
           <div class="form-grid">
@@ -101,6 +102,10 @@ export interface ContractSampleData {
 export class ContractSampleDialog {
   readonly ref = inject<DialogRef<boolean>>(DialogRef);
   readonly data = inject<ContractSampleData>(DIALOG_DATA);
+  /** A platform administrator's workspaces, by name (found by number too). */
+  readonly tenantChoices: AdvancedOption[] = workspaceChoices(this.data.tenants ?? []);
+  readonly idValue = idValue;
+  readonly idOf = idOf;
   private readonly api = inject(SourcesApi);
   private readonly toast = inject(ToastService);
 

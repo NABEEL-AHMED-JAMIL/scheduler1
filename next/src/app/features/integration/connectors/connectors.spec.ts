@@ -11,6 +11,7 @@ import { Connectors } from './connectors';
 import { ConnectorsApi } from './connectors.api';
 import { ConnectPanel, ConnectPanelData } from './connect-panel';
 import { ConnectionPanel } from './connection-panel';
+import { advancedSelect } from '../../../shared/ui/advanced-select.testing';
 import {
   Connection, ConnectionDetail, ConnectorCard, ConnectorSpec, agoText, connectionState, lagText, scheduleText, suggestedMode,
 } from './connectors.model';
@@ -185,7 +186,9 @@ describe('Connect stepper', () => {
     (el.querySelector('[data-next]') as HTMLButtonElement).click();
     fixture.detectChanges();
     expect(screen.mode()).toBe('INCREMENTAL');
-    expect((el.querySelector('[data-cursor="public.orders"]') as HTMLSelectElement).value).toBe('updated_at');
+    const cursor = advancedSelect(fixture, '[data-cursor="public.orders"]');
+    expect(cursor.value()).toBe('updated_at');
+    expect(cursor.options().find(o => o.value === 'updated_at')?.badge).toBe('Suggested');
     (el.querySelector('[data-next]') as HTMLButtonElement).click();
     fixture.detectChanges();
     expect(el.querySelector('[data-summary]')?.textContent).toContain('1 table, incremental, hourly.');

@@ -15,6 +15,7 @@ export const PINNED: Record<string, unknown> = {
       "Required",
       "Saved",
       "State",
+      "The active version",
       "Type",
       "Validate",
       "Version",
@@ -55,7 +56,8 @@ export const PINNED: Record<string, unknown> = {
       "Infer schema",
       "Preview",
       "Save",
-      "Test connection"
+      "Test connection",
+      "UI-REVIEW LocalStack S3 (fake keys)ui-review-s3 · S3"
     ],
     "columns": [],
     "fields": [

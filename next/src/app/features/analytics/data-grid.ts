@@ -8,7 +8,8 @@ import { WrapToggle } from '../../shared/ui/wrap-toggle';
 import { capTitle } from '../../shared/ui/long-text';
 import { copyText } from '../../shared/ui/clipboard.util';
 import { FilterClause, FilterOperator, OPERAND_COUNT } from './analytics.service';
-import { FILTER_OPERATORS, isDateType, isNumericType } from './filter-builder';
+import { FILTER_OPERATORS, isDateType, isNumericType, operatorPicks } from './filter-builder';
+import { AdvancedSelect } from '../../shared/ui/advanced-select';
 
 /**
  * One column of the grid. `hidden` and `width` are the reader's own two conveniences and are the
@@ -153,7 +154,7 @@ type Pending = '' | 'sort' | 'search' | 'filter';
  */
 @Component({
   selector: 'app-data-grid',
-  imports: [Icon, BlurLoader, WrapToggle],
+  imports: [Icon, BlurLoader, WrapToggle, AdvancedSelect],
   host: { class: 'block min-w-0' },
   template: `
     <div class="flex flex-col gap-2 min-w-0">
@@ -351,17 +352,9 @@ type Pending = '' | 'sort' | 'search' | 'filter';
                   @for (column of viewColumns(); track column.name) {
                     <th scope="col" class="!static font-normal normal-case">
                       <div class="flex items-center gap-1">
-                        <select class="input min-h-0 py-0.5 pl-1.5 pr-6 text-[11px] w-auto min-w-0"
-                                [attr.aria-label]="'Filter operator for ' + column.name"
-                                [value]="column.operator"
-                                (change)="setOperator(column.name, $any($event.target).value)">
-                          @for (operator of operators; track operator.id) {
-                            <option [value]="operator.id"
-                                    [selected]="operator.id === column.operator">
-                              {{ operator.label }}
-                            </option>
-                          }
-                        </select>
+                        <app-advanced-select class="w-28 min-w-0 text-[11px]" [compact]="true" [ariaLabel]="'Filter operator for ' + column.name"
+                                             [options]="operatorPicks" [value]="column.operator" (valueChange)="setOperator(column.name, $any($event))"
+                                             searchLabel="Search the operators" panelWidth="14rem" />
                         @if (column.needsValue) {
                           <input class="input min-h-0 py-0.5 px-1.5 text-[11px] w-full min-w-0"
                                  [type]="column.numeric ? 'number' : 'text'"
@@ -527,6 +520,7 @@ export class DataGrid {
   readonly copyCell = output<GridCopy>();
 
   protected readonly operators = GRID_OPERATORS;
+  protected readonly operatorPicks = operatorPicks(GRID_OPERATORS);
   protected readonly minWidth = MIN_COLUMN_WIDTH;
   protected readonly maxWidth = MAX_COLUMN_WIDTH;
   /** The number reported for an automatically sized column. See the separator's comment. */

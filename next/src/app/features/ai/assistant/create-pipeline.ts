@@ -10,6 +10,8 @@ import { CreatedFlow, FlowDefinition, FlowTrigger, PipelineFlowArtifact, pipelin
 import { ConversationApi } from './conversation.api';
 import { AuthService } from '../../../core/auth/auth.service';
 import { InlineStatus, createLoadState } from '../../../shared/ui/loading';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
+import { idOf, idValue } from '../../../shared/ui/advanced-options';
 
 export interface CreatePipelineData {
   flow: PipelineFlowArtifact;
@@ -79,7 +81,7 @@ export function jobPayload(name: string, taskDetailId: number, trigger: FlowTrig
 @Component({
   selector: 'app-create-pipeline',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon, InlineStatus],
+  imports: [Icon, InlineStatus, AdvancedSelect],
   styles: [`.cp-dialog { width: min(36rem, 94vw); max-height: 88vh; }`],
   template: `
     <div class="cp-dialog card shadow-xl flex flex-col" role="dialog" aria-labelledby="create-pipeline-title">
@@ -105,12 +107,10 @@ export function jobPayload(name: string, taskDetailId: number, trigger: FlowTrig
         </label>
         <label class="flex flex-col gap-1 text-sm">
           <span class="font-medium">Topic</span>
-          <select class="input" [disabled]="busy() || !!created() || !topics().length" (change)="topicId.set(+$any($event.target).value)">
-            @if (topicsState.loading()) { <option value="">Loading topics…</option> }
-            @for (t of topics(); track t.sourceTaskTypeId) {
-              <option [value]="t.sourceTaskTypeId" [selected]="t.sourceTaskTypeId === topicId()">{{ t.serviceName }}</option>
-            }
-          </select>
+          <app-advanced-select ariaLabel="Topic" [options]="topicOptions()" [value]="idValue(topicId())" (valueChange)="topicId.set(idOf($event))"
+                               [disabled]="busy() || !!created() || !topics().length" placeholder="Choose a topic" searchLabel="Search the topics"
+                               [loading]="topicsState.loading()" loadingText="Loading topics…"
+                               [emptyText]="topicsState.error() ? 'The topics could not be read.' : 'This workspace has no active topic.'" />
           <!-- Owner 2026-10-27: the field says it is loading, that there is no topic, or why the topics could not be read. -->
           @if (topicsNote()) {
             <span class="text-xs text-crit-500">{{ topicsNote() }}</span>
@@ -189,6 +189,11 @@ export class CreatePipeline implements OnInit {
   readonly topicsNote = signal('');
   readonly topicsState = createLoadState(false);
   readonly topicId = signal<number | null>(null);
+  /** The workspace's active topics a pipeline may sit under, by name. */
+  readonly topicOptions = computed<AdvancedOption[]>(() => this.topics().map(t => ({
+    value: String(t.sourceTaskTypeId), label: t.serviceName, mono: true, keywords: String(t.sourceTaskTypeId) })));
+  readonly idValue = idValue;
+  readonly idOf = idOf;
   readonly busy = signal(false);
   readonly created = signal<CreatedPipeline | null>(null);
   readonly steps = signal<{ label: string; state: StepState; note?: string }[]>([]);

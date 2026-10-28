@@ -10,6 +10,7 @@ import { SidePanel } from '../../../shared/ui/side-panel';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { ConnectorsApi, StorageTarget } from './connectors.api';
 import { InlineStatus, createLoadState, loadErrorText } from '../../../shared/ui/loading';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
 import {
   Connection, ConnectorCard, ConnectorField, Dataset, SCHEDULES, Stream, SyncMode, countText, modeText, needsCursor, settingsFields,
   suggestedCursor, suggestedMode,
@@ -51,7 +52,7 @@ export function stepText(step: Step, kindWord = 'tables'): string {
  */
 @Component({
   selector: 'app-connect-panel',
-  imports: [SidePanel, Icon, Segmented, Field, InlineStatus],
+  imports: [SidePanel, Icon, Segmented, Field, InlineStatus, AdvancedSelect],
   template: `
     <!-- UX final I2: the subtitle says what this step is (it repeated the title), the chooser is step 1 of the stepper
          when the panel opens on it, and the footer always has Cancel, with the step's primary at the right. -->
@@ -84,10 +85,11 @@ export function stepText(step: Step, kindWord = 'tables'): string {
               <input class="input" id="cName" [value]="name()" (input)="name.set($any($event.target).value)" maxlength="255" placeholder="ERP replica" />
             </app-field>
             <app-field label="Write to" for="cTarget" [required]="true" hint="Synced data lands in this workspace's bucket, under connectors/.">
-              <select class="input" id="cTarget" (change)="target.set($any($event.target).value)" [attr.aria-busy]="targetsState.loading() || null">
-                <option value="" [selected]="!target()">{{ targetsState.loading() ? 'Loading storage connections…' : 'Choose a storage connection' }}</option>
-                @for (t of targets(); track t.alias) { <option [value]="t.alias" [selected]="target() === t.alias">{{ t.connectionName }} ({{ t.alias }})</option> }
-              </select>
+              <app-advanced-select id="cTarget" [options]="targetOptions()" [value]="target()" (valueChange)="target.set($event)"
+                                   placeholder="Choose a storage connection" searchLabel="Search the storage connections"
+                                   searchPlaceholder="Search by name, alias or provider" [loading]="targetsState.loading()"
+                                   loadingText="Loading storage connections…" unknownText="Not an active storage connection"
+                                   [emptyText]="targetsState.error() ? 'The storage connections could not be read.' : 'No active storage connection yet.'" />
               <!-- Owner 2026-10-27: the list said only "Choose a storage connection" while loading, when empty and when its read failed. -->
               <app-inline-status [loading]="targetsState.loading()" [error]="targetsState.error()" [empty]="targetsState.loaded() && !targets().length"
                                  label="Loading storage connections…" (retry)="loadTargets()"
@@ -104,10 +106,9 @@ export function stepText(step: Step, kindWord = 'tables'): string {
                 <app-field [label]="f.label" [for]="'cf-' + f.name" [required]="f.required && !(f.secret && kept(f))" [hint]="f.help || ''">
                   @switch (f.type) {
                     @case ('select') {
-                      <select class="input" [id]="'cf-' + f.name" [attr.data-field]="f.name" (change)="set(f, $any($event.target).value)">
-                        <option value="" [selected]="!values()[f.name]">Default</option>
-                        @for (o of f.options; track o) { <option [value]="o" [selected]="values()[f.name] === o">{{ o }}</option> }
-                      </select>
+                      <app-advanced-select [id]="'cf-' + f.name" [attr.data-field]="f.name" [options]="fieldChoices()[f.name] ?? []"
+                                           [value]="values()[f.name] || ''" (valueChange)="set(f, $event)" [allowClear]="true" clearLabel="Default"
+                                           placeholder="Default" [searchLabel]="'Search ' + f.label" unknownText="Not one of the connector's choices" />
                     }
                     @case ('password') {
                       <input class="input" type="password" autocomplete="new-password" [id]="'cf-' + f.name" [attr.data-field]="f.name"
@@ -186,9 +187,10 @@ export function stepText(step: Step, kindWord = 'tables'): string {
                       @if (c.spec.sourceKind === 'file') {
                         <span class="text-sm">When a file last changed</span>
                       } @else if (ch.dataset.columns.length || ch.dataset.cursorCandidates.length) {
-                        <select class="input input-sm w-auto" [attr.data-cursor]="ch.dataset.name" (change)="setCursor(ch, $any($event.target).value)">
-                          @for (col of cursorOptions(ch); track col) { <option [value]="col" [selected]="ch.cursor === col">{{ col }}</option> }
-                        </select>
+                        <app-advanced-select class="w-64" [compact]="true" [attr.data-cursor]="ch.dataset.name" [options]="cursorChoices()[ch.dataset.name] ?? []"
+                                             [value]="ch.cursor || ''" (valueChange)="setCursor(ch, $event)" placeholder="Choose a column"
+                                             [ariaLabel]="'Follow changes of ' + ch.dataset.name + ' by'" searchLabel="Search the columns"
+                                             unknownText="Not a column of this table" panelWidth="22rem" />
                       } @else {
                         <input class="input input-sm" [attr.data-cursor]="ch.dataset.name" [value]="ch.cursor || ''" placeholder="updated_at"
                                (input)="setCursor(ch, $any($event.target).value)" />
@@ -315,6 +317,23 @@ export class ConnectPanel implements OnInit {
     return this.choices().filter(c => !q || c.dataset.name.toLowerCase().includes(q));
   });
   readonly chosen = computed(() => this.choices().filter(c => c.on));
+  /** "Write to": the workspace's active storage connections, by name, with their alias and provider. */
+  readonly targetOptions = computed<AdvancedOption[]>(() => this.targets().map(t => ({
+    value: t.alias, label: t.connectionName, sample: t.alias, description: t.provider || undefined, keywords: `${t.alias} ${t.provider}` })));
+  /** Each select setting's choices, by field name, as the connector names them. */
+  readonly fieldChoices = computed<Record<string, AdvancedOption[]>>(() =>
+    Object.fromEntries(this.fields().filter(f => f.type === 'select').map(f => [f.name, f.options.map(o => ({ value: o, label: o }))])));
+  /**
+   * Each chosen table's columns to follow changes by, by table name: the ones the connection suggests first (marked), then
+   * the rest, each with its type.
+   */
+  readonly cursorChoices = computed<Record<string, AdvancedOption[]>>(() => Object.fromEntries(this.chosen().map(ch => {
+    const types = new Map(ch.dataset.columns.map(c => [c.name, c.type]));
+    const suggested = new Set(ch.dataset.cursorCandidates);
+    return [ch.dataset.name, this.cursorOptions(ch).map(col => ({
+      value: col, label: col, mono: true, sample: types.get(col) || undefined,
+      badge: suggested.has(col) ? 'Suggested' : undefined, badgeTone: 'info' as const }))];
+  })));
   readonly modes = computed<SegmentOption<SyncMode>[]>(() => (this.card()?.spec.modes ?? ['FULL']).map(m => ({
     id: m, label: m === 'FULL' ? 'Full refresh' : m === 'INCREMENTAL' ? 'Incremental' : 'Continuous (CDC)' })));
   readonly modeHelp = computed(() => this.mode() === 'FULL' ? 'Every sync reads everything again into a new folder.'

@@ -5,6 +5,7 @@ import { waitOnOwnerData } from './support/owner-data';
 import { hasFixtures, NEEDS_FIXTURES, pipeline, riverside } from './support/fixtures';
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import { pickOption } from './support/advanced-select';
 
 /**
  * MIG-253: Documents -- the converter's PDF from a dataset and PDF from a run, Reports as generated outputs, and
@@ -161,11 +162,10 @@ test.describe('Documents: converter, Reports and file details (live)', () => {
     await page.getByRole('group', { name: 'Choose a source' }).getByRole('button', { name: 'PDF from a run' }).click();
     await page.locator('#render-schedule').fill(SCHEDULE.split(' ').slice(0, 2).join(' '));
     await page.getByRole('option', { name: new RegExp(`^${SCHEDULE.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`) }).click();
-    await page.locator('#render-run').selectOption(String(RUN));
-    // A run that kept one dataset has it picked without asking; this one also kept its PDF, so the csv is picked here.
-    const dataset = page.locator('#render-dataset');
-    if ((await dataset.inputValue()) !== String(DATASET)) await dataset.selectOption(String(DATASET));
-    await expect(dataset).toHaveValue(String(DATASET));
+    await pickOption(page.locator('#render-run'), String(RUN));
+    // A run that kept one dataset has it picked without asking; this one also kept its PDF, so the csv is picked here
+    // (picking the one already chosen reads it again, which the line below waits for).
+    await pickOption(page.locator('#render-dataset'), String(DATASET));
     await expect(page.getByText(`${ROWS} rows from run #${RUN}, ready to render.`)).toBeVisible();
   }
 

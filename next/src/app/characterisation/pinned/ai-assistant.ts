@@ -32,6 +32,7 @@ export const PINNED: Record<string, unknown> = {
       "History",
       "How did my last run go?",
       "List the data sources in this workspace.",
+      "Model connection",
       "New chat",
       "Pin Run the job named \"UI-CHECK step engine job 0928\" now.",
       "Pipelines",
@@ -49,7 +50,6 @@ export const PINNED: Record<string, unknown> = {
     "fields": [
       "Describe a pipeline, or ask about runs, sources or files…",
       "Message the assistant",
-      "Model connection",
       "Search the conversations, titles and messages",
       "Search titles and messages"
     ],
@@ -99,6 +99,7 @@ export const PINNED: Record<string, unknown> = {
       "Flow",
       "Fold the conversations to icons",
       "History",
+      "Model connection",
       "New chat",
       "Pin Run the job named \"UI-CHECK step engine job 0928\" now.",
       "Pipelines",
@@ -114,7 +115,6 @@ export const PINNED: Record<string, unknown> = {
     "fields": [
       "Describe a pipeline, or ask about runs, sources or files…",
       "Message the assistant",
-      "Model connection",
       "Search the conversations, titles and messages",
       "Search titles and messages"
     ],

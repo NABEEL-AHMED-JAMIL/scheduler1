@@ -46,6 +46,7 @@ import { colorKeysOf } from './charts/board-colors';
 import { CHART_SLOTS } from '../../shared/charts/status-color';
 import { Mark, widgetConfigOf, widgetConfigString, WidgetView, combineFilters, analysisView, queryView, WidgetRun, SavedAnalysisConfig, mintQueryId, TILE_ROWS, WidgetSpan, fillRows, SM_SPAN, LG_SPAN, ROW_KINDS, SEARCH_FROM, fileName, SPANS } from './widget-view';
 import { formatDuration } from '../../shared/ui/time-format';
+import { AdvancedOption, AdvancedSelect } from '../../shared/ui/advanced-select';
 
 /**
  * How many of a board's tiles run at once (owner 2026-10-12: tiles load in parallel). Three of the four permits the
@@ -106,7 +107,7 @@ export { DatasetRegistry } from './dataset-registry';
  */
 @Component({
   selector: 'app-dashboards',
-  imports: [PageHeader, NeedsWorkspace, Icon, LoadError, RouterLink, CdkMenu, CdkMenuGroup, CdkMenuItem, CdkMenuItemRadio, CdkMenuTrigger, FilterBuilder, AnalyticsWidget, WidgetChart, Field, ServerTimePipe, KindPicker, ThemePicker, BoardFilterBar, BoardTable, AppLoading, InlineStatus],
+  imports: [PageHeader, NeedsWorkspace, Icon, LoadError, RouterLink, CdkMenu, CdkMenuGroup, CdkMenuItem, CdkMenuItemRadio, CdkMenuTrigger, FilterBuilder, AnalyticsWidget, WidgetChart, Field, ServerTimePipe, KindPicker, ThemePicker, BoardFilterBar, BoardTable, AppLoading, InlineStatus, AdvancedSelect],
   templateUrl: './dashboard.html',
   styleUrls: ['./dashboard.css', './board/board.css'],
 })
@@ -225,6 +226,15 @@ export class Dashboards implements OnInit, OnDestroy {
     }
     return Array.from(seen.values());
   });
+
+  /** The board filter's datasets, each with how many of the board's widgets read it. */
+  readonly filterDatasetOptions = computed<AdvancedOption[]>(() => this.boardDatasets().map(d => {
+    const tiles = this.widgets().filter(w => {
+      const saved = this.analyses().find(a => a.analyticsAnalysisId === w.analyticsAnalysisId);
+      return !!saved && Dashboards.datasetKey(saved.connectionAlias, saved.datasetPath) === d.key;
+    }).length;
+    return { value: d.key, label: d.label, mono: true, description: `Read by ${tiles} widget${tiles === 1 ? '' : 's'}` };
+  }));
 
   /**
    * Chooses which dataset the bar filters, and fetches its columns.
@@ -814,6 +824,12 @@ export class Dashboards implements OnInit, OnDestroy {
   readonly addTitle = signal('');
   readonly addKindOfSource = signal<'analysis' | 'query'>('analysis');
   readonly addSourceId = signal('');
+  /** "Which one": the saved analyses or the saved queries, each with the dataset it reads. */
+  readonly addSourceOptions = computed<AdvancedOption[]>(() => this.addKindOfSource() === 'analysis'
+    ? this.analyses().filter(a => a.analyticsAnalysisId != null).map(a => ({ value: String(a.analyticsAnalysisId), label: a.analysisName,
+      description: `${a.connectionAlias}/${a.datasetPath}`, keywords: String(a.analyticsAnalysisId) }))
+    : this.queries().filter(q => q.analyticsQueryId != null).map(q => ({ value: String(q.analyticsQueryId), label: q.queryName,
+      description: `${q.connectionAlias}/${q.datasetPath}`, keywords: String(q.analyticsQueryId) })));
   readonly addVisualization = signal<WidgetVisualization>('table');
   /** Blank means "the default height" -- stored as absent rather than as the default value. */
   readonly addHeight = signal('');

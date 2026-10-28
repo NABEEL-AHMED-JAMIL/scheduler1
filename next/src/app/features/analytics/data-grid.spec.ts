@@ -6,6 +6,8 @@ import {
 import { FilterClause } from './analytics.service';
 import { FILTER_OPERATORS } from './filter-builder';
 import { useMemoryStorage } from '../../shared/testing/memory-storage';
+import { getDebugNode } from '@angular/core';
+import { AdvancedSelect } from '../../shared/ui/advanced-select';
 
 /**
  * The dataset grid.
@@ -125,7 +127,7 @@ function gridWith(options: GridOptions = {}) {
       const cells = Array.from(element.querySelectorAll('thead tr:nth-child(2) th'));
       const cell = cells[column] as HTMLElement;
       return {
-        operator: cell.querySelector<HTMLSelectElement>('select')!,
+        operator: getDebugNode(cell.querySelector('app-advanced-select'))!.componentInstance as AdvancedSelect,
         value: cell.querySelector<HTMLInputElement>('input'),
       };
     },
@@ -406,8 +408,7 @@ describe('filtering, in the vocabulary the Canvas already uses', () => {
     grid.openFilters();
     const operator = grid.filterCell(1).operator;
 
-    operator.value = 'GT';
-    operator.dispatchEvent(new Event('change', { bubbles: true }));
+    operator.choose('GT');
 
     expect(grid.filters.at(-1)).toEqual([]);
   });
@@ -417,8 +418,7 @@ describe('filtering, in the vocabulary the Canvas already uses', () => {
     grid.openFilters();
     const operator = grid.filterCell(1).operator;
 
-    operator.value = 'IS_NULL';
-    operator.dispatchEvent(new Event('change', { bubbles: true }));
+    operator.choose('IS_NULL');
     grid.render();
 
     // No `value` key at all, rather than an empty one: a server reading presence as intent
@@ -431,9 +431,9 @@ describe('filtering, in the vocabulary the Canvas already uses', () => {
     const grid = gridWith();
     grid.openFilters();
 
-    expect(grid.filterCell(0).operator.value).toBe('CONTAINS');
-    expect(grid.filterCell(1).operator.value).toBe('EQ');
-    expect(grid.filterCell(2).operator.value).toBe('EQ');
+    expect(grid.filterCell(0).operator.value()).toBe('CONTAINS');
+    expect(grid.filterCell(1).operator.value()).toBe('EQ');
+    expect(grid.filterCell(2).operator.value()).toBe('EQ');
   });
 
   it('shows every active clause as a chip, so what is sent is what is on screen', () => {

@@ -2,6 +2,7 @@ import { expect as expectNow, Page } from '@playwright/test';
 import { defaultSession, NO_SESSION, signedIn, test } from './support/session';
 import { analyticsFixtures, boardName, ordersTotalRevenue } from './support/analytics-fixtures';
 import { KIND_IDS } from '../src/app/features/analytics/widget-kinds';
+import { pickOption } from './support/advanced-select';
 
 /**
  * The five seeded reports, opened the way a person opens them.
@@ -292,7 +293,7 @@ test('a board filter narrows every tile on its dataset, and says nothing ran unt
     await page.getByRole('button', { name: 'More actions' }).click();
     await page.getByRole('menuitem', { name: /Filter this board/ }).click();
     await expect(page.locator('#b-filter-dataset')).toBeVisible();
-    await page.locator('#b-filter-dataset').selectOption({ index: 1 });
+    await pickOption(page.locator('#b-filter-dataset'), { index: 0 });
     await expect(page.locator('app-filter-builder')).toBeVisible();
 
     // Nothing may run while the bar is being edited. Ten widgets is ten governed queries against
@@ -305,8 +306,8 @@ test('a board filter narrows every tile on its dataset, and says nothing ran unt
     await page.getByRole('button', { name: 'Condition', exact: true }).click();
     await page.waitForTimeout(500);
     const builder = page.locator('app-filter-builder');
-    await builder.getByLabel('Column for condition 1').selectOption('status');
-    await builder.getByLabel('Operator for condition 1').selectOption('EQ');
+    await pickOption(builder.getByLabel('Column for condition 1').first(), 'status');
+    await pickOption(builder.getByLabel('Operator for condition 1').first(), 'EQ');
     await builder.getByLabel('Value for condition 1').fill('Completed');
     await page.waitForTimeout(1500);
 

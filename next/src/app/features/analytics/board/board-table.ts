@@ -5,6 +5,7 @@ import { API_SUCCESS } from '../../../core/api/api.config';
 import { Icon } from '../../../shared/ui/icon';
 import { columnLabel } from '../../../shared/ui/column-label';
 import { InlineStatus, loadErrorText } from '../../../shared/ui/loading';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
 import type { ExportFile } from '../analytics.service';
 import { BoardApi, PageColumn, TablePage, TableRequest } from './board-api';
 import type { BoardFilterOutcome, BoardFilterWire } from './board-filters';
@@ -55,7 +56,7 @@ export interface TableRead {
  */
 @Component({
   selector: 'app-board-table',
-  imports: [Icon, InlineStatus],
+  imports: [Icon, InlineStatus, AdvancedSelect],
   host: { class: 'board-table' },
   styles: `
     :host { display: flex; flex-direction: column; gap: 0.5rem; min-width: 0; }
@@ -76,6 +77,7 @@ export interface TableRead {
     .bt-sort:hover { color: var(--text-primary); }
     .bt-sort:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: var(--radius-sm); }
     .bt-input { min-height: 0; height: 1.625rem; padding: 0 0.375rem; font-size: 12px; min-width: 4.5rem; width: 100%; }
+    .bt-pick { min-width: 4.5rem; width: 100%; font-weight: 400; }
     .bt-pair { display: flex; gap: 0.25rem; min-width: 9.5rem; }
     .bt-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; font-size: 12px; color: var(--text-secondary); }
     .bt-pager { margin-left: auto; display: inline-flex; align-items: center; gap: 0.375rem; }
@@ -139,10 +141,11 @@ export interface TableRead {
                 <th [class.num]="isNumber(column)">
                   @switch (kind) {
                     @case ('select') {
-                      <select class="input bt-input" [attr.aria-label]="'Filter ' + label(column.name)" (change)="setFilter(column.name, { value: $any($event.target).value })">
-                        <option value="" [selected]="!f.value">All</option>
-                        @for (v of facets()[column.name]; track v) { <option [value]="v" [selected]="v === f.value">{{ v }}</option> }
-                      </select>
+                      <app-advanced-select class="bt-pick" [compact]="true" [ariaLabel]="'Filter ' + label(column.name)"
+                                           [options]="facetPicks()[column.name] ?? []" [value]="f.value ?? ''"
+                                           (valueChange)="setFilter(column.name, { value: $event })" [allowClear]="true" clearLabel="All"
+                                           placeholder="All" [searchLabel]="'Search the values of ' + label(column.name)" panelWidth="16rem"
+                                           unknownText="Not among the values now" />
                     }
                     @case ('text') {
                       <input class="input bt-input" placeholder="Contains…" [attr.aria-label]="'Filter ' + label(column.name) + ', contains'"
@@ -244,6 +247,9 @@ export class BoardTable {
   readonly exportNote = signal('');
   /** The facets and bounds of the result under the board's filters, read with its first page. */
   readonly facets = signal<Record<string, string[]>>({});
+  /** A few-valued column's filter: its values as the server listed them, by column. */
+  readonly facetPicks = computed<Record<string, AdvancedOption[]>>(() =>
+    Object.fromEntries(Object.entries(this.facets()).map(([name, values]) => [name, (values ?? []).map(v => ({ value: v, label: v }))])));
   private readonly ranges = signal<Record<string, string[]>>({});
 
   private readonly typed = new Subject<void>();

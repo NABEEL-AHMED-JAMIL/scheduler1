@@ -5,6 +5,8 @@ import { Field } from '../../../shared/ui/field';
 import { FormDialog } from '../../../shared/ui/form-dialog';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { ApiClientsApi, EventRouteRow, RouteTarget } from './api-clients.api';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
+import { idOf, idValue } from '../../../shared/ui/advanced-options';
 
 export interface RouteDialogData {
   pipelines: RouteTarget[];
@@ -19,7 +21,7 @@ export interface RouteDialogData {
  */
 @Component({
   selector: 'app-event-route-dialog',
-  imports: [Field, FormDialog],
+  imports: [Field, FormDialog, AdvancedSelect],
   template: `
     <app-form-dialog [heading]="data.route ? 'Change the route for ' + data.route.eventType : 'New event route'"
         subtitle="POST /v1/events with this type starts what the route names."
@@ -37,10 +39,9 @@ export interface RouteDialogData {
       </app-field>
       @if (kind() === 'PIPELINE') {
         <app-field label="Pipeline" for="routeJob">
-          <select id="routeJob" class="input" [value]="jobId() ?? ''" (change)="jobId.set(num($any($event.target).value))">
-            <option value="">Choose a pipeline</option>
-            @for (p of data.pipelines; track p.jobId) { <option [value]="p.jobId">{{ p.name }}</option> }
-          </select>
+          <app-advanced-select id="routeJob" [options]="pipelineOptions" [value]="idValue(jobId())" (valueChange)="jobId.set(idOf($event))"
+                               placeholder="Choose a pipeline" searchLabel="Search the pipelines" searchPlaceholder="Search by name or number"
+                               emptyText="No pipeline in this workspace yet." />
         </app-field>
       } @else {
         <app-field label="Workflow key" for="routeWorkflow" hint="The key of one of your workflows.">
@@ -75,10 +76,16 @@ export class RouteDialog {
   readonly ready = computed(() => !!this.eventType().trim() && !this.saving()
     && (this.kind() === 'PIPELINE' ? !!this.jobId() : !!this.workflowKey().trim()));
 
-  num(value: string): number | null {
-    const n = Number(value);
-    return value && Number.isFinite(n) ? n : null;
-  }
+  /** The pipelines a route may start, by name and number; the route's own, when the list no longer has it, kept by its number. */
+  readonly pipelineOptions: AdvancedOption[] = (() => {
+    const list: AdvancedOption[] = this.data.pipelines.map(p => ({ value: String(p.jobId), label: p.name, sample: '#' + p.jobId, keywords: String(p.jobId) }));
+    const own = this.data.route?.jobId;
+    return own != null && !list.some(o => o.value === String(own))
+      ? [...list, { value: String(own), label: `Pipeline ${own}`, description: 'Not one of this workspace\'s pipelines', badge: 'Not found', badgeTone: 'warn' }]
+      : list;
+  })();
+  readonly idValue = idValue;
+  readonly idOf = idOf;
 
   save(): void {
     if (!this.ready()) return;

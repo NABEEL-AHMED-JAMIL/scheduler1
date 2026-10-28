@@ -2,6 +2,7 @@ import { expect as expectNow, Page } from '@playwright/test';
 import { defaultSession, NO_SESSION, signedIn, test } from './support/session';
 import { analyticsFixtures, boardName } from './support/analytics-fixtures';
 import AxeBuilder from '@axe-core/playwright';
+import { pickOption } from './support/advanced-select';
 
 /** The console's alias for the MinIO bucket that holds the fixtures; see analytics-workspace.spec.ts. */
 let CONNECTION = process.env['E2E_CONNECTION'] ?? '';
@@ -37,7 +38,7 @@ async function openFixture(page: Page) {
   await page.goto('/objects/analytics');
   // The files are a panel now (owner, 2026-09-28): Choose a file opens it on the connection picker.
   await page.getByRole('button', { name: 'Choose a file' }).click();
-  await page.locator('#a-conn').selectOption(CONNECTION);
+  await pickOption(page.locator('#a-conn'), CONNECTION);
   await page.getByRole('button', { name: /analytics-samples/ }).click();
   await page.getByRole('button', { name: /orders\.csv/ }).click();
   await expect(page.getByText('250K rows')).toBeVisible({ timeout: 45_000 });   // the count reads the whole file from S3

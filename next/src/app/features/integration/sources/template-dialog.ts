@@ -6,7 +6,9 @@ import { FormDialog } from '../../../shared/ui/form-dialog';
 import { Field } from '../../../shared/ui/field';
 import { Icon } from '../../../shared/ui/icon';
 import { ComboboxOption } from '../../../shared/ui/combobox';
-import { TemplateRow, directionLabel } from './sources.model';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
+import { idOf, idValue } from '../../../shared/ui/advanced-options';
+import { TemplateRow, directionLabel, workspaceChoices } from './sources.model';
 import { SourcesApi } from './sources.service';
 import { AppLoading, createLoadState } from '../../../shared/ui/loading';
 import { LoadError } from '../../../shared/ui/load-error';
@@ -31,17 +33,16 @@ export interface TemplateGroup { key: string; label: string; hint: string; templ
  */
 @Component({
   selector: 'app-template-dialog',
-  imports: [FormDialog, Field, Icon, AppLoading, LoadError],
+  imports: [FormDialog, Field, Icon, AppLoading, LoadError, AdvancedSelect],
   template: `
     <app-form-dialog heading="Install a contract template" [subtitle]="subtitle" [showConfirm]="false" cancelLabel="Close" size="wide"
                      (cancelled)="close()">
       <div class="form-stack">
         @if (data.tenants) {
           <app-field label="Workspace" for="tplTenant" [required]="true">
-            <select id="tplTenant" class="input" [value]="tenantId() ?? ''" (change)="tenantId.set($any($event.target).value ? +$any($event.target).value : null)">
-              <option value="">Pick a workspace</option>
-              @for (t of data.tenants; track t.value) { <option [value]="t.value" [selected]="t.value === (tenantId() + '')">{{ t.label }}</option> }
-            </select>
+            <app-advanced-select id="tplTenant" [options]="tenantChoices" [value]="idValue(tenantId())" (valueChange)="tenantId.set(idOf($event))"
+                                 placeholder="Pick a workspace" searchLabel="Search the workspaces" searchPlaceholder="Search by name or number"
+                                 emptyText="No workspace to choose." />
           </app-field>
         }
         <!-- Owner 2026-10-27: the shared loader; a failed read with Try again; and an empty list says so instead of
@@ -88,6 +89,10 @@ export interface TemplateGroup { key: string; label: string; hint: string; templ
 export class TemplateDialog {
   readonly ref = inject<DialogRef<boolean>>(DialogRef);
   readonly data = inject<TemplateDialogData>(DIALOG_DATA);
+  /** A platform administrator's workspaces, by name (found by number too). */
+  readonly tenantChoices: AdvancedOption[] = workspaceChoices(this.data.tenants ?? []);
+  readonly idValue = idValue;
+  readonly idOf = idOf;
   private readonly api = inject(SourcesApi);
   private readonly toast = inject(ToastService);
 

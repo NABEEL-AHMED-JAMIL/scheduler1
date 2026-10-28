@@ -9,6 +9,8 @@
  * `passwordSet` and never the value; the console shows "••• configured" and offers Replace, a box whose value is
  * sent once and nothing else. A connection saved without a typed password keeps the one stored.
  */
+import type { ComboboxOption } from '../../../shared/ui/combobox';
+import type { AdvancedOption } from '../../../shared/ui/advanced-select';
 
 // ---------------------------------------------------------------------------------------------- vocabularies
 
@@ -432,4 +434,9 @@ export function contractSaveOf(e: ContractEdit): { body: Record<string, unknown>
   if (e.tenantId != null) body['tenantId'] = e.tenantId;
   Object.assign(body, { name, direction: e.direction, sensitivity: e.sensitivity || null, ...tail });
   return { body };
+}
+
+/** A platform administrator's workspaces as an advanced select lists them: each by name, found by its number too. */
+export function workspaceChoices(tenants: readonly ComboboxOption[]): AdvancedOption[] {
+  return tenants.map(t => ({ value: t.value, label: t.label, description: t.hint || undefined, keywords: t.value, disabled: t.disabled, group: t.group }));
 }

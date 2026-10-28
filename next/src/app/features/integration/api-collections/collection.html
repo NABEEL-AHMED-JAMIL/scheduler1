@@ -61,11 +61,9 @@
       <ng-container toolbar>
         <app-view-toggle [(value)]="view" key="api-collection-requests" cardsIcon="plug" />
         @if (folders().length) {
-          <select class="input max-w-40" [value]="folderFilter()" aria-label="Folder" (change)="folderFilter.set($any($event.target).value)">
-            <option value="">All folders</option>
-            <option value="top">Top level</option>
-            @for (f of folders(); track f.id) { <option [value]="f.id" [selected]="(f.id + '') === folderFilter()">{{ f.label }}</option> }
-          </select>
+          <app-advanced-select class="w-48" ariaLabel="Folder" [options]="folderFilterOptions()" [value]="folderFilter()"
+                               (valueChange)="folderFilter.set($event)" [allowClear]="true" clearLabel="All folders" placeholder="All folders"
+                               searchLabel="Search the folders" panelWidth="20rem" />
         }
         <select class="input max-w-32" [value]="stateFilter()" aria-label="State" (change)="stateFilter.set($any($event.target).value)">
           <option value="">All states</option>

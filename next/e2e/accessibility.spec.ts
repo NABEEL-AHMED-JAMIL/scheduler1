@@ -2,6 +2,7 @@ import { expect as expectNow, Page } from '@playwright/test';
 import { defaultSession, NO_SESSION, signedIn, test } from './support/session';
 import { analyticsFixtures } from './support/analytics-fixtures';
 import AxeBuilder from '@axe-core/playwright';
+import { pickOption } from './support/advanced-select';
 
 /**
  * The alias of the storage connection that holds the fixtures: E2E_CONNECTION, else what
@@ -48,7 +49,7 @@ async function openFixture(page: Page) {
   await page.goto('/objects/analytics');
   // The files are a panel now (owner, 2026-09-28): Choose a file opens it on the connection picker.
   await page.getByRole('button', { name: 'Choose a file' }).click();
-  await page.locator('#a-conn').selectOption(CONNECTION);
+  await pickOption(page.locator('#a-conn'), CONNECTION);
   await page.getByRole('button', { name: /analytics-benchmark/ }).click();
   await page.getByRole('button', { name: /sales-10mb\.csv/ }).click();
   await expect(page.getByText('150K rows')).toBeVisible({ timeout: 45_000 });   // the count reads the whole file from S3
@@ -101,7 +102,7 @@ test('the browse screen has no WCAG A/AA violations before a dataset is opened',
   await page.goto('/objects/analytics');
   // The files are a panel now (owner, 2026-09-28): Choose a file opens it on the connection picker.
   await page.getByRole('button', { name: 'Choose a file' }).click();
-  await page.locator('#a-conn').selectOption(CONNECTION);
+  await pickOption(page.locator('#a-conn'), CONNECTION);
   const violations = await scan(page);
   expect(violations, `axe found WCAG A/AA violations:${describeAll(violations)}`).toEqual([]);
 });

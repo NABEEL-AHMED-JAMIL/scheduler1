@@ -1,4 +1,4 @@
-import { Component, DestroyRef, OnInit, computed, inject, input, signal } from '@angular/core';
+import { Component, DestroyRef, LOCALE_ID, OnInit, computed, inject, input, signal } from '@angular/core';
 import { Dialog } from '@angular/cdk/dialog';
 import { RouterLink } from '@angular/router';
 import { Icon } from '../../../shared/ui/icon';
@@ -14,6 +14,8 @@ import { RunOutput } from '../../jobs/run-steps/run-steps.model';
 import { RunRow } from '../../tasks/steps/steps.model';
 import { GeneratedService } from '../../documents/generated/generated.service';
 import { AppLoading, InlineStatus, createLoadState, loadErrorText } from '../../../shared/ui/loading';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
+import { idValue, runOption } from '../../../shared/ui/advanced-options';
 import {
   DEFAULT_OPTIONS, Orientation, PAGE_SIZES, PageSize, RenderFormat, RenderResult, ReportTemplateSummary, TemplateOptions,
   base64ToBlob, datasetOf, parseDatasetText, recentJobs, renderBody,
@@ -44,7 +46,7 @@ interface ScheduleRow { jobId: number; jobName?: string | null; lastJobRun?: str
  */
 @Component({
   selector: 'app-render-panel',
-  imports: [Icon, Combobox, Segmented, PdfViewer, RouterLink, ServerTimePipe, AppLoading, InlineStatus],
+  imports: [Icon, Combobox, Segmented, PdfViewer, RouterLink, AppLoading, InlineStatus, AdvancedSelect],
   templateUrl: './render-panel.html',
 })
 export class RenderPanel implements OnInit {
@@ -101,6 +103,15 @@ export class RenderPanel implements OnInit {
   readonly outputs = signal<RunOutput[] | null>(null);
   readonly datasets = computed(() => datasetOf(this.outputs() ?? []));
   readonly datasetId = signal<number | null>(null);
+  private readonly when = new ServerTimePipe(inject(LOCALE_ID));
+  /** The schedule's newest runs, each with when it started and how it ended. */
+  readonly runOptions = computed<AdvancedOption[]>(() => this.runList().map(r => runOption(r, r.startTime ? this.when.transform(r.startTime, 'recent') : null)));
+  /** The run's kept datasets: each by name, its step and rows under it, its format on the right. */
+  readonly datasetOptions = computed<AdvancedOption[]>(() => this.datasets().map(d => ({
+    value: String(d.runDatasetId), label: d.name, keywords: d.stepKey ?? '', sample: d.format ? d.format.toUpperCase() : undefined,
+    description: [d.stepKey ? `Step ${d.stepKey}` : '', d.rowCount != null ? `${d.rowCount} row${d.rowCount === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · ') || undefined,
+  })));
+  readonly idValue = idValue;
   readonly runRows = signal<unknown>(null);
   readonly readingRun = signal(false);
 

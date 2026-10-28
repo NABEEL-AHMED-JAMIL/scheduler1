@@ -185,6 +185,8 @@ export const PINNED: Record<string, unknown> = {
       "7 days",
       "90 days",
       "All time",
+      "Choose a dataset",
+      "Choose a schedule first",
       "Columns",
       "Conversion",
       "Created",

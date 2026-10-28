@@ -1,6 +1,7 @@
 import { Component, computed, input, output } from '@angular/core';
 import { Icon } from '../../shared/ui/icon';
 import { Segmented, SegmentOption } from '../../shared/ui/segmented';
+import { AdvancedOption, AdvancedSelect } from '../../shared/ui/advanced-select';
 import {
   DatasetColumn, FilterClause, FilterGroup, FilterNode, FilterOperator, OPERAND_COUNT,
   isFilterGroup,
@@ -34,6 +35,11 @@ export const FILTER_OPERATORS: { id: FilterOperator; label: string }[] = [
   { id: 'RELATIVE_DATE', label: 'is in the last' },
   { id: 'NUMERIC_RANGE', label: 'is in the numeric range' },
 ];
+
+/** The operators as an advanced select lists them: the words, found by the server's id too ("NOT_IN"). */
+export function operatorPicks(operators: readonly { id: FilterOperator; label: string }[]): AdvancedOption[] {
+  return operators.map(o => ({ value: o.id, label: o.label, keywords: o.id }));
+}
 
 /**
  * The windows RELATIVE_DATE can name.
@@ -246,7 +252,7 @@ interface BuilderRow {
   // Self-referencing on purpose -- see the class note. Angular resolves the forward reference
   // for a standalone component that imports itself, which is what makes the recursion possible
   // without a second near-identical component for "a group inside a group".
-  imports: [Icon, FilterBuilder, Segmented],
+  imports: [Icon, FilterBuilder, Segmented, AdvancedSelect],
   template: `
     <div class="flex flex-col gap-2 rounded-md p-2 min-w-0"
          [class.border]="depth() > 0"
@@ -291,27 +297,14 @@ interface BuilderRow {
         } @else if (row.clause) {
           <div class="flex flex-wrap items-start gap-1.5 min-w-0">
 
-            <select class="input input-sm w-auto min-w-0 max-w-44"
-                    [attr.aria-label]="'Column for condition ' + (row.index + 1)"
-                    [value]="row.clause.field"
-                    (change)="setField(row.index, $any($event.target).value)">
-              @for (column of columns(); track column.name) {
-                <option [value]="column.name" [selected]="column.name === row.clause.field">
-                  {{ column.name }}
-                </option>
-              }
-            </select>
+            <app-advanced-select class="w-44 min-w-0" [compact]="true" [ariaLabel]="'Column for condition ' + (row.index + 1)"
+                                 [options]="columnPicks()" [value]="row.clause.field" (valueChange)="setField(row.index, $event)"
+                                 placeholder="choose a column" searchLabel="Search the columns" unknownText="Not a column of this dataset"
+                                 emptyText="The dataset has no columns." panelWidth="20rem" />
 
-            <select class="input input-sm w-auto min-w-0 max-w-44"
-                    [attr.aria-label]="'Operator for condition ' + (row.index + 1)"
-                    [value]="row.clause.operator"
-                    (change)="setOperator(row.index, $any($event.target).value)">
-              @for (operator of operators; track operator.id) {
-                <option [value]="operator.id" [selected]="operator.id === row.clause!.operator">
-                  {{ operator.label }}
-                </option>
-              }
-            </select>
+            <app-advanced-select class="w-44 min-w-0" [compact]="true" [ariaLabel]="'Operator for condition ' + (row.index + 1)"
+                                 [options]="operatorPicks" [value]="row.clause.operator" (valueChange)="setOperator(row.index, $any($event))"
+                                 searchLabel="Search the operators" panelWidth="16rem" />
 
             @switch (row.operands) {
               @case (0) {
@@ -416,6 +409,10 @@ export class FilterBuilder {
   readonly removed = output<void>();
 
   readonly operators = FILTER_OPERATORS;
+  readonly operatorPicks = operatorPicks(FILTER_OPERATORS);
+  /** The dataset's columns, each with its type. */
+  readonly columnPicks = computed<AdvancedOption[]>(() => this.columns().map(c => ({
+    value: c.name, label: c.name, mono: true, sample: c.type ? c.type.replace(/\(.*$/, '') : undefined, keywords: c.type })));
   readonly relativeWindows = RELATIVE_WINDOWS;
   readonly maxDepth = MAX_GROUP_DEPTH;
 

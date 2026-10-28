@@ -2,6 +2,7 @@ import { test, expect, APIRequestContext, Browser, Page, TestInfo } from '@playw
 import { hasToken, NEEDS, sessionFor, tokenFor, pageWith } from './support/session';
 import { bestEffort, getJson } from './support/workspace';
 import { hasFixtures, NEEDS_FIXTURES, riverside } from './support/fixtures';
+import { pickOption } from './support/advanced-select';
 import { join } from 'path';
 
 /**
@@ -69,12 +70,12 @@ test.describe.serial('Connector Hub', () => {
     await page.locator('[data-new-connection]').click();
     await page.locator('[data-choose="postgres"]').click();
     await page.locator('#cName').fill(name);
-    await page.locator('#cTarget').selectOption(riverside().storageAlias);
+    await pickOption(page.locator('#cTarget'), riverside().storageAlias);
     await page.locator('[data-field="host"]').fill('demo-source-db');
     await page.locator('[data-field="port"]').fill('5432');
     await page.locator('[data-field="database"]').fill('shop');
     await page.locator('[data-field="username"]').fill('demo_reader');
-    await page.locator('[data-field="sslMode"]').selectOption('DISABLE');
+    await pickOption(page.locator('[data-field="sslMode"]'), 'DISABLE');
     await page.locator('[data-field="password"]').fill('not-the-password');
     await page.locator('[data-next]').click();
     const problem = page.locator('[data-problem]');

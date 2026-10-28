@@ -38,20 +38,15 @@
       <div>
         <label class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]"
                for="a-conn">Connection</label>
-        <select id="a-conn" class="input w-full mt-1" [value]="connection()"
-                (change)="pickConnection($any($event.target).value)">
-          @if (bucketsLoading()) { <option value="">Loading connections…</option> }
-          <!-- A connection this reader cannot use is shown but inert, exactly as an unreadable
-               file is below: this list is the Object Browser's, and it offers FTP, FTPS and
-               legacy bucket entries that the analytics reader has no way to open. The reason
-               travels with the option so nobody has to click one to find out. -->
-          @for (item of connectionOptions(); track item.bucket) {
-            <option [value]="item.bucket" [disabled]="!!item.issue"
-                    [title]="item.issue || item.bucket">
-              {{ item.label }} · {{ item.provider }}{{ item.issue ? ' — ' + item.issue : '' }}
-            </option>
-          }
-        </select>
+        <!-- A connection this reader cannot use is shown but inert, exactly as an unreadable
+             file is below: this list is the Object Browser's, and it offers FTP, FTPS and
+             legacy bucket entries that the analytics reader has no way to open. The reason
+             travels with the option so nobody has to click one to find out. -->
+        <app-advanced-select id="a-conn" class="w-full mt-1" [options]="connectionPick()" [value]="connection()"
+                             (valueChange)="pickConnection($event)" placeholder="Choose a connection"
+                             searchLabel="Search the connections" searchPlaceholder="Search by name, bucket or provider"
+                             [loading]="bucketsLoading()" loadingText="Loading connections…"
+                             [emptyText]="bucketsError() ? 'The connections could not be read.' : 'No storage connection yet.'" />
         <!-- Owner 2026-10-27: the picker says it is loading, or why the connections could not be read. -->
         <app-inline-status [loading]="bucketsLoading()" [error]="bucketsError()" label="Loading connections…" (retry)="loadBuckets()" />
         @if (noReadableConnection()) {
@@ -932,24 +927,15 @@
                            [attr.for]="'a-dim-' + $index">
                       {{ $index === 0 ? 'Dimension' : 'then by' }}
                     </label>
-                    <select [id]="'a-dim-' + $index" class="input input-sm w-auto min-w-0 max-w-52"
-                            [value]="slot"
-                            (change)="setDimension($index, $any($event.target).value)">
-                      <option value="">
-                        {{ $index === 0 ? 'no grouping — one figure over every matching row' : 'none' }}
-                      </option>
-                      <!-- A name this dataset does not have is listed and inert rather than
-                           missing, or the control shows "no grouping" while the request still
-                           carries the column. -->
-                      @for (column of dimensionOptions($index); track column.name) {
-                        <option [value]="column.name" [selected]="column.name === slot"
-                                [disabled]="column.missing">
-                          {{ column.name }}{{ column.missing
-                            ? ' — not a column of this dataset'
-                            : ' · ' + shortType(column.type) }}
-                        </option>
-                      }
-                    </select>
+                    <!-- A name this dataset does not have is listed and inert rather than
+                         missing, or the control shows "no grouping" while the request still
+                         carries the column. -->
+                    <app-advanced-select [id]="'a-dim-' + $index" class="w-52 min-w-0" [compact]="true"
+                                         [options]="dimensionPicks()[$index] ?? []" [value]="slot"
+                                         (valueChange)="setDimension($index, $event)" [allowClear]="true"
+                                         [clearLabel]="$index === 0 ? 'no grouping — one figure over every matching row' : 'none'"
+                                         [placeholder]="$index === 0 ? 'no grouping' : 'none'" searchLabel="Search the columns"
+                                         emptyText="The dataset has no other column." panelWidth="22rem" />
                   </div>
                   <!-- Only where there is a calendar to bucket by. Offering "by month" against a
                        text column would be offering an error: the server refuses a grain on a
@@ -1014,19 +1000,10 @@
                   <div class="flex flex-col gap-1 min-w-0">
                     <label class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]"
                            for="a-measure-field">of column</label>
-                    <select id="a-measure-field" class="input input-sm w-auto min-w-0 max-w-52"
-                            [value]="measureField()"
-                            (change)="measureField.set($any($event.target).value)">
-                      <option value="">choose a column…</option>
-                      @for (column of measureFieldOptions(); track column.name) {
-                        <option [value]="column.name" [selected]="column.name === measureField()"
-                                [disabled]="column.missing">
-                          {{ column.name }}{{ column.missing
-                            ? ' — not a column of this dataset'
-                            : ' · ' + shortType(column.type) }}
-                        </option>
-                      }
-                    </select>
+                    <app-advanced-select id="a-measure-field" class="w-52 min-w-0" [compact]="true" [options]="measurePick()"
+                                         [value]="measureField()" (valueChange)="measureField.set($event)"
+                                         placeholder="choose a column…" searchLabel="Search the columns"
+                                         emptyText="The dataset has no columns." panelWidth="22rem" />
                   </div>
                 }
 
@@ -1337,29 +1314,18 @@
                       <div class="flex flex-col gap-1 min-w-0">
                         <label class="text-[11px] uppercase tracking-wider
                                       text-[color:var(--text-muted)]" for="a-drill-dim">Drill</label>
-                        <select id="a-drill-dim" class="input input-sm w-auto min-w-0 max-w-40"
-                                [value]="drillDimension()"
-                                (change)="drillDimension.set($any($event.target).value)">
-                          @for (name of effectiveDimensions(); track name) {
-                            <option [value]="name" [selected]="name === drillDimension()">{{ name }}</option>
-                          }
-                        </select>
+                        <app-advanced-select id="a-drill-dim" class="w-40 min-w-0" [compact]="true" [options]="drillDimPick()"
+                                             [value]="drillDimension()" (valueChange)="drillDimension.set($event)"
+                                             placeholder="choose a dimension" searchLabel="Search the dimensions" panelWidth="18rem" />
                       </div>
                       <div class="flex flex-col gap-1 min-w-0">
                         <label class="text-[11px] uppercase tracking-wider
                                       text-[color:var(--text-muted)]" for="a-drill-next">then by</label>
-                        <select id="a-drill-next" class="input input-sm w-auto min-w-0 max-w-40"
-                                [value]="drillNext()"
-                                (change)="drillNext.set($any($event.target).value)">
-                          <option value="">nothing — just narrow</option>
-                          @for (column of columns(); track column.name) {
-                            @if (!effectiveDimensions().includes(column.name)) {
-                              <option [value]="column.name" [selected]="column.name === drillNext()">
-                                {{ column.name }}
-                              </option>
-                            }
-                          }
-                        </select>
+                        <app-advanced-select id="a-drill-next" class="w-40 min-w-0" [compact]="true" [options]="drillNextPick()"
+                                             [value]="drillNext()" (valueChange)="drillNext.set($event)" [allowClear]="true"
+                                             clearLabel="nothing — just narrow" placeholder="nothing — just narrow"
+                                             searchLabel="Search the columns" emptyText="Every column is a dimension already."
+                                             panelWidth="22rem" />
                       </div>
                     }
                   </div>
@@ -1672,13 +1638,10 @@
                     <!-- Fed by the rail, which is on screen the whole time this tab is open. A
                          picker with a file browser of its own would be a second way to be
                          somewhere, and the two would disagree. -->
-                    <select id="a-second" class="input text-xs max-w-full" [value]="secondPath()"
-                            (change)="pickSecond($any($event.target).value)">
-                      <option value="">No second dataset</option>
-                      @for (option of secondOptions(); track option.path) {
-                        <option [value]="option.path">{{ option.label }}</option>
-                      }
-                    </select>
+                    <app-advanced-select id="a-second" class="w-64 max-w-full" [compact]="true" [options]="secondPick()"
+                                         [value]="secondPath()" (valueChange)="pickSecond($event)" [allowClear]="true"
+                                         clearLabel="No second dataset" placeholder="No second dataset" searchLabel="Search the datasets"
+                                         emptyText="Nothing else in this folder can be joined." panelWidth="24rem" />
                     @if (!secondOptions().length) {
                       <span class="text-[color:var(--text-muted)]">
                         Nothing else in this folder can be joined — open another folder in Files.
@@ -2091,21 +2054,12 @@
                     <label class="text-[11px] uppercase tracking-wider
                                   text-[color:var(--text-muted)]"
                            for="a-chart-label">Label</label>
-                    <select id="a-chart-label" class="input input-sm w-auto max-w-full"
-                            [value]="labelColumn()?.name ?? ''"
-                            (change)="chartLabelName.set($any($event.target).value)">
-                      <!-- [selected] on the OPTION, not only [value] on the select. Angular
-                           applies a host property binding before the @for below it has created
-                           anything, so the browser had nothing to select and fell back to the
-                           first option -- and since the expression never changed afterwards the
-                           binding never re-fired. The picker then named a different column from
-                           the one the chart was drawing, which on this screen is the whole
-                           problem: the control that says what a chart is OF disagreed with it. -->
-                      @for (column of chartLabelOptions(); track column.name) {
-                        <option [value]="column.name"
-                                [selected]="column.name === labelColumn()?.name">{{ column.name }}</option>
-                      }
-                    </select>
+                    <!-- The picker names the column the chart is drawing (labelColumn), never a
+                         first option the browser fell back to: the control that says what a chart
+                         is OF must agree with it. -->
+                    <app-advanced-select id="a-chart-label" class="w-52 max-w-full" [compact]="true" [options]="chartLabelPick()"
+                                         [value]="labelColumn()?.name ?? ''" (valueChange)="chartLabelName.set($event)"
+                                         placeholder="choose a column" searchLabel="Search the columns" panelWidth="22rem" />
                   </div>
                 }
 
@@ -2113,22 +2067,14 @@
                   <label class="text-[11px] uppercase tracking-wider
                                 text-[color:var(--text-muted)]"
                          for="a-chart-value">Value</label>
-                  <select id="a-chart-value" class="input input-sm w-auto max-w-full"
-                          [value]="valueColumn()?.name ?? ''"
-                          (change)="chartValueName.set($any($event.target).value)">
-                    @for (column of chartValueOptions(); track column.name) {
-                      <!-- How much of the column is actually numbers, on the option itself.
-                           A column that parses in nine rows out of nine thousand is offered
-                           and is almost certainly the wrong pick, and the count is the only
-                           thing that says so before the chart is drawn. -->
-                      <option [value]="column.name"
-                              [selected]="column.name === valueColumn()?.name">
-                        {{ column.name }} · a number in
-                        {{ column.numbers.toLocaleString() }} of
-                        {{ column.rows.toLocaleString() }} rows
-                      </option>
-                    }
-                  </select>
+                  <!-- How much of the column is actually numbers, on the option itself. A column
+                       that parses in nine rows out of nine thousand is offered and is almost
+                       certainly the wrong pick, and the count is the only thing that says so
+                       before the chart is drawn. -->
+                  <app-advanced-select id="a-chart-value" class="w-60 max-w-full" [compact]="true" [options]="chartValuePick()"
+                                       [value]="valueColumn()?.name ?? ''" (valueChange)="chartValueName.set($event)"
+                                       placeholder="choose a column" searchLabel="Search the columns"
+                                       emptyText="No column of the result holds numbers." panelWidth="24rem" />
                 </div>
 
                 <!-- The kinds as a segmented switch, as on the Canvas: one click each, the drawn

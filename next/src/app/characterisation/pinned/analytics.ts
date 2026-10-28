@@ -28,6 +28,7 @@ export const PINNED: Record<string, unknown> = {
       "Quality issues: 0, nothing to look at",
       "Refresh the saved analysis list",
       "SQL",
+      "UI-REVIEW LocalStack S3 (fake keys)ui-review-s3 · S3",
       "Visualise",
       "all *.csv",
       "customers.csv 1.4 KB",
@@ -65,6 +66,7 @@ export const PINNED: Record<string, unknown> = {
       "Close files",
       "Close saved analyses",
       "Refresh the saved analysis list",
+      "UI-REVIEW LocalStack S3 (fake keys)ui-review-s3 · S3",
       "UI-REVIEW converted",
       "UI-REVIEW uploads",
       "root"
@@ -102,6 +104,7 @@ export const PINNED: Record<string, unknown> = {
       "Close files",
       "Close saved analyses",
       "Refresh the saved analysis list",
+      "UI-REVIEW LocalStack S3 (fake keys)ui-review-s3 · S3",
       "UI-REVIEW converted",
       "UI-REVIEW uploads",
       "root"

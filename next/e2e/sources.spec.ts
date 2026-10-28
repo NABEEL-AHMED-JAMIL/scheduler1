@@ -2,6 +2,7 @@ import { test, expect, Browser, Page, Response } from '@playwright/test';
 import { canSignIn, NEEDS, Session, sessionFor, pageWith } from './support/session';
 import { bestEffort, ensureObject, getJson } from './support/workspace';
 import { hasFixtures, NEEDS_FIXTURES, riverside } from './support/fixtures';
+import { pickOption } from './support/advanced-select';
 
 /**
  * MIG-248: Sources end to end, as a workspace administrator -- create a FILE source on the workspace's own storage
@@ -83,7 +84,7 @@ test.describe('Sources', () => {
     await expect(panel.getByRole('heading', { name: 'New source' })).toBeVisible();
     await panel.locator('#srcName').fill(SOURCE);
     await panel.getByRole('button', { name: 'File', exact: true }).click();
-    await panel.locator('#srcStorage').selectOption(STORAGE());
+    await pickOption(panel.locator('#srcStorage'), STORAGE());
     await panel.locator('#srcPath').fill(CSV_PATH);
     await panel.locator('#srcFormat').selectOption('CSV');
 

@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { CHART_SLOTS } from '../../../shared/charts/status-color';
@@ -13,6 +13,7 @@ import type { RangePreset } from '../../../shared/ui/date-range';
 import { BoardFilterDef, FilterFamily, MAX_BOARD_FILTERS } from './board-filters';
 import { BOARD_PRESETS } from './board-filter-bar';
 import { InlineStatus, loadErrorText } from '../../../shared/ui/loading';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
 
 /** A dataset the board's tiles read: where a filter's values may come from. */
 export interface FilterSourceOption { connection: string; path: string; label: string }
@@ -64,7 +65,7 @@ export function keyOf(label: string, taken: ReadonlySet<string>): string {
  */
 @Component({
   selector: 'app-board-filter-editor',
-  imports: [SidePanel, Icon, InlineStatus],
+  imports: [SidePanel, Icon, InlineStatus, AdvancedSelect],
   template: `
     <app-side-panel heading="Edit filters" subtitle="What this board's filter bar offers every reader">
       <div class="flex flex-col gap-3 min-w-0" data-test="bf-editor">
@@ -80,22 +81,15 @@ export function keyOf(label: string, taken: ReadonlySet<string>): string {
               <button type="button" class="btn btn-ghost btn-icon btn-sm" [attr.aria-label]="'Remove filter ' + (draft.label || i + 1)" (click)="remove(i)"><app-icon name="trash" /></button>
             </div>
             <div class="grid grid-cols-2 gap-2 min-w-0">
-              <select class="input min-w-0" [attr.aria-label]="'Filter ' + (i + 1) + ' dataset'" (change)="pickSource(i, $any($event.target).value)">
-                <option value="">Dataset…</option>
-                @for (source of data.sources; track sourceKey(source)) {
-                  <option [value]="sourceKey(source)" [selected]="sourceKey(source) === draft.source">{{ source.label }}</option>
-                }
-              </select>
-              <select class="input min-w-0" [attr.aria-label]="'Filter ' + (i + 1) + ' column'" [disabled]="!draft.source" (change)="pickColumn(i, $any($event.target).value)">
-                <option value="">{{ columnsLoading(draft) ? 'Loading columns…' : 'Column…' }}</option>
-                <!-- Owner 2026-10-27: a filter's saved column stays shown while its dataset's columns load (it looked lost). -->
-                @if (columnsLoading(draft) && draft.column) { <option [value]="draft.column" selected>{{ draft.column }}</option> }
-                @for (column of columnsFor(draft); track column.name) {
-                  @if (draft.kind !== 'date' || familyOf(column.type) === 'date') {
-                    <option [value]="column.name" [selected]="column.name === draft.column">{{ column.name }} · {{ column.type }}</option>
-                  }
-                }
-              </select>
+              <app-advanced-select class="min-w-0" [ariaLabel]="'Filter ' + (i + 1) + ' dataset'" [options]="rowPicks()[i]?.sources ?? []"
+                                   [value]="draft.source" (valueChange)="pickSource(i, $event)" placeholder="Dataset…"
+                                   searchLabel="Search the datasets" emptyText="No tile of this board reads a dataset yet." panelWidth="24rem" />
+              <!-- Owner 2026-10-27: a filter's saved column stays shown while its dataset's columns load (it looked lost). -->
+              <app-advanced-select class="min-w-0" [ariaLabel]="'Filter ' + (i + 1) + ' column'" [options]="rowPicks()[i]?.columns ?? []"
+                                   [value]="draft.column" (valueChange)="pickColumn(i, $event)" [disabled]="!draft.source" placeholder="Column…"
+                                   searchLabel="Search the columns" [loading]="columnsLoading(draft)" loadingText="Loading columns…"
+                                   unknownText="Not a column of this dataset" panelWidth="22rem"
+                                   [emptyText]="draft.kind === 'date' ? 'This dataset has no date column.' : 'This dataset has no columns.'" />
             </div>
             @if (draft.source) {
               <app-inline-status [loading]="columnsLoading(draft)" [error]="columnsError(draft)"
@@ -151,6 +145,25 @@ export class BoardFilterEditor {
   /** Each dataset's column read: loading, or why it failed (it failed silently, leaving only "Column…"). */
   private readonly schemaLoading = signal<Record<string, boolean>>({});
   private readonly schemaErrors = signal<Record<string, string>>({});
+
+  /** The board's datasets, by name with where each is under it. */
+  private readonly sourceOptions: AdvancedOption[] = this.data.sources.map(source => ({
+    value: this.sourceKey(source), label: source.label, description: source.path !== source.label ? source.path : undefined, keywords: source.connection }));
+  /**
+   * Each filter's two pickers, by row: the datasets (a saved one the board's tiles no longer read kept and marked), and its
+   * dataset's columns with their types -- a date range only the date ones; the saved column kept while they load.
+   */
+  readonly rowPicks = computed<{ sources: AdvancedOption[]; columns: AdvancedOption[] }[]>(() => this.drafts().map(draft => {
+    const sources = draft.source && !this.sourceOptions.some(o => o.value === draft.source)
+      ? [...this.sourceOptions, { value: draft.source, label: draft.source.slice(draft.source.indexOf('\u0000') + 1), mono: true,
+          description: 'Not a dataset this board\'s tiles read', badge: 'Not found', badgeTone: 'warn' as const }]
+      : this.sourceOptions;
+    const columns: AdvancedOption[] = this.columnsFor(draft)
+      .filter(column => draft.kind !== 'date' || familyOfType(column.type) === 'date')
+      .map(column => ({ value: column.name, label: column.name, mono: true, sample: column.type, keywords: column.type }));
+    if (this.columnsLoading(draft) && draft.column && !columns.some(o => o.value === draft.column)) columns.push({ value: draft.column, label: draft.column, mono: true });
+    return { sources, columns };
+  }));
 
   constructor() {
     for (const draft of this.drafts()) if (draft.source) this.loadColumns(draft.source);

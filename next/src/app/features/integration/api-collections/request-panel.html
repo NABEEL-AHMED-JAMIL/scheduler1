@@ -23,10 +23,9 @@
             <input id="apiName" class="input" [value]="e.name" placeholder="Orders API" (input)="patch({ name: $any($event.target).value })" />
           </app-field>
           <app-field label="Folder" for="apiFolder">
-            <select id="apiFolder" class="input" [value]="e.folderId ?? ''" (change)="patch({ folderId: $any($event.target).value ? +$any($event.target).value : null })">
-              <option value="">Top level</option>
-              @for (f of folders; track f.id) { <option [value]="f.id" [selected]="f.id === e.folderId">{{ f.label }}</option> }
-            </select>
+            <app-advanced-select id="apiFolder" [options]="folderChoices" [value]="idValue(e.folderId)" (valueChange)="patch({ folderId: idOf($event) })"
+                                 [allowClear]="true" clearLabel="Top level" placeholder="Top level" searchLabel="Search the folders"
+                                 emptyText="This collection has no folders yet." />
           </app-field>
         </div>
         <app-field label="Description" for="apiDescription">
@@ -193,10 +192,9 @@
         @if (data.canManage) {
           <div class="form-grid">
             <app-field label="Environment" for="apiEnv" [hint]="envHint">
-              <select id="apiEnv" class="input" [value]="environmentId() ?? ''" (change)="environmentId.set($any($event.target).value ? +$any($event.target).value : null)">
-                <option value="">No environment</option>
-                @for (env of data.environments; track env.environmentId) { <option [value]="env.environmentId" [selected]="env.environmentId === environmentId()">{{ env.name }}{{ env.isDefault ? ' (default)' : '' }}</option> }
-              </select>
+              <app-advanced-select id="apiEnv" [options]="environmentChoices" [value]="idValue(environmentId())" (valueChange)="environmentId.set(idOf($event))"
+                                   [allowClear]="true" clearLabel="No environment" placeholder="No environment" searchLabel="Search the environments"
+                                   emptyText="This collection has no environments yet." />
             </app-field>
           </div>
           <details class="text-sm">

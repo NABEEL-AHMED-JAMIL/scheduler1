@@ -9,6 +9,8 @@ import { kindInfo } from '../widget-kinds';
 import { ChartAnswer, pinRequest } from './chart-answer';
 import type { ChartSettings } from './chart-settings';
 import { AppLoading, InlineStatus, loadErrorText } from '../../../shared/ui/loading';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
+import { idOf, idValue } from '../../../shared/ui/advanced-options';
 
 export interface PinChartData {
   answer: ChartAnswer;
@@ -26,7 +28,7 @@ export interface PinChartData {
  */
 @Component({
   selector: 'app-pin-chart-panel',
-  imports: [SidePanel, Icon, RouterLink, AppLoading, InlineStatus],
+  imports: [SidePanel, Icon, RouterLink, AppLoading, InlineStatus, AdvancedSelect],
   template: `
     <app-side-panel heading="Pin to dashboard" [subtitle]="data.title + ' · ' + kindLabel">
       <div class="flex flex-col gap-4 min-w-0" data-test="pin-panel">
@@ -56,11 +58,9 @@ export interface PinChartData {
               }
               @if (boards().length) {
                 <label class="flex items-center gap-2"><input type="radio" name="pin-where" [checked]="mode() === 'existing'" (change)="mode.set('existing')" />An existing dashboard</label>
-                <select class="input" data-test="pin-board" [disabled]="mode() !== 'existing'" (change)="boardId.set(+$any($event.target).value)">
-                  @for (b of boards(); track b.analyticsDashboardId) {
-                    <option [value]="b.analyticsDashboardId" [selected]="b.analyticsDashboardId === boardId()">{{ b.dashboardName }}</option>
-                  }
-                </select>
+                <app-advanced-select data-test="pin-board" ariaLabel="Existing dashboard" [options]="boardOptions()" [value]="idValue(boardId())"
+                                     (valueChange)="boardId.set(idOf($event))" [disabled]="mode() !== 'existing'" placeholder="Choose a dashboard"
+                                     searchLabel="Search your dashboards" emptyText="No dashboards in this workspace yet." />
               }
               <label class="flex items-center gap-2"><input type="radio" name="pin-where" data-test="pin-new" [checked]="mode() === 'new'" (change)="mode.set('new')" />A new dashboard</label>
               <input class="input" data-test="pin-new-name" maxlength="255" placeholder="Name of the new dashboard" [disabled]="mode() !== 'new'"
@@ -98,6 +98,12 @@ export class PinChartPanel implements OnInit {
   readonly boardsError = signal('');
   readonly mode = signal<'existing' | 'new'>('new');
   readonly boardId = signal<number | null>(null);
+  /** The dashboards a chart may be pinned to, each with how many tiles it has. */
+  readonly boardOptions = computed<AdvancedOption[]>(() => this.boards().filter(b => b.analyticsDashboardId != null).map(b => ({
+    value: String(b.analyticsDashboardId), label: b.dashboardName,
+    description: [b.widgetCount != null ? `${b.widgetCount} tile${b.widgetCount === 1 ? '' : 's'}` : '', b.dashboardDescription ?? ''].filter(Boolean).join(' · ') || undefined })));
+  readonly idValue = idValue;
+  readonly idOf = idOf;
   readonly newName = signal('');
   readonly busy = signal(false);
   readonly error = signal('');

@@ -6,7 +6,9 @@ import { FormDialog } from '../../../shared/ui/form-dialog';
 import { Field } from '../../../shared/ui/field';
 import { Icon } from '../../../shared/ui/icon';
 import { ComboboxOption } from '../../../shared/ui/combobox';
-import { ConnectionEdit, ConnectionRow, SSL_MODES, blankConnection, connectionEditOf, connectionSaveOf, sslLabel } from './sources.model';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
+import { idOf, idValue } from '../../../shared/ui/advanced-options';
+import { ConnectionEdit, ConnectionRow, SSL_MODES, blankConnection, connectionEditOf, connectionSaveOf, sslLabel, workspaceChoices } from './sources.model';
 import { SourcesApi } from './sources.service';
 
 export interface ConnectionDialogData {
@@ -25,7 +27,7 @@ export interface ConnectionDialogData {
  */
 @Component({
   selector: 'app-connection-dialog',
-  imports: [FormDialog, Field, Icon],
+  imports: [FormDialog, Field, Icon, AdvancedSelect],
   template: `
     <app-form-dialog [heading]="data.connection ? 'Edit database connection' : 'New database connection'"
                      [subtitle]="data.connection ? data.connection.name : subtitle"
@@ -34,10 +36,9 @@ export interface ConnectionDialogData {
       <div class="form-stack">
         @if (data.tenants && !data.connection) {
           <app-field label="Workspace" for="dbTenant" [required]="true">
-            <select id="dbTenant" class="input" [value]="edit().tenantId ?? ''" (change)="patch({ tenantId: $any($event.target).value ? +$any($event.target).value : null })">
-              <option value="">Pick a workspace</option>
-              @for (t of data.tenants; track t.value) { <option [value]="t.value" [selected]="t.value === (edit().tenantId + '')">{{ t.label }}</option> }
-            </select>
+            <app-advanced-select id="dbTenant" [options]="tenantChoices" [value]="idValue(edit().tenantId)" (valueChange)="patch({ tenantId: idOf($event) })"
+                                 placeholder="Pick a workspace" searchLabel="Search the workspaces" searchPlaceholder="Search by name or number"
+                                 emptyText="No workspace to choose." />
           </app-field>
         }
         <app-field label="Name" for="dbName" [required]="true">
@@ -99,6 +100,10 @@ export interface ConnectionDialogData {
 export class ConnectionDialog {
   readonly ref = inject<DialogRef<ConnectionRow | null>>(DialogRef);
   readonly data = inject<ConnectionDialogData>(DIALOG_DATA);
+  /** A platform administrator's workspaces, by name (found by number too). */
+  readonly tenantChoices: AdvancedOption[] = workspaceChoices(this.data.tenants ?? []);
+  readonly idValue = idValue;
+  readonly idOf = idOf;
   private readonly api = inject(SourcesApi);
   private readonly toast = inject(ToastService);
 

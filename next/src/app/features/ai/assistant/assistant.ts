@@ -1,7 +1,7 @@
 import { ConversationRow, titleOf } from './conversation.model';
 import { ModelSetupBanner } from '../model-setup-banner';
 import { ManagedBanner } from '../../../shared/ui/managed-banner';
-import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, LOCALE_ID, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Dialog } from '@angular/cdk/dialog';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -43,6 +43,8 @@ import { PageHeader } from '../../../shared/ui/page-header';
 import { elapsedDuration, formatDuration } from '../../../shared/ui/time-format';
 import { AppLoading, InlineStatus, loadErrorText } from '../../../shared/ui/loading';
 import { LoadError } from '../../../shared/ui/load-error';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
+import { idOf, idValue, runStatusTone } from '../../../shared/ui/advanced-options';
 
 interface Connection { connectionId: number; name: string; isDefault?: boolean; status?: string; defaultModel?: string | null; provider?: string; }
 interface TraceState { loading: boolean; error: string; trace: ToolTrace | null; }
@@ -92,7 +94,7 @@ export const PROGRESS_MS = [1000, 2000] as const;
 @Component({
   selector: 'app-assistant',
   imports: [PageHeader, Icon, StatusPill, ServerTimePipe, StickToBottom, RouterLink, ModelSetupBanner, ManagedBanner, RunFollow,
-    FlowPanel, TracePanel, ChartAnswerSlot, ConversationList, Markdown, AppLoading, InlineStatus, LoadError],
+    FlowPanel, TracePanel, ChartAnswerSlot, ConversationList, Markdown, AppLoading, InlineStatus, LoadError, AdvancedSelect],
   templateUrl: './assistant.html',
   // Escape closes the history laid over the thread, as it closes a side panel.
   host: { '(document:keydown.escape)': 'historyOpen.set(false)' },
@@ -210,6 +212,12 @@ export class Assistant implements OnInit {
   readonly canCreatePipelines = computed(() => this.auth.canBuild());
   readonly connections = signal<Connection[]>([]);
   readonly connectionOptions = computed(() => this.connections().filter(c => (c.status ?? 'Active') === 'Active'));
+  /** The model picker: each active connection by name, its provider and model under it, the workspace's default marked. */
+  readonly connectionChoices = computed<AdvancedOption[]>(() => this.connectionOptions().map(c => ({
+    value: String(c.connectionId), label: c.name, description: [c.provider ?? '', c.defaultModel ?? ''].filter(Boolean).join(' · ') || undefined,
+    badge: c.isDefault ? 'Default' : undefined, badgeTone: 'neutral' as const })));
+  readonly idValue = idValue;
+  readonly idOf = idOf;
   /** The picked connection; null is the workspace default, which the server chooses. */
   readonly connectionId = signal<number | null>(null);
   readonly modelLabel = computed(() => {
@@ -295,6 +303,23 @@ export class Assistant implements OnInit {
     const ids: number[] = [];
     for (const m of this.messages()) if (m.toolRunId != null && !ids.includes(m.toolRunId)) ids.push(m.toolRunId);
     return ids.reverse();
+  });
+  private readonly when = new ServerTimePipe(inject(LOCALE_ID));
+  /** The Trace tab's runs, newest first: each by number, when it answered and the question it answered, its outcome marked. */
+  readonly traceRunOptions = computed<AdvancedOption[]>(() => {
+    const list = this.messages();
+    return this.traceRuns().map(id => {
+      const at = list.findIndex(m => m.toolRunId === id);
+      const answer = [...list].reverse().find(m => m.toolRunId === id) ?? null;
+      const question = at > 0 ? [...list.slice(0, at)].reverse().find(m => m.role === 'user')?.content?.trim() ?? '' : '';
+      const status = answer?.runStatus ?? '';
+      const word = status ? status.charAt(0).toUpperCase() + status.slice(1).toLowerCase() : '';
+      return {
+        value: String(id), label: `Run #${id}`, keywords: String(id),
+        description: [answer?.dateCreated ? this.when.transform(answer.dateCreated, 'dateTime') ?? '' : '', question].filter(Boolean).join(' · ') || undefined,
+        badge: word || undefined, badgeTone: runStatusTone(word),
+      };
+    });
   });
 
   /** The last question, when the answer to it failed or stopped: what Retry sends again. */

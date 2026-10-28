@@ -12,7 +12,9 @@ import {
 import { ApiCollectionsApi } from './api-collections.service';
 import { PairsEditor } from './pairs-editor';
 import { ResponseViewer } from './response-viewer';
-import { folderOptions } from './folders';
+import { folderOptions, folderPickOptions } from './folders';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
+import { idOf, idValue } from '../../../shared/ui/advanced-options';
 import { LastTests } from './last-tests';
 import { AppLoading, loadErrorText } from '../../../shared/ui/loading';
 import { LoadError } from '../../../shared/ui/load-error';
@@ -44,7 +46,7 @@ type SecretState = 'configured' | 'not set' | 'plain' | 'missing' | null;
  */
 @Component({
   selector: 'app-request-panel',
-  imports: [SidePanel, Icon, Field, PairsEditor, ResponseViewer, AppLoading, LoadError],
+  imports: [SidePanel, Icon, Field, PairsEditor, ResponseViewer, AppLoading, LoadError, AdvancedSelect],
   templateUrl: './request-panel.html',
 })
 export class RequestPanel {
@@ -62,6 +64,13 @@ export class RequestPanel {
   /** What is wrong with the paging as it stands, said under its fields before Save is pressed. */
   readonly pagingProblem = pagingProblem;
   readonly folders = folderOptions(this.data.folders);
+  /** The panel's lists are the collection's as it opened: its folders by path, its environments (the default marked). */
+  readonly folderChoices: AdvancedOption[] = folderPickOptions(this.folders);
+  readonly environmentChoices: AdvancedOption[] = this.data.environments.map(env => ({
+    value: String(env.environmentId), label: env.name, badge: env.isDefault ? 'Default' : undefined, badgeTone: 'neutral' as const,
+    description: `${env.variables?.length ?? 0} variable${env.variables?.length === 1 ? '' : 's'}` }));
+  readonly idValue = idValue;
+  readonly idOf = idOf;
   readonly tabs: { id: Tab; label: string }[] = [
     { id: 'params', label: 'Params' }, { id: 'headers', label: 'Headers' }, { id: 'auth', label: 'Auth' },
     { id: 'body', label: 'Body' }, { id: 'schemas', label: 'Schemas' }, { id: 'settings', label: 'Settings' },

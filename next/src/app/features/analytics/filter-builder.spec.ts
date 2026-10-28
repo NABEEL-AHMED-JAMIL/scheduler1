@@ -8,6 +8,7 @@ import {
   DatasetColumn, FilterClause, FilterGroup, OPERAND_COUNT, clauseToWire, filtersToWire,
   isFilterGroup,
 } from './analytics.service';
+import { advancedSelect } from '../../shared/ui/advanced-select.testing';
 
 /**
  * The filter builder, which is the piece the audit says unblocks about seventy items.
@@ -50,6 +51,7 @@ function builderWith(model: FilterGroup, columns: DatasetColumn[] = COLUMNS) {
   fixture.componentInstance.changed.subscribe(group => emitted.push(group));
   fixture.detectChanges();
   return {
+    fixture,
     builder: fixture.componentInstance,
     emitted,
     /** The last group the builder handed out -- what a parent would have stored. */
@@ -89,9 +91,9 @@ describe('the fourteen operators document 07 lists', () => {
 
   it('puts every one of them on the screen, in English', () => {
     const view = builderWith({ op: 'AND', clauses: [newFilterClause('region')] });
-    const text = view.text();
+    const listed = advancedSelect(view.fixture, 'Operator for condition 1').options().map(option => option.label);
     for (const operator of FILTER_OPERATORS) {
-      expect(text, `"${operator.label}" is missing from the operator list`)
+      expect(listed, `"${operator.label}" is missing from the operator list`)
         .toContain(operator.label);
     }
   });

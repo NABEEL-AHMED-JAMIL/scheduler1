@@ -33,10 +33,12 @@ export const PINNED: Record<string, unknown> = {
       "Close",
       "Headers",
       "Params",
+      "Prod2 variables",
       "Save",
       "Schemas",
       "Settings",
-      "Test"
+      "Test",
+      "Top level"
     ],
     "columns": [],
     "fields": [

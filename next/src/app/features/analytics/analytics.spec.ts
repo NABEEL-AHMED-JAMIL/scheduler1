@@ -15,6 +15,7 @@ import {
 } from './analytics.service';
 import { BucketSummary, ObjectSummary, StorageService } from '../objects/storage.service';
 import { API_SUCCESS } from '../../core/api/api.config';
+import { advancedSelect } from '../../shared/ui/advanced-select.testing';
 
 /**
  * Analytics Studio's frontend, which had no test at all.
@@ -4894,10 +4895,9 @@ describe('the Drill picker offers the column the analysis is grouped by NOW', ()
     return canvas;
   }
 
+  /** The values an advanced select offers (its "none" row is not one of them). */
   function optionsOf(canvas: ReturnType<typeof canvasWith>, id: string): string[] {
-    const select = (canvas.fixture.nativeElement as HTMLElement)
-      .querySelector(id) as HTMLSelectElement;
-    return Array.from(select.options).map(option => option.value);
+    return advancedSelect(canvas.fixture, id.replace(/^#/, '')).options().map(option => option.value);
   }
 
   it('lists the drilled-INTO column rather than the root it came from', () => {
@@ -5041,7 +5041,12 @@ describe('what a saved analysis records is what was on screen', () => {
     const shown = canvas.studio.dimensionOptions(0).find(option => option.name === 'nowhere');
     expect(shown?.missing).toBe(true);
     expect(canvas.studio.analysisFieldsMissing()).toEqual(['nowhere']);
-    expect(canvas.show()).toContain('not a column of this dataset');
+    // The picker holds the name and says it is not a column of this dataset.
+    canvas.fixture.detectChanges();
+    const picker = advancedSelect(canvas.fixture, 'a-dim-0');
+    expect(picker.value()).toBe('nowhere');
+    expect(picker.options().find(option => option.value === 'nowhere')?.description).toBe('Not a column of this dataset');
+    expect((canvas.fixture.nativeElement as HTMLElement).querySelector('#a-dim-0')!.textContent).toContain('nowhere');
     expect(canvas.show()).toContain('Run will be refused');
   });
 

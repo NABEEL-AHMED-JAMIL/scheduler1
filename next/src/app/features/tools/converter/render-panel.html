@@ -52,28 +52,18 @@
       </div>
       <div class="field">
         <label class="label" for="render-run">Run</label>
-        <select id="render-run" class="input" [disabled]="!runList().length"
-                (change)="pickRun($any($event.target).value)">
-          <option value="" [selected]="jobQueueId() == null">{{ jobId() == null ? 'Choose a schedule first' : runsState.loading() ? 'Loading runs…' : runsState.error() ? 'The runs could not be read' : runList().length ? 'Choose a run' : 'No runs yet' }}</option>
-          @for (run of runList(); track run.jobQueueId) {
-            <option [value]="run.jobQueueId" [selected]="run.jobQueueId === jobQueueId()">
-              #{{ run.jobQueueId }} · {{ run.jobStatus || '—' }}{{ run.startTime ? ' · ' + (run.startTime | serverTime: 'recent') : '' }}
-            </option>
-          }
-        </select>
+        <app-advanced-select id="render-run" [options]="runOptions()" [value]="idValue(jobQueueId())" (valueChange)="pickRun($event)"
+                             [disabled]="!runList().length" [loading]="runsState.loading()" loadingText="Loading runs…"
+                             [placeholder]="jobId() == null ? 'Choose a schedule first' : runsState.error() ? 'The runs could not be read' : runList().length ? 'Choose a run' : 'No runs yet'"
+                             searchLabel="Search the runs" searchPlaceholder="Search by run number or date" />
         <app-inline-status [loading]="runsState.loading()" [error]="runsState.error()" label="Loading runs…" (retry)="loadRuns()" />
       </div>
       <div class="field">
         <label class="label" for="render-dataset">Dataset</label>
-        <select id="render-dataset" class="input" [disabled]="!datasets().length"
-                (change)="pickDataset($any($event.target).value)">
-          <option value="" [selected]="datasetId() == null">{{ outputsState.loading() ? 'Loading datasets…' : outputs() && !datasets().length ? 'This run kept no dataset' : 'Choose a dataset' }}</option>
-          @for (d of datasets(); track d.runOutputId) {
-            <option [value]="d.runDatasetId" [selected]="d.runDatasetId === datasetId()">
-              {{ d.name }}{{ d.stepKey ? ' · step ' + d.stepKey : '' }}{{ d.rowCount != null ? ' · ' + d.rowCount + ' rows' : '' }}
-            </option>
-          }
-        </select>
+        <app-advanced-select id="render-dataset" [options]="datasetOptions()" [value]="idValue(datasetId())" (valueChange)="pickDataset($event)"
+                             [disabled]="!datasets().length" [loading]="outputsState.loading()" loadingText="Loading datasets…"
+                             [placeholder]="outputs() && !datasets().length ? 'This run kept no dataset' : 'Choose a dataset'"
+                             searchLabel="Search the datasets" searchPlaceholder="Search by name or step" />
         <app-inline-status [loading]="outputsState.loading()" [error]="outputsState.error()" label="Loading datasets…" (retry)="loadOutputs()" />
       </div>
     </div>

@@ -23,7 +23,8 @@ import { CollectionDialog, CollectionDialogData } from './collection-dialog';
 import { EnvironmentDialog, EnvironmentDialogData } from './environment-dialog';
 import { InUseDialog, InUseData } from './in-use-dialog';
 import { RequestPanel, RequestPanelData } from './request-panel';
-import { folderOptions } from './folders';
+import { folderOptions, folderPickOptions } from './folders';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
 import { LastTests } from './last-tests';
 import { SensitivityTag } from '../../../shared/ui/sensitivity';
 import { ManagedBanner } from '../../../shared/ui/managed-banner';
@@ -49,7 +50,7 @@ const USER_KINDS: Record<string, string> = { PIPELINE: 'Pipeline', SOURCE: 'Sour
  */
 @Component({
   selector: 'app-api-collection',
-  imports: [RefreshButton, PageHeader, Icon, SensitivityTag, TableShell, StatusPill, StatStrip, ViewToggle, DataText, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, RouterLink, ManagedBanner, WorkspaceSelect, SortHeader],
+  imports: [RefreshButton, PageHeader, Icon, SensitivityTag, TableShell, StatusPill, StatStrip, ViewToggle, DataText, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, RouterLink, ManagedBanner, WorkspaceSelect, SortHeader, AdvancedSelect],
   templateUrl: './collection.html',
 })
 export class Collection implements OnChanges {
@@ -96,6 +97,15 @@ export class Collection implements OnChanges {
   readonly environments = computed(() => this.detail()?.environments ?? []);
   readonly versions = computed(() => this.detail()?.versions ?? []);
   private readonly folderNames = computed(() => new Map(this.folders().map(f => [f.id, f.label])));
+  /** The folder filter: the top level, then each folder by its path, with how many of the APIs each holds. */
+  readonly folderFilterOptions = computed<AdvancedOption[]>(() => {
+    const requests = this.detail()?.requests ?? [];
+    const apis = new Map<number, number>();
+    for (const r of requests) if (r.folderId != null) apis.set(r.folderId, (apis.get(r.folderId) ?? 0) + 1);
+    const top = requests.filter(r => r.folderId == null).length;
+    return [{ value: 'top', label: 'Top level', description: `${top} API${top === 1 ? '' : 's'}` },
+      ...folderPickOptions(this.folders(), apis).map(o => ({ ...o, group: 'Folders' }))];
+  });
 
   readonly visibleRequests = computed(() => {
     const q = this.search().trim().toLowerCase();

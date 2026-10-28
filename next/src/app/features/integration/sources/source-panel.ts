@@ -13,13 +13,16 @@ import { ApiCollectionsApi } from '../api-collections/api-collections.service';
 import { CollectionRow, EnvironmentRow, RequestRow } from '../api-collections/api-collections.model';
 import {
   BucketRow, ConnectionRow, FORMATS, PreviewResult, SchemaField, SourceDetail, SourceEdit, SourceKind, blankSource, formatLabel,
-  kindLabel, sourceEditOf, sourceSaveOf,
+  kindLabel, sourceEditOf, sourceSaveOf, workspaceChoices,
 } from './sources.model';
 import { SourcesApi } from './sources.service';
 import { PreviewTable } from './preview-table';
 import { SchemaView } from './schema-view';
 import { AppLoading, InlineStatus, loadErrorText } from '../../../shared/ui/loading';
 import { LoadError } from '../../../shared/ui/load-error';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
+import { bucketOption, idOf, idValue } from '../../../shared/ui/advanced-options';
+import { folderOptions } from '../api-collections/folders';
 
 type PickerSlot = 'buckets' | 'connections' | 'collections';
 /** One picker's read (owner 2026-10-27): a select said only "Pick a …" while loading, when empty and when its read failed. */
@@ -44,6 +47,12 @@ export interface SourcePanelData {
 
 type ResultTab = 'preview' | 'schema';
 
+/** A list with the saved id kept at its end when the list does not hold it ("API 41", and why), so it never reads as none. */
+function keptId(list: AdvancedOption[], id: number | null | undefined, noun: string, why: string): AdvancedOption[] {
+  return id != null && !list.some(o => o.value === String(id))
+    ? [...list, { value: String(id), label: `${noun} ${id}`, description: why, badge: 'Not found', badgeTone: 'warn' }] : list;
+}
+
 /**
  * One source, in the wide side panel (MIG-248): its kind's fields, then Test connection, Preview and Infer schema.
  * The service reads the saved source -- each action takes its id, not its fields -- so unsaved changes are saved
@@ -51,7 +60,7 @@ type ResultTab = 'preview' | 'schema';
  */
 @Component({
   selector: 'app-source-panel',
-  imports: [SidePanel, Icon, Field, Segmented, ServerTimePipe, PreviewTable, SchemaView, AppLoading, InlineStatus, LoadError],
+  imports: [SidePanel, Icon, Field, Segmented, ServerTimePipe, PreviewTable, SchemaView, AppLoading, InlineStatus, LoadError, AdvancedSelect],
   templateUrl: './source-panel.html',
 })
 export class SourcePanel {
@@ -97,6 +106,10 @@ export class SourcePanel {
   readonly requests = signal<RequestRow[]>([]);
   readonly versions = signal<number[]>([]);
   readonly environments = signal<EnvironmentRow[]>([]);
+  /** The picked collection's folders by path, by id: its APIs are listed under them. */
+  readonly requestFolders = signal<ReadonlyMap<number, string>>(new Map());
+  /** The collection whose APIs were last read in full: only then is a saved API it lacks "not in this collection". */
+  private readonly collectionRead = signal<number | null>(null);
   private readonly read = new Set<string>();
   readonly pickerStates = signal<Record<PickerSlot, PickerState>>({ buckets: PICKER_IDLE, connections: PICKER_IDLE, collections: PICKER_IDLE });
   /** The picked collection's APIs, versions and environments are on their way, or could not be read. */
@@ -116,12 +129,46 @@ export class SourcePanel {
   readonly tenantConnections = computed(() => this.connections().filter(c => !this.data.tenants || c.tenantId == null || c.tenantId === this.tenantId()));
   readonly tenantCollections = computed(() => this.collections().filter(c => !this.data.tenants || c.tenantId == null || c.tenantId === this.tenantId()));
   /** The stored alias stays choosable even when it is not (or no longer) among the workspace's connections. */
-  readonly bucketOptions = computed(() => {
-    const list = this.buckets().map(b => ({ value: b.bucket, label: b.label && b.label !== b.bucket ? `${b.label} (${b.bucket})` : b.bucket }));
+  readonly bucketOptions = computed<AdvancedOption[]>(() => {
+    const list = this.buckets().map(bucketOption);
     const alias = this.edit()?.storageAlias;
-    if (alias && !list.some(b => b.value === alias)) list.push({ value: alias, label: `${alias} (not among this workspace's connections)` });
+    if (alias && !list.some(b => b.value === alias)) {
+      list.push({ value: alias, label: alias, mono: true, description: 'Not among this workspace\'s connections', badge: 'Not found', badgeTone: 'warn' });
+    }
     return list;
   });
+  // The other pickers' lists (owner 2026-10-27, "all select should be advance"); a saved choice the list no longer has is
+  // kept by its number and says so, never shown as a name.
+  /** A platform administrator's workspaces, for a new source. */
+  readonly tenantChoices: AdvancedOption[] = workspaceChoices(this.data.tenants ?? []);
+  readonly collectionOptions = computed<AdvancedOption[]>(() => keptId(this.tenantCollections().map(c => ({
+    value: String(c.collectionId), label: c.name, description: c.description || undefined, keywords: String(c.collectionId) })),
+    this.picker('collections').loaded ? this.edit()?.collectionId : null, 'Collection', 'Not one of this workspace\'s collections'));
+  /** The collection's APIs, under their folders, each with its method and URL. */
+  readonly requestOptions = computed<AdvancedOption[]>(() => {
+    const folders = this.requestFolders();
+    const grouped = folders.size > 0;
+    const list = this.requests().map(q => ({
+      value: String(q.requestId), label: q.name, sample: q.method, description: q.urlTemplate || undefined,
+      group: grouped ? (q.folderId != null ? folders.get(q.folderId) ?? 'Top level' : 'Top level') : undefined,
+      keywords: `${q.method} ${q.requestId}`, badge: q.enabled ? undefined : 'Disabled', badgeTone: 'neutral' as const,
+    }));
+    if (grouped) list.sort((a, b) => (a.group === 'Top level' ? -1 : b.group === 'Top level' ? 1 : a.group!.localeCompare(b.group!)));
+    const read = this.collectionRead() != null && this.collectionRead() === this.edit()?.collectionId;
+    return keptId(list, read ? this.edit()?.requestId : null, 'API', 'Not in this collection');
+  });
+  readonly versionOptions = computed<AdvancedOption[]>(() => this.versions().map((v, i) => ({
+    value: String(v), label: `v${v}`, badge: i === 0 ? 'Current' : undefined, badgeTone: 'ok' as const })));
+  readonly environmentOptions = computed<AdvancedOption[]>(() => this.environments().map(env => ({
+    value: String(env.environmentId), label: env.name, badge: env.isDefault ? 'Default' : undefined, badgeTone: 'neutral' as const,
+    description: `${env.variables?.length ?? 0} variable${env.variables?.length === 1 ? '' : 's'}` })));
+  /** The workspace's database connections, each with where it reads and as whom. */
+  readonly connectionOptions = computed<AdvancedOption[]>(() => keptId(this.tenantConnections().map(c => ({
+    value: String(c.id), label: c.name, sample: c.engine || undefined, description: [`${c.host}/${c.database}`, c.username].filter(Boolean).join(' · '),
+    keywords: `${c.host} ${c.database} ${c.id}` })),
+    this.picker('connections').loaded ? this.edit()?.connectionId : null, 'Connection', 'Not one of this workspace\'s connections'));
+  readonly idValue = idValue;
+  readonly idOf = idOf;
   /** The schema shown on the Schema tab: the one just inferred, else a fresh preview's, else the one the source kept. */
   readonly schemaShown = computed((): { schema: unknown; fields: SchemaField[] | null | undefined } | null => {
     const fresh = this.inferred() ?? this.previewResult();
@@ -231,6 +278,8 @@ export class SourcePanel {
         if (r.status !== API_SUCCESS || !r.data) { this.collectionError.set(loadErrorText(r, 'The collection could not be read.')); return; }
         const d = r.data;
         this.requests.set(d.requests ?? []);
+        this.requestFolders.set(new Map(folderOptions(d.folders ?? []).map(f => [f.id, f.label])));
+        this.collectionRead.set(collectionId);
         const versions = (d.versions ?? []).map(v => v.version).sort((a, b) => b - a);
         this.versions.set(versions);
         this.environments.set(d.environments ?? []);
@@ -266,6 +315,8 @@ export class SourcePanel {
   pickCollection(collectionId: number | null): void {
     this.patch({ collectionId, requestId: null, version: null, environmentId: null });
     this.requests.set([]);
+    this.requestFolders.set(new Map());
+    this.collectionRead.set(null);
     this.versions.set([]);
     this.environments.set([]);
     this.collectionError.set('');
@@ -274,7 +325,6 @@ export class SourcePanel {
   }
 
   formatText(format: string): string { return formatLabel(format); }
-  idOf(event: Event): number | null { const v = (event.target as HTMLSelectElement).value; return v ? +v : null; }
 
   newConnection(): void {
     const data: ConnectionDialogData = { connection: null, tenants: this.data.tenants, tenantId: this.tenantId() };

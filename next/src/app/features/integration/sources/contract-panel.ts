@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, LOCALE_ID, computed, inject, signal } from '@angular/core';
 import { DIALOG_DATA, Dialog, DialogRef } from '@angular/cdk/dialog';
 import { API_SUCCESS } from '../../../core/api/api.config';
 import { ToastService } from '../../../shared/ui/toast.service';
@@ -19,6 +19,8 @@ import { LoadError } from '../../../shared/ui/load-error';
 import { BlurLoader } from '../../../shared/ui/blur-loader';
 import { createTableSort } from '../../../shared/ui/sort';
 import { SortHeader } from '../../../shared/ui/sort-header';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
+import { idOf, idValue } from '../../../shared/ui/advanced-options';
 
 export interface ContractPanelData {
   contract: ContractRow;
@@ -33,7 +35,7 @@ export interface ContractPanelData {
  */
 @Component({
   selector: 'app-contract-panel',
-  imports: [SidePanel, Icon, Field, DataText, ServerTimePipe, SchemaView, AppLoading, InlineStatus, LoadError, BlurLoader, SortHeader],
+  imports: [SidePanel, Icon, Field, DataText, ServerTimePipe, SchemaView, AppLoading, InlineStatus, LoadError, BlurLoader, SortHeader, AdvancedSelect],
   template: `
     <app-side-panel [heading]="heading()" [subtitle]="subtitle()">
       <div class="flex flex-col gap-4 min-w-0">
@@ -111,10 +113,9 @@ export interface ContractPanelData {
           <h3 class="text-sm font-semibold">Validate a payload</h3>
           <div class="form-grid">
             <app-field label="Against" for="ctVersion" hint="The active version is what a pipeline checks with unless it pinned another.">
-              <select id="ctVersion" class="input" [value]="validateVersion() ?? ''" (change)="validateVersion.set($any($event.target).value ? +$any($event.target).value : null)">
-                <option value="">The active version</option>
-                @for (v of versions(); track v.version) { <option [value]="v.version" [selected]="v.version === validateVersion()">v{{ v.version }}</option> }
-              </select>
+              <app-advanced-select id="ctVersion" [options]="versionOptions()" [value]="idValue(validateVersion())" (valueChange)="validateVersion.set(idOf($event))"
+                                   [allowClear]="true" clearLabel="The active version" placeholder="The active version" searchLabel="Search the versions"
+                                   [loading]="state.loading() && !versions().length" loadingText="Loading the versions…" emptyText="No version yet." />
             </app-field>
           </div>
           <app-field label="Payload" for="ctPayload" hint="Paste the JSON a customer would send (or we would answer). Nothing is recorded.">
@@ -175,6 +176,14 @@ export class ContractPanel {
   readonly payloadPlaceholder = '{"record_id": "R-1001", "customer": {"id": "C-77"}}';
   readonly contract = signal<ContractRow>(this.data.contract);
   readonly versions = signal<ContractVersionRow[]>([]);
+  private readonly when = new ServerTimePipe(inject(LOCALE_ID));
+  /** "Against": the contract's versions, newest first as listed, each with its state and when it was saved. */
+  readonly versionOptions = computed<AdvancedOption[]>(() => this.versions().map(v => ({
+    value: String(v.version), label: `v${v.version}`, keywords: String(v.version),
+    description: v.dateCreated ? `Saved ${this.when.transform(v.dateCreated, 'dateTime')}` : undefined,
+    badge: this.statusText(v.status), badgeTone: v.status === 'ACTIVE' ? 'ok' as const : 'neutral' as const })));
+  readonly idValue = idValue;
+  readonly idOf = idOf;
   readonly selected = signal<number | null>(null);
   readonly versionDetail = signal<ContractVersionDetail | null>(null);
   readonly versionError = signal('');
