@@ -82,7 +82,8 @@ test.describe('Task Registry', () => {
     await expect(panel.locator('[data-setting="conditions"]')).toContainText('Repeatable group');
     await expect(panel.locator('[data-setting="column"]')).toBeVisible();
     await expect(panel).toContainText('filter_rows');
-    await expect(panel).toContainText('Once, no retry');
+    // Owner 2026-10-21: a step safe to repeat is tried up to 3 more times when a service is briefly away.
+    await expect(panel).toContainText('Once; up to 3 more when a service is briefly away');
     await expect(panel).toContainText('Any member');
     await expect(panel.getByRole('switch')).toBeEnabled();
     await panel.getByRole('button', { name: 'Close' }).last().click();

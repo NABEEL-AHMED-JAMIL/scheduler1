@@ -248,9 +248,10 @@ test.describe('a new organisation\'s first hour (MIG-324)', () => {
       await keep.locator('#cfg-fileName').fill('orders.csv');
       await pickOption(keep.locator('#cfg-format'), { label: 'csv' });
       await keep.getByRole('button', { name: 'Apply' }).click();
-      // One save bar saves the details and the steps (B2); the first steps of a legacy pipeline are confirmed in a dialog.
+      // One save bar saves the details and the steps (B2). A new pipeline has no schedule yet, so nothing runs as its legacy step
+      // and no "Save steps" dialog asks first (ZT-P5): the save goes straight through.
       await page.getByRole('button', { name: 'Save', exact: true }).click();
-      await page.getByRole('dialog').getByRole('button', { name: 'Save steps' }).click();
+      await expect(page.getByRole('dialog', { name: 'Run this pipeline as steps' })).toHaveCount(0);
     } else {
       await stepsTab.click();
       await page.getByRole('button', { name: 'Edit step orders' }).click();

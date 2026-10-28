@@ -129,12 +129,12 @@ test.describe.serial('Workflows: design, publish, submit, approve, reject (live)
     await detail.getByRole('button', { name: 'Reject', exact: true }).click();
     await expect(row('b')).toHaveCount(0);
 
-    // Both decisions, as Done shows them.
+    // Both decisions, as Done shows them: the reviewer by name with "(you)" (owner 2026-10-21).
     await page.locator('[data-test="tab-done"]').click();
     await row('a').click();
-    await expect(detail).toContainText(/approved by you/i);
+    await expect(detail).toContainText(/approved by .+ \(you\)/i);
     await row('b').click();
-    await expect(detail).toContainText(/rejected by you/i);
+    await expect(detail).toContainText(/rejected by .+ \(you\)/i);
     await expect(detail).toContainText('Over the quarter\'s budget');
 
     // The designer is not the reviewer's page.
