@@ -12,7 +12,9 @@ import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { confirmWith } from '../../../shared/ui/confirm';
 import { GrantDialog, GrantDialogData, GrantWorkspace } from './grant-dialog';
-import { ManagedGrant, ManagedServiceApi, StaffCandidate, personName, staffOf } from './managed-service.api';
+import { ManagedGrant, ManagedServiceApi, StaffCandidate, personName, staffOf, staffOption } from './managed-service.api';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
+import { idValue } from '../../../shared/ui/advanced-options';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
 import { createTableSort } from '../../../shared/ui/sort';
@@ -28,7 +30,7 @@ interface TenantRow { tenantId: number; tenantName: string; status?: string; man
  */
 @Component({
   selector: 'app-managed-service',
-  imports: [WorkspaceSelect, RefreshButton, PageHeader, TableShell, Icon, ServerTimePipe, RouterLink, SortHeader, InlineStatus],
+  imports: [WorkspaceSelect, RefreshButton, PageHeader, TableShell, Icon, ServerTimePipe, RouterLink, SortHeader, InlineStatus, AdvancedSelect],
   templateUrl: './managed-service.html',
 })
 export class ManagedService implements OnInit {
@@ -50,6 +52,9 @@ export class ManagedService implements OnInit {
   readonly hasFilters = computed(() => !!this.tenantFilter() || !!this.staffFilter() || this.includeRevoked());
   readonly liveCount = computed(() => this.grants().filter(g => this.isLive(g)).length);
   readonly name = personName;
+  /** The staff filter's list: each staff member by name, their sign-in name under it. */
+  readonly staffOptions = computed<AdvancedOption[]>(() => this.staff().map(staffOption));
+  readonly idValue = idValue;
   /**
    * Owner 2026-10-27: the staff and workspace lists feed the filter and the Grant dialog; their state is said (the filter
    * reads "Loading staff…", a failure shows with Try again, and Grant waits for both) instead of empty lists that look

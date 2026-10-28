@@ -5,7 +5,9 @@ import { ManagementMode } from '../../../core/auth/auth.models';
 import { Field } from '../../../shared/ui/field';
 import { FormDialog } from '../../../shared/ui/form-dialog';
 import { ToastService } from '../../../shared/ui/toast.service';
-import { ManagedServiceApi, StaffCandidate, personName } from './managed-service.api';
+import { ManagedServiceApi, StaffCandidate, personName, staffOption } from './managed-service.api';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
+import { idOf, idValue } from '../../../shared/ui/advanced-options';
 
 export interface GrantWorkspace { tenantId: number; tenantName: string; managementMode?: ManagementMode | null }
 
@@ -26,7 +28,7 @@ export interface GrantDialogData {
  */
 @Component({
   selector: 'app-grant-dialog',
-  imports: [Field, FormDialog],
+  imports: [Field, FormDialog, AdvancedSelect],
   template: `
     <app-form-dialog heading="Grant a workspace"
         subtitle="The staff member can then open a managed session there. Every change they make is audited."
@@ -34,21 +36,14 @@ export interface GrantDialogData {
         (cancelled)="ref.close(false)" (confirmed)="save()">
       <app-field label="Staff member" for="grantStaff"
           [hint]="data.staffError ? data.staffError + ' Close and try again.' : data.staff.length ? 'Active platform administrators.' : 'No active platform administrator to grant.'">
-        <select id="grantStaff" class="input" [value]="appUserId() ?? ''" (change)="appUserId.set(num($any($event.target).value))"
-                cdkFocusInitial>
-          <option value="">Choose a staff member</option>
-          @for (s of data.staff; track s.appUserId) {
-            <option [value]="s.appUserId">{{ name(s) }}{{ s.fullName ? ' (' + s.username + ')' : '' }}</option>
-          }
-        </select>
+        <app-advanced-select id="grantStaff" [options]="staffOptions" [value]="idValue(appUserId())" (valueChange)="appUserId.set(idOf($event))"
+                             cdkFocusInitial placeholder="Choose a staff member" searchLabel="Search the staff"
+                             searchPlaceholder="Search by name or sign-in" [emptyText]="data.staffError || 'No active platform administrator to grant.'" />
       </app-field>
       <app-field label="Workspace" for="grantWorkspace" [hint]="data.tenantsError ? data.tenantsError + ' Close and try again.' : ''">
-        <select id="grantWorkspace" class="input" [value]="tenantId() ?? ''" (change)="tenantId.set(num($any($event.target).value))">
-          <option value="">Choose a workspace</option>
-          @for (t of data.tenants; track t.tenantId) {
-            <option [value]="t.tenantId">{{ t.tenantName }}{{ t.managementMode === 'MANAGED' ? ' · managed' : '' }}</option>
-          }
-        </select>
+        <app-advanced-select id="grantWorkspace" [options]="workspaceOptions" [value]="idValue(tenantId())" (valueChange)="tenantId.set(idOf($event))"
+                             placeholder="Choose a workspace" searchLabel="Search the workspaces" searchPlaceholder="Search by name or number"
+                             [emptyText]="data.tenantsError || 'No workspace to grant.'" />
       </app-field>
       @if (error()) { <p class="text-sm text-[color:var(--color-crit-500)]" role="alert">{{ error() }}</p> }
     </app-form-dialog>
@@ -66,11 +61,13 @@ export class GrantDialog {
   readonly error = signal('');
   readonly ready = computed(() => !!this.appUserId() && !!this.tenantId() && !this.saving());
   readonly name = personName;
-
-  num(value: string): number | null {
-    const n = Number(value);
-    return value && Number.isFinite(n) ? n : null;
-  }
+  /** The dialog's lists are fixed while it is open: the staff by name with their sign-in name, the workspaces with their mode. */
+  readonly staffOptions: AdvancedOption[] = this.data.staff.map(staffOption);
+  readonly workspaceOptions: AdvancedOption[] = this.data.tenants.map(t => ({
+    value: String(t.tenantId), label: t.tenantName, keywords: String(t.tenantId),
+    badge: t.managementMode === 'MANAGED' ? 'Managed' : undefined, badgeTone: 'info' as const }));
+  readonly idValue = idValue;
+  readonly idOf = idOf;
 
   save(): void {
     const appUserId = this.appUserId();

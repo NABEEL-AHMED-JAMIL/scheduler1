@@ -34,17 +34,14 @@
         <input class="input" placeholder="Search team, description or person" aria-label="Search teams"
                [value]="search()" (input)="search.set($any($event.target).value); pager.reset()" data-testid="team-search" />
       </div>
-      <select class="input max-w-48" aria-label="Filter by lead" [value]="leadFilter()" data-testid="lead-filter"
-              (change)="leadFilter.set($any($event.target).value); pager.reset()">
-        <option value="" [selected]="leadFilter() === ''">Any lead</option>
-        <option value="none" [selected]="leadFilter() === 'none'">Without a lead</option>
-        @for (p of leadOptions(); track p.id) { <option [value]="'' + p.id" [selected]="leadFilter() === '' + p.id">{{ p.name }}</option> }
-      </select>
-      <select class="input max-w-48" aria-label="Filter by member" [value]="memberFilter()" data-testid="member-filter"
-              (change)="memberFilter.set($any($event.target).value); pager.reset()">
-        <option value="" [selected]="memberFilter() === ''">Any member</option>
-        @for (p of memberOptions(); track p.id) { <option [value]="'' + p.id" [selected]="memberFilter() === '' + p.id">{{ p.name }}</option> }
-      </select>
+      <app-advanced-select class="w-48" ariaLabel="Filter by lead" data-testid="lead-filter" [options]="leadOptions()" [value]="leadFilter()"
+                           (valueChange)="leadFilter.set($event); pager.reset()" [allowClear]="true" clearLabel="Any lead" placeholder="Any lead"
+                           searchLabel="Search the leads" searchPlaceholder="Search by name or sign-in" panelWidth="20rem"
+                           [loading]="loading() && !teams().length" loadingText="Loading teams…" emptyText="No team has a lead yet." />
+      <app-advanced-select class="w-48" ariaLabel="Filter by member" data-testid="member-filter" [options]="memberOptions()" [value]="memberFilter()"
+                           (valueChange)="memberFilter.set($event); pager.reset()" [allowClear]="true" clearLabel="Any member" placeholder="Any member"
+                           searchLabel="Search the members" searchPlaceholder="Search by name or sign-in" panelWidth="20rem"
+                           [loading]="loading() && !teams().length" loadingText="Loading teams…" emptyText="Nobody is in a team yet." />
       @if (admin()) {
         <select class="input max-w-36" aria-label="Filter by status" data-testid="show-archived"
                 (change)="setStatus($any($event.target).value)">
@@ -249,11 +246,11 @@
             <div class="flex flex-wrap items-end gap-2 rounded-md bg-sunken p-3" data-testid="add-member">
               <div class="field flex-1 min-w-48">
                 <label class="label" for="add-person">Add a person</label>
-                <select id="add-person" class="input input-sm" (change)="addPerson.set(+$any($event.target).value || null)"
-                        data-testid="add-person">
-                  <option value="" [selected]="addPerson() === null">Choose someone</option>
-                  @for (p of addable(); track p.userId) { <option [value]="p.userId" [selected]="addPerson() === p.userId">{{ p.fullName || p.username }}</option> }
-                </select>
+                <app-advanced-select id="add-person" [compact]="true" data-testid="add-person" [options]="addableOptions()"
+                                     [value]="idValue(addPerson())" (valueChange)="addPerson.set(idOf($event))" placeholder="Choose someone"
+                                     searchLabel="Search the people" searchPlaceholder="Search by name or sign-in" [loading]="peopleState.loading()"
+                                     loadingText="Loading people…" panelWidth="22rem"
+                                     [emptyText]="peopleState.error() ? 'The people could not be read.' : 'Everyone in the workspace is in this team already.'" />
                 <app-inline-status [loading]="peopleState.loading()" [error]="peopleState.error()"
                                    [empty]="peopleState.loaded() && !addable().length" label="Loading people…"
                                    emptyText="Everyone in the workspace is in this team already." (retry)="loadPeople()" />

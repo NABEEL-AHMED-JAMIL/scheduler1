@@ -6,7 +6,9 @@ import { API_SUCCESS } from '../../../core/api/api.config';
 import { TableShell } from '../../../shared/ui/data-table';
 import { Icon } from '../../../shared/ui/icon';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
-import { ActionsPage, ActivityKind, ManagedAction, ManagedServiceApi, StaffCandidate, personName, staffOf } from './managed-service.api';
+import { ActionsPage, ActivityKind, ManagedAction, ManagedServiceApi, StaffCandidate, personName, staffOf, staffOption } from './managed-service.api';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
+import { idValue } from '../../../shared/ui/advanced-options';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
 import { InlineStatus, createLoadState, loadErrorText } from '../../../shared/ui/loading';
@@ -117,7 +119,7 @@ export const ACTIONS_PAGE = 50;
  */
 @Component({
   selector: 'app-staff-activity',
-  imports: [WorkspaceSelect, RefreshButton, PageHeader, TableShell, Icon, ServerTimePipe, Avatar, InlineStatus, SortHeader],
+  imports: [WorkspaceSelect, RefreshButton, PageHeader, TableShell, Icon, ServerTimePipe, Avatar, InlineStatus, SortHeader, AdvancedSelect],
   templateUrl: './staff-activity.html',
 })
 export class StaffActivity implements OnInit {
@@ -181,6 +183,12 @@ export class StaffActivity implements OnInit {
     { value: '', label: 'Changes and reads' }, { value: 'changes', label: 'Changes' }, { value: 'reads', label: 'Data reads' }];
   readonly hasFilters = computed(() => !!this.tenantFilter() || !!this.staffFilter() || !!this.kindFilter());
   readonly name = personName;
+  /** The staff filter's list: each staff member by name, their sign-in name under it. */
+  readonly staffOptions = computed<AdvancedOption[]>(() => this.staff().map(staffOption));
+  /** Our staff (platform), or the staff the log has shown so far (a workspace's own page). */
+  readonly staffEmptyText = computed(() => this.showWorkspace() ? 'No active platform administrator yet.'
+    : 'Nobody from our team has acted in this workspace yet.');
+  readonly idValue = idValue;
   readonly change = changeText;
   readonly targetOf = targetText;
   readonly isRead = isRead;

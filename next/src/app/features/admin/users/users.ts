@@ -35,6 +35,7 @@ import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { AccountSecurityApi, PersonStanding } from '../../account/account-security.api';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
 
 /** What one user owns and how their runs have gone, from dashboard.json/userStatistics. */
 export interface UserStatistic {
@@ -88,7 +89,7 @@ export interface AppUser {
 
 @Component({
   selector: 'app-users',
-  imports: [WorkspaceSelect, RefreshButton, PageHeader, MineFilter, ViewToggle, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Icon, CopyButton, Avatar, Pagination, StatStrip, SortHeader, InlineStatus],
+  imports: [WorkspaceSelect, RefreshButton, PageHeader, MineFilter, ViewToggle, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Icon, CopyButton, Avatar, Pagination, StatStrip, SortHeader, InlineStatus, AdvancedSelect],
   templateUrl: './users.html',
 })
 export class Users implements OnInit {
@@ -179,6 +180,17 @@ export class Users implements OnInit {
     [...new Set(this.users().filter(u => u.userRole === 'TENANT_USER').map(u => u.pageAccessProfileName).filter(Boolean))].sort() as string[]);
   readonly anyOnDefault = computed(() =>
     this.users().some(u => u.userRole === 'TENANT_USER' && !u.pageAccessProfileName));
+  /** The access filter: the default (when anyone is on it), then each profile in use, with how many of the list hold it. */
+  readonly profileFilterOptions = computed<AdvancedOption[]>(() => {
+    const members = this.users().filter(u => u.userRole === 'TENANT_USER');
+    const count = (n: number) => `${n} ${n === 1 ? 'person' : 'people'}`;
+    const onDefault = members.filter(u => !u.pageAccessProfileName).length;
+    return [
+      ...(this.anyOnDefault() ? [{ value: 'default', label: 'On the default', description: count(onDefault) }] : []),
+      ...this.profileOptions().map(name => ({ value: name, label: name, group: 'Profiles',
+        description: count(members.filter(u => u.pageAccessProfileName === name).length) })),
+    ];
+  });
 
   /** The catalogue's size, for "4 of 10 pages": an admin's count is the whole catalogue. */
   readonly totalPages = computed(() => Math.max(0, ...this.users().map(u => u.pageCount ?? 0)));

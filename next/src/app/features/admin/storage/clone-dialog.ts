@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
@@ -9,6 +9,7 @@ import { FormDialog } from '../../../shared/ui/form-dialog';
 import { Icon } from '../../../shared/ui/icon';
 import { ALIAS_PATTERN } from './connection-dialog';
 import { InlineStatus, loadErrorText } from '../../../shared/ui/loading';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
 
 /**
  * Copies a connection so only the bucket has to change.
@@ -23,7 +24,7 @@ import { InlineStatus, loadErrorText } from '../../../shared/ui/loading';
  */
 @Component({
   selector: 'app-clone-dialog',
-  imports: [FormsModule, Field, FormDialog, Icon, InlineStatus],
+  imports: [FormsModule, Field, FormDialog, Icon, InlineStatus, AdvancedSelect],
   template: `
     <app-form-dialog heading="Clone connection"
         [subtitle]="'Copies everything from &quot;' + data.connection.connectionName + '&quot; except the bucket.'"
@@ -52,10 +53,9 @@ import { InlineStatus, loadErrorText } from '../../../shared/ui/loading';
                      : 'The bucket this copy points at.'">
           @if (discovered().length) {
             <div class="flex gap-2">
-              <select id="bucket" class="input" [(ngModel)]="bucketName" name="bucketName"
-                      [ngModelOptions]="{standalone: true}">
-                @for (b of discovered(); track b) { <option [value]="b">{{ b }}</option> }
-              </select>
+              <app-advanced-select id="bucket" class="flex-1" [(ngModel)]="bucketName" name="bucketName" [ngModelOptions]="{standalone: true}"
+                                   [options]="bucketOptions()" placeholder="Choose a bucket" searchLabel="Search the buckets"
+                                   unknownText="Not among the buckets found" />
               <!-- The hint offers typing another, so there has to be a way back to the input. -->
               <button type="button" class="btn btn-default btn-sm whitespace-nowrap"
                       (click)="discovered.set([])"><app-icon name="edit" />Type instead</button>
@@ -95,6 +95,8 @@ export class CloneDialog {
   readonly submitted = signal(false);
   readonly discovering = signal(false);
   readonly discovered = signal<string[]>([]);
+  /** The buckets the server listed, by name. */
+  readonly bucketOptions = computed<AdvancedOption[]>(() => this.discovered().map(b => ({ value: b, label: b, mono: true })));
   readonly discoverError = signal('');
   readonly discoverNote = signal('');
   readonly aliasPattern = ALIAS_PATTERN;

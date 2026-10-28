@@ -68,12 +68,9 @@
           <app-field label="Page access" for="pageAccessProfileId"
                      [control]="form.get('pageAccessProfileId')" [submitted]="submitted()"
                      hint="Which pages they can open. Set up under Administration &amp; billing › Page access.">
-            <select id="pageAccessProfileId" class="input" formControlName="pageAccessProfileId">
-              <option [ngValue]="null">Workspace default{{ defaultProfileName() ? ' (' + defaultProfileName() + ')' : '' }}</option>
-              @for (profile of accessProfiles(); track profile.pageAccessProfileId) {
-                <option [ngValue]="profile.pageAccessProfileId">{{ profile.profileName }}</option>
-              }
-            </select>
+            <app-advanced-select id="pageAccessProfileId" formControlName="pageAccessProfileId" [numeric]="true" [options]="profileOptions()"
+                                 [allowClear]="true" [clearLabel]="defaultLabel()" [placeholder]="defaultLabel()" searchLabel="Search the access profiles"
+                                 [loading]="profilesLoading()" loadingText="Loading access profiles…" />
             <app-inline-status [loading]="profilesLoading()" [error]="profilesError()" [retryable]="data.canPickTenant"
                                label="Loading access profiles…" (retry)="loadProfiles()" />
           </app-field>

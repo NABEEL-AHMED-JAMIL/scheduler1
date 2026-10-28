@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { provideZonelessChangeDetection, signal } from '@angular/core';
+import { getDebugNode, provideZonelessChangeDetection, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
@@ -13,6 +13,7 @@ import { ToastService } from '../../../shared/ui/toast.service';
 import { WorkflowsApi } from '../../workflows/workflows.api';
 import { Teams } from './teams';
 import { TeamUsage, TeamUsageReader } from './teams-usage';
+import { AdvancedSelect } from '../../../shared/ui/advanced-select';
 
 /**
  * F4 (MIG-401): Administration › Teams -- an administrator makes teams and names leads; a lead changes members only.
@@ -76,6 +77,11 @@ function mount(opts: { admin?: boolean; me?: number; teams?: Team[]; usage?: Tea
 const panel = () => document.querySelector('.cdk-overlay-container app-side-panel') as HTMLElement | null;
 const inPanel = (selector: string) => panel()?.querySelector(selector) as HTMLElement | null;
 
+/** An advanced select by its element (the side panel's are in the overlay, outside the fixture's tree). */
+function picker(root: ParentNode, selector: string): AdvancedSelect {
+  return getDebugNode(root.querySelector(selector))!.componentInstance as AdvancedSelect;
+}
+
 function choose(root: ParentNode, selector: string, value: string) {
   const select = root.querySelector(selector) as HTMLSelectElement;
   select.value = value;
@@ -112,9 +118,10 @@ describe('Teams', () => {
     openRow(fixture, el, 6);
     expect(panel()!.textContent).toContain('Wound care');
     expect(inPanel('[data-testid="members"]')!.textContent).toContain('Ben Nurse');
-    const options = [...panel()!.querySelectorAll('[data-testid="add-person"] option')].map(o => o.textContent!.trim());
-    expect(options).toEqual(['Choose someone', 'Cara Clerk']);
-    choose(panel()!, '[data-testid="add-person"]', '43');
+    const addPerson = picker(panel()!, '[data-testid="add-person"]');
+    expect(addPerson.placeholder()).toBe('Choose someone');
+    expect(addPerson.options().map(o => o.label)).toEqual(['Cara Clerk']);
+    addPerson.choose('43');
     choose(panel()!, '[data-testid="add-role"]', 'LEAD');
     fixture.detectChanges();
     inPanel('[data-testid="add"]')!.click();
@@ -157,7 +164,7 @@ describe('Teams', () => {
     await confirmIt(fixture);
     expect(api.removeMember).toHaveBeenCalledWith(6, 42);
     expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('names a team\'s leads'));
-    choose(panel()!, '[data-testid="add-person"]', '43');
+    picker(panel()!, '[data-testid="add-person"]').choose('43');
     fixture.detectChanges();
     inPanel('[data-testid="add"]')!.click();
     expect(api.addMember).toHaveBeenCalledWith(6, 43, 'MEMBER');
@@ -188,17 +195,17 @@ describe('Teams', () => {
     fixture.detectChanges();
     expect(rows()).toEqual(['7', '6']);
 
-    choose(el, '[data-testid="lead-filter"]', '41');
+    picker(el, '[data-testid="lead-filter"]').choose('41');
     fixture.detectChanges();
     expect(rows()).toEqual(['6']);
-    choose(el, '[data-testid="lead-filter"]', 'none');
+    picker(el, '[data-testid="lead-filter"]').choose('none');
     fixture.detectChanges();
     expect(rows()).toEqual(['7']);
-    choose(el, '[data-testid="lead-filter"]', '');
-    choose(el, '[data-testid="member-filter"]', '42');
+    picker(el, '[data-testid="lead-filter"]').choose('');
+    picker(el, '[data-testid="member-filter"]').choose('42');
     fixture.detectChanges();
     expect(rows()).toEqual(['6']);
-    choose(el, '[data-testid="member-filter"]', '');
+    picker(el, '[data-testid="member-filter"]').choose('');
     fixture.detectChanges();
 
     const unled = [...el.querySelectorAll('[data-testid="team-stats"] button')].find(b => b.textContent!.includes('Without a lead')) as HTMLButtonElement;

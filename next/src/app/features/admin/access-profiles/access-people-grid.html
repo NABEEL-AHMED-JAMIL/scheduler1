@@ -60,14 +60,11 @@
                 </div>
               </td>
               <td class="access-grid-profile">
-                <select class="input py-1 text-xs" (change)="pick(row.person, $any($event.target).value, $any($event.target))"
-                        [disabled]="busy() === row.person.appUserId" [attr.aria-label]="'Profile for ' + row.person.fullName"
-                        [title]="row.person.pageAccessProfileName || ('Default' + (defaultProfile() ? ' · ' + defaultProfile()!.profileName : ''))">
-                  <option value="" [selected]="row.person.pageAccessProfileId == null">Default{{ defaultProfile() ? ' · ' + defaultProfile()!.profileName : '' }}</option>
-                  @for (profile of profiles(); track profile.pageAccessProfileId) {
-                    <option [value]="profile.pageAccessProfileId" [selected]="profile.pageAccessProfileId === row.person.pageAccessProfileId">{{ profile.profileName }}</option>
-                  }
-                </select>
+                <app-advanced-select #profileSelect [compact]="true" [options]="profileOptions()" [value]="idValue(row.person.pageAccessProfileId)"
+                                     (valueChange)="pick(row.person, $event, profileSelect)" [disabled]="busy() === row.person.appUserId"
+                                     [ariaLabel]="'Profile for ' + row.person.fullName" [allowClear]="true" [clearLabel]="defaultLabel()"
+                                     [placeholder]="defaultLabel()" searchLabel="Search the access profiles" panelWidth="22rem"
+                                     [title]="row.person.pageAccessProfileName || defaultLabel()" />
                 @if (row.person.twoFactorRequired || row.person.twoFactorEnabled) {
                   <!-- MIG-424: two-factor on, or required (by the workspace or the profile) and not set up yet. -->
                   <span class="mt-1 pill text-[11px]" [class.pill-ok]="row.person.twoFactorEnabled" [class.pill-warn]="!row.person.twoFactorEnabled"

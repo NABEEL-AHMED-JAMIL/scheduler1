@@ -22,7 +22,9 @@ import { StatusPill } from '../../../shared/ui/status-pill';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { AccountSecurityApi, METHOD_LABEL, OUTCOME_LABEL, PersonSession, PersonStanding, SignInEvent } from '../../account/account-security.api';
 import { pictureProblem } from '../../profile/picture-check';
-import { AccessPerson, AccessProfile, AccessProfilesService } from '../access-profiles/access-profiles.service';
+import { AccessPerson, AccessProfile, AccessProfilesService, profileOption } from '../access-profiles/access-profiles.service';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
+import { idOf, idValue } from '../../../shared/ui/advanced-options';
 import { Team, TeamsApi, refusal } from '../../../core/teams/teams.api';
 import { isOwnPlatformSignIn } from '../../../core/auth/workspace-data';
 import { PreviewGroup, menuPreview, previewSize } from '../access-profiles/page-groups';
@@ -59,7 +61,7 @@ export const USER_EDIT_SECTIONS = [
 @Component({
   selector: 'app-user-edit',
   imports: [PageHeader, Section, FormRow, Field, PhoneInput, Combobox, Icon, Avatar, StatusPill, ServerTimePipe, ReactiveFormsModule, RouterLink, SortHeader,
-    AppLoading, InlineStatus, LoadError],
+    AppLoading, InlineStatus, LoadError, AdvancedSelect],
   templateUrl: './user-edit.html',
   styles: `
     .ue-layout { display: grid; gap: 1.25rem; }
@@ -140,6 +142,12 @@ export class UserEdit implements OnInit {
     return this.teams().filter(t => !t.members.some(m => m.appUserId === id));
   });
   readonly joinTeamId = signal<number | null>(null);
+  /** The teams they could join, each with its size and description. */
+  readonly joinOptions = computed<AdvancedOption[]>(() => this.joinable().map(t => ({
+    value: String(t.teamId), label: t.name, keywords: String(t.teamId),
+    description: [`${t.memberCount} member${t.memberCount === 1 ? '' : 's'}`, t.description ?? ''].filter(Boolean).join(' · ') })));
+  readonly idValue = idValue;
+  readonly idOf = idOf;
   /** ZT-M16: a workspace's teams are a managed session's to read, never the platform administrator's own sign-in. */
   readonly ownSignIn = computed(() => isOwnPlatformSignIn(this.auth));
   readonly teamBusy = signal(false);
@@ -192,6 +200,9 @@ export class UserEdit implements OnInit {
   readonly roleHint = computed(() => (isUserRole(this.role()) ? ROLE_META[this.role()].hint : ''));
   readonly isMember = computed(() => this.role() === 'TENANT_USER');
   readonly defaultProfile = computed(() => this.profiles().find(p => p.defaultProfile) ?? null);
+  /** The profile picker's "none": the workspace default, by name when there is one. */
+  readonly defaultLabel = computed(() => 'Workspace default' + (this.defaultProfile() ? ' (' + this.defaultProfile()!.profileName + ')' : ''));
+  readonly profileOptions = computed<AdvancedOption[]>(() => this.profiles().map(profileOption));
   readonly name = computed(() => this.person()?.fullName || this.person()?.username || 'User');
 
   readonly managerOptions = computed<ComboboxOption[]>(() => {

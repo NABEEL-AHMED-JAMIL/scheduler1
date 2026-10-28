@@ -10,6 +10,8 @@ import { Team, TeamsApi } from '../../../core/teams/teams.api';
 import { AlertKindInfo, AlertRule, AlertScope, AlertsApi, ruleSentence } from './alerts.api';
 import { AuthService } from '../../../core/auth/auth.service';
 import { isOwnPlatformSignIn } from '../../../core/auth/workspace-data';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
+import { idValue } from '../../../shared/ui/advanced-options';
 
 export interface AlertRulePanelData {
   scope: AlertScope;
@@ -26,16 +28,15 @@ interface Schedule { jobId: number; jobName: string; }
  */
 @Component({
   selector: 'app-alert-rule-panel',
-  imports: [SidePanel, Icon, InlineStatus],
+  imports: [SidePanel, Icon, InlineStatus, AdvancedSelect],
   template: `
     <app-side-panel [heading]="draft().id ? 'Change the alert rule' : 'New alert rule'" [subtitle]="sentence()" data-test="alert-rule-panel">
       <div class="form-lock flex flex-col gap-4">
         <div>
           <label class="label" for="rule-kind">Watch for</label>
-          <select id="rule-kind" class="input" [value]="draft().kind" [disabled]="!!draft().id" (change)="setKind($any($event.target).value)"
-                  data-test="rule-kind">
-            @for (k of data.kinds; track k.kind) { <option [value]="k.kind">{{ k.label }}</option> }
-          </select>
+          <app-advanced-select id="rule-kind" data-test="rule-kind" [options]="kindOptions" [value]="draft().kind" [disabled]="!!draft().id"
+                               (valueChange)="setKind($event)" [showDescription]="false" searchLabel="Search what alerts can watch"
+                               unknownText="Not an alert this console knows" />
           @if (kindInfo(); as k) { <p class="field-note text-[color:var(--text-muted)]">What to do when it fires: {{ k.whatToDo }}</p> }
         </div>
         <div>
@@ -76,12 +77,14 @@ interface Schedule { jobId: number; jobName: string; }
         @if (data.scope === 'workspace') {
           <div>
             <label class="label" for="rule-job">Schedule</label>
-            <!-- Owner 2026-10-27: each option says whether it is the rule's own, so a schedule read after the select drew
-                 is still picked (a [value] on the select set before its options existed fell back to "Every schedule"). -->
-            <select id="rule-job" class="input" (change)="setJob($any($event.target).value)" data-test="rule-job">
-              <option value="" [selected]="draft().jobId == null">{{ schedulesState.pending() && draft().jobId != null ? 'Loading schedules…' : 'Every schedule of the workspace' }}</option>
-              @for (s of schedules(); track s.jobId) { <option [value]="s.jobId" [selected]="s.jobId === draft().jobId">{{ s.jobName }}</option> }
-            </select>
+            <!-- Owner 2026-10-27: a schedule read after the picker drew is still picked; while the list is on its way the picker
+                 says so, and a rule's schedule the workspace no longer lists is kept by its number and says so. -->
+            <app-advanced-select id="rule-job" data-test="rule-job" [options]="scheduleOptions()" [value]="idValue(draft().jobId)"
+                                 (valueChange)="setJob($event)" [allowClear]="true" clearLabel="Every schedule of the workspace"
+                                 placeholder="Every schedule of the workspace" searchLabel="Search the schedules"
+                                 searchPlaceholder="Search by name or number" [loading]="schedulesState.pending() && draft().jobId != null"
+                                 loadingText="Loading schedules…"
+                                 [emptyText]="schedulesState.error() ? 'The schedules could not be read.' : 'No schedule in this workspace yet.'" />
             <app-inline-status [loading]="schedulesState.loading()" [error]="schedulesState.error()" label="Loading schedules…"
                                (retry)="loadSchedules()" />
           </div>
@@ -183,6 +186,17 @@ export class AlertRulePanel implements OnInit {
   readonly saving = signal(false);
   readonly error = signal('');
 
+  /** What a rule can watch, from the server: each by name, what to do when it fires under it (the note below says it for the choice). */
+  readonly kindOptions: AdvancedOption[] = this.data.kinds.map(k => ({ value: k.kind, label: k.label, description: k.whatToDo || undefined, keywords: k.kind }));
+  /** The workspace's schedules by name and number; the rule's own, when the list no longer has it, kept by its number. */
+  readonly scheduleOptions = computed<AdvancedOption[]>(() => {
+    const list: AdvancedOption[] = this.schedules().map(j => ({ value: String(j.jobId), label: j.jobName, sample: '#' + j.jobId, keywords: String(j.jobId) }));
+    const own = this.draft().jobId;
+    return own != null && this.schedulesState.loaded() && !this.schedulesState.loading() && !list.some(o => o.value === String(own))
+      ? [...list, { value: String(own), label: `Schedule ${own}`, description: 'Not one of this workspace\'s schedules', badge: 'Not found', badgeTone: 'warn' }]
+      : list;
+  });
+  readonly idValue = idValue;
   readonly kindInfo = computed(() => this.data.kinds.find(k => k.kind === this.draft().kind) ?? null);
   readonly sentence = computed(() => ruleSentence(this.draft()));
   readonly needsThreshold = computed(() => ['RUN_FAILED', 'SERVICE_UNHEALTHY', 'MEMORY_HIGH', 'KAFKA_LAG', 'DISK_LOW'].includes(this.draft().kind));

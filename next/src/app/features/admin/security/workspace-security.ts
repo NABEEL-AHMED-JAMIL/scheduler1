@@ -12,7 +12,8 @@ import { copyText } from '../../../shared/ui/clipboard.util';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { AccountSecurityApi, SecurityPolicy, SecuritySettings } from '../../account/account-security.api';
 import { SignInHistory } from '../../account/sign-in-history';
-import { AccessProfile, AccessProfilesService } from '../access-profiles/access-profiles.service';
+import { AccessProfile, AccessProfilesService, profileOption } from '../access-profiles/access-profiles.service';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
 import { FlagChoice, RANGES, RulesDraft, draftOf, draftProblem, platformText, settingsOf } from './security-settings.model';
 import { SsoStarted, rememberFlow } from '../../login/sign-in.api';
 import { PageHeader } from '../../../shared/ui/page-header';
@@ -135,7 +136,7 @@ const RULE_FIELDS: { key: keyof RulesDraft; label: string; hint: string; flag?: 
 @Component({
   selector: 'app-workspace-security',
   imports: [WorkspaceSelect, ActionsBar, RefreshButton, PageHeader, Icon, CopyButton, ServerTimePipe, SignInHistory, AppLoading,
-    InlineStatus, LoadError, BlurLoader],
+    InlineStatus, LoadError, BlurLoader, AdvancedSelect],
   templateUrl: './workspace-security.html',
 })
 export class WorkspaceSecurity implements OnInit {
@@ -175,6 +176,16 @@ export class WorkspaceSecurity implements OnInit {
   readonly ssoError = signal('');
   readonly ssoTest = signal('');
   readonly profiles = signal<AccessProfile[]>([]);
+  /**
+   * SSO's "Their access profile": the workspace's profiles; a saved one the workspace no longer has is kept by its number
+   * and says so, rather than reading as the default.
+   */
+  readonly ssoProfileOptions = computed<AdvancedOption[]>(() => {
+    const list = this.profiles().map(profileOption);
+    const saved = this.ssoDraft().defaultProfileId;
+    return saved && this.profilesState.loaded() && !this.profilesState.loading() && !list.some(o => o.value === saved)
+      ? [...list, { value: saved, label: `Profile ${saved}`, description: 'Not in this workspace', badge: 'Not found', badgeTone: 'warn' }] : list;
+  });
   readonly copied = signal('');
   readonly nameIdFormats = NAME_ID_FORMATS;
   /** SAML: the metadata an administrator pastes, and the certificates the last read found. */

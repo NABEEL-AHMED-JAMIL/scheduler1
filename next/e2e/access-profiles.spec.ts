@@ -1,5 +1,6 @@
 import { test, expect, APIRequestContext } from '@playwright/test';
 import { api, authOf, canSignIn, NEEDS, pageAs, Session, sessionFor, sessionOf, signInWithPassword, tokenFor } from './support/session';
+import { pickOption } from './support/advanced-select';
 
 /**
  * Access profiles, end to end: a tenant administrator makes a profile and puts a person on it, and that
@@ -118,7 +119,7 @@ test.describe('access profiles', () => {
     await expect(adminPage).toHaveURL(/\/administration\/users\/\d+$/);
     const picker = adminPage.locator('#ue-profile');
     await expect(picker).toBeVisible();
-    await picker.selectOption({ label: PROFILE });
+    await pickOption(picker, { label: PROFILE });
     await expect(adminPage.getByTestId('user-preview')).toContainText('After you save');
     await adminPage.getByTestId('save-user').click();
     await expect(adminPage.getByText(/updated/i).first()).toBeVisible();

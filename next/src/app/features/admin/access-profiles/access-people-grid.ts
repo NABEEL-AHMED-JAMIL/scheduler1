@@ -4,7 +4,9 @@ import { Component, effect, signal, untracked, computed, input, output } from '@
 import { PageCatalogueEntry } from '../../../core/auth/page-keys';
 import { Icon } from '../../../shared/ui/icon';
 import { Avatar } from '../../../shared/ui/avatar';
-import { AccessPerson, AccessProfile } from './access-profiles.service';
+import { AccessPerson, AccessProfile, profileOption } from './access-profiles.service';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
+import { idValue } from '../../../shared/ui/advanced-options';
 
 /** One column group in the header: a menu section and the pages under it. */
 interface ColumnGroup { section: string; pages: PageCatalogueEntry[]; }
@@ -48,7 +50,7 @@ interface ProfileGroup {
  */
 @Component({
   selector: 'app-access-people-grid',
-  imports: [Icon, Avatar, Pagination],
+  imports: [Icon, Avatar, Pagination, AdvancedSelect],
   templateUrl: './access-people-grid.html',
 })
 export class AccessPeopleGrid {
@@ -85,6 +87,11 @@ export class AccessPeopleGrid {
   readonly columns = computed<PageCatalogueEntry[]>(() => this.groupsOfColumns().flatMap(group => group.pages));
 
   readonly defaultProfile = computed(() => this.profiles().find(p => p.defaultProfile) ?? null);
+  /** The row picker's "none": the workspace default, by name when there is one. */
+  readonly defaultLabel = computed(() => 'Default' + (this.defaultProfile() ? ' · ' + this.defaultProfile()!.profileName : ''));
+  /** The profiles a row may move its person to (one list for every row). */
+  readonly profileOptions = computed<AdvancedOption[]>(() => this.profiles().map(profileOption));
+  readonly idValue = idValue;
 
   private readonly matching = computed(() => {
     const needle = this.search().trim().toLowerCase();
@@ -163,8 +170,8 @@ export class AccessPeopleGrid {
    * current profile and moves only when the row comes back from the server -- a refused change
    * used to stay on screen, because nothing in the model had moved to redraw it.
    */
-  pick(person: AccessPerson, value: string, select?: HTMLSelectElement): void {
-    if (select) select.value = person.pageAccessProfileId == null ? '' : String(person.pageAccessProfileId);
+  pick(person: AccessPerson, value: string, select?: Pick<AdvancedSelect, 'value'>): void {
+    if (select) select.value.set(idValue(person.pageAccessProfileId));
     const id = Number(value);
     const profile = id > 0 ? (this.profiles().find(p => p.pageAccessProfileId === id) ?? null) : null;
     if ((profile?.pageAccessProfileId ?? null) === person.pageAccessProfileId) return;

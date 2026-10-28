@@ -14,6 +14,7 @@ import { AlertRules } from './alert-rules';
 import { Alert, AlertRule, PlannedDeploy, minutes, recommendedRules, ruleSentence } from './alerts.api';
 import { PlatformHealthView, backgroundChecks, deployNote, errorRate, statusWord, unplannedRestarts } from '../../admin/reliability/platform-health';
 import { notificationTarget, openableTarget } from '../../notifications/notification-links';
+import { advancedSelect } from '../../../shared/ui/advanced-select.testing';
 
 /** MIG-355: alerts and their rules -- the list, the open alerts with Resolve, the recommended rules, and the words. */
 
@@ -309,7 +310,10 @@ describe('Alert rule panel -- schedules and teams that could not be read (owner 
       .flush({ status: API_SUCCESS, message: '', data: [{ jobId: 41, jobName: 'A' }, { jobId: 42, jobName: 'B' }] });
     p.fixture.detectChanges();
     expect(p.page.schedulesState.loading()).toBe(false);
-    expect((p.el.querySelector('[data-test="rule-job"]') as HTMLSelectElement).value).toBe('42');
+    const job = advancedSelect(p.fixture, 'rule-job');
+    expect(job.value()).toBe('42');
+    expect(job.options().map(o => o.label)).toEqual(['A', 'B']);
+    expect(p.el.querySelector('#rule-job')!.textContent).toContain('B');
   });
 
   it('says the schedules and the teams could not be read, with Try again', () => {

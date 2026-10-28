@@ -10,7 +10,8 @@ import { FormDialog } from '../../../shared/ui/form-dialog';
 import { PhoneInput } from '../../../shared/ui/phone-input';
 import { AuthService } from '../../../core/auth/auth.service';
 import { ROLE_META, UserRole } from '../../../core/auth/auth.models';
-import { AccessProfile, AccessProfilesService } from '../access-profiles/access-profiles.service';
+import { AccessProfile, AccessProfilesService, profileOption } from '../access-profiles/access-profiles.service';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
 import { AccountSecurityApi, PasswordRules } from '../../account/account-security.api';
 import { PasswordRulesHint } from '../../account/password-rules';
 import { Section } from '../../../shared/ui/section';
@@ -45,7 +46,7 @@ export function grantableRoles(current: UserRole | undefined, self: boolean, pla
 
 @Component({
   selector: 'app-user-dialog',
-  imports: [Section, FormRow, PasswordRulesHint, ReactiveFormsModule, Field, FormDialog, PhoneInput, Combobox, InlineStatus],
+  imports: [Section, FormRow, PasswordRulesHint, ReactiveFormsModule, Field, FormDialog, PhoneInput, Combobox, InlineStatus, AdvancedSelect],
   templateUrl: './user-dialog.html',
 })
 export class UserDialog {
@@ -131,6 +132,9 @@ export class UserDialog {
 
   readonly defaultProfileName = computed(() =>
     this.accessProfiles().find(p => p.defaultProfile)?.profileName ?? '');
+  /** Page access's "none": the workspace default, by name when there is one. */
+  readonly defaultLabel = computed(() => 'Workspace default' + (this.defaultProfileName() ? ' (' + this.defaultProfileName() + ')' : ''));
+  readonly profileOptions = computed<AdvancedOption[]>(() => this.accessProfiles().map(profileOption));
 
   /** The workspace the form is for: the person's, or the one a platform administrator picks. */
   private readonly tenant = signal<number | null>(this.data.user?.tenantId ?? null);

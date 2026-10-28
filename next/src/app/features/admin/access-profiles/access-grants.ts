@@ -12,7 +12,9 @@ import { SortHeader } from '../../../shared/ui/sort-header';
 import { AppLoading, InlineStatus, createLoadState, loadErrorText } from '../../../shared/ui/loading';
 import { LoadError } from '../../../shared/ui/load-error';
 import { BlurLoader } from '../../../shared/ui/blur-loader';
-import { AccessChange, AccessPerson, AccessProfilesService, Delegation, EffectiveAccess } from './access-profiles.service';
+import { AccessChange, AccessPerson, AccessProfilesService, Delegation, EffectiveAccess, accessPersonOption } from './access-profiles.service';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
+import { idOf, idValue } from '../../../shared/ui/advanced-options';
 
 type GrantsView = 'person' | 'delegates' | 'changes';
 
@@ -82,7 +84,7 @@ function stamp(value: string | null | undefined): string {
  */
 @Component({
   selector: 'app-access-grants',
-  imports: [Icon, SortHeader, AppLoading, InlineStatus, LoadError, BlurLoader],
+  imports: [Icon, SortHeader, AppLoading, InlineStatus, LoadError, BlurLoader, AdvancedSelect],
   template: `
     <section class="card p-4 flex flex-col gap-4" data-testid="access-grants" aria-labelledby="grants-title">
       <div class="flex flex-wrap items-center gap-3">
@@ -105,12 +107,11 @@ function stamp(value: string | null | undefined): string {
         <div class="flex flex-wrap items-end gap-3">
           <label class="flex flex-col gap-1 text-sm">
             <span class="font-medium">Person</span>
-            <select class="input input-sm min-w-64" data-testid="grant-person" (focus)="needPeople.emit()" (pointerdown)="needPeople.emit()" (change)="pick(+$any($event.target).value || null)">
-              <option value="">{{ peopleLoading() ? 'Loading people…' : peopleEmpty() ? 'No member to choose' : 'Choose a member' }}</option>
-              @for (p of people(); track p.appUserId) {
-                <option [value]="p.appUserId" [selected]="personId() === p.appUserId">{{ p.fullName || p.username }}</option>
-              }
-            </select>
+            <app-advanced-select class="min-w-64" [compact]="true" data-testid="grant-person" ariaLabel="Person" [options]="personOptions()"
+                                 [value]="idValue(personId())" (valueChange)="pick(idOf($event))" (focusin)="needPeople.emit()" (pointerdown)="needPeople.emit()"
+                                 [placeholder]="peopleEmpty() ? 'No member to choose' : 'Choose a member'" searchLabel="Search the people"
+                                 searchPlaceholder="Search by name, sign-in or position" [loading]="peopleLoading()" loadingText="Loading people…"
+                                 [emptyText]="peopleEmptyText()" panelWidth="26rem" />
             <!-- Owner 2026-10-27: the list is the page's read; say it is coming, that it failed, or that it is empty. -->
             <app-inline-status [loading]="peopleLoading()" [error]="peopleError()" [empty]="peopleEmpty()"
                                label="Loading people…" emptyText="No member to choose in this workspace yet." (retry)="needPeople.emit()" />
@@ -176,10 +177,11 @@ function stamp(value: string | null | undefined): string {
           <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4 items-end">
             <label class="flex flex-col gap-1 text-sm">
               <span class="font-medium">Member who may grant</span>
-              <select class="input input-sm" (focus)="needPeople.emit()" (pointerdown)="needPeople.emit()" (change)="draftDelegate.set(+$any($event.target).value || null)" data-testid="delegate-person">
-                <option value="">{{ peopleLoading() ? 'Loading people…' : peopleEmpty() ? 'No member to choose' : 'Choose a member' }}</option>
-                @for (p of people(); track p.appUserId) { <option [value]="p.appUserId">{{ p.fullName || p.username }}</option> }
-              </select>
+              <app-advanced-select [compact]="true" data-testid="delegate-person" ariaLabel="Member who may grant" [options]="personOptions()"
+                                   [value]="idValue(draftDelegate())" (valueChange)="draftDelegate.set(idOf($event))" (focusin)="needPeople.emit()"
+                                   (pointerdown)="needPeople.emit()" [placeholder]="peopleEmpty() ? 'No member to choose' : 'Choose a member'"
+                                   searchLabel="Search the people" searchPlaceholder="Search by name, sign-in or position" [loading]="peopleLoading()"
+                                   loadingText="Loading people…" [emptyText]="peopleEmptyText()" panelWidth="26rem" />
               <app-inline-status [loading]="peopleLoading()" [error]="peopleError()" [empty]="peopleEmpty()"
                                  label="Loading people…" emptyText="No member to choose in this workspace yet." (retry)="needPeople.emit()" />
             </label>
@@ -309,6 +311,13 @@ export class AccessGrants {
   readonly peopleError = input('');
   readonly peopleLoaded = input(true);
   readonly peopleEmpty = computed(() => this.peopleLoaded() && !this.peopleLoading() && !this.peopleError() && !this.people().length);
+  /** The people as the two person pickers list them: the name, the sign-in name, position and profile under it. */
+  readonly personOptions = computed<AdvancedOption[]>(() => this.people().map(accessPersonOption));
+  /** What an empty person list says: why it could not be read, that it is still to come, or that there is nobody. */
+  readonly peopleEmptyText = computed(() => this.peopleError() ? 'The people could not be read.'
+    : this.peopleLoaded() ? 'No member to choose in this workspace yet.' : 'Loading people…');
+  readonly idValue = idValue;
+  readonly idOf = idOf;
   /** Asked the first time a person is to be chosen: the page reads its people then, not before (a big workspace's list). */
   readonly needPeople = output<void>();
 

@@ -15,6 +15,7 @@ export const PINNED: Record<string, unknown> = {
     ],
     "buttons": [
       "Columns",
+      "Filter by staff member",
       "Grant",
       "Granted",
       "Refresh",
@@ -36,7 +37,6 @@ export const PINNED: Record<string, unknown> = {
     ],
     "fields": [
       "All workspaces",
-      "Filter by staff member",
       "Include revoked",
       "Workspace"
     ],
@@ -63,6 +63,7 @@ export const PINNED: Record<string, unknown> = {
       "Activity"
     ],
     "buttons": [
+      "Filter by staff member",
       "Load older",
       "Refresh",
       "Service",
@@ -78,8 +79,7 @@ export const PINNED: Record<string, unknown> = {
       ]
     ],
     "fields": [
-      "Changes or data reads",
-      "Filter by staff member"
+      "Changes or data reads"
     ],
     "links": [
       "/administration",
@@ -166,6 +166,7 @@ export const PINNED: Record<string, unknown> = {
     ],
     "buttons": [
       "Columns",
+      "Filter by staff member",
       "Load older",
       "Refresh",
       "Service",
@@ -185,7 +186,6 @@ export const PINNED: Record<string, unknown> = {
     "fields": [
       "All workspaces",
       "Changes or data reads",
-      "Filter by staff member",
       "Workspace"
     ],
     "links": [

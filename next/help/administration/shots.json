@@ -91,7 +91,7 @@
     "press": "Escape"
    },
    {
-    "select": [
+    "pick": [
      "[data-testid=grant-person]",
      {
       "label": "Dr. Anika Patel"

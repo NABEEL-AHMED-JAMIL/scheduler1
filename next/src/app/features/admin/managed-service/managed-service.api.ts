@@ -3,6 +3,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { API_BASE, ApiResponse } from '../../../core/api/api.config';
 import { AuthUser, ManagementMode } from '../../../core/auth/auth.models';
+import { AdvancedOption } from '../../../shared/ui/advanced-select';
 
 /** A managed-service grant (identity-service managed_service_grant): staff member X may manage workspace Y. */
 export interface ManagedGrant {
@@ -138,6 +139,12 @@ export function staffOf(users: StaffCandidate[]): StaffCandidate[] {
   return users
     .filter(u => u.userRole === 'PLATFORM_ADMIN' && u.status === 'Active' && (u.tenantId === null || u.tenantId === undefined))
     .sort((a, b) => (a.fullName || a.username).localeCompare(b.fullName || b.username));
+}
+
+/** A staff member as the advanced selects list them: the name as the lists show it, the sign-in name under it. */
+export function staffOption(s: StaffCandidate): AdvancedOption {
+  const name = personName(s);
+  return { value: String(s.appUserId), label: name, description: s.username && s.username !== name ? s.username : undefined, keywords: s.username };
 }
 
 /** A person's name as the lists show it: full name, else the sign-in name, else their number. */

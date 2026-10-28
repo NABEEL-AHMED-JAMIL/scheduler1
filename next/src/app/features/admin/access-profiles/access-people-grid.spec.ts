@@ -6,6 +6,7 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { PageCatalogueEntry } from '../../../core/auth/page-keys';
 import { AccessPerson, AccessProfile } from './access-profiles.service';
 import { AccessPeopleGrid } from './access-people-grid';
+import { advancedSelect } from '../../../shared/ui/advanced-select.testing';
 
 const PAGES: PageCatalogueEntry[] = [
   { key: 'jobs', label: 'Source Jobs', section: 'Pipelines', route: '/operations/jobs' },
@@ -149,7 +150,7 @@ describe('AccessPeopleGrid profile select', () => {
     fixture.componentRef.setInput('pages', PAGES);
     fixture.componentRef.setInput('search', '');
     fixture.detectChanges();
-    const select = (fixture.nativeElement as HTMLElement).querySelector<HTMLSelectElement>('.access-grid-profile select')!;
+    const select = advancedSelect(fixture, '.access-grid-profile app-advanced-select');
     return { fixture, select };
   }
 
@@ -159,24 +160,23 @@ describe('AccessPeopleGrid profile select', () => {
     const emitted: unknown[] = [];
     fixture.componentInstance.assign.subscribe(e => emitted.push(e));
 
-    select.value = '3';
-    select.dispatchEvent(new Event('change'));
+    expect(select.options().map(o => o.label)).toEqual(['Operator', 'Analyst', 'Compliance']);
+    select.choose('3');
     fixture.detectChanges();
 
     expect(emitted).toHaveLength(1);
-    expect(select.value).toBe('2');
+    expect(select.value()).toBe('2');
   });
 
   it('moves once the row comes back with the new profile', () => {
     const ada = person(5, 'Ada King', 2, 'Analyst', ['jobs', 'queue', 'reports']);
     const { fixture, select } = rendered([ada]);
-    select.value = '3';
-    select.dispatchEvent(new Event('change'));
+    select.choose('3');
 
     fixture.componentRef.setInput('people', [{ ...ada, pageAccessProfileId: 3, pageAccessProfileName: 'Compliance' }]);
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.querySelector('.access-grid-profile select').value).toBe('3');
+    expect(advancedSelect(fixture, '.access-grid-profile app-advanced-select').value()).toBe('3');
   });
 });
 

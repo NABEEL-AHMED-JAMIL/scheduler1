@@ -55,14 +55,9 @@
         }
       </select>
       @if (profileOptions().length || anyOnDefault()) {
-        <select class="input max-w-44" [value]="profileFilter()" aria-label="Filter by access profile"
-                (change)="profileFilter.set($any($event.target).value); pager.reset()">
-          <option value="">All access</option>
-          @if (anyOnDefault()) { <option value="default">On the default</option> }
-          @for (name of profileOptions(); track name) {
-            <option [value]="name">{{ name }}</option>
-          }
-        </select>
+        <app-advanced-select class="w-44" ariaLabel="Filter by access profile" [options]="profileFilterOptions()" [value]="profileFilter()"
+                             (valueChange)="profileFilter.set($event); pager.reset()" [allowClear]="true" clearLabel="All access"
+                             placeholder="All access" searchLabel="Search the access profiles" panelWidth="18rem" />
       }
       <select class="input max-w-32" [value]="statusFilter()" aria-label="Filter by state"
               (change)="statusFilter.set($any($event.target).value); pager.reset()">

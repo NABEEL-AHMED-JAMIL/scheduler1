@@ -9,6 +9,7 @@ import { AccessDelegation } from '../../../core/auth/access-delegation';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { AccessGrants, actionLabel } from './access-grants';
 import { AccessPerson, AccessProfilesService } from './access-profiles.service';
+import { advancedSelect, chooseAdvanced } from '../../../shared/ui/advanced-select.testing';
 
 /** F3 (MIG-400): granting pages and tabs to a person, delegating, and the change log. */
 
@@ -63,11 +64,14 @@ function choose(el: HTMLElement, selector: string, value: string) {
 describe('Grant pages and tabs', () => {
   it('shows a person\'s pages with their tabs, and opens one tab for 30 days with a reason', async () => {
     const { fixture, el, api } = mount();
+    // The person picker lists each member by name, their sign-in name under it.
+    expect(advancedSelect(fixture, '[data-testid="grant-person"]').options().map(o => [o.label, o.description]))
+      .toEqual([['Ana Analyst', 'ana@x'], ['Ben Clerk', 'ben@x']]);
     choose(el, '[data-testid="grant-days"]', '30');
     const reason = el.querySelector('[data-testid="grant-reason"]') as HTMLInputElement;
     reason.value = 'month-end close';
     reason.dispatchEvent(new Event('input'));
-    choose(el, '[data-testid="grant-person"]', '41');
+    chooseAdvanced(fixture, '[data-testid="grant-person"]', '41');
     fixture.detectChanges();
     await fixture.whenStable();
     expect(api.effective).toHaveBeenCalledWith(41);
@@ -84,7 +88,7 @@ describe('Grant pages and tabs', () => {
     fixture.detectChanges();
     expect(fixture.componentInstance.asked).toBeGreaterThan(0);
     expect(el.querySelector('[data-testid="delegate-list"]')!.textContent).toContain('Ben Clerk');
-    choose(el, '[data-testid="delegate-person"]', '42');
+    chooseAdvanced(fixture, '[data-testid="delegate-person"]', '42');
     choose(el, '[data-testid="delegate-scope"]', 'LISTED');
     fixture.detectChanges();
     (el.querySelector('[data-testid="delegate-people"] input') as HTMLInputElement).click();
@@ -103,7 +107,7 @@ describe('Grant pages and tabs', () => {
   it('shows a delegate only what they may grant, no Delegates view, and their own changes', async () => {
     const { fixture, el, api } = mount({ delegateId: 7, grantableKeys: ['jobs', 'jobs:schedules', 'jobs:backfills'], scopePeople: 'LISTED', people: [41] });
     expect(el.querySelector('[data-testid="view-delegates"]')).toBeNull();
-    choose(el, '[data-testid="grant-person"]', '41');
+    chooseAdvanced(fixture, '[data-testid="grant-person"]', '41');
     fixture.detectChanges();
     await fixture.whenStable();
     expect(el.querySelector('[data-page="jobs"]')).not.toBeNull();
@@ -203,7 +207,7 @@ describe('Grant pages and tabs -- loading, empty, error (owner 2026-10-27)', () 
 
   it('says a person\'s access could not be read, with a way to try again', () => {
     const { fixture, el } = mount(null, { effective: () => throwError(() => new HttpErrorResponse({ status: 500 })) });
-    choose(el, '[data-testid="grant-person"]', '41');
+    chooseAdvanced(fixture, '[data-testid="grant-person"]', '41');
     fixture.detectChanges();
     expect(grantsOf(fixture).accessError()).toBe('Their access could not be read.');
     expect(el.textContent).toContain('Try again');

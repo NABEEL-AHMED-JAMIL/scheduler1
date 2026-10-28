@@ -12,7 +12,9 @@ import { Icon } from '../../../shared/ui/icon';
 import { StatTile } from '../../../shared/ui/stat-tile';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { confirmWith } from '../../../shared/ui/confirm';
-import { AccessPerson, AccessProfile, AccessProfilesService } from './access-profiles.service';
+import { AccessPerson, AccessProfile, AccessProfilesService, accessPersonOption } from './access-profiles.service';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
+import { idOf, idValue } from '../../../shared/ui/advanced-options';
 import { AccessPeopleGrid } from './access-people-grid';
 import { AccessGrants } from './access-grants';
 import { AccessDelegation } from '../../../core/auth/access-delegation';
@@ -35,7 +37,7 @@ interface CardSection { section: string; opens: string[]; withholds: string[]; }
  */
 @Component({
   selector: 'app-access-profiles',
-  imports: [WorkspaceSelect, RefreshButton, PageHeader, Icon, StatTile, CdkMenu, CdkMenuItem, CdkMenuTrigger, AccessPeopleGrid, AccessGrants, NeedsWorkspace, AppLoading, InlineStatus, LoadError],
+  imports: [WorkspaceSelect, RefreshButton, PageHeader, Icon, StatTile, CdkMenu, CdkMenuItem, CdkMenuTrigger, AccessPeopleGrid, AccessGrants, NeedsWorkspace, AppLoading, InlineStatus, LoadError, AdvancedSelect],
   templateUrl: './access-profiles.html',
 })
 export class AccessProfiles implements OnInit {
@@ -61,6 +63,10 @@ export class AccessProfiles implements OnInit {
   readonly profiles = signal<AccessProfile[]>([]);
   readonly pages = signal<PageCatalogueEntry[]>([]);
   readonly people = signal<AccessPerson[]>([]);
+  /** "Check a person": the people by name, their sign-in name, position and profile under it. */
+  readonly personOptions = computed<AdvancedOption[]>(() => this.people().map(accessPersonOption));
+  readonly idValue = idValue;
+  readonly idOf = idOf;
   readonly view = signal<'profiles' | 'people'>('profiles');
   readonly search = signal('');
   /** The search as the grid reads it, 250 ms after the last keystroke (P2 #34): every key re-drew the whole matrix. */

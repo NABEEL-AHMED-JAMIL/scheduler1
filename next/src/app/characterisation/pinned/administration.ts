@@ -78,6 +78,7 @@ export const PINNED: Record<string, unknown> = {
       "Delegates",
       "New profile",
       "People × pages",
+      "Person",
       "Profiles",
       "Refresh",
       "See in grid ›"
@@ -121,6 +122,8 @@ export const PINNED: Record<string, unknown> = {
       "Delegates",
       "New profile",
       "People × pages",
+      "Person",
+      "Profile for Casey Baseline",
       "Profiles",
       "Refresh"
     ],
@@ -145,8 +148,7 @@ export const PINNED: Record<string, unknown> = {
       "Find a person",
       "Find a person…",
       "ForUntil removed7 days30 days90 days",
-      "PersonChoose a memberCasey Baseline",
-      "Profile for Casey Baseline",
+      "PersonChoose a member",
       "Reason (kept in the change log)",
       "Source Jobs for Casey Baseline",
       "Source Tasks for Casey Baseline"

@@ -82,10 +82,11 @@
           <button type="button" class="btn btn-default btn-sm" (click)="openPreview()" data-testid="check-person"><app-icon name="eye" />Check a person</button>
         } @else {
           <label for="access-preview-person" class="text-sm font-medium">Check a person</label>
-          <select id="access-preview-person" class="input input-sm w-auto max-w-72" [disabled]="peopleLoading()" (change)="previewId.set(+$any($event.target).value || null)">
-            <option value="">{{ peopleLoading() ? 'Loading people…' : 'Choose a member' }}</option>
-            @for (p of people(); track p.appUserId) { <option [value]="p.appUserId" [selected]="previewId() === p.appUserId" [title]="p.fullName || p.username">{{ p.fullName || p.username }}</option> }
-          </select>
+          <app-advanced-select id="access-preview-person" class="min-w-56 max-w-72" [compact]="true" [options]="personOptions()" [disabled]="peopleLoading()"
+                               [value]="idValue(previewId())" (valueChange)="previewId.set(idOf($event))" placeholder="Choose a member"
+                               searchLabel="Search the people" searchPlaceholder="Search by name, sign-in or position" [loading]="peopleLoading()"
+                               loadingText="Loading people…" [emptyText]="peopleError() ? 'The people could not be read.' : 'No member in this workspace yet.'"
+                               panelWidth="26rem" />
         }
       </div>
       @if (previewOpen()) {

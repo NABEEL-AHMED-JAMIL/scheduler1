@@ -257,12 +257,11 @@
               @if (ssoDraft().userCreation === 'JIT') {
                 <div class="field">
                   <label class="label" for="sso-profile">Their access profile</label>
-                  <select id="sso-profile" class="input" [value]="ssoDraft().defaultProfileId" (change)="setSso('defaultProfileId', $any($event.target).value)">
-                    <option value="" [selected]="!ssoDraft().defaultProfileId">The workspace default</option>
-                    @for (p of profiles(); track p.pageAccessProfileId) {
-                      <option [value]="'' + p.pageAccessProfileId" [selected]="ssoDraft().defaultProfileId === '' + p.pageAccessProfileId">{{ p.profileName }}</option>
-                    }
-                  </select>
+                  <app-advanced-select id="sso-profile" [options]="ssoProfileOptions()" [value]="ssoDraft().defaultProfileId"
+                                       (valueChange)="setSso('defaultProfileId', $event)" [allowClear]="true" clearLabel="The workspace default"
+                                       placeholder="The workspace default" searchLabel="Search the access profiles"
+                                       [loading]="profilesState.loading()" loadingText="Loading access profiles…"
+                                       [emptyText]="profilesState.error() ? 'The access profiles could not be read.' : 'No access profile in this workspace yet.'" />
                   <app-inline-status [loading]="profilesState.loading()" [error]="profilesState.error()" label="Loading access profiles…"
                                      (retry)="loadProfiles()" />
                 </div>

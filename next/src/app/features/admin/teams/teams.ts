@@ -21,6 +21,8 @@ import { MAX_WORKFLOWS, TeamUsage, TeamUsageReader, TeamUse, USE_LABELS, usageSu
 import { createTableSort } from '../../../shared/ui/sort';
 import { SortHeader } from '../../../shared/ui/sort-header';
 import { AppLoading, InlineStatus, createLoadState } from '../../../shared/ui/loading';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
+import { idOf, idValue, personOption } from '../../../shared/ui/advanced-options';
 
 /** The members drawn in a row's avatar stack; the rest are "+N". */
 const STACK = 4;
@@ -41,7 +43,7 @@ const STACK = 4;
 @Component({
   selector: 'app-teams',
   imports: [PageHeader, RefreshButton, StatStrip, Icon, TableShell, Pagination, Avatar, SidePanel, RouterLink, ServerTimePipe, SortHeader,
-    AppLoading, InlineStatus],
+    AppLoading, InlineStatus, AdvancedSelect],
   templateUrl: './teams.html',
   styles: `
     /* A row opens its team: the whole row is the target, the name is its keyboard button. */
@@ -113,14 +115,29 @@ export class Teams implements OnInit {
   readonly maxWorkflows = MAX_WORKFLOWS;
   readonly stack = STACK;
 
-  /** Everyone who leads or is in a team now, for the filters: by name. */
-  private peopleIn(role: TeamRole | null): { id: number; name: string }[] {
-    const seen = new Map<number, string>();
-    for (const t of this.teams()) for (const m of t.members) if (!role || m.teamRole === role) seen.set(m.appUserId, this.nameOf(m));
-    return [...seen].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+  /**
+   * Everyone who leads or is in a team now, for the filters: by name, their sign-in name and how many teams they lead or
+   * are in under it.
+   */
+  private peopleIn(role: TeamRole | null): AdvancedOption[] {
+    const seen = new Map<number, { name: string; username: string; teams: number }>();
+    for (const t of this.teams()) {
+      for (const m of t.members) {
+        if (role && m.teamRole !== role) continue;
+        const known = seen.get(m.appUserId);
+        seen.set(m.appUserId, { name: this.nameOf(m), username: m.username ?? '', teams: (known?.teams ?? 0) + 1 });
+      }
+    }
+    const verb = role === 'LEAD' ? 'Leads' : 'In';
+    return [...seen].sort((a, b) => a[1].name.localeCompare(b[1].name)).map(([id, p]) =>
+      personOption(id, { fullName: p.name, username: p.username }, `${verb} ${p.teams} team${p.teams === 1 ? '' : 's'}`));
   }
-  readonly leadOptions = computed(() => this.peopleIn('LEAD'));
-  readonly memberOptions = computed(() => this.peopleIn(null));
+  /** The lead filter: teams without a lead first, then each lead. */
+  readonly leadOptions = computed<AdvancedOption[]>(() => [{ value: 'none', label: 'Without a lead' },
+    ...this.peopleIn('LEAD').map(o => ({ ...o, group: 'Leads' }))]);
+  readonly memberOptions = computed<AdvancedOption[]>(() => this.peopleIn(null));
+  readonly idValue = idValue;
+  readonly idOf = idOf;
 
   readonly filtered = computed(() => {
     const q = this.search().trim().toLowerCase();
@@ -167,6 +184,8 @@ export class Teams implements OnInit {
     const inIt = new Set((team?.members ?? []).map(m => m.appUserId));
     return this.people().filter(p => !inIt.has(p.userId));
   });
+  /** "Add a person": the workspace's people not in the team yet, by name with their sign-in name. */
+  readonly addableOptions = computed<AdvancedOption[]>(() => this.addable().map(p => personOption(p.userId, p)));
 
   readonly cards = computed<StatStripItem[]>(() => {
     const s = this.stats();

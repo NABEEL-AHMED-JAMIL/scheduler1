@@ -3,6 +3,8 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { API_BASE, ApiResponse } from '../../../core/api/api.config';
 import { PageCatalogueEntry, PageKey, TabKey } from '../../../core/auth/page-keys';
+import { AdvancedOption } from '../../../shared/ui/advanced-select';
+import { personOption } from '../../../shared/ui/advanced-options';
 
 /** An access profile as /pageAccess.json serves it. */
 export interface AccessProfile {
@@ -48,6 +50,31 @@ export interface AccessPerson {
   twoFactorEnabled?: boolean;
   twoFactorRequired?: boolean;
   twoFactorRequiredBy?: 'workspace' | 'profile' | null;
+}
+
+/**
+ * A person as the advanced selects of this area list them (owner 2026-10-27, "all select should be advance"): the name,
+ * then the sign-in name, position and access profile under it; someone not active says so.
+ */
+export function accessPersonOption(p: AccessPerson): AdvancedOption {
+  const o = personOption(p.appUserId, { fullName: p.fullName, username: p.username, role: p.position ?? null },
+    p.pageAccessProfileName ? `Profile: ${p.pageAccessProfileName}` : '');
+  return p.status && p.status !== 'Active' ? { ...o, badge: p.status, badgeTone: 'neutral' } : o;
+}
+
+/**
+ * An access profile as the advanced selects list it: its name, its description and how many pages it opens under it,
+ * the workspace's default marked.
+ */
+export function profileOption(p: Pick<AccessProfile, 'pageAccessProfileId' | 'profileName' | 'description' | 'defaultProfile' | 'pageKeys'>): AdvancedOption {
+  const pages = p.pageKeys?.length ?? 0;
+  return {
+    value: String(p.pageAccessProfileId),
+    label: p.profileName,
+    description: [p.description ?? '', `Opens ${pages} page${pages === 1 ? '' : 's'}`].filter(Boolean).join(' · '),
+    badge: p.defaultProfile ? 'Default' : undefined,
+    badgeTone: 'neutral',
+  };
 }
 
 /** What the dialog sends: the id only on an edit. */

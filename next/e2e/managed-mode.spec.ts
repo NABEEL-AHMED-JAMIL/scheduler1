@@ -1,5 +1,6 @@
 import { test, expect, Browser, Page, Route, TestInfo } from '@playwright/test';
 import { openFromMenu } from './support/menu';
+import { pickOption } from './support/advanced-select';
 import { hasToken, NEEDS, tokenFor } from './support/session';
 import { join } from 'path';
 import { LIVE, LIVE_IDS } from '../src/app/characterisation/fixtures.live';
@@ -201,8 +202,8 @@ test.describe('MIG-254: a platform administrator (faked; the owner\'s account is
     await expect(page.getByRole('cell', { name: /Sam Staff/ }).first()).toBeVisible();
     await page.getByRole('button', { name: 'Grant', exact: true }).click();
     const grant = page.getByRole('dialog');
-    await grant.getByLabel('Staff member').selectOption({ label: 'Sam Staff (staff@example.com)' });
-    await grant.getByLabel('Workspace').selectOption({ label: 'Claude Demo' });
+    await pickOption(grant.getByLabel('Staff member'), { label: 'Sam Staff' });
+    await pickOption(grant.getByLabel('Workspace'), { label: 'Claude Demo' });
     await shot(page, info, 'managed-service-grant');
     await grant.getByRole('button', { name: 'Grant', exact: true }).click();
     await expect(page.getByText('Granted.')).toBeVisible();

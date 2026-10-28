@@ -23,11 +23,11 @@
                    [emptyMessage]="hasFilters() ? 'No grant matches those filters.' : 'No live grants. Grant a staff member a workspace to let them work in it.'"
                    emptyIcon="briefcase" (retry)="load()">
     <ng-container toolbar>
-      <select class="input max-w-48 min-w-0" aria-label="Filter by staff member" [value]="staffFilter() ?? ''"
-              (change)="setStaff($any($event.target).value)">
-        <option value="">{{ staffState.loading() ? 'Loading staff…' : 'Every staff member' }}</option>
-        @for (s of staff(); track s.appUserId) { <option [value]="s.appUserId">{{ name(s) }}</option> }
-      </select>
+      <app-advanced-select class="w-48 min-w-0" [compact]="true" ariaLabel="Filter by staff member" [options]="staffOptions()"
+                           [value]="idValue(staffFilter())" (valueChange)="setStaff($event)" [allowClear]="true" clearLabel="Every staff member"
+                           placeholder="Every staff member" searchLabel="Search the staff" searchPlaceholder="Search by name or sign-in"
+                           [loading]="staffState.loading()" loadingText="Loading staff…" panelWidth="20rem"
+                           [emptyText]="staffState.error() ? 'The staff could not be read.' : 'No active platform administrator yet.'" />
       @if (staffState.error()) { <app-inline-status [error]="staffState.error()" (retry)="loadStaff()" /> }
       @if (tenantsState.error()) { <app-inline-status [error]="tenantsState.error()" (retry)="loadTenants()" /> }
       <label class="inline-flex items-center gap-1.5 text-sm whitespace-nowrap">

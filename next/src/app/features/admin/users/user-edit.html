@@ -116,12 +116,9 @@
                 @if (isMember()) {
                   @if (profiles().length) {
                     <app-field label="Page access profile" for="ue-profile" hint="Which pages they open. Profiles are made on Page access.">
-                      <select id="ue-profile" class="input" formControlName="pageAccessProfileId" data-test="profile-picker">
-                        <option [ngValue]="null">Workspace default{{ defaultProfile() ? ' (' + defaultProfile()!.profileName + ')' : '' }}</option>
-                        @for (profile of profiles(); track profile.pageAccessProfileId) {
-                          <option [ngValue]="profile.pageAccessProfileId">{{ profile.profileName }}</option>
-                        }
-                      </select>
+                      <app-advanced-select id="ue-profile" formControlName="pageAccessProfileId" data-test="profile-picker" [numeric]="true"
+                                           [options]="profileOptions()" [allowClear]="true" [clearLabel]="defaultLabel()" [placeholder]="defaultLabel()"
+                                           searchLabel="Search the access profiles" />
                     </app-field>
                   } @else if (profilesState.pending() || profilesState.error()) {
                     <app-inline-status [loading]="profilesState.pending()" [error]="profilesState.error()" label="Loading access profiles…"
@@ -166,10 +163,9 @@
                     }
                     @if (!readOnly() && joinable().length) {
                       <div class="flex flex-wrap items-center gap-2">
-                        <select class="input input-sm w-auto" aria-label="Add them to a team" (change)="joinTeamId.set(+$any($event.target).value || null)" data-test="join-team">
-                          <option value="" [selected]="joinTeamId() === null">Add to a team…</option>
-                          @for (t of joinable(); track t.teamId) { <option [value]="t.teamId" [selected]="joinTeamId() === t.teamId">{{ t.name }}</option> }
-                        </select>
+                        <app-advanced-select class="w-60" [compact]="true" ariaLabel="Add them to a team" data-test="join-team" [options]="joinOptions()"
+                                             [value]="idValue(joinTeamId())" (valueChange)="joinTeamId.set(idOf($event))" placeholder="Add to a team…"
+                                             searchLabel="Search the teams" panelWidth="22rem" />
                         <button type="button" class="btn btn-default btn-sm" (click)="joinTeam()" [disabled]="!joinTeamId() || teamBusy()" data-test="join-team-add">Add</button>
                       </div>
                     }

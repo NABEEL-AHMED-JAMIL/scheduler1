@@ -7,6 +7,8 @@ import { refusal } from '../../../shared/ui/bulk/bulk.model';
 import { RetentionApi } from './retention.api';
 import { InlineStatus, createLoadState } from '../../../shared/ui/loading';
 import { RetentionHold } from './retention.model';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
+import { idOf, idValue } from '../../../shared/ui/advanced-options';
 
 export interface RetentionHoldPanelData {
   tenantId: number | null;
@@ -21,7 +23,7 @@ type Scope = 'WORKSPACE' | 'PIPELINE' | 'RUN';
  */
 @Component({
   selector: 'app-retention-hold-panel',
-  imports: [SidePanel, Icon, InlineStatus],
+  imports: [SidePanel, Icon, InlineStatus, AdvancedSelect],
   template: `
     <app-side-panel heading="Place a legal hold" subtitle="Nothing in its scope is removed while it is on" data-test="retention-hold-panel">
       <div class="form-lock flex flex-col gap-4">
@@ -40,10 +42,10 @@ type Scope = 'WORKSPACE' | 'PIPELINE' | 'RUN';
         @if (scope() === 'PIPELINE') {
           <div>
             <label class="label" for="hold-job">Pipeline</label>
-            <select id="hold-job" class="input" [value]="jobId() ?? ''" (change)="jobId.set(+$any($event.target).value || null)" data-test="hold-job">
-              <option value="">{{ pipelinesState.loading() ? 'Loading pipelines…' : 'Choose a pipeline' }}</option>
-              @for (p of pipelines(); track p.jobId) { <option [value]="p.jobId">{{ p.jobName }} (#{{ p.jobId }})</option> }
-            </select>
+            <app-advanced-select id="hold-job" data-test="hold-job" [options]="pipelineOptions()" [value]="idValue(jobId())"
+                                 (valueChange)="jobId.set(idOf($event))" placeholder="Choose a pipeline" searchLabel="Search the pipelines"
+                                 searchPlaceholder="Search by name or number" [loading]="pipelinesState.loading()" loadingText="Loading pipelines…"
+                                 [emptyText]="pipelinesState.error() ? 'The pipelines could not be read.' : 'No pipeline in this workspace yet.'" />
             <!-- Owner 2026-10-27: the list's state under the field -- a failed read left an empty list and a disabled
                  Place with no word. -->
             <app-inline-status [loading]="pipelinesState.loading()" [error]="pipelinesState.error()"
@@ -85,6 +87,11 @@ export class RetentionHoldPanel implements OnInit {
   readonly runId = signal<number | null>(null);
   readonly reason = signal('');
   readonly pipelines = signal<{ jobId: number; jobName: string }[]>([]);
+  /** The pipelines a hold may cover, each with its number (the run pages and the API name it by it). */
+  readonly pipelineOptions = computed<AdvancedOption[]>(() => this.pipelines().map(p => ({
+    value: String(p.jobId), label: p.jobName, sample: '#' + p.jobId, keywords: String(p.jobId) })));
+  readonly idValue = idValue;
+  readonly idOf = idOf;
   readonly saving = signal(false);
   readonly error = signal('');
   readonly pipelinesState = createLoadState();
