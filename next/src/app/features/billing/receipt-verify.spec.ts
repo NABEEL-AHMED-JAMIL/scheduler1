@@ -1,6 +1,10 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
+import { HttpErrorResponse } from '@angular/common/http';
+import { NEVER, Observable, of, throwError } from 'rxjs';
+import { BillingApi } from './billing.service';
 import { TestBed } from '@angular/core/testing';
-import { ReceiptVerdictView, shortHash } from './receipt-verify';
+import { ReceiptVerdictView, ReceiptVerifyDialog, shortHash } from './receipt-verify';
 import { ReceiptVerdict } from './billing.service';
 import { documentState, documentTitle } from './documents';
 
@@ -64,5 +68,34 @@ describe('a billing document in the list', () => {
     expect(documentState({ ...base, kind: 'payment_slip', paymentStatus: 'submitted', paymentMethod: 'bank' })?.cls).toContain('pill-pay-pending');
     expect(documentState({ ...base, kind: 'invoice', invoiceStatus: 'paid' })).toMatchObject({ label: 'Paid', cls: 'pill pill-ok' });
     expect(documentState({ ...base, kind: 'statement' })).toBeNull();
+  });
+});
+
+describe('the verify dialog -- loading, error (owner 2026-10-27)', () => {
+  function dialog(answer: () => Observable<unknown>) {
+    const verifyReceipt = vi.fn(answer);
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [
+      { provide: BillingApi, useValue: { verifyReceipt, verifyReceiptFile: vi.fn(), receiptCertificate: vi.fn() } },
+      { provide: DialogRef, useValue: { close: vi.fn() } }, { provide: DIALOG_DATA, useValue: { number: 'RCP-2026-10-0001' } },
+    ] });
+    const component = TestBed.runInInjectionContext(() => new ReceiptVerifyDialog());
+    component.ngOnInit();
+    return { component, verifyReceipt };
+  }
+
+  it('is checking until the answer comes', () => {
+    const { component } = dialog(() => NEVER);
+    expect(component.busy()).toBe(true);
+    expect(component.error()).toBe('');
+  });
+
+  it('says the receipt could not be checked, in plain words, and checks again on Try again', () => {
+    const { component, verifyReceipt } = dialog(() => throwError(() => new HttpErrorResponse({ status: 500, error: 'Internal Server Error' })));
+    expect(component.busy()).toBe(false);
+    expect(component.error()).toBe('The receipt could not be checked.');
+    verifyReceipt.mockReturnValue(of({ status: 'SUCCESS', data: null }) as never);
+    component.retry();
+    expect(verifyReceipt).toHaveBeenCalledTimes(2);
   });
 });

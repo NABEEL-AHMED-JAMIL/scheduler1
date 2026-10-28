@@ -34,6 +34,7 @@
       </div>
     }
 
+    <app-blur-loader [active]="state.loading()" label="Refreshing…">
     <div class="rsa-detail">
       <div class="flex flex-col gap-4 min-w-0">
         <section class="card">
@@ -69,9 +70,10 @@
             <span class="pill pill-neutral">{{ a.versions.length }} version{{ a.versions.length === 1 ? '' : 's' }}</span>
           </div>
           <div class="overflow-x-auto"><table class="table-modern">
-            <thead><tr><th>Version · state</th><th>Uploaded by</th><th>Review</th><th>Date</th></tr></thead>
+            <thead><tr><th appSort="version" [sortBy]="versionSort">Version · state</th><th appSort="uploadedBy" [sortBy]="versionSort">Uploaded by</th>
+              <th appSort="review" [sortBy]="versionSort">Review</th><th appSort="date" [sortBy]="versionSort">Date</th></tr></thead>
             <tbody>
-              @for (v of a.versions; track v.version) {
+              @for (v of sortedVersions(); track v.version) {
                 <tr>
                   <td class="whitespace-nowrap">v{{ v.version }} ·
                     @switch (v.state) {
@@ -106,9 +108,10 @@
           <div class="rs-head"><div><h2 class="section-title">Where it's used</h2>
             <p class="text-xs text-[color:var(--text-muted)]">{{ a.usageTemplates }} template{{ a.usageTemplates === 1 ? '' : 's' }} · {{ a.usageReports }} report{{ a.usageReports === 1 ? '' : 's' }} keep the version they were made with.</p></div></div>
           <div class="overflow-x-auto"><table class="table-modern">
-            <thead><tr><th>Used in</th><th>Version</th><th>Use</th></tr></thead>
+            <thead><tr><th appSort="usedIn" [sortBy]="usageSort">Used in</th><th appSort="version" [sortBy]="usageSort">Version</th>
+              <th appSort="use" [sortBy]="usageSort">Use</th></tr></thead>
             <tbody>
-              @for (u of a.usage; track $index) {
+              @for (u of sortedUsage(); track usageKey(u)) {
                 <tr>
                   <td>@if (u.templateId) { <a class="link-inline" [routerLink]="['/reports/templates', u.templateId]">{{ u.name }} · v{{ u.templateVersion }}</a>@if (u.templateVersionState === 'DRAFT') { <span class="text-xs text-[color:var(--text-muted)]"> (draft)</span> } }
                       @else { {{ u.name }} (brand profile) }</td>
@@ -160,11 +163,14 @@
               @if (a.you.mayGrant && a.status === 'ACTIVE') {
                 <div class="flex flex-wrap gap-2 items-end">
                   <select class="input input-sm w-auto" aria-label="Grant to" [ngModel]="grantTo()" (ngModelChange)="grantTo.set($event)">
-                    <option [ngValue]="null">Grant use to…</option>
+                    <option [ngValue]="null">{{ peopleState.loading() ? 'Loading people…' : 'Grant use to…' }}</option>
                     @for (p of people(); track p.userId) { @if (p.userId !== a.ownerUserId) { <option [ngValue]="p.userId">{{ p.name }}</option> } }
                   </select>
                   <button type="button" class="btn btn-default btn-sm" [disabled]="!grantTo()" (click)="grant()">Grant</button>
                 </div>
+                <app-inline-status [loading]="peopleState.loading()" [error]="peopleState.error()" label="Loading people…"
+                                   [empty]="peopleState.loaded() && !people().length" emptyText="No one in the workspace to grant it to yet."
+                                   (retry)="loadPeople()" />
               }
             </div>
           }
@@ -190,9 +196,12 @@
                                 (search)="findTemplates($event)" />
             <label class="field"><span class="label">Template</span>
               <select class="input" aria-label="Template" [ngModel]="placeTemplate()" (ngModelChange)="placeTemplate.set($event)">
-                <option value="">Choose a template</option>
+                <option value="">{{ templatesState.loading() ? 'Loading templates…' : 'Choose a template' }}</option>
                 @for (t of templates(); track t.templateId) { <option [value]="t.templateId">{{ t.name }}{{ t.hasDraft ? ' · draft' : t.currentPublishedVersion ? ' · v' + t.currentPublishedVersion : '' }}</option> }
-              </select></label>
+              </select>
+              <app-inline-status [loading]="templatesState.loading()" [error]="templatesState.error()" label="Loading templates…"
+                                 [empty]="templatesState.loaded() && !templates().length" emptyText="No template to place it on yet."
+                                 (retry)="findTemplates('')" /></label>
             <label class="field"><span class="label">{{ a.kind === 'STAMP' ? 'Stamp' : 'Signature' }} version</span>
               <select class="input" [attr.aria-label]="(a.kind === 'STAMP' ? 'Stamp' : 'Signature') + ' version'" [ngModel]="placeVersion()" (ngModelChange)="placeVersion.set($event)">
                 @for (v of approvedVersions(); track v.version) { <option [ngValue]="v.version">{{ a.name }} · v{{ v.version }}</option> }
@@ -215,8 +224,11 @@
                                   (search)="findStamps($event)" />
               <label class="field"><span class="label">Stamp · optional</span>
                 <select class="input" aria-label="Stamp" [ngModel]="placeStamp()" (ngModelChange)="placeStamp.set($event)">
-                  <option value="">No stamp</option>@for (s of stamps(); track s.assetId) { <option [value]="s.assetId">{{ s.name }}</option> }
-                </select></label>
+                  <option value="">{{ stampsState.loading() ? 'Loading stamps…' : 'No stamp' }}</option>@for (s of stamps(); track s.assetId) { <option [value]="s.assetId">{{ s.name }}</option> }
+                </select>
+                <app-inline-status [loading]="stampsState.loading()" [error]="stampsState.error()" label="Loading stamps…"
+                                   [empty]="stampsState.loaded() && !stamps().length" emptyText="No stamp you may place yet."
+                                   (retry)="findStamps('')" /></label>
             }
             <span class="text-xs text-[color:var(--text-muted)]">Keeps the picture's shape and keeps it with the end of the report. A template without it set up leaves it out.</span>
             @if (a.kind === 'SIGNATURE') {
@@ -240,8 +252,9 @@
         </section>
       </aside>
     </div>
+    </app-blur-loader>
   } @else {
     <app-page-header title="Asset" />
-    <div class="flex justify-center py-16"><span class="spinner" role="status" aria-label="Loading"></span></div>
+    <app-loading shape="panel" label="Loading the asset…" [count]="6" />
   }
 </div>

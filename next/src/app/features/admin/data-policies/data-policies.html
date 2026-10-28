@@ -122,8 +122,12 @@
                               <span class="min-w-0 break-words">{{ allowedName(entry) }}</span>
                             </label>
                           }
-                          @if (!choices().length && !unknownAllowed(c.i).length) {
-                            <p class="text-xs text-[color:var(--text-muted)]">{{ connectionsError() || 'No model connections in this workspace yet.' }}</p>
+                          @if (connectionsLoading() || connectionsError() || (!choices().length && !unknownAllowed(c.i).length)) {
+                            <app-inline-status [loading]="connectionsLoading()" [error]="connectionsError()"
+                                               [empty]="connectionsLoaded() && !choices().length" label="Loading model connections…"
+                                               emptyText="No model connections in this workspace yet." (retry)="loadConnections()">
+                              <a class="link-inline" routerLink="/settings/model-connections">Add one</a>
+                            </app-inline-status>
                           }
                         </div>
                       </fieldset>

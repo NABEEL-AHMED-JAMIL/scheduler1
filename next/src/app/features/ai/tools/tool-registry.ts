@@ -18,6 +18,9 @@ import { askReason } from '../../../shared/ui/reason';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { ManagedBanner } from '../../../shared/ui/managed-banner';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
+import { InlineStatus, createLoadState } from '../../../shared/ui/loading';
 
 /**
  * AI › Tool Registry (MIG-252): the only operations the AI Assistant may request (ai-service's
@@ -37,7 +40,7 @@ import { RefreshButton } from '../../../shared/ui/refresh-button';
  */
 @Component({
   selector: 'app-tool-registry',
-  imports: [WorkspaceSelect, RefreshButton, PageHeader, Icon, TableShell, StatTile, ServerTimePipe, RouterLink, ManagedBanner],
+  imports: [WorkspaceSelect, RefreshButton, PageHeader, SortHeader, InlineStatus, Icon, TableShell, StatTile, ServerTimePipe, RouterLink, ManagedBanner],
   templateUrl: './tool-registry.html',
   styles: `
     .tool-group th { background: var(--surface-sunken); text-align: left; padding: 0.4rem 1rem; text-transform: none; letter-spacing: 0;
@@ -58,8 +61,6 @@ export class ToolRegistry implements OnInit {
   readonly changes = signal<ToolChange[]>([]);
 
   readonly tools = signal<ToolDef[]>([]);
-  readonly loading = signal(true);
-  readonly error = signal('');
   readonly busy = signal<string | null>(null);
 
   readonly search = signal('');
@@ -70,6 +71,19 @@ export class ToolRegistry implements OnInit {
   readonly canPickTenant = computed(() => this.auth.isPlatformAdmin());
   readonly tenantId = signal<number | null>(inject(WorkspaceDirectory).remembered());
   readonly needsWorkspace = computed(() => this.canPickTenant() && !this.tenantId());
+
+  /**
+   * The list's read (owner 2026-10-27): loading from the start unless a platform administrator has not picked a
+   * workspace yet (then nothing is read and the table asks for one), so the tiles never show 0 before the answer.
+   */
+  readonly listState = createLoadState(!this.needsWorkspace());
+  readonly loading = this.listState.loading;
+  readonly error = this.listState.error;
+  /** The tiles wait for the first answer for this workspace; picking another workspace empties them until it comes. */
+  readonly tilesLoading = computed(() => !this.needsWorkspace() && this.loading() && !this.tools().length);
+  readonly tilesFailed = computed(() => !!this.error() && !this.tools().length);
+  /** The Recent changes audit's read: its failure used to look the same as "nothing changed". */
+  readonly changesState = createLoadState(false);
 
   readonly filtered = computed(() => {
     const q = this.search().trim().toLowerCase();
@@ -86,6 +100,23 @@ export class ToolRegistry implements OnInit {
       { kind: 'write', label: 'Writes', sub: 'Run, save or delete something in the workspace.', tools: list.filter(t => t.kind === 'write') },
     ].filter(g => g.tools.length);
   });
+  /**
+   * Owner 2026-10-27: every column with a value sorts, inside its group (Reads stay above Writes); the rows keep the
+   * registry's order until a heading is picked.
+   */
+  readonly sort = createTableSort<ToolDef>({
+    id: 'ai-tools',
+    columns: {
+      tool: t => t.title,
+      service: t => serviceOf(t),
+      io: t => ioOf(t).input,
+      permission: t => roleLabel(t.requiredRole),
+      asksFirst: { value: t => t.requiresConfirmation, kind: 'bool' },
+      enabled: { value: t => toolState(t).label, kind: 'status' },
+      lastUsed: { value: t => t.lastUsedAt, kind: 'date' },
+    },
+  });
+  readonly sortedGroups = computed(() => this.groups().map(g => ({ ...g, tools: this.sort.apply(g.tools) })));
   readonly hasFilters = computed(() => !!this.search().trim() || !!this.kindFilter() || !!this.stateFilter());
 
   readonly summary = computed(() => {
@@ -101,7 +132,6 @@ export class ToolRegistry implements OnInit {
 
   ngOnInit(): void {
     if (this.canPickTenant()) {
-      this.loading.set(false);
       if (this.tenantId()) this.load();
       return;
     }
@@ -112,30 +142,40 @@ export class ToolRegistry implements OnInit {
     const id = Number(value);
     this.tenantId.set(Number.isFinite(id) && id > 0 ? id : null);
     this.tools.set([]);
+    this.changes.set([]);
     if (this.tenantId()) this.load();
   }
 
   load(): void {
     if (this.needsWorkspace()) return;
-    this.loading.set(true);
-    this.error.set('');
-    this.api.tools(this.tenantId() ?? undefined).subscribe({
+    // A reply for a workspace picked away from must not fill the new one's list.
+    const asked = this.tenantId();
+    this.listState.start();
+    this.api.tools(asked ?? undefined).subscribe({
       next: r => {
-        this.loading.set(false);
-        if (r.status !== API_SUCCESS) { this.error.set(r.message); return; }
+        if (this.tenantId() !== asked) return;
+        if (r.status !== API_SUCCESS) { this.listState.fail(r, 'The tools could not be read.'); return; }
         this.tools.set(r.data ?? []);
+        this.listState.done();
         this.loadChanges();
       },
-      error: err => { this.loading.set(false); this.error.set(err?.error?.message || 'Could not load the tools.'); },
+      error: err => { if (this.tenantId() === asked) this.listState.fail(err, 'The tools could not be read.'); },
     });
   }
 
   /** The audit of the workspace's switches and blocks: administrators only (tools/history answers 403 to anyone else). */
   loadChanges(): void {
     if (!this.canSwitch()) return;
-    this.api.toolHistory(null, this.tenantId() ?? undefined).subscribe({
-      next: r => this.changes.set(r.status === API_SUCCESS ? (r.data ?? []).slice(0, 12) : []),
-      error: () => this.changes.set([]),
+    const asked = this.tenantId();
+    this.changesState.start();
+    this.api.toolHistory(null, asked ?? undefined).subscribe({
+      next: r => {
+        if (this.tenantId() !== asked) return;
+        if (r.status !== API_SUCCESS) { this.changesState.fail(r, 'The recent changes could not be read.'); return; }
+        this.changes.set((r.data ?? []).slice(0, 12));
+        this.changesState.done();
+      },
+      error: err => { if (this.tenantId() === asked) this.changesState.fail(err, 'The recent changes could not be read.'); },
     });
   }
 

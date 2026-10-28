@@ -71,3 +71,17 @@ describe('Runs facets rail', () => {
     expect(el.textContent).toContain('The counts could not be read');
   });
 });
+
+describe('the runs explorer rail -- counts that failed (owner 2026-10-27)', () => {
+  it('says the counts are not counted rather than none, and offers Try again when it can help', () => {
+    const { el, fixture } = rail(NO_FILTER, null);
+    let retried = 0;
+    fixture.componentInstance.retry.subscribe(() => retried++);
+    fixture.componentRef.setInput('unavailable', true);
+    fixture.componentRef.setInput('retryable', true);
+    fixture.detectChanges();
+    expect(el.textContent).not.toContain('None in this window');
+    (el.querySelector('[data-test="facets-retry"]') as HTMLButtonElement).click();
+    expect(retried).toBe(1);
+  });
+});

@@ -9,6 +9,7 @@ import { WorkflowsApi } from '../../workflows/workflows.api';
 import { exactTime } from '../../workflows/history';
 import { RunApprovalStore } from './run-approval.store';
 import { approvalRoute, fromNow, reviewersWords } from './run-approval.model';
+import { AppLoading, InlineStatus } from '../../../shared/ui/loading';
 
 /**
  * A run waiting at an Approval step, as the run page's Next steps (run page polish 2026-10-12). It used to be the run's
@@ -22,7 +23,7 @@ import { approvalRoute, fromNow, reviewersWords } from './run-approval.model';
  */
 @Component({
   selector: 'app-run-approval',
-  imports: [Icon, RouterLink, ServerTimePipe],
+  imports: [Icon, RouterLink, ServerTimePipe, AppLoading, InlineStatus],
   host: { class: 'contents' },
   styles: `
     .run-approval { box-shadow: inset 3px 0 0 var(--warn-text); }
@@ -53,6 +54,13 @@ import { approvalRoute, fromNow, reviewersWords } from './run-approval.model';
             <dd data-test="approval-expires" [title]="exact(w.approval.expiresAt)">{{ w.approval.expiresAt | serverTime:'recent' }} · {{ ago(w.approval.expiresAt) }}</dd>
           }
         </dl>
+        <!-- Owner 2026-10-27: say while the reader's own task is looked up, and when it could not be, instead of showing the
+             inbox link first and the decide buttons a moment later. -->
+        @if (approvals.taskLoading()) {
+          <app-loading class="mt-auto" shape="inline" label="Checking whether you decide this…" />
+        } @else if (approvals.taskError()) {
+          <app-inline-status class="mt-auto" [error]="approvals.taskError()" (retry)="approvals.retryTask()" />
+        } @else {
         @switch (route()) {
           @case ('decide') {
             <label class="flex flex-col gap-1 mt-auto">
@@ -76,6 +84,7 @@ import { approvalRoute, fromNow, reviewersWords } from './run-approval.model';
             <a class="link-inline inline-flex items-center gap-1 text-sm self-start mt-auto" routerLink="/review/approvals" data-test="approval-inbox">
               <app-icon name="inbox" size="0.95em" />Open Review › Approvals</a>
           }
+        }
         }
       </section>
     }

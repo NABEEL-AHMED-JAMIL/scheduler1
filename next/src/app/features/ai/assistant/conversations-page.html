@@ -28,7 +28,7 @@
         @for (k of kinds; track k) {
           <label class="cp-opt">
             <input type="checkbox" class="checkbox" [checked]="kind().includes(k)" (change)="toggleKind(k)" [attr.data-facet-kind]="k" />
-            <span>{{ kindLabel[k] }}</span><span class="cp-count">{{ count('kind', k) }}</span>
+            <span>{{ kindLabel[k] }}</span>@if (state.loaded()) { <span class="cp-count">{{ count('kind', k) }}</span> }
           </label>
         }
       </fieldset>
@@ -38,7 +38,7 @@
           @if (count('outcome', o) || outcome().includes(o)) {
             <label class="cp-opt">
               <input type="checkbox" class="checkbox" [checked]="outcome().includes(o)" (change)="toggleOutcome(o)" [attr.data-facet-outcome]="o" />
-              <span>{{ outcomeLabel[o] }}</span><span class="cp-count">{{ count('outcome', o) }}</span>
+              <span>{{ outcomeLabel[o] }}</span>@if (state.loaded()) { <span class="cp-count">{{ count('outcome', o) }}</span> }
             </label>
           }
         }
@@ -47,12 +47,12 @@
         <legend>Last used</legend>
         <label class="cp-opt">
           <input type="radio" name="cp-day" class="checkbox" [checked]="updated() === null" (change)="pickDay(null)" />
-          <span>Any time</span><span class="cp-count">{{ dayTotal() }}</span>
+          <span>Any time</span>@if (state.loaded()) { <span class="cp-count">{{ dayTotal() }}</span> }
         </label>
         @for (d of days; track d) {
           <label class="cp-opt">
             <input type="radio" name="cp-day" class="checkbox" [checked]="updated() === d" (change)="pickDay(d)" [attr.data-facet-day]="d" />
-            <span>{{ dayLabel[d] }}</span><span class="cp-count">{{ count('updated', d) }}</span>
+            <span>{{ dayLabel[d] }}</span>@if (state.loaded()) { <span class="cp-count">{{ count('updated', d) }}</span> }
           </label>
         }
       </fieldset>
@@ -60,7 +60,7 @@
         <legend>Pinned</legend>
         <label class="cp-opt">
           <input type="checkbox" class="checkbox" [checked]="pinnedOnly()" (change)="togglePinned()" />
-          <span>Pinned only</span><span class="cp-count">{{ pinnedCount() }}</span>
+          <span>Pinned only</span>@if (state.loaded()) { <span class="cp-count">{{ pinnedCount() }}</span> }
         </label>
       </fieldset>
     </aside>
@@ -74,25 +74,32 @@
                  maxlength="200" [value]="q()" (input)="search($any($event.target).value)" />
         </label>
         <span class="text-xs text-[color:var(--text-muted)] ml-auto" aria-live="polite" data-total>
-          {{ loading() ? 'Reading…' : total() + ' conversation' + (total() === 1 ? '' : 's') }}
+          @if (state.loaded()) { {{ total() + ' conversation' + (total() === 1 ? '' : 's') }} } @else if (loading()) { Loading… }
         </span>
       </div>
+      <!-- Owner 2026-10-27: a failed first read is the error alone; a failed re-read keeps the rows with the reason above them. -->
+      @if (error() && !state.loaded()) {
+        <app-load-error [message]="error()" (retry)="load()" />
+      } @else if (state.pending()) {
+        <app-loading shape="rows" label="Loading conversations…" [count]="6" />
+      } @else {
       @if (error()) {
         <div class="mt-4 mx-1 rounded-lg px-3 py-2 text-sm bg-crit-500/12 text-crit-500 flex items-start gap-2" role="alert">
           <app-icon name="alert" class="icon-crit mt-0.5 shrink-0" size="0.9em" /><span class="flex-1">{{ error() }}</span>
-          <button type="button" class="link-inline" (click)="load()">Retry</button>
+          <button type="button" class="btn btn-default btn-xs" (click)="load()"><app-icon name="refresh" />Try again</button>
         </div>
       }
+      <app-blur-loader [active]="loading()" label="Refreshing…">
       <div class="scroll-table">
         <table class="table-modern" data-table>
           <thead>
             <tr>
-              <th scope="col">Conversation</th>
-              <th scope="col" class="cp-wide">Kind</th>
-              <th scope="col">Status</th>
+              <th scope="col" appSort="title" [sortBy]="sort">Conversation</th>
+              <th scope="col" class="cp-wide" appSort="kind" [sortBy]="sort">Kind</th>
+              <th scope="col" appSort="status" [sortBy]="sort">Status</th>
               <th scope="col" class="cp-wide">Pipeline</th>
-              <th scope="col" class="cp-wide text-right">Messages</th>
-              <th scope="col" class="text-right">Updated</th>
+              <th scope="col" class="cp-wide text-right" appSort="messages" [sortBy]="sort">Messages</th>
+              <th scope="col" class="text-right" appSort="updated" [sortBy]="sort">Updated</th>
             </tr>
           </thead>
           <tbody>
@@ -127,8 +134,7 @@
             } @empty {
               <tr>
                 <td colspan="6" class="text-center py-10 text-sm text-[color:var(--text-muted)]">
-                  @if (loading()) { Reading the conversations… }
-                  @else if (filtered()) { Nothing matches these filters. <button type="button" class="link-inline" (click)="clearAll()">Clear them</button> }
+                  @if (filtered()) { Nothing matches these filters. <button type="button" class="link-inline" (click)="clearAll()">Clear them</button> }
                   @else { No conversations yet. <a class="link-inline" routerLink="/ai/assistant">Ask the assistant</a> }
                 </td>
               </tr>
@@ -136,7 +142,12 @@
           </tbody>
         </table>
       </div>
-      @if (more()) {
+      </app-blur-loader>
+      }
+      @if (moreError()) {
+        <div class="px-4 pb-3"><app-inline-status [error]="moreError()" (retry)="loadMore()" /></div>
+      }
+      @if (more() && state.loaded()) {
         <div class="px-4 py-3 border-t border-subtle flex items-center gap-3">
           <button type="button" class="btn btn-default btn-sm" [disabled]="loadingMore()" (click)="loadMore()">
             {{ loadingMore() ? 'Loading…' : 'Load more' }}

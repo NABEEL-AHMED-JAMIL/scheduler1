@@ -3,7 +3,8 @@ import { TestBed } from '@angular/core/testing';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { DIALOG_DATA, Dialog, DialogRef } from '@angular/cdk/dialog';
-import { of } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
 import { ManagedService } from './managed-service';
 import { GrantDialog } from './grant-dialog';
@@ -27,17 +28,19 @@ const TENANTS = [
   { tenantId: 3002, tenantName: 'Gone', status: 'Delete' },
 ];
 
-function setup(confirm = true) {
+function setup(confirm = true, overrides: Record<string, unknown> = {}) {
   const api = {
     listGrants: vi.fn(() => of({ status: 'SUCCESS', message: '', data: GRANTS })),
     users: vi.fn(() => of({ status: 'SUCCESS', message: '', data: USERS })),
     revoke: vi.fn(() => of({ status: 'SUCCESS', message: 'Revoked. The staff member signs in again.' })),
     grant: vi.fn(() => of({ status: 'SUCCESS', message: 'Granted.' })),
+    ...overrides,
   };
   const asked: any[] = [];
   const opened: any[] = [];
   const toasts: string[] = [];
   TestBed.resetTestingModule();
+  try { localStorage.clear(); } catch { /* none */ }
   TestBed.configureTestingModule({ providers: [
     provideZonelessChangeDetection(),
     provideRouter([]),
@@ -154,5 +157,50 @@ describe('MIG-254: the grant dialog', () => {
     d.save();
     expect(closed).toEqual([]);
     expect(d.error()).toBe('Only an active platform user can be granted a workspace.');
+  });
+});
+
+describe('Managed service -- sorting (owner 2026-10-27)', () => {
+  it('keeps the server order, then sorts by workspace both ways', () => {
+    const { page } = setup();
+    expect(page.sorted().map(g => g.grantId)).toEqual([11, 10]);
+    page.sort.toggle('workspace');
+    expect(page.sorted().map(g => g.tenantName)).toEqual(['Beta', 'Claude Demo']);
+    page.sort.toggle('workspace');
+    expect(page.sorted().map(g => g.tenantName)).toEqual(['Claude Demo', 'Beta']);
+  });
+
+  it('sorts by when granted, newest first on the first click', () => {
+    const { page } = setup();
+    page.sort.toggle('granted');
+    expect(page.sorted().map(g => g.grantId)).toEqual([11, 10]);
+    page.sort.toggle('granted');
+    expect(page.sorted().map(g => g.grantId)).toEqual([10, 11]);
+  });
+});
+
+describe('Managed service -- loading, empty, error (owner 2026-10-27)', () => {
+  it('is loading, not "No live grants", until the grants answer; Grant waits for its lists', () => {
+    const { page, fixture } = setup(true, { listGrants: vi.fn(() => NEVER), users: vi.fn(() => NEVER) });
+    expect(page.loading()).toBe(true);
+    expect(page.listsLoading()).toBe(true);
+    expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('No live grants');
+  });
+
+  it('is empty once no grant answers', () => {
+    const { page, fixture } = setup(true, { listGrants: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [] })) });
+    fixture.detectChanges();
+    expect(page.loading()).toBe(false);
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('No live grants');
+  });
+
+  it('says the grants could not be read in plain words, and a failed staff read is not "no staff"', () => {
+    const failed = () => throwError(() => new HttpErrorResponse({ status: 500, error: 'Internal Server Error' }));
+    const { page, fixture } = setup(true, { listGrants: vi.fn(failed), users: vi.fn(failed) });
+    fixture.detectChanges();
+    expect(page.loading()).toBe(false);
+    expect(page.error()).toBe('The grants could not be read.');
+    expect(page.staffState.error()).toBe('The staff could not be read.');
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('The staff could not be read.');
   });
 });

@@ -30,6 +30,9 @@ import { NgTemplateOutlet } from '@angular/common';
 import { StartersDialog, StartersDialogResult } from './starters-dialog';
 import { PageHeader } from '../../shared/ui/page-header';
 import { RefreshButton } from '../../shared/ui/refresh-button';
+import { createTableSort } from '../../shared/ui/sort';
+import { SortHeader } from '../../shared/ui/sort-header';
+import { AppLoading, InlineStatus, createLoadState, loadErrorText } from '../../shared/ui/loading';
 
 /**
  * The page's views. overview, types and dataset are tabs of Documents (Documents in, Document types, Approved data);
@@ -68,7 +71,7 @@ const RECENT_STATES = ['In review', 'Approved', 'Auto-approved', 'Rejected', 'Fa
  */
 @Component({
   selector: 'app-document-intelligence',
-  imports: [RefreshButton, PageHeader, RouterLink, Icon, TableShell, StatusPill, StatStrip, Pagination, DataText, ServerTimePipe, ConfidenceBar, CdkMenu, CdkMenuItem, CdkMenuTrigger, ManagedBanner, NeedsWorkspace, NgTemplateOutlet],
+  imports: [RefreshButton, PageHeader, SortHeader, AppLoading, InlineStatus, RouterLink, Icon, TableShell, StatusPill, StatStrip, Pagination, DataText, ServerTimePipe, ConfidenceBar, CdkMenu, CdkMenuItem, CdkMenuTrigger, ManagedBanner, NeedsWorkspace, NgTemplateOutlet],
   templateUrl: './intelligence.html',
 })
 export class DocumentIntelligence implements OnInit {
@@ -110,7 +113,17 @@ export class DocumentIntelligence implements OnInit {
   readonly extractions = signal<Extraction[]>([]);
   readonly loading = signal(true);
   readonly error = signal('');
-  readonly typesError = signal('');
+  /**
+   * Owner 2026-10-27: the 30-day numbers' own read. The strip showed 0 while they loaded and 0 when they failed, both
+   * read as "nothing happened"; it now shows placeholders, then the numbers or "Not available right now".
+   */
+  readonly statsState = createLoadState();
+  /**
+   * The types' read. The table used `!types().length` as its loading flag, so a workspace with no type spun for ever;
+   * it now loads until the first answer and then says there is none.
+   */
+  readonly typesState = createLoadState();
+  readonly typesError = this.typesState.error;
 
   readonly states = RECENT_STATES;
   readonly typeFilter = signal('');
@@ -140,6 +153,8 @@ export class DocumentIntelligence implements OnInit {
    */
   readonly canSeeSchedules = computed(() => typeof this.auth.canOpen === 'function' && this.auth.canOpen('jobs'));
   readonly triggers = signal<DocumentTriggerRow[] | null>(null);
+  /** Owner 2026-10-27: a failed read of the schedules said "Nothing yet" for every type; it now says it is not known. */
+  readonly triggersError = signal('');
   /** Each type's schedules its approved documents start (switched-off triggers say so), by type id. */
   readonly startsByType = computed(() => {
     const byType = new Map<number, { jobId: number; name: string; on: boolean; why: string }[]>();
@@ -160,6 +175,36 @@ export class DocumentIntelligence implements OnInit {
   });
   readonly hasFilters = computed(() => !!this.typeFilter() || !!this.stateFilter() || !!this.search().trim());
 
+  /** Owner 2026-10-27: every column with a value sorts; the list keeps recentRows' order (newest extraction first) until one is picked. */
+  readonly recentSort = createTableSort<RecentRow>({
+    id: 'documents-recent',
+    columns: {
+      document: r => r.name,
+      type: r => r.extraction ? (r.extraction.documentTypeName || r.extraction.documentTypeKey || 'Not classified') : null,
+      fields: { value: r => r.extraction ? (r.extraction.fieldCount ?? 0) : null, kind: 'number' },
+      confidence: { value: r => r.extraction?.minConfidence, kind: 'number' },
+      state: { value: r => r.status, kind: 'status' },
+      received: { value: r => r.received, kind: 'date' },
+    },
+  });
+  readonly recentSorted = computed(() => this.recentSort.apply(this.filtered()));
+
+  /** Owner 2026-10-27: the document types sort by any column but the schedules list; the API's order until one is picked. */
+  readonly typeSort = createTableSort<DocumentType>({
+    id: 'document-types',
+    columns: {
+      type: t => t.name,
+      fields: { value: t => t.fieldCount ?? t.definition?.fields?.length ?? 0, kind: 'number' },
+      tables: { value: t => t.tableCount ?? t.definition?.tables?.length ?? 0, kind: 'number' },
+      rules: { value: t => t.definition?.rules?.length ?? 0, kind: 'number' },
+      autoApprove: { value: t => t.autoApproveThreshold, kind: 'number' },
+      version: { value: t => t.currentVersion, kind: 'number' },
+      kind: t => (t.builtIn ? 'Built-in' : 'This workspace'),
+      state: { value: t => t.status, kind: 'status' },
+    },
+  });
+  readonly typesSorted = computed(() => this.typeSort.apply(this.types()));
+
   // -------------------------------------------------------------------------------------------- dataset
 
   readonly datasetType = signal('');
@@ -173,6 +218,35 @@ export class DocumentIntelligence implements OnInit {
   readonly datasetDefinition = computed(() => this.types().find(t => String(t.documentTypeId) === this.datasetType())?.definition ?? null);
   readonly datasetColumns = computed(() => (this.datasetDefinition()?.fields ?? []).map(f => ({ key: f.key, label: f.label || f.key })));
   readonly datasetTables = computed(() => (this.datasetDefinition()?.tables ?? []).map(t => ({ key: t.key, label: t.label || t.key })));
+  /** Whether the type's fields sort for this person (the service says no while any of its data is masked for them). */
+  readonly datasetFieldsSort = signal(true);
+  /**
+   * Owner 2026-10-27 ("add a sort on each table"): Approved data is paged, so it sorts on the server
+   * (documentExtraction.json/dataset sort/dir): Document, Approved, any field of the type ("fields.<key>") and a table's
+   * row count ("tables.<key>"); a new order goes back to page 1. No order picked: the dataset's own order, as before, and
+   * no sort is sent. Not remembered: each type has fields of its own.
+   */
+  readonly datasetSort = createTableSort<DatasetRow>({
+    id: 'documents-approved-data',
+    server: true,
+    remember: false,
+    columns: {
+      document: { value: r => r.extractionId, kind: 'number', param: 'document' },
+      approved: { value: r => r.dateCreated, kind: 'date', param: 'approved' },
+    },
+    dynamic: key => key.startsWith('fields.')
+      ? { value: r => r.row?.fields?.[key.slice(7)], kind: 'auto', param: key,
+          blocked: () => this.datasetFieldsSort() ? '' : 'Some of this data is masked for you, so its fields do not sort' }
+      : key.startsWith('tables.') ? { value: r => r.row?.tables?.[key.slice(7)]?.length ?? 0, kind: 'number', param: key } : null,
+    onChange: () => { this.datasetPage.set(1); this.loadDataset(); },
+  });
+  /**
+   * Owner 2026-10-27: the dataset is read only once the types have named its type, so until then it is loading too --
+   * it showed "No approved documents of this type yet" while the stats and the types were still on the way.
+   */
+  readonly datasetBusy = computed(() => this.datasetLoading() || (!this.datasetType() && this.typesState.loading()));
+  /** The dataset's error, or the types' when they failed before naming a type to read. */
+  readonly datasetProblem = computed(() => this.datasetError() || (!this.datasetType() ? this.typesError() : ''));
 
   private overviewRead = false;
   private datasetRead = false;
@@ -196,9 +270,14 @@ export class DocumentIntelligence implements OnInit {
   }
 
   private loadStats(then?: () => void): void {
+    this.statsState.start();
     this.api.stats(30).subscribe({
-      next: r => { if (r.status === API_SUCCESS) this.stats.set(r.data ?? []); then?.(); },
-      error: () => { this.stats.set([]); then?.(); },
+      next: r => {
+        if (r.status === API_SUCCESS) { this.stats.set(r.data ?? []); this.statsState.done(); }
+        else this.statsState.fail(r, 'The numbers could not be read.');
+        then?.();
+      },
+      error: err => { this.statsState.fail(err, 'The numbers could not be read.'); then?.(); },
     });
   }
 
@@ -232,9 +311,13 @@ export class DocumentIntelligence implements OnInit {
   /** The schedules each type's approved documents start, for Document types' "When approved, starts…" column. */
   loadTriggers(): void {
     if (!this.canSeeSchedules()) return;
+    this.triggersError.set('');
     this.api.documentTriggers?.()?.subscribe({
-      next: r => this.triggers.set(r.status === API_SUCCESS && Array.isArray(r.data) ? r.data : []),
-      error: () => this.triggers.set([]),
+      next: r => {
+        if (r.status !== API_SUCCESS) { this.triggersError.set(loadErrorText(r, 'The schedules could not be read.')); return; }
+        this.triggers.set(Array.isArray(r.data) ? r.data : []);
+      },
+      error: err => this.triggersError.set(loadErrorText(err, 'The schedules could not be read.')),
     });
   }
 
@@ -260,12 +343,13 @@ export class DocumentIntelligence implements OnInit {
   }
 
   loadTypes(): void {
-    this.typesError.set('');
+    this.typesState.start();
     this.api.types().subscribe({
       next: r => {
-        if (r.status !== API_SUCCESS) { this.typesError.set(r.message); return; }
+        if (r.status !== API_SUCCESS) { this.typesState.fail(r, 'Could not load the document types.'); return; }
         const types = r.data ?? [];
         this.types.set(types);
+        this.typesState.done();
         if (!this.datasetType() && types.length) {
           // The dataset opens on the type with the most documents behind it.
           const busiest = [...this.stats()].sort((a, b) => b.approvedByReviewer + b.autoApproved - a.approvedByReviewer - a.autoApproved)[0];
@@ -273,7 +357,8 @@ export class DocumentIntelligence implements OnInit {
           if (this.tab() === 'dataset') this.loadDataset();
         }
       },
-      error: err => this.typesError.set(refusalText(err, 'Could not load the document types.')),
+      // refusalText already words the status (404, 429 …); passed as the fallback so it is what shows.
+      error: err => this.typesState.fail(null, refusalText(err, 'Could not load the document types.')),
     });
   }
 
@@ -323,6 +408,22 @@ export class DocumentIntelligence implements OnInit {
   readonly intakeError = signal('');
   readonly channelFilter = signal('');
   readonly mailbox = signal<Mailbox | null>(null);
+  /** Owner 2026-10-27: a failed read of the address left "Reading the address…" on screen for ever. */
+  readonly mailboxError = signal('');
+  /** Owner 2026-10-27: what arrived sorts by any column, over the newest 100 the service sends. */
+  readonly intakeSort = createTableSort<IntakeRow>({
+    id: 'documents-intake',
+    columns: {
+      file: i => i.fileName,
+      channel: i => this.channelLabels[i.channel] || i.channel,
+      from: i => i.sourceLabel,
+      outcome: { value: i => i.outcome, kind: 'status', order: ['Refused', 'Duplicate', 'Accepted'] },
+      document: { value: i => i.extractionId ?? (i.ocrDocumentId ? this.takenAs().get(i.ocrDocumentId) : null), kind: 'number' },
+      arrived: { value: i => i.dateCreated, kind: 'date' },
+    },
+    note: 'Sorts the newest 100 shown',
+  });
+  readonly intakesSorted = computed(() => this.intakeSort.apply(this.intakes()));
   readonly mailboxBusy = signal(false);
   private intakeRead = false;
 
@@ -338,7 +439,18 @@ export class DocumentIntelligence implements OnInit {
       },
       error: err => { this.intakeLoading.set(false); this.intakeError.set(refusalText(err, 'Could not load what arrived.')); },
     });
-    this.api.mailbox().subscribe({ next: r => { if (r.status === API_SUCCESS) this.mailbox.set(r.data ?? null); }, error: () => this.mailbox.set(null) });
+    this.loadMailbox();
+  }
+
+  loadMailbox(): void {
+    this.mailboxError.set('');
+    this.api.mailbox().subscribe({
+      next: r => {
+        if (r.status === API_SUCCESS && r.data) this.mailbox.set(r.data);
+        else this.mailboxError.set(loadErrorText(r, 'The email-in address could not be read.'));
+      },
+      error: err => this.mailboxError.set(loadErrorText(err, 'The email-in address could not be read.')),
+    });
   }
 
   pickChannel(channel: string): void { this.channelFilter.set(channel); this.loadIntake(); }
@@ -392,6 +504,9 @@ export class DocumentIntelligence implements OnInit {
   pickDatasetType(id: string): void {
     this.datasetType.set(id);
     this.datasetPage.set(1);
+    // Another type has fields of its own: a field's order does not carry over (the reset reads the new type).
+    const key = this.datasetSort.key();
+    if (key.startsWith('fields.') || key.startsWith('tables.')) { this.datasetSort.reset(); return; }
     this.loadDataset();
   }
 
@@ -401,16 +516,19 @@ export class DocumentIntelligence implements OnInit {
     this.datasetRead = true;
     this.datasetLoading.set(true);
     this.datasetError.set('');
-    this.api.dataset(id, this.datasetPage() - 1, this.datasetSize()).subscribe({
+    this.api.dataset(id, this.datasetPage() - 1, this.datasetSize(), this.datasetSort.param()).subscribe({
       next: r => {
         this.datasetLoading.set(false);
         if (r.status !== API_SUCCESS || !r.data) { this.datasetError.set(r.message || 'Could not load the dataset.'); return; }
         this.dataset.set(r.data.rows ?? []);
         this.datasetTotal.set(r.data.total ?? 0);
+        this.datasetFieldsSort.set(r.data.fieldsSort !== false);
       },
       error: err => { this.datasetLoading.set(false); this.datasetError.set(refusalText(err, 'Could not load the dataset.')); },
     });
   }
+
+  retryDataset(): void { if (this.datasetType()) this.loadDataset(); else this.loadTypes(); }
 
   datasetGoTo(page: number): void { this.datasetPage.set(page); this.loadDataset(); }
   datasetSetSize(size: number): void { this.datasetSize.set(size); this.datasetPage.set(1); this.loadDataset(); }

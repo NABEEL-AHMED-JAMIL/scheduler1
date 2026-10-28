@@ -3,7 +3,8 @@ import { provideZonelessChangeDetection, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
 import { Router, provideRouter } from '@angular/router';
-import { of } from 'rxjs';
+import { NEVER, Observable, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { AuthService } from '../../../core/auth/auth.service';
 import { NewPipeline, STEP_PAYLOAD } from './new-pipeline';
 
@@ -101,5 +102,43 @@ describe('New pipeline', () => {
     expect(el.querySelector('[data-test="start-with"]')).toBeNull();
     expect(el.querySelector('[data-test="needs-workspace"] a')?.getAttribute('href')).toBe('/platform/workspaces');
     expect(posts.length).toBe(0);
+  });
+});
+
+describe('New pipeline -- the topic and copy lists load, are empty, or fail in words (owner 2026-10-27)', () => {
+  function bare(answer: () => Observable<unknown>) {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideZonelessChangeDetection(), provideRouter([]),
+        { provide: HttpClient, useValue: { get: vi.fn(answer), post: vi.fn(answer) } },
+        { provide: AuthService, useValue: { canOpen: () => true, user: signal({ appUserId: 4640, tenantId: 2960 }) } },
+      ],
+    });
+    const fixture = TestBed.createComponent(NewPipeline);
+    fixture.detectChanges();
+    return { fixture, component: fixture.componentInstance, el: fixture.nativeElement as HTMLElement };
+  }
+
+  it('is loading until the lists answer', () => {
+    const { component, el } = bare(() => NEVER);
+    expect(component.topicsState.pending()).toBe(true);
+    expect(component.sourcesState.pending()).toBe(true);
+    expect(el.querySelector('[data-test="copy-from"]')!.textContent).toContain('Loading pipelines…');
+  });
+
+  it('says there is nothing to copy once the list answers empty', () => {
+    const { component, fixture, el } = bare(() => of({ status: 'SUCCESS', data: [] }));
+    fixture.detectChanges();
+    expect(component.sourcesState.loaded()).toBe(true);
+    expect(el.textContent).toContain('No pipeline with steps to copy yet.');
+  });
+
+  it('says each list could not be read, with Try again', () => {
+    const { component, fixture, el } = bare(() => throwError(() => new HttpErrorResponse({ status: 500 })));
+    fixture.detectChanges();
+    expect(component.topicsState.error()).toBe('The topics could not be read.');
+    expect(component.sourcesState.error()).toBe('The pipelines could not be read.');
+    expect(el.querySelectorAll('app-inline-status [role="alert"]').length).toBe(2);
   });
 });

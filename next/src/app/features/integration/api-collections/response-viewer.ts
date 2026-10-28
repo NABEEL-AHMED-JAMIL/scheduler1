@@ -3,7 +3,9 @@ import { Icon } from '../../../shared/ui/icon';
 import { DataText } from '../../../shared/ui/data-text';
 import { formatSize } from '../../../shared/ui/format-size';
 import { clipText } from '../../../shared/ui/long-text';
-import { RunResult } from './api-collections.model';
+import { Assertion, RunResult } from './api-collections.model';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
 import { formatDuration } from '../../../shared/ui/time-format';
 
 type Tab = 'body' | 'headers' | 'extracted' | 'assertions';
@@ -18,7 +20,7 @@ const BODY_MAX = 200_000;
  */
 @Component({
   selector: 'app-response-viewer',
-  imports: [Icon, DataText],
+  imports: [Icon, DataText, SortHeader],
   template: `
     @let r = result();
     <div class="flex flex-col gap-2">
@@ -76,9 +78,13 @@ const BODY_MAX = 200_000;
           }
           @case ('assertions') {
             <table class="table-modern">
-              <thead><tr><th>Rule</th><th>Result</th><th>Actual</th></tr></thead>
+              <thead><tr>
+                <th appSort="rule" [sortBy]="assertionSort">Rule</th>
+                <th appSort="result" [sortBy]="assertionSort">Result</th>
+                <th appSort="actual" [sortBy]="assertionSort">Actual</th>
+              </tr></thead>
               <tbody>
-                @for (a of r.assertions ?? []; track $index) {
+                @for (a of sortedAssertions(); track $index) {
                   <tr>
                     <td class="mono text-xs max-w-72"><app-data-text [value]="a.rule" label="Rule" /></td>
                     <td><span class="pill" [class.pill-ok]="a.passed" [class.pill-crit]="!a.passed">{{ a.passed ? 'Passed' : 'Failed' }}</span></td>
@@ -104,6 +110,19 @@ export class ResponseViewer {
   readonly size = computed(() => formatSize(this.result().responseBytes));
   readonly passedAssertions = computed(() => (this.result().assertions ?? []).filter(a => a.passed).length);
   readonly failedAssertions = computed(() => (this.result().assertions ?? []).some(a => !a.passed));
+  /**
+   * Owner 2026-10-27: the assertions sort by their columns (Failed first on Result); the request's own rule order until
+   * a heading is picked.
+   */
+  readonly assertionSort = createTableSort<Assertion>({
+    id: 'api-collection-assertions',
+    columns: {
+      rule: a => a.rule,
+      result: { value: a => (a.passed ? 'Passed' : 'Failed'), kind: 'status' },
+      actual: a => a.actual,
+    },
+  });
+  readonly sortedAssertions = computed(() => this.assertionSort.apply(this.result().assertions ?? []));
   readonly headerRows = computed(() => Object.entries(this.result().headers ?? {}));
   readonly extractedRows = computed(() => Object.entries(this.result().extracted ?? {})
     .map(([k, v]) => [k, typeof v === 'string' ? v : JSON.stringify(v)] as [string, string]));

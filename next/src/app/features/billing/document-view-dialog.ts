@@ -8,6 +8,8 @@ import { formatSize } from '../../shared/ui/format-size';
 import { PdfViewer } from '../objects/preview/pdf-viewer';
 import { BillingApi, DOCUMENT_KIND_LABEL, DocumentRow } from './billing.service';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
+import { AppLoading } from '../../shared/ui/loading';
+import { LoadError } from '../../shared/ui/load-error';
 
 /** The dialog's heading id, for the opener's ariaLabelledBy: the CDK role="dialog" otherwise has no name. */
 export const DOC_VIEW_TITLE_ID = 'doc-view-title';
@@ -19,7 +21,7 @@ export const DOC_VIEW_TITLE_ID = 'doc-view-title';
  */
 @Component({
   selector: 'app-document-view-dialog',
-  imports: [Icon, ServerTimePipe, PdfViewer],
+  imports: [Icon, ServerTimePipe, PdfViewer, AppLoading, LoadError],
   template: `
     <div class="card shadow-2xl w-[60rem] max-w-[calc(100vw-2rem)] max-h-[88vh] flex flex-col overflow-hidden">
       <div class="flex items-center gap-3 px-4 py-2.5 border-b shrink-0 border-subtle">
@@ -38,12 +40,11 @@ export const DOC_VIEW_TITLE_ID = 'doc-view-title';
         <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="ref.close()" aria-label="Close"><app-icon name="close" /></button>
       </div>
       <div class="flex-1 min-h-0 h-[72vh] flex flex-col">
+        <!-- Owner 2026-10-27: the shared loader and error, with Try again (the dialog had to be closed and opened again). -->
         @if (error()) {
-          <div class="flex-1 flex flex-col items-center justify-center gap-2 text-center p-8">
-            <app-icon name="alert" size="1.6rem" class="icon-crit" /><p class="text-sm text-crit-500">{{ error() }}</p>
-          </div>
+          <app-load-error class="flex-1" [message]="error()" (retry)="read()" />
         } @else if (!url()) {
-          <div class="flex-1 flex flex-col items-center justify-center gap-3"><div class="spinner"></div><p class="text-sm text-[color:var(--text-muted)]">Reading {{ data.fileName }}…</p></div>
+          <app-loading class="flex-1" shape="spinner" [label]="'Reading ' + data.fileName + '…'" />
         } @else if (kind() === 'pdf') {
           <app-pdf-viewer [src]="url()" />
         } @else if (kind() === 'image') {
@@ -75,7 +76,10 @@ export class DocumentViewDialog implements OnInit, OnDestroy {
     return t.includes('pdf') ? 'pdf' : t.startsWith('image/') ? 'image' : 'other';
   }
 
-  ngOnInit(): void {
+  ngOnInit(): void { this.read(); }
+
+  read(): void {
+    this.error.set('');
     this.api.documentBlob(this.data.documentId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: b => { this.blob.set(b); this.url.set(URL.createObjectURL(b)); },
       error: async err => this.error.set((await refusalOf(err)) || 'The document could not be read.'),

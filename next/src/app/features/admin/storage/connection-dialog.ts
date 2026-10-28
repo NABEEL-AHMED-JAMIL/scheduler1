@@ -9,6 +9,7 @@ import { Field } from '../../../shared/ui/field';
 import { FormDialog } from '../../../shared/ui/form-dialog';
 import { Icon } from '../../../shared/ui/icon';
 import { kafkaDependencyNote, kafkaProfilesUsing } from './kafka-dependents';
+import { InlineStatus, loadErrorText } from '../../../shared/ui/loading';
 
 /**
  * Azure takes either a connection string or an account name plus account key, so neither field
@@ -40,7 +41,7 @@ const PROVIDERS = [
 
 @Component({
   selector: 'app-connection-dialog',
-  imports: [Icon, ReactiveFormsModule, Field, FormDialog, Combobox],
+  imports: [Icon, ReactiveFormsModule, Field, FormDialog, Combobox, InlineStatus],
   templateUrl: './connection-dialog.html',
 })
 export class ConnectionDialog {
@@ -55,6 +56,9 @@ export class ConnectionDialog {
   readonly submitted = signal(false);
   readonly discovering = signal(false);
   readonly discovered = signal<string[]>([]);
+  /** Owner 2026-10-27: the listing's answer said under the field (red with Try again, or plain words when empty). */
+  readonly discoverError = signal('');
+  readonly discoverNote = signal('');
   readonly bucketOptions = computed(() => this.discovered().map(name => ({ value: name, label: name })));
 
   readonly isEdit = computed(() => !!this.data.connection);
@@ -196,22 +200,24 @@ export class ConnectionDialog {
 
   discover(): void {
     this.discovering.set(true);
+    this.discoverError.set('');
+    this.discoverNote.set('');
     this.http.post<ApiResponse<string[]>>(`${API_BASE}/storageConnection.json/discoverBuckets`,
       this.form.getRawValue()).subscribe({
       next: response => {
         this.discovering.set(false);
-        // Reported as the clone dialog reports it: a loose red line under the field read an
-        // empty-but-working server as a failure.
+        // Reported as the clone dialog reports it: an empty-but-working server in plain (not red) words, a failure in
+        // red with Try again -- under the field, not in a toast (owner 2026-10-27).
         if (response.status === API_SUCCESS) {
           this.discovered.set(response.data ?? []);
-          if (!(response.data ?? []).length) this.toast.info(response.message || 'No buckets came back.');
+          if (!(response.data ?? []).length) this.discoverNote.set(response.message || 'No buckets came back.');
         } else {
-          this.toast.error(response.message || 'Could not list buckets.');
+          this.discoverError.set(loadErrorText(response, 'Could not list buckets.'));
         }
       },
       error: err => {
         this.discovering.set(false);
-        this.toast.error(err?.error?.message || 'Could not list buckets.');
+        this.discoverError.set(loadErrorText(err, 'Could not list buckets.'));
       },
     });
   }

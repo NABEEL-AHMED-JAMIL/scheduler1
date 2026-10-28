@@ -19,10 +19,20 @@ export const PINNED: Record<string, unknown> = {
       "Change",
       "Columns",
       "Copy",
+      "Created",
+      "Created by",
       "Hide details for Reference CSV check (e2e)",
+      "Mode",
+      "Next / last run",
       "Only mine",
+      "Pipeline",
       "Refresh",
-      "Show details for UI-REVIEW Clean customers (manual, notify on completion)"
+      "Run status",
+      "Schedule",
+      "Show details for UI-REVIEW Clean customers (manual, notify on completion)",
+      "State",
+      "Updated by",
+      "When"
     ],
     "columns": [
       [
@@ -101,10 +111,16 @@ export const PINNED: Record<string, unknown> = {
       "Backfill…",
       "Columns",
       "Completed 1",
+      "Duration",
+      "Ended",
       "Expand the schedule details",
+      "Queued",
       "Refresh",
+      "Run",
       "Schedule details#2833Pipeline: Reference: CSV check and summarise · On demand",
-      "Show the full message for run #7331"
+      "Show the full message for run #7331",
+      "Started",
+      "Status"
     ],
     "columns": [
       [
@@ -327,8 +343,14 @@ export const PINNED: Record<string, unknown> = {
     "buttons": [
       "Charts",
       "Columns",
+      "Duration",
+      "Ended",
+      "Queued",
       "Refresh",
-      "Show the full message for run #7381"
+      "Run",
+      "Show the full message for run #7381",
+      "Started",
+      "Status"
     ],
     "columns": [
       [
@@ -413,9 +435,19 @@ export const PINNED: Record<string, unknown> = {
       "Actions for Reference CSV check (e2e)",
       "Actions for UI-REVIEW Clean customers (manual, notify on completion)",
       "Columns",
+      "Created",
+      "Created by",
+      "Mode",
+      "Next / last run",
+      "Pipeline",
       "Refresh",
+      "Run status",
+      "Schedule",
       "Show details for Reference CSV check (e2e)",
-      "Show details for UI-REVIEW Clean customers (manual, notify on completion)"
+      "Show details for UI-REVIEW Clean customers (manual, notify on completion)",
+      "State",
+      "Updated by",
+      "When"
     ],
     "columns": [
       [
@@ -467,10 +499,20 @@ export const PINNED: Record<string, unknown> = {
       "Actions for Reference CSV check (e2e)",
       "Actions for UI-REVIEW Clean customers (manual, notify on completion)",
       "Columns",
+      "Created",
+      "Created by",
+      "Mode",
+      "Next / last run",
       "Only mine",
+      "Pipeline",
       "Refresh",
+      "Run status",
+      "Schedule",
       "Show details for Reference CSV check (e2e)",
-      "Show details for UI-REVIEW Clean customers (manual, notify on completion)"
+      "Show details for UI-REVIEW Clean customers (manual, notify on completion)",
+      "State",
+      "Updated by",
+      "When"
     ],
     "columns": [
       [

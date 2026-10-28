@@ -150,5 +150,31 @@ describe('Pipeline approval card: the rows, not the raw subject', () => {
       await settle(f);
       expect((f.nativeElement as HTMLElement).querySelector('[data-test="approval-rows-none"]')).not.toBeNull();
     });
+
+    // Owner 2026-10-27: the rows sort by any column; a failed read says so with Try again, not "kept no rows".
+    it('sorts the rows by a column, numbers as numbers, both ways', async () => {
+      const f = await render();
+      const card = f.componentInstance;
+      expect(card.sortedRows()[0]['measurement_check']).toContain('Re-measure');
+      // Columns typed from the data sort A to Z (smallest) first; "4,5" reads as 45 (a thousands comma).
+      card.sort.toggle('length_diff_pct');
+      expect(card.sortedRows().map(r => r['length_diff_pct'])).toEqual(['-29.6', '1.0', '2.7', '4,5']);
+      card.sort.toggle('length_diff_pct');
+      expect(card.sortedRows().map(r => r['length_diff_pct'])).toEqual(['4,5', '2.7', '1.0', '-29.6']);
+    });
+
+    it('says the rows could not be read, with Try again, when the run\'s outputs fail', async () => {
+      const f = TestBed.createComponent(PipelineApprovalCard);
+      f.componentRef.setInput('subject', subject);
+      f.detectChanges();
+      http.expectOne(r => r.url.endsWith('/sourceJob.json/runOutputs')).flush({ message: 'down' }, { status: 500, statusText: 'Server Error' });
+      await settle(f);
+      const el = f.nativeElement as HTMLElement;
+      expect(f.componentInstance.loading()).toBe(false);
+      expect(el.querySelector('[data-test="approval-rows-error"]')?.textContent).toContain('Try again');
+      expect(el.querySelector('[data-test="approval-rows-none"]')).toBeNull();
+      f.componentInstance.retry();
+      expect(http.match(r => r.url.endsWith('/sourceJob.json/runOutputs')).length).toBe(1);
+    });
   });
 });

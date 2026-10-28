@@ -3,6 +3,8 @@ import { RouterLink } from '@angular/router';
 import { Icon } from '../../../shared/ui/icon';
 import { Section } from '../../../shared/ui/section';
 import { TableShell } from '../../../shared/ui/data-table';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
 
 /**
  * UX review 2026-10-13 (I1): what the workspace's pipelines actually read, from Core's GET pipeline.json/steps/reads --
@@ -62,7 +64,7 @@ export const READERS_SHOWN = 3;
 
 @Component({
   selector: 'app-pipeline-reads',
-  imports: [RouterLink, Icon, Section, TableShell],
+  imports: [RouterLink, Icon, Section, TableShell, SortHeader],
   template: `
     <app-section title="What your pipelines read" data-test="pipeline-reads"
                  sub="Read straight from each pipeline's steps: storage, API Collections, databases and documents. Nothing to set up here; open a pipeline to change what it reads.">
@@ -77,13 +79,13 @@ export const READERS_SHOWN = 3;
         <table class="table-modern">
           <thead>
             <tr>
-              <th>What</th>
-              <th>Kind</th>
-              <th>Read by</th>
+              <th appSort="what" [sortBy]="sort">What</th>
+              <th appSort="kind" [sortBy]="sort">Kind</th>
+              <th appSort="readBy" [sortBy]="sort">Read by</th>
             </tr>
           </thead>
           <tbody>
-            @for (r of reads(); track r.kind + r.label; let i = $index) {
+            @for (r of sorted(); track keyOf(r)) {
               <tr>
                 <td class="min-w-48 max-w-96">
                   @if (r.link) {
@@ -98,14 +100,14 @@ export const READERS_SHOWN = 3;
                 </td>
                 <td class="min-w-56">
                   <ul class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm" [attr.aria-label]="'Pipelines that read ' + r.label">
-                    @for (p of shownReaders(r, i); track p.taskDetailId) {
+                    @for (p of shownReaders(r); track p.taskDetailId) {
                       <li>
                         <a class="link-inline" [routerLink]="['/pipelines', p.taskDetailId, 'edit']" [queryParams]="{ tab: 'steps' }"
                            [attr.title]="'Steps: ' + p.steps.join(', ')">{{ p.taskName }}</a>
                       </li>
                     }
-                    @if (hiddenReaders(r, i) > 0) {
-                      <li><button type="button" class="btn btn-default btn-xs" (click)="expand(i)">+{{ hiddenReaders(r, i) }} more</button></li>
+                    @if (hiddenReaders(r) > 0) {
+                      <li><button type="button" class="btn btn-default btn-xs" (click)="expand(r)">+{{ hiddenReaders(r) }} more</button></li>
                     }
                   </ul>
                 </td>
@@ -123,24 +125,39 @@ export class PipelineReads {
   readonly error = input('');
   readonly retry = output<void>();
 
-  /** The rows whose every reader is shown. */
-  private readonly expanded = signal<ReadonlySet<number>>(new Set());
+  /**
+   * The rows whose every reader is shown, by the row's place (kind and label) -- not by its position, which a sort moves
+   * (owner 2026-10-27).
+   */
+  private readonly expanded = signal<ReadonlySet<string>>(new Set());
   readonly pipelineCount = computed(() => readingPipelines(this.reads()));
+  /** Owner 2026-10-27: the places sort by what, kind and how many pipelines read them; Core's order until then. */
+  readonly sort = createTableSort<PipelineRead>({
+    id: 'pipeline-reads',
+    columns: {
+      what: r => r.label,
+      kind: r => readKindLabel(r.kind),
+      readBy: { value: r => (r.pipelines ?? []).length, kind: 'number' },
+    },
+  });
+  readonly sorted = computed(() => this.sort.apply(this.reads()));
+
+  keyOf(r: PipelineRead): string { return `${r.kind}|${r.label}`; }
 
   kind(k: string): string { return readKindLabel(k); }
   icon(k: string): string { return readKindIcon(k); }
   pill(k: string): string { return readKindPill(k); }
 
-  shownReaders(r: PipelineRead, index: number): PipelineReader[] {
+  shownReaders(r: PipelineRead): PipelineReader[] {
     const all = r.pipelines ?? [];
-    return this.expanded().has(index) ? all : all.slice(0, READERS_SHOWN);
+    return this.expanded().has(this.keyOf(r)) ? all : all.slice(0, READERS_SHOWN);
   }
 
-  hiddenReaders(r: PipelineRead, index: number): number {
-    return (r.pipelines ?? []).length - this.shownReaders(r, index).length;
+  hiddenReaders(r: PipelineRead): number {
+    return (r.pipelines ?? []).length - this.shownReaders(r).length;
   }
 
-  expand(index: number): void {
-    this.expanded.update(open => new Set(open).add(index));
+  expand(r: PipelineRead): void {
+    this.expanded.update(open => new Set(open).add(this.keyOf(r)));
   }
 }

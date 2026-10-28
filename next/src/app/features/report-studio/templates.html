@@ -128,7 +128,10 @@
     } @else {
       <table class="table-modern">
         <thead>
-          <tr><th>Template</th><th>Category</th><th>Versions</th><th>From</th><th>Pages</th><th>Updated</th><th class="w-12 th-actions">Actions</th></tr>
+          <!-- Owner 2026-10-27: these headings sort the workspace's templates on the server; the starters, after them, by the same column. -->
+          <tr><th appSort="template" [sortBy]="sort">Template</th><th appSort="category" [sortBy]="sort">Category</th><th>Versions</th>
+            <th appSort="from" [sortBy]="sort">From</th><th>Pages</th><th appSort="updated" [sortBy]="sort">Updated</th>
+            <th class="w-12 th-actions">Actions</th></tr>
         </thead>
         <tbody>
           @for (i of filtered(); track i.id) {

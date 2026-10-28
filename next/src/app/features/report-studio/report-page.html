@@ -78,6 +78,8 @@
                       @if (thumb(); as src) { <img [src]="src" [alt]="'Page ' + thumbPage() + ' of ' + r.name + ' version ' + v.version" /> }
                       @else { <span class="rst-paper-sm" aria-hidden="true"><i></i><i></i><b></b><i></i><i></i></span> }
                     </div>
+                    @if (thumbLoading() && !thumb()) { <app-loading shape="inline" label="Drawing the first page…" /> }
+                    @if (thumbError()) { <app-inline-status [error]="thumbError()" (retry)="retryThumb()" /> }
                     @if ((v.pages ?? 0) > 1) {
                       <div class="rsr-thumb-nav" data-test="thumb-nav">
                         <button type="button" class="btn btn-default btn-icon btn-sm" aria-label="Previous page" [disabled]="thumbPage() <= 1 || thumbLoading()" (click)="turn(-1)"><app-icon name="chevronLeft" /></button>
@@ -186,8 +188,12 @@
             <div><h2 class="section-title">Generate again</h2><span class="text-xs text-[color:var(--text-muted)]">Make a new version and keep all the others.</span></div>
             <label class="field"><span class="label">Template version</span>
               <select class="input" [ngModel]="againVersion()" (ngModelChange)="againVersion.set($event)" aria-label="Template version">
+                @if (versionsState.loading() && !templateVersions().length) { <option [ngValue]="null" disabled>Loading versions…</option> }
                 @for (tv of templateVersions(); track tv.versionId) { <option [ngValue]="tv.version">v{{ tv.version }} · {{ tv.state === 'PUBLISHED' ? 'Published (fixed)' : 'Superseded' }}</option> }
-              </select></label>
+              </select>
+              <app-inline-status [loading]="versionsState.loading()" [error]="versionsState.error()" label="Loading versions…"
+                                 [empty]="versionsState.loaded() && !templateVersions().length" emptyText="The template has no published version yet."
+                                 (retry)="loadVersions()" /></label>
             <label class="field"><span class="label">Data</span>
               <select class="input" [ngModel]="againData()" (ngModelChange)="againData.set($event)" aria-label="Data">
                 @if (current(); as v) { <option value="same">The data of v{{ v.version }} (frozen{{ v.snapshot?.pipelineRunId ? ', run #' + v.snapshot!.pipelineRunId : '' }})</option> }
@@ -205,6 +211,10 @@
               </div>
             }
             @if (againError()) { <p class="text-xs text-[color:var(--crit-text)]" role="alert">{{ againError() }}</p> }
+            @if (pollError()) {
+              <p class="text-xs text-[color:var(--crit-text)] flex flex-wrap items-center gap-2" role="alert">{{ pollError() }}
+                <button type="button" class="btn btn-default btn-xs" (click)="checkAgain()"><app-icon name="refresh" />Check again</button></p>
+            }
             <button type="button" class="btn btn-primary btn-sm self-start" [disabled]="againBusy() || (againJob() && isRunning(againJob()!.status))" (click)="again()">
               <app-icon name="refresh" />{{ againData() === 'other' ? 'Pick the data' : 'Check and generate v' + nextVersion() }}
             </button>
@@ -255,9 +265,10 @@
           <span class="pill pill-neutral">{{ r.versions.length }} version{{ r.versions.length === 1 ? '' : 's' }}</span>
         </div>
         <div class="overflow-x-auto"><table class="table-modern">
-          <thead><tr><th>Version</th><th>Generated · by</th><th>Template · data</th><th>Signed</th><th class="text-right">Files</th></tr></thead>
+          <thead><tr><th appSort="version" [sortBy]="versionSort">Version</th><th appSort="generated" [sortBy]="versionSort">Generated · by</th>
+            <th appSort="template" [sortBy]="versionSort">Template · data</th><th appSort="signed" [sortBy]="versionSort">Signed</th><th class="text-right">Files</th></tr></thead>
           <tbody>
-            @for (v of r.versions; track v.versionId) {
+            @for (v of sortedVersions(); track v.versionId) {
               <tr>
                 <td>v{{ v.version }}@if (v.version === r.currentVersion) { <span class="pill pill-ok ml-1">Current</span> }
                   @if (v.config?.['markAsCopy'] === true) { <span class="pill pill-neutral ml-1" title="Generated marked as COPY: every page of its files says COPY">COPY</span> }
@@ -297,6 +308,6 @@
     </ng-template>
   } @else {
     <app-page-header title="Report" />
-    <div class="flex justify-center py-16"><span class="spinner" role="status" aria-label="Loading"></span></div>
+    <app-loading shape="panel" label="Loading the report…" [count]="6" />
   }
 </div>

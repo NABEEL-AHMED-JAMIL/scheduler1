@@ -2,7 +2,8 @@ import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { Component, ViewChild } from '@angular/core';
 import { provideRouter } from '@angular/router';
-import { of } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { DatasetOverview, shortDate } from './dataset-overview';
 import { AnalyticsService, AnalysisRequest, DatasetOverview as OverviewData } from './analytics.service';
 import { API_SUCCESS } from '../../core/api/api.config';
@@ -93,5 +94,35 @@ describe('DatasetOverview', () => {
     const { component, text } = mount({ status: API_SUCCESS, data: { ...OVERVIEW, charts: [], profile: { ...OVERVIEW.profile, totalRows: 0 } } });
     expect(component.tiles()).toEqual([]);
     expect(text()).toContain('The file has no rows');
+  });
+});
+
+describe('DatasetOverview -- loading, refresh, error (owner 2026-10-27)', () => {
+  it('keeps the charts on screen while Refresh reads again', () => {
+    const { component, api, fixture, text } = mount();
+    api.overview.mockReturnValue(NEVER as never);
+    component.load(true);
+    fixture.detectChanges();
+    expect(component.loading()).toBe(true);
+    expect(component.tiles().length).toBe(5);
+    expect(text()).toContain('Rows over time');
+  });
+
+  it('is loading, with skeleton tiles, on the first read of a file', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ imports: [Host], providers: [provideRouter([]), { provide: AnalyticsService, useValue: { overview: () => NEVER } }] });
+    const fixture = TestBed.createComponent(Host);
+    fixture.detectChanges();
+    expect(fixture.componentInstance.overview.loading()).toBe(true);
+    expect((fixture.nativeElement as HTMLElement).querySelector('[aria-busy="true"]')).not.toBeNull();
+  });
+
+  it('says the overview could not be read, in plain words', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ imports: [Host], providers: [provideRouter([]),
+      { provide: AnalyticsService, useValue: { overview: () => throwError(() => new HttpErrorResponse({ status: 500 })) } }] });
+    const fixture = TestBed.createComponent(Host);
+    fixture.detectChanges();
+    expect(fixture.componentInstance.overview.error()).toBe('The overview could not be read.');
   });
 });

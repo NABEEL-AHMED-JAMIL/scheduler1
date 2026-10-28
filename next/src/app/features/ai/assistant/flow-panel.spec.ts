@@ -3,7 +3,8 @@ import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Dialog } from '@angular/cdk/dialog';
 import { provideRouter } from '@angular/router';
-import { Subject, of } from 'rxjs';
+import { NEVER, Observable, Subject, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { StepsApi } from '../../tasks/steps/steps.service';
 import { FlowPanel } from './flow-panel';
@@ -78,5 +79,42 @@ describe('the flow panel', () => {
     expect(changed.el.querySelector('[data-needs-update]')).not.toBeNull();
     (changed.el.querySelector('[data-update]') as HTMLButtonElement).click();
     expect((changed.dialog.open.mock.calls[0] as unknown[])[1]).toMatchObject({ data: { update: { pipelineKey: 1428 } } });
+  });
+});
+
+describe('the flow panel -- the step choices load, or say why not (owner 2026-10-27)', () => {
+  function withTasks(tasks: () => Observable<unknown>) {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [FlowPanel],
+      providers: [provideZonelessChangeDetection(), provideRouter([]),
+        { provide: StepsApi, useValue: { tasks, prompts: () => of([]), buckets: () => of([]) } },
+        { provide: Dialog, useValue: { open: vi.fn() } },
+        { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }],
+    });
+    const fixture = TestBed.createComponent(FlowPanel);
+    fixture.componentRef.setInput('flow', flow());
+    fixture.componentRef.setInput('canCreate', true);
+    fixture.componentRef.setInput('messageId', 41);
+    fixture.detectChanges();
+    return fixture.componentInstance;
+  }
+
+  it('is loading until the task catalogue answers', () => {
+    const panel = withTasks(() => NEVER);
+    expect(panel.tasksLoading()).toBe(true);
+    expect(panel.choicesError()).toBe('');
+  });
+
+  it('has no settings form for a task the empty catalogue does not know', () => {
+    const panel = withTasks(() => of({ status: 'SUCCESS', data: [] }));
+    expect(panel.tasksLoading()).toBe(false);
+    expect(panel.schemaOf('aggregate')).toBeNull();
+  });
+
+  it('says the settings could not be read, in plain words', () => {
+    const panel = withTasks(() => throwError(() => new HttpErrorResponse({ status: 500 })));
+    expect(panel.tasksLoading()).toBe(false);
+    expect(panel.choicesError()).toBe('The step settings could not be read.');
   });
 });

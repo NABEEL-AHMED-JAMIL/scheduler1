@@ -2,6 +2,8 @@ import { Component, computed, effect, inject, input, output, signal, untracked }
 import { Subscription } from 'rxjs';
 import { API_SUCCESS } from '../../core/api/api.config';
 import { Icon } from '../../shared/ui/icon';
+import { BlurLoader } from '../../shared/ui/blur-loader';
+import { loadErrorText } from '../../shared/ui/loading';
 import { DataText } from '../../shared/ui/data-text';
 import { formatSize } from '../../shared/ui/format-size';
 import { BarChart, Bar } from '../../shared/charts/bar-chart';
@@ -24,12 +26,13 @@ interface OverviewTile { chart: OverviewChart; view: WidgetView | null; kind: st
  */
 @Component({
   selector: 'app-dataset-overview',
-  imports: [Icon, AnalyticsWidget, WidgetChart, BarChart, RankedBar, DataText],
+  imports: [Icon, AnalyticsWidget, WidgetChart, BarChart, RankedBar, DataText, BlurLoader],
   template: `
     <!-- No tiles here. Rows, columns, Complete and Quality are the Studio's KPI strip right above
          this (owner, 2026-09-28), where the quality count -- which this component cannot see --
          sits beside the other three. -->
-    @if (loading()) {
+    <!-- Owner 2026-10-27: skeleton tiles on the first read of a file only; Refresh keeps the charts under a blur. -->
+    @if (loading() && !overview()) {
       <div class="widget-grid" aria-busy="true">
         @for (n of [1, 2, 3, 4]; track n) {
           <app-analytics-widget [title]="'Reading the file…'" state="running" [refreshable]="false" />
@@ -51,6 +54,7 @@ interface OverviewTile { chart: OverviewChart; view: WidgetView | null; kind: st
         <p class="text-xs text-[color:var(--text-muted)]" title="Each opens in the Canvas as the analysis that drew it.">{{ tiles().length }} chart{{ tiles().length === 1 ? '' : 's' }} chosen from the columns, read in {{ took() }}.</p>
         <button type="button" class="btn btn-default btn-sm" (click)="load(true)" [disabled]="loading()"><app-icon name="refresh" [class.spin]="loading()" />Refresh</button>
       </div>
+      <app-blur-loader [active]="loading()" label="Refreshing…">
       <div class="widget-grid">
         @for (tile of tiles(); track tile.chart.title) {
           <app-analytics-widget [title]="tile.chart.title" [subtitle]="tile.chart.question" [state]="stateOf(tile)" [error]="tile.chart.error || ''" [refreshable]="false"
@@ -91,6 +95,7 @@ interface OverviewTile { chart: OverviewChart; view: WidgetView | null; kind: st
           </app-analytics-widget>
         }
       </div>
+      </app-blur-loader>
     }
   `,
 })
@@ -157,14 +162,15 @@ export class DatasetOverview {
 
   load(fresh = false): void {
     this.inFlight?.unsubscribe();
-    this.loading.set(true); this.error.set(''); this.overview.set(null);
+    // A refresh of the same file keeps its charts on screen; a new file starts empty.
+    this.loading.set(true); this.error.set(''); if (!fresh) this.overview.set(null);
     this.inFlight = this.analytics.overview(this.connection(), this.path(), fresh).subscribe({
       next: r => {
         this.loading.set(false);
-        if (r.status !== API_SUCCESS || !r.data) { this.error.set(r.message || 'The overview could not be read.'); return; }
+        if (r.status !== API_SUCCESS || !r.data) { this.error.set(loadErrorText(r, 'The overview could not be read.')); return; }
         this.overview.set(r.data); this.profiled.emit(r.data.profile);
       },
-      error: err => { this.loading.set(false); this.error.set(err?.error?.message || 'The overview could not be read.'); },
+      error: err => { this.loading.set(false); this.error.set(loadErrorText(err, 'The overview could not be read.')); },
     });
   }
 

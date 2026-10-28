@@ -11,6 +11,9 @@ export const PINNED: Record<string, unknown> = {
     "buttons": [
       "Close",
       "Customise",
+      "Name",
+      "Saved",
+      "Version",
       "v1",
       "v2"
     ],
@@ -248,11 +251,18 @@ export const PINNED: Record<string, unknown> = {
       "Approved data (1 of 1)"
     ],
     "buttons": [
+      "Approved",
       "CSV",
       "Columns",
+      "Document",
       "JSON Lines",
       "More actions",
+      "Order date",
+      "Order total",
+      "Ordered items",
+      "PO number",
       "Refresh",
+      "Supplier",
       "Upload documents"
     ],
     "columns": [
@@ -294,13 +304,21 @@ export const PINNED: Record<string, unknown> = {
     ],
     "buttons": [
       "Add from starters",
+      "Auto-approve at",
       "Columns",
+      "Fields",
       "Invoice",
+      "Kind",
       "More actions",
       "New document type",
       "Purchase order",
       "Refresh",
-      "Upload documents"
+      "Rules",
+      "State",
+      "Tables",
+      "Type",
+      "Upload documents",
+      "Version"
     ],
     "columns": [
       [
@@ -341,8 +359,14 @@ export const PINNED: Record<string, unknown> = {
       "What arrived"
     ],
     "buttons": [
+      "Arrived",
+      "Channel",
       "Columns",
       "Copy the address",
+      "Document",
+      "File",
+      "From",
+      "Outcome",
       "Refresh"
     ],
     "columns": [
@@ -387,8 +411,14 @@ export const PINNED: Record<string, unknown> = {
     "buttons": [
       "Actions for ocr-live-check.png",
       "Columns",
+      "Confidence",
+      "Document",
+      "Fields",
       "More actions",
+      "Received",
       "Refresh",
+      "State",
+      "Type",
       "Upload documents"
     ],
     "columns": [
@@ -454,8 +484,14 @@ export const PINNED: Record<string, unknown> = {
     "buttons": [
       "Actions for ocr-live-check.png",
       "Columns",
+      "Confidence",
+      "Document",
+      "Fields",
       "More actions",
+      "Received",
       "Refresh",
+      "State",
+      "Type",
       "Upload documents"
     ],
     "columns": [
@@ -518,9 +554,16 @@ export const PINNED: Record<string, unknown> = {
       "Documents (1 of 1)"
     ],
     "buttons": [
+      "Claimed",
       "Columns",
+      "Document",
+      "Least sure",
       "Refresh",
-      "Start reviewing"
+      "Start reviewing",
+      "State",
+      "To check",
+      "Type",
+      "Waiting since"
     ],
     "columns": [
       [
@@ -568,7 +611,13 @@ export const PINNED: Record<string, unknown> = {
       "What arrived"
     ],
     "buttons": [
+      "Arrived",
+      "Channel",
       "Columns",
+      "Document",
+      "File",
+      "From",
+      "Outcome",
       "Read a stored file",
       "Refresh",
       "Upload documents"

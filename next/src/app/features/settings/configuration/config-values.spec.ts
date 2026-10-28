@@ -37,6 +37,7 @@ function screen(platform = false, confirmed = true) {
   const toast = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
   const open = vi.fn(() => ({ closed: of(confirmed) }));
   TestBed.resetTestingModule();
+  try { localStorage.clear(); } catch { /* none: the sort remembers its choice there */ }
   TestBed.configureTestingModule({
     imports: [ConfigValues],
     providers: [
@@ -57,6 +58,49 @@ function flushList(http: HttpTestingController, rows: PipelineConfig[] = ROWS) {
   req.flush({ status: API_SUCCESS, message: '', data: rows });
   return req;
 }
+
+describe('Configuration values -- sorting, loading, empty, error (owner 2026-10-27)', () => {
+  it('keeps the API order until a heading is picked, then sorts by it both ways', () => {
+    const { component, http } = screen();
+    flushList(http);
+    expect(component.sorted().map(r => r.key)).toEqual(['INPUT_BUCKET', 'DB_PASSWORD']);
+    component.sort.toggle('key');
+    expect(component.sorted().map(r => r.key)).toEqual(['DB_PASSWORD', 'INPUT_BUCKET']);
+    component.sort.toggle('key');
+    expect(component.sorted().map(r => r.key)).toEqual(['INPUT_BUCKET', 'DB_PASSWORD']);
+    component.sort.toggle('usedBy');
+    expect(component.sorted().map(r => r.usedByTasks)).toEqual([2, 0]);
+  });
+
+  it('is loading, with the tiles waiting, until the list answers', () => {
+    const { component, el } = screen();
+    expect(component.loading()).toBe(true);
+    expect(component.state.pending()).toBe(true);
+    expect(el.querySelectorAll('app-stat-tile').length).toBe(3);
+    expect(el.textContent).not.toContain('No configuration values yet');
+  });
+
+  it('is empty once an empty list answers', () => {
+    const { component, http } = screen();
+    flushList(http, []);
+    expect(component.loading()).toBe(false);
+    expect(component.state.pending()).toBe(false);
+    expect(component.sorted()).toEqual([]);
+  });
+
+  it('says the list could not be read, in plain words', () => {
+    const { component, http } = screen();
+    http.expectOne(r => r.url === ENDPOINT && r.method === 'GET').flush('Internal Server Error', { status: 500, statusText: 'Server Error' });
+    expect(component.loading()).toBe(false);
+    expect(component.error()).toBe('The configuration values could not be read.');
+  });
+
+  it('says when the workspace names could not be read, for a platform administrator', () => {
+    const { component, http } = screen(true);
+    for (const r of http.match(r => r.url.endsWith('/tenant.json/listTenants'))) r.flush('no', { status: 500, statusText: 'Server Error' });
+    expect(component.tenantsState.error()).toBe('The workspace names could not be read.');
+  });
+});
 
 describe('Configuration values -- the list', () => {
   it('asks for the caller\'s own workspace and lists every key', () => {

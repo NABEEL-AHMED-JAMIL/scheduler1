@@ -21,7 +21,9 @@ import { Icon } from '../../../shared/ui/icon';
 import { CopyButton } from '../../../shared/ui/copy-button';
 import { ViewToggle } from '../../../shared/ui/view-toggle';
 import { Avatar } from '../../../shared/ui/avatar';
-import { createSort } from '../../../shared/ui/sort';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
+import { InlineStatus, loadErrorText } from '../../../shared/ui/loading';
 import { UserDialog } from './user-dialog';
 import { AccessProfile, AccessProfilesService } from '../access-profiles/access-profiles.service';
 import { ResetPasswordData, ResetPasswordDialog, ResetPasswordResult } from './reset-password-dialog';
@@ -86,7 +88,7 @@ export interface AppUser {
 
 @Component({
   selector: 'app-users',
-  imports: [WorkspaceSelect, RefreshButton, PageHeader, MineFilter, ViewToggle, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Icon, CopyButton, Avatar, Pagination, StatStrip],
+  imports: [WorkspaceSelect, RefreshButton, PageHeader, MineFilter, ViewToggle, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Icon, CopyButton, Avatar, Pagination, StatStrip, SortHeader, InlineStatus],
   templateUrl: './users.html',
 })
 export class Users implements OnInit {
@@ -112,6 +114,18 @@ export class Users implements OnInit {
   readonly accessProfiles = signal<AccessProfile[]>([]);
   readonly loading = signal(true);
   readonly error = signal('');
+  /** Owner 2026-10-27: the list has answered once; until then the cards show a placeholder, not 0. */
+  readonly loaded = signal(false);
+  /**
+   * The sign-in standing (locks, two-factor) behind four of the cards and the row pills. Until it answers those cards say
+   * so instead of "Locked 0"; a failure is said with Try again, since a missed read would hide a real lock.
+   */
+  readonly standingLoaded = signal(false);
+  readonly standingError = signal('');
+  /** The workspaces for the New user dialog (a platform administrator's): why they could not be read, if so. */
+  readonly tenantsError = signal('');
+  /** New user waits for the access profiles; the button says it is busy meanwhile. */
+  readonly opening = signal(false);
   readonly search = signal('');
   readonly roleFilter = signal('');
   readonly statusFilter = signal('');
@@ -127,7 +141,24 @@ export class Users implements OnInit {
   readonly cardFilter = signal<UserCard | ''>('');
   readonly focusedTenantId = signal<number | null>(null);
 
-  readonly sort = createSort<AppUser>('fullName');
+  /**
+   * Owner 2026-10-27: the shared column sort, by name A to Z as before. Role sorts by its rank (platform administrator
+   * first on the first click), Access by what the cell says, Workload by the schedules a person owns.
+   */
+  readonly sort = createTableSort<AppUser>({
+    id: 'users',
+    initial: { key: 'fullName', direction: 'asc' },
+    columns: {
+      fullName: u => u.fullName || u.username,
+      userRole: { value: u => (isUserRole(u.userRole) ? ROLE_RANK[u.userRole] : null), kind: 'number' },
+      pageAccessProfileName: u => this.accessLabel(u),
+      tenantName: u => u.tenantName,
+      lastLoginAt: { value: u => u.lastLoginAt, kind: 'date' },
+      workload: { value: u => this.statFor(u)?.jobCount, kind: 'number' },
+      dateCreated: { value: u => u.dateCreated, kind: 'date' },
+      status: { value: u => u.status, kind: 'status' },
+    },
+  });
 
   readonly canPickTenant = this.auth.isPlatformAdmin;
   readonly currentUserId = computed(() => this.auth.user()?.appUserId ?? null);
@@ -209,11 +240,13 @@ export class Users implements OnInit {
         || (!!digits && (user.phoneNumber ?? '').replace(/[^0-9+]/g, '').includes(digits))
         || (user.tenantName ?? '').toLowerCase().includes(term);
     });
-    return this.sort.apply(this.mine(rows), (row, key) => (row as any)[key]);
+    return this.mine(rows);
   });
+  /** The rows in the chosen order, before the pager; the cards view follows it too. */
+  readonly sorted = computed(() => this.sort.apply(this.filtered()));
 
   readonly pager = createPager<AppUser>();
-  readonly paged = computed(() => this.pager.slice(this.filtered()));
+  readonly paged = computed(() => this.pager.slice(this.sorted()));
 
   goToPage(next: number): void { this.pager.goTo(next, this.filtered().length); }
   setPageSize(size: number): void { this.pager.setSize(size); }
@@ -244,7 +277,13 @@ export class Users implements OnInit {
     const list = this.users().filter(u => (focusedTenant === null || u.tenantId === focusedTenant) && (!tenant || String(u.tenantId) === tenant));
     const standing = this.standing();
     const picked = this.cardFilter();
+    const standingKnown = this.standingLoaded();
     return USER_CARDS.map(card => {
+      // Owner 2026-10-27: a count that needs the standing is not 0 before (or without) it.
+      if (!standingKnown && STANDING_CARDS.includes(card.key)) {
+        return { label: card.label, value: '—', icon: card.icon, tone: 'muted' as const, hint: card.hint, quiet: true,
+          foot: this.standingError() ? 'not available right now' : 'loading…', clickable: false };
+      }
       const count = list.filter(u => cardHolds(card.key, u, standing[String(u.appUserId)])).length;
       return { label: card.label, value: count, icon: card.icon, tone: count ? card.tone : 'muted', hint: card.hint,
         foot: card.key === 'all' ? `${list.length} in ${this.canPickTenant() && !tenant && focusedTenant === null ? 'every workspace' : 'this workspace'}`
@@ -282,12 +321,12 @@ export class Users implements OnInit {
     this.http.get<ApiResponse<AppUser[]>>(`${API_BASE}/appUser.json/listUsers`).subscribe({
       next: response => {
         this.loading.set(false);
-        if (response.status === API_SUCCESS) this.users.set(response.data ?? []);
-        else this.error.set(response.message);
+        if (response.status === API_SUCCESS) { this.users.set(response.data ?? []); this.loaded.set(true); }
+        else this.error.set(loadErrorText(response, 'Could not load users.'));
       },
       error: err => {
         this.loading.set(false);
-        this.error.set(err?.error?.message || 'Could not load users.');
+        this.error.set(loadErrorText(err, 'Could not load users.'));
       },
     });
   }
@@ -328,10 +367,14 @@ export class Users implements OnInit {
 
   private loadTenants(): void {
     if (!this.canPickTenant()) return;
+    this.tenantsError.set('');
     this.http.get<ApiResponse<any[]>>(`${API_BASE}/tenant.json/listTenants`).subscribe({
       next: response => {
         if (response.status === API_SUCCESS) this.tenants.set(response.data ?? []);
+        else this.tenantsError.set(loadErrorText(response, 'The workspaces could not be read. Close this and open it again.'));
       },
+      // Owner 2026-10-27: it had no error handler; New user then offered no workspace, with no word why.
+      error: err => this.tenantsError.set(loadErrorText(err, 'The workspaces could not be read. Close this and open it again.')),
     });
   }
 
@@ -340,21 +383,30 @@ export class Users implements OnInit {
    * never open one. A platform administrator's dialog fetches per tenant on its own.
    */
   private accessProfilesLoaded = false;
-  private withAccessProfiles(open: (profiles: AccessProfile[]) => void): void {
-    if (this.canPickTenant() || this.accessProfilesLoaded) { open(this.accessProfiles()); return; }
+  private withAccessProfiles(open: (profiles: AccessProfile[], error: string) => void): void {
+    if (this.canPickTenant() || this.accessProfilesLoaded) { open(this.accessProfiles(), ''); return; }
+    this.opening.set(true);
     this.profilesApi.list().subscribe({
       next: response => {
-        if (response.status === API_SUCCESS) this.accessProfiles.set(response.data ?? []);
+        this.opening.set(false);
+        if (response.status !== API_SUCCESS) {
+          open([], loadErrorText(response, 'The access profiles could not be read. Close this and open it again.'));
+          return;
+        }
+        this.accessProfiles.set(response.data ?? []);
         this.accessProfilesLoaded = true;
-        open(this.accessProfiles());
+        open(this.accessProfiles(), '');
       },
-      error: () => open([]),
+      // Owner 2026-10-27: the dialog says why its Page access list holds only the default.
+      error: err => { this.opening.set(false); open([], loadErrorText(err, 'The access profiles could not be read. Close this and open it again.')); },
     });
   }
 
   create(): void {
-    this.withAccessProfiles(accessProfiles => this.dialog.open<boolean>(UserDialog, {
-      data: { tenants: this.tenants(), canPickTenant: this.canPickTenant(), accessProfiles, people: this.users() }, hasBackdrop: true,
+    if (this.opening()) return;
+    this.withAccessProfiles((accessProfiles, accessProfilesError) => this.dialog.open<boolean>(UserDialog, {
+      data: { tenants: this.tenants(), canPickTenant: this.canPickTenant(), accessProfiles, people: this.users(),
+        tenantsError: this.tenantsError(), accessProfilesError }, hasBackdrop: true,
     }).closed.subscribe(saved => { if (saved) this.load(); }));
   }
 
@@ -444,10 +496,15 @@ export class Users implements OnInit {
   /** {appUserId: {lockedUntil, failedSignIns, mfaEnabled, ...}} from tenant.json/security/people. */
   readonly standing = signal<Record<string, PersonStanding>>({});
 
-  private loadStanding(): void {
+  loadStanding(): void {
+    this.standingError.set('');
     this.security.people().subscribe({
-      next: r => { if (r.status === API_SUCCESS) this.standing.set(r.data ?? {}); },
-      error: () => { /* the list stands without it */ },
+      next: r => {
+        if (r.status === API_SUCCESS) { this.standing.set(r.data ?? {}); this.standingLoaded.set(true); }
+        else this.standingError.set(loadErrorText(r, 'Locks and two-factor could not be read.'));
+      },
+      // Owner 2026-10-27: the list stands without it, but a missed read must not read as "nobody is locked".
+      error: err => this.standingError.set(loadErrorText(err, 'Locks and two-factor could not be read.')),
     });
   }
 
@@ -654,6 +711,9 @@ export class Users implements OnInit {
 /** The Users screen's cards (owner 2026-10-19 #30): each is a count and the filter it counts. */
 export type UserCard = 'all' | 'active' | 'inactive' | 'invited' | 'locked' | 'mfa' | 'noMfa' | 'sso' | 'admins' | 'members'
   | 'recent' | 'never';
+
+/** The cards counted from the sign-in standing (tenant.json/security/people), which says nothing until it answers. */
+const STANDING_CARDS: readonly UserCard[] = ['locked', 'mfa', 'noMfa', 'sso'];
 
 export const USER_CARDS: { key: UserCard; label: string; icon: string; tone: 'ok' | 'warn' | 'crit' | 'info' | 'muted'; hint: string }[] = [
   { key: 'all', label: 'People', icon: 'users', tone: 'info', hint: 'Everyone on the list; shows them all again' },

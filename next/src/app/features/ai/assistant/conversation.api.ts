@@ -23,6 +23,7 @@ export class ConversationApi {
     if (filter.pinned) params['pinned'] = true;
     if (filter.offset) params['offset'] = filter.offset;
     params['limit'] = filter.limit ?? 50;
+    if (filter.sort) { params['sort'] = filter.sort; params['dir'] = filter.dir ?? 'asc'; }
     return this.http.get<ApiResponse<ConversationPage>>(`${BASE()}/conversationList`, { params });
   }
 

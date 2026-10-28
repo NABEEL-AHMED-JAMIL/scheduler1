@@ -27,7 +27,14 @@
     <ng-container toolbar>
       <div class="w-56 max-w-full">
         <app-combobox ariaLabel="Bucket" [selected]="bucket()" (selectedChange)="pickBucket($event)"
-                      placeholder="Choose a bucket" [allowClear]="false" [options]="bucketOptions()" />
+                      [placeholder]="bucketsState.loading() ? 'Loading connections…' : 'Choose a bucket'"
+                      [allowClear]="false" [options]="bucketOptions()" />
+        <!-- Owner 2026-10-27: the bucket list says when it is loading, when there is none, and why it failed. -->
+        <app-inline-status [loading]="bucketsState.loading()" [error]="bucketsState.error()"
+                           [empty]="bucketsState.loaded() && !buckets().length" label="Loading connections…"
+                           emptyText="No storage connection yet." (retry)="loadBuckets()">
+          <a class="link-inline" routerLink="/connections/storage">Add one</a>
+        </app-inline-status>
       </div>
       <input class="input mono w-40 max-w-full" aria-label="Folder" placeholder="reports/"
              [value]="folder()" (change)="setFolder($any($event.target).value)" />
@@ -41,13 +48,13 @@
     <table class="table-modern">
       <thead>
         <tr>
-          <th>Name</th>
-          <th>Type</th>
-          <th>Pipeline</th>
-          <th>Created</th>
-          <th class="text-right">Size</th>
-          <th>Status</th>
-          <th>Owner</th>
+          <th appSort="name" [sortBy]="sort">Name</th>
+          <th appSort="type" [sortBy]="sort">Type</th>
+          <th appSort="pipeline" [sortBy]="sort">Pipeline</th>
+          <th appSort="created" [sortBy]="sort">Created</th>
+          <th class="text-right" appSort="size" [sortBy]="sort">Size</th>
+          <th appSort="status" [sortBy]="sort">Status</th>
+          <th appSort="owner" [sortBy]="sort">Owner</th>
           <th class="w-14 th-actions">Actions</th>
         </tr>
       </thead>
@@ -132,6 +139,8 @@
       <app-icon name="alert" class="shrink-0" />{{ bucket() }}/{{ folder() }} could not be read: {{ objectsError() }}
     </p>
   }
+  <app-inline-status [loading]="finding()" [error]="findError()" label="Looking through the other schedules…"
+                     (retry)="findBeyond(query().trim())" />
   @if (reach()) {
     <p class="text-xs text-[color:var(--text-muted)]" data-reports-reach>{{ reach() }}</p>
   }

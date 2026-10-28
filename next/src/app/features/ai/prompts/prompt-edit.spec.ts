@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Router, provideRouter } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
 import { PromptEdit } from './prompt-edit';
 import { placeholdersOf } from './prompt-model';
 import { ToastService } from '../../../shared/ui/toast.service';
@@ -415,5 +415,39 @@ describe('PromptEdit try held for review', () => {
     expect(text).toContain('Failed');
     expect(text).toContain('HTTP 401: bad key');
     expect(text).not.toContain('Held for review');
+  });
+});
+
+describe('PromptEdit -- the connection picker loads, is empty, or failed (owner 2026-10-27)', () => {
+  function withConnections(answer: () => unknown) {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [
+      { provide: HttpClient, useValue: { get: answer, post: () => of({}) } },
+      { provide: ToastService, useValue: { success: () => {}, error: () => {}, info: () => {} } },
+      { provide: Router, useValue: { navigate: () => {} } },
+      { provide: AuthService, useValue: { isPlatformAdmin: () => false, canManageAgents: () => true, builderLocked: () => false, user: () => ({ appUserId: 1 }) } },
+    ] });
+    const component = TestBed.runInInjectionContext(() => new PromptEdit());
+    component.ngOnInit();
+    return component;
+  }
+
+  it('is loading, not empty, until the list answers', () => {
+    const c = withConnections(() => NEVER);
+    expect(c.connectionsState.pending()).toBe(true);
+    expect(c.connectionsState.loaded()).toBe(false);
+  });
+
+  it('is empty once an empty list answers', () => {
+    const c = withConnections(() => of({ status: API_SUCCESS, data: [] }));
+    expect(c.connectionsState.pending()).toBe(false);
+    expect(c.connectionsState.loaded()).toBe(true);
+    expect(c.connectionOptions()).toEqual([]);
+  });
+
+  it('says the list could not be read, in plain words', () => {
+    const c = withConnections(() => throwError(() => new HttpErrorResponse({ status: 500 })));
+    expect(c.connectionsState.loading()).toBe(false);
+    expect(c.connectionsState.error()).toBe('The connections could not be read.');
   });
 });

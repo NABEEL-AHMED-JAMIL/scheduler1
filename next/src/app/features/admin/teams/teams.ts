@@ -18,6 +18,9 @@ import { SidePanel, sidePanelConfig } from '../../../shared/ui/side-panel';
 import { StatStrip, StatStripItem } from '../../../shared/ui/stat-strip';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { MAX_WORKFLOWS, TeamUsage, TeamUsageReader, TeamUse, USE_LABELS, usageSummary } from './teams-usage';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
+import { AppLoading, InlineStatus, createLoadState } from '../../../shared/ui/loading';
 
 /** The members drawn in a row's avatar stack; the rest are "+N". */
 const STACK = 4;
@@ -37,7 +40,8 @@ const STACK = 4;
  */
 @Component({
   selector: 'app-teams',
-  imports: [PageHeader, RefreshButton, StatStrip, Icon, TableShell, Pagination, Avatar, SidePanel, RouterLink, ServerTimePipe],
+  imports: [PageHeader, RefreshButton, StatStrip, Icon, TableShell, Pagination, Avatar, SidePanel, RouterLink, ServerTimePipe, SortHeader,
+    AppLoading, InlineStatus],
   templateUrl: './teams.html',
   styles: `
     /* A row opens its team: the whole row is the target, the name is its keyboard button. */
@@ -72,7 +76,10 @@ export class Teams implements OnInit {
 
   readonly teams = signal<Team[]>([]);
   readonly people = signal<Colleague[]>([]);
-  readonly loading = signal(false);
+  /** Loading from the start: the table and the tiles wait for the first answer instead of showing "No teams yet" / 0. */
+  readonly loading = signal(true);
+  /** The list has answered once (owner 2026-10-27): until then the tiles show a placeholder, not 0. */
+  readonly loaded = signal(false);
   readonly busy = signal(false);
   readonly withArchived = signal(false);
   readonly selectedId = signal<number | null>(null);
@@ -93,6 +100,15 @@ export class Teams implements OnInit {
   readonly statusFilter = signal<'ACTIVE' | 'ARCHIVED' | ''>('ACTIVE');
   readonly pager = createPager<Team>();
   readonly usage = signal<TeamUsage | null>(null);
+  /**
+   * Owner 2026-10-27: where the teams are used is its own read. While it is on its way the column and the panel say so
+   * (the panel said "Nothing you can open sends work to it" before the answer), and a failure is said with Try again
+   * instead of reading as "used nowhere".
+   */
+  readonly usageLoading = signal(false);
+  readonly usageError = signal('');
+  /** The workspace's people, for "Add a person": loading, failed or read. */
+  readonly peopleState = createLoadState(false);
   readonly useLabels = USE_LABELS;
   readonly maxWorkflows = MAX_WORKFLOWS;
   readonly stack = STACK;
@@ -121,7 +137,21 @@ export class Teams implements OnInit {
         || t.members.some(m => this.nameOf(m).toLowerCase().includes(q) || (m.username ?? '').toLowerCase().includes(q));
     }).sort((a, b) => (a.status === b.status ? a.name.localeCompare(b.name) : a.status === 'ACTIVE' ? -1 : 1));
   });
-  readonly paged = computed(() => this.pager.slice(this.filtered()));
+  /**
+   * Owner 2026-10-27: every column that holds one value sorts, before the pager. Until a heading is picked the rows keep
+   * their own order (active first, then by name), so nothing moves on load. "Used by" is a list of pills: not sortable.
+   */
+  readonly sort = createTableSort<Team>({
+    id: 'teams',
+    columns: {
+      name: t => t.name,
+      lead: t => this.leadsOf(t).map(m => this.nameOf(m)).join(', '),
+      members: { value: t => t.memberCount, kind: 'number' },
+      created: { value: t => t.createdAt, kind: 'date' },
+    },
+  });
+  readonly sorted = computed(() => this.sort.apply(this.filtered()));
+  readonly paged = computed(() => this.pager.slice(this.sorted()));
   readonly hasFilters = computed(() => !!(this.search().trim() || this.leadFilter() || this.memberFilter() || this.statusFilter() !== 'ACTIVE'));
 
   readonly selected = computed(() => this.teams().find(t => t.teamId === this.selectedId()) ?? null);
@@ -177,13 +207,14 @@ export class Teams implements OnInit {
     this.api.list(null, this.admin() && this.withArchived()).subscribe({
       next: r => {
         this.loading.set(false);
+        // Owner 2026-10-27: the table says it (with Try again); a toast as well only repeated it.
         if (r.status !== API_SUCCESS) {
           this.error.set(r.message || 'The teams could not be read.');
-          this.toast.error(r.message || 'The teams could not be read.');
           return;
         }
         const teams = r.data ?? [];
         this.teams.set(teams);
+        this.loaded.set(true);
         // A link names a team (?team=, from a person's page): it opens in the panel, once.
         const linked = Number(this.route.snapshot.queryParamMap.get('team'));
         if (!this.deepLinked && teams.some(t => t.teamId === linked)) {
@@ -196,13 +227,30 @@ export class Teams implements OnInit {
       error: e => {
         this.loading.set(false);
         this.error.set(refusal(e, 'The teams could not be read.'));
-        this.toast.error(refusal(e, 'The teams could not be read.'));
       },
     });
-    if (usage !== 'skip') this.usageReader.read(usage === 'fresh').subscribe({ next: u => this.usage.set(u), error: () => this.usage.set(null) });
+    if (usage !== 'skip') this.loadUsage(usage === 'fresh');
+    this.loadPeople();
+  }
+
+  loadUsage(fresh = true): void {
+    this.usageLoading.set(true);
+    this.usageError.set('');
+    this.usageReader.read(fresh).subscribe({
+      next: u => { this.usageLoading.set(false); this.usage.set(u); },
+      error: () => { this.usageLoading.set(false); this.usage.set(null); this.usageError.set('Where the teams are used could not be read.'); },
+    });
+  }
+
+  loadPeople(): void {
+    this.peopleState.start();
     this.workflows.colleagues().subscribe({
-      next: r => this.people.set(r.status === API_SUCCESS ? r.data ?? [] : []),
-      error: () => this.people.set([]),
+      next: r => {
+        if (r.status !== API_SUCCESS) { this.peopleState.fail(r, 'The workspace\'s people could not be read.'); return; }
+        this.people.set(r.data ?? []);
+        this.peopleState.done();
+      },
+      error: err => this.peopleState.fail(err, 'The workspace\'s people could not be read.'),
     });
   }
 

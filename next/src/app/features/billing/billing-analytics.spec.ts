@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { of } from 'rxjs';
+import { NEVER, Observable, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { BillingAnalyticsPage } from './billing-analytics';
 import { BillingApi } from './billing.service';
 import { API_SUCCESS } from '../../core/api/api.config';
@@ -37,10 +38,12 @@ const TRENDS = {
 const OWN_TRENDS = { ...TRENDS, tenantId: 2960, byWorkspace: undefined,
   byPipeline: [{ taskDetailId: 1, pipeline: 'Patient 360', runs: 12, cost: '7.25', lastRunAt: '2026-10-19T06:04:00Z' }] };
 
-function page(data: object = DATA, payments: object[] = [], role: 'PLATFORM_ADMIN' | 'TENANT_ADMIN' = 'PLATFORM_ADMIN', trends: object = TRENDS) {
+function page(data: object = DATA, payments: object[] = [], role: 'PLATFORM_ADMIN' | 'TENANT_ADMIN' = 'PLATFORM_ADMIN', trends: object = TRENDS,
+              over: Record<string, () => Observable<unknown>> = {}) {
   const api = { analytics: vi.fn(() => of({ status: API_SUCCESS, data })), payments: vi.fn(() => of({ status: API_SUCCESS, data: payments })),
-    costTrends: vi.fn(() => of({ status: API_SUCCESS, data: trends })) };
+    costTrends: vi.fn(() => of({ status: API_SUCCESS, data: trends })), ...over };
   TestBed.resetTestingModule();
+  try { localStorage.clear(); } catch { /* none */ }
   TestBed.configureTestingModule({ imports: [BillingAnalyticsPage], providers: [provideRouter([]),
     { provide: BillingApi, useValue: api },
     { provide: AuthService, useValue: { isPlatformAdmin: () => role === 'PLATFORM_ADMIN', isManagedSession: () => false,
@@ -164,5 +167,59 @@ describe('BillingAnalyticsPage', () => {
     expect(all.api.costTrends).toHaveBeenLastCalledWith(expect.any(String), expect.any(String), 2905);
     expect(all.api.analytics).toHaveBeenCalledTimes(1);
     expect(all.el.querySelector('[data-test="revenue"]')).toBeNull();
+  });
+});
+
+describe('BillingAnalyticsPage -- sorting (owner 2026-10-27)', () => {
+  beforeEach(() => sessionStorage.clear());
+  it('keeps usage and churn most-deleted first, and sorts it by metered cost both ways', () => {
+    const { component } = page();
+    expect(component.sortedChurn().map(c => c.tenantId)).toEqual([2905, 3107, 2901]);
+    component.churnSort.toggle('cost');
+    expect(component.sortedChurn().map(c => c.tenantId)).toEqual([2905, 3107, 2901]);
+    component.churnSort.toggle('cost');
+    expect(component.sortedChurn().map(c => c.tenantId)).toEqual([2901, 3107, 2905]);
+  });
+
+  it('sorts By service and By workspace by their names', () => {
+    const { component } = page();
+    component.serviceSort.toggle('service');
+    expect(component.sortedServices().map(s => s.service)).toEqual(['Model calls', 'Pipelines']);
+    component.workspaceSort.toggle('cost');
+    expect(component.sortedWorkspaces().map(w => w.tenantId)).toEqual([2905, 2901]);
+    component.workspaceSort.toggle('cost');
+    expect(component.sortedWorkspaces().map(w => w.tenantId)).toEqual([2901, 2905]);
+  });
+});
+
+describe('BillingAnalyticsPage -- loading, empty, error (owner 2026-10-27)', () => {
+  beforeEach(() => sessionStorage.clear());
+  it('is loading, not empty, until the trends and the payments answer', () => {
+    const { component, el } = page(DATA, [], 'PLATFORM_ADMIN', TRENDS, { costTrends: () => NEVER, analytics: () => NEVER, payments: () => NEVER });
+    expect(component.trendsLoading()).toBe(true);
+    expect(component.loading()).toBe(true);
+    expect(component.paymentsLoading()).toBe(true);
+    expect(el.textContent).not.toContain('Nothing used in this range.');
+    expect(el.textContent).not.toContain('No invoice in this range.');
+  });
+
+  it('says nothing was used once an empty range answers', () => {
+    const empty = { ...TRENDS, total: '0', months: [], byService: [], byWorkspace: [] };
+    const { component, el } = page(DATA, [], 'PLATFORM_ADMIN', empty);
+    expect(component.trendsLoading()).toBe(false);
+    expect(component.sortedServices()).toEqual([]);
+    expect(el.querySelector('[data-test="cost-by-service"]')!.textContent).toContain('Nothing used in this range.');
+    expect(el.querySelector('[data-payments]')!.textContent).toContain('No payment yet.');
+  });
+
+  it('says the trends and the payments could not be read, in plain words, with Try again', () => {
+    const fail = () => throwError(() => new HttpErrorResponse({ status: 500, error: 'Internal Server Error' }));
+    const { component, el, fixture } = page(DATA, [], 'PLATFORM_ADMIN', TRENDS, { costTrends: fail, payments: fail });
+    fixture.detectChanges();
+    expect(component.trendsLoading()).toBe(false);
+    expect(component.trendsError()).toBe('The cost trends could not be read.');
+    expect(component.paymentsError()).toBe('The payments could not be read.');
+    expect(el.querySelector('[data-payments]')!.textContent).not.toContain('No payment yet.');
+    expect(el.querySelector('[data-test="cost-trends"]')!.textContent).toContain('Try again');
   });
 });

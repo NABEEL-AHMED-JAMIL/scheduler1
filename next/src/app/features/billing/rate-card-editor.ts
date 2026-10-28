@@ -13,6 +13,7 @@ import { BillingApi, MODEL_PRICED_METERS, RateCard, RateCardDraft, RateCardDraft
 import { firstOfMonth, formatUnitPrice } from './billing-format';
 import { DATA_CLASSES, RULE_KINDS, byPrecedence, kindText, ruleProblems } from './rate-rules';
 import { RatePreviewView, previewPeriods } from './rate-preview';
+import { AppLoading, InlineStatus, loadErrorText } from '../../shared/ui/loading';
 
 /** One item as it is being edited: strings in the inputs, numbers on save. */
 interface EditItem {
@@ -49,7 +50,7 @@ function choiceOf(p: PipelineName): PipelineChoice | null {
  */
 @Component({
   selector: 'app-rate-card-editor',
-  imports: [DateField, SidePanel, Icon, Combobox, Field, RatePreviewView],
+  imports: [DateField, SidePanel, Icon, Combobox, Field, RatePreviewView, AppLoading, InlineStatus],
   template: `
     <app-side-panel [heading]="data.draft ? 'Draft: ' + data.draft.name : 'New version from ' + data.base.name + ' v' + data.base.version"
                     [subtitle]="data.draft ? 'A draft prices nothing until it is published as a new version.' : 'Saved as its own version; bills already drafted keep the one they were priced with.'">
@@ -151,6 +152,9 @@ function choiceOf(p: PipelineName): PipelineChoice | null {
                         @case ('PIPELINE') {
                           <app-combobox class="w-48" [options]="pipelineOptions()" [selected]="r.match_value" (selectedChange)="pickPipeline(r.key, $event)"
                                         [ariaLabel]="'Rule ' + r.rule_no + ' pipeline'" [placeholder]="pipelinesLoading() ? 'Loading pipelines…' : 'Find a pipeline'" [allowClear]="false" />
+                          <!-- Owner 2026-10-27: a list that could not be read says so (it read as "no pipeline"), with Try again. -->
+                          <app-inline-status class="w-full" [loading]="pipelinesLoading()" [error]="pipelinesError()" [empty]="pipelines()?.length === 0"
+                                             label="Loading pipelines…" emptyText="No pipeline yet." (retry)="retryPipelines()" />
                         }
                         @case ('TAG') {
                           <input class="input py-1 text-xs w-40" [value]="r.match_value" (input)="setRule(r.key, 'match_value', $any($event.target).value)"
@@ -197,8 +201,8 @@ function choiceOf(p: PipelineName): PipelineChoice | null {
               @for (m of periods; track m.value) { <option [value]="m.value" [selected]="m.value === previewPeriod()">{{ m.label }}</option> }
             </select>
           </div>
-          @if (previewing()) { <span class="text-xs text-[color:var(--text-muted)]"><span class="spinner inline-block align-middle mr-2"></span>Pricing last month…</span> }
-          @else if (previewError()) { <span class="text-xs text-crit-500" role="alert">{{ previewError() }}</span> }
+          @if (previewing()) { <app-loading shape="inline" label="Pricing last month…" /> }
+          @else if (previewError()) { <app-inline-status [error]="previewError()" (retry)="runPreview()" /> }
           @else { <app-rate-preview [preview]="preview()" [currency]="data.base.currency" /> }
         </section>
       }
@@ -248,6 +252,7 @@ export class RateCardEditor {
   /** Core's pipelines, read once when a pipeline rule is shown or added (declared before the rules, which may ask for them). */
   readonly pipelines = signal<PipelineChoice[] | null>(null);
   readonly pipelinesLoading = signal(false);
+  readonly pipelinesError = signal('');
   /** The draft's rules, else the base version's (a new version carries them over, as it carries its items). */
   readonly rules = signal<EditRule[]>((this.opened ? this.opened.rules ?? [] : this.data.base.rules ?? []).map(r => this.editableRule(r)));
   readonly orderedRules = computed(() => byPrecedence(this.rules()));
@@ -384,16 +389,20 @@ export class RateCardEditor {
   }
   private loadPipelines(): void {
     if (this.pipelines() || this.pipelinesLoading()) return;
-    this.pipelinesLoading.set(true);
+    this.pipelinesLoading.set(true); this.pipelinesError.set('');
+    const unread = 'The pipelines could not be read.';
     // Ids and names only (Core's names list): the rule picker never reads a workspace's pipelines themselves.
     this.http.get<ApiResponse<PipelineName[]>>(`${API_BASE}/sourceTask.json/names`).subscribe({
       next: r => {
         this.pipelinesLoading.set(false);
-        this.pipelines.set(r.status === API_SUCCESS ? (r.data ?? []).map(choiceOf).filter((p): p is PipelineChoice => !!p) : []);
+        if (r.status !== API_SUCCESS) { this.pipelinesError.set(loadErrorText(r, unread)); return; }
+        this.pipelines.set((r.data ?? []).map(choiceOf).filter((p): p is PipelineChoice => !!p));
       },
-      error: () => { this.pipelinesLoading.set(false); this.pipelines.set([]); },
+      // Owner 2026-10-27: a failure is said under the picker; the list stays unread (null) so Try again reads it again.
+      error: err => { this.pipelinesLoading.set(false); this.pipelinesError.set(loadErrorText(err, unread)); },
     });
   }
+  retryPipelines(): void { this.loadPipelines(); }
 
   /** The panel's card for a draft: its items, named as the base version names them. */
   private openedItems(card: RateCardDraft): EditItem[] {
@@ -476,10 +485,10 @@ export class RateCardEditor {
     this.api.previewRateCard({ card: draft }, this.previewPeriod()).subscribe({
       next: r => {
         this.previewing.set(false);
-        if (r.status !== API_SUCCESS || !r.data) { this.preview.set(null); this.previewError.set(r.message); this.refused(r); return; }
+        if (r.status !== API_SUCCESS || !r.data) { this.preview.set(null); this.previewError.set(loadErrorText(r, 'The preview could not be priced.')); this.refused(r); return; }
         this.preview.set(r.data);
       },
-      error: err => { this.previewing.set(false); this.previewError.set(err?.error?.message || 'The preview could not be priced.'); },
+      error: err => { this.previewing.set(false); this.previewError.set(loadErrorText(err, 'The preview could not be priced.')); },
     });
   }
 

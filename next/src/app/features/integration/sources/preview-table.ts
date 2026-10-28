@@ -2,6 +2,8 @@ import { Component, computed, input } from '@angular/core';
 import { DataText } from '../../../shared/ui/data-text';
 import { formatSize } from '../../../shared/ui/format-size';
 import { PreviewResult } from './sources.model';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
 
 /**
  * A source's first rows, as the service returned them: masked there (a value a policy hides arrives as "***"),
@@ -9,7 +11,7 @@ import { PreviewResult } from './sources.model';
  */
 @Component({
   selector: 'app-preview-table',
-  imports: [DataText],
+  imports: [DataText, SortHeader],
   template: `
     @let p = result();
     <div class="flex flex-col gap-2 min-w-0">
@@ -19,7 +21,7 @@ import { PreviewResult } from './sources.model';
       @if (columns().length) {
         <div class="overflow-auto max-h-96 rounded border border-subtle">
           <table class="table-modern" data-test="preview-rows">
-            <thead><tr>@for (column of columns(); track column) { <th class="mono text-xs whitespace-nowrap">{{ column }}</th> }</tr></thead>
+            <thead><tr>@for (column of columns(); track column) { <th class="mono text-xs whitespace-nowrap" [appSort]="column" [sortBy]="sort">{{ column }}</th> }</tr></thead>
             <tbody>
               @for (row of cells(); track $index) {
                 <tr>
@@ -49,7 +51,18 @@ export class PreviewTable {
     for (const row of this.rows()) for (const key of Object.keys(row ?? {})) seen.add(key);
     return [...seen];
   });
-  readonly cells = computed(() => this.rows().map(row => this.columns().map(c => shown(row?.[c]))));
+  /**
+   * Owner 2026-10-27: any column sorts -- by the value the service sent (numbers as numbers, timestamps as instants, a
+   * null last), not by the text drawn. The columns come from the data, so one sort covers them all; it is not
+   * remembered, since the next source has other columns.
+   */
+  readonly sort = createTableSort<Record<string, unknown>>({
+    id: 'source-preview',
+    remember: false,
+    columns: {},
+    dynamic: k => ({ value: row => row?.[k], kind: 'auto' }),
+  });
+  readonly cells = computed(() => this.sort.apply(this.rows()).map(row => this.columns().map(c => shown(row?.[c]))));
   readonly size = computed(() => formatSize(this.result().bytes ?? 0));
 }
 

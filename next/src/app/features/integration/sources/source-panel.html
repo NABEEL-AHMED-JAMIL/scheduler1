@@ -1,10 +1,9 @@
 <app-side-panel [heading]="heading()" [subtitle]="subtitle()">
+  <!-- Owner 2026-10-27: the shared loader, and a failed read offers Try again. -->
   @if (loading()) {
-    <div class="py-14 text-center text-sm text-[color:var(--text-muted)]">
-      <div class="spinner mx-auto mb-3" role="status" aria-label="Loading"></div>Loading…
-    </div>
+    <app-loading shape="panel" label="Loading the source…" [count]="6" />
   } @else if (loadError()) {
-    <p class="text-sm text-crit-500" role="alert">{{ loadError() }}</p>
+    <app-load-error [message]="loadError()" (retry)="readSource()" />
   } @else if (edit(); as e) {
     <div class="flex flex-col gap-4 min-w-0">
       <fieldset class="flex flex-col gap-3 min-w-0" [disabled]="!data.canManage">
@@ -34,24 +33,31 @@
             <div class="form-grid">
               <app-field label="Collection" for="srcCollection" [required]="true" hint="From API Collections: the source calls one of its APIs.">
                 <select id="srcCollection" class="input" [value]="e.collectionId ?? ''" (change)="pickCollection(idOf($event))">
-                  <option value="">Pick a collection</option>
+                  <option value="">{{ picker('collections').loading ? 'Loading collections…' : 'Pick a collection' }}</option>
                   @for (c of tenantCollections(); track c.collectionId) { <option [value]="c.collectionId" [selected]="c.collectionId === e.collectionId">{{ c.name }}</option> }
                 </select>
+                <app-inline-status [loading]="picker('collections').loading" [error]="picker('collections').error" (retry)="retryPickers()"
+                                   [empty]="picker('collections').loaded && !tenantCollections().length" label="Loading collections…"
+                                   emptyText="No API collection yet. Add one under Connections › API collections." />
               </app-field>
               <app-field label="API" for="srcRequest" [required]="true">
-                <select id="srcRequest" class="input" [value]="e.requestId ?? ''" [disabled]="!e.collectionId" (change)="patch({ requestId: idOf($event) })">
-                  <option value="">Pick an API</option>
+                <select id="srcRequest" class="input" [value]="e.requestId ?? ''" [disabled]="!e.collectionId || collectionLoading()" (change)="patch({ requestId: idOf($event) })">
+                  <option value="">{{ collectionLoading() ? 'Loading…' : 'Pick an API' }}</option>
                   @for (q of requests(); track q.requestId) { <option [value]="q.requestId" [selected]="q.requestId === e.requestId">{{ q.method }} {{ q.name }}{{ q.enabled ? '' : ' (disabled)' }}</option> }
                 </select>
+                <!-- The collection's APIs, versions and environments come in one read: its state is said once, here. -->
+                <app-inline-status [loading]="collectionLoading()" [error]="collectionError()" (retry)="retryCollection()"
+                                   [empty]="!!e.collectionId && !collectionLoading() && !collectionError() && !requests().length"
+                                   label="Loading the collection's APIs…" emptyText="This collection has no API yet." />
               </app-field>
               <app-field label="Version" for="srcVersion" [required]="true" hint="The collection version the source runs; a later save of the collection does not change it.">
-                <select id="srcVersion" class="input" [value]="e.version ?? ''" [disabled]="!e.collectionId" (change)="patch({ version: idOf($event) })">
-                  <option value="">Pick a version</option>
+                <select id="srcVersion" class="input" [value]="e.version ?? ''" [disabled]="!e.collectionId || collectionLoading()" (change)="patch({ version: idOf($event) })">
+                  <option value="">{{ collectionLoading() ? 'Loading…' : 'Pick a version' }}</option>
                   @for (v of versions(); track v) { <option [value]="v" [selected]="v === e.version">v{{ v }}{{ v === versions()[0] ? ' (current)' : '' }}</option> }
                 </select>
               </app-field>
               <app-field label="Environment" for="srcEnv" [hint]="envHint">
-                <select id="srcEnv" class="input" [value]="e.environmentId ?? ''" [disabled]="!e.collectionId" (change)="patch({ environmentId: idOf($event) })">
+                <select id="srcEnv" class="input" [value]="e.environmentId ?? ''" [disabled]="!e.collectionId || collectionLoading()" (change)="patch({ environmentId: idOf($event) })">
                   <option value="">The collection's default</option>
                   @for (env of environments(); track env.environmentId) { <option [value]="env.environmentId" [selected]="env.environmentId === e.environmentId">{{ env.name }}</option> }
                 </select>
@@ -65,9 +71,12 @@
             <div class="flex items-end gap-2">
               <app-field class="flex-1 min-w-0" label="Database connection" for="srcConnection" [required]="true" hint="PostgreSQL, read-only. Its password is kept by the service and never shown.">
                 <select id="srcConnection" class="input" [value]="e.connectionId ?? ''" (change)="patch({ connectionId: idOf($event) })">
-                  <option value="">Pick a connection</option>
+                  <option value="">{{ picker('connections').loading ? 'Loading connections…' : 'Pick a connection' }}</option>
                   @for (c of tenantConnections(); track c.id) { <option [value]="c.id" [selected]="c.id === e.connectionId">{{ c.name }} · {{ c.host }}/{{ c.database }}</option> }
                 </select>
+                <app-inline-status [loading]="picker('connections').loading" [error]="picker('connections').error" (retry)="retryPickers()"
+                                   [empty]="picker('connections').loaded && !tenantConnections().length" label="Loading connections…"
+                                   [emptyText]="data.canManage ? 'No database connection yet: add one with New connection.' : 'No database connection yet.'" />
               </app-field>
               @if (data.canManage) {
                 <button type="button" class="btn btn-default btn-sm mb-[1.6rem]" (click)="newConnection()"><app-icon name="plus" />New connection</button>
@@ -81,9 +90,12 @@
             <div class="form-grid">
               <app-field label="Storage connection" for="srcStorage" [required]="true" hint="One of this workspace's Storage Connections, by its alias.">
                 <select id="srcStorage" class="input" [value]="e.storageAlias" (change)="patch({ storageAlias: $any($event.target).value })">
-                  <option value="">Pick a storage connection</option>
+                  <option value="">{{ picker('buckets').loading ? 'Loading storage connections…' : 'Pick a storage connection' }}</option>
                   @for (b of bucketOptions(); track b.value) { <option [value]="b.value" [selected]="b.value === e.storageAlias">{{ b.label }}</option> }
                 </select>
+                <app-inline-status [loading]="picker('buckets').loading" [error]="picker('buckets').error" (retry)="retryPickers()"
+                                   [empty]="picker('buckets').loaded && !bucketOptions().length" label="Loading storage connections…"
+                                   emptyText="No storage connection yet. Add one under Connections › Storage." />
               </app-field>
               <app-field label="Format" for="srcFormat">
                 <select id="srcFormat" class="input" [value]="e.format" (change)="patch({ format: $any($event.target).value })">

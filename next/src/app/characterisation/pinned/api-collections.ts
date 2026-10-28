@@ -69,14 +69,22 @@ export const PINNED: Record<string, unknown> = {
       "Used by"
     ],
     "buttons": [
+      "API",
+      "Auth",
       "Cards",
       "Columns",
+      "Environment",
+      "Folder",
       "Get status",
       "History 3",
+      "Last test",
       "Metadata probe",
+      "Method · endpoint",
       "Overview",
       "Refresh",
-      "Table"
+      "State",
+      "Table",
+      "Timeout"
     ],
     "columns": [
       [
@@ -120,20 +128,28 @@ export const PINNED: Record<string, unknown> = {
       "Used by"
     ],
     "buttons": [
+      "API",
       "Actions for Get status",
       "Actions for Metadata probe",
       "Actions for the Prod environment",
       "Add API",
+      "Auth",
       "Cards",
       "Columns",
       "Edit details",
+      "Environment",
+      "Folder",
       "Get status",
       "History 3",
+      "Last test",
       "Metadata probe",
+      "Method · endpoint",
       "New environment",
       "Overview",
       "Refresh",
-      "Table"
+      "State",
+      "Table",
+      "Timeout"
     ],
     "columns": [
       [
@@ -201,10 +217,18 @@ export const PINNED: Record<string, unknown> = {
       "Collections (1 of 1)"
     ],
     "buttons": [
+      "APIs",
       "Cards",
+      "Collection",
       "Columns",
+      "Folders",
       "Refresh",
-      "Table"
+      "Sensitivity",
+      "Source",
+      "State",
+      "Table",
+      "Updated",
+      "Version"
     ],
     "columns": [
       [
@@ -262,13 +286,21 @@ export const PINNED: Record<string, unknown> = {
       "Collections (1 of 1)"
     ],
     "buttons": [
+      "APIs",
       "Actions for LIVE-CHECK 0928 httpbin",
       "Cards",
+      "Collection",
       "Columns",
+      "Folders",
       "Import",
       "New collection",
       "Refresh",
-      "Table"
+      "Sensitivity",
+      "Source",
+      "State",
+      "Table",
+      "Updated",
+      "Version"
     ],
     "columns": [
       [

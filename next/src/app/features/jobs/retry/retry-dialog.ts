@@ -7,6 +7,8 @@ import { FormDialog } from '../../../shared/ui/form-dialog';
 import { Icon } from '../../../shared/ui/icon';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { RouterLink } from '@angular/router';
+import { AppLoading, loadErrorText } from '../../../shared/ui/loading';
+import { LoadError } from '../../../shared/ui/load-error';
 import { RetryFrom, RetryPlan, backfillLink, backfillRetryNote, planOf, resumeLabel, stepLabel } from './run-retry';
 
 export interface RetryDialogData {
@@ -23,7 +25,7 @@ export interface RetryDialogData {
  */
 @Component({
   selector: 'app-retry-dialog',
-  imports: [FormDialog, Icon, ServerTimePipe, RouterLink],
+  imports: [FormDialog, Icon, ServerTimePipe, RouterLink, AppLoading, LoadError],
   template: `
     <app-form-dialog
         heading="Retry this run"
@@ -36,13 +38,10 @@ export interface RetryDialogData {
         size="wide"
         (cancelled)="ref.close(false)" (confirmed)="retry()">
       @if (loading()) {
-        <p class="flex items-center gap-2 text-sm text-[color:var(--text-muted)]" role="status">
-          <app-icon name="refresh" class="spin" />Reading what a retry would do…
-        </p>
+        <app-loading shape="panel" [count]="3" label="Reading what a retry would do…" />
       } @else if (problem() && !plan()) {
-        <p class="flex items-start gap-2 text-sm text-crit-500" role="alert">
-          <app-icon name="alert" class="mt-0.5 shrink-0" />{{ problem() }}
-        </p>
+        <!-- Owner 2026-10-27: a failed read of the plan offers Try again rather than only Close. -->
+        <app-load-error [message]="problem()" (retry)="readPlan()" />
       } @else if (plan()?.backfillId) {
         <!-- UX review 2026-10-13: a backfill's run is retried by its backfill, which Core says before either choice. -->
         <p class="flex items-start gap-2 text-sm" data-test="retry-backfill">
@@ -149,14 +148,18 @@ export class RetryDialog {
 
   readonly confirmLabel = computed(() => (this.from() === 'start' ? 'Run again from the start' : resumeLabel(this.plan())));
 
-  constructor() {
+  constructor() { this.readPlan(); }
+
+  readPlan(): void {
+    this.loading.set(true);
+    this.problem.set('');
     this.http.get<ApiResponse<unknown>>(`${API_BASE}/sourceJob.json/retryPlan`, { params: { jobQueueId: String(this.data.jobQueueId) } })
       .subscribe({
         next: response => {
           this.loading.set(false);
           const plan = planOf(response.data);
           if (!plan) {
-            this.problem.set(response.message || 'What a retry would do could not be read.');
+            this.problem.set(loadErrorText(response, 'What a retry would do could not be read.'));
             return;
           }
           this.plan.set(plan);
@@ -164,7 +167,7 @@ export class RetryDialog {
         },
         error: err => {
           this.loading.set(false);
-          this.problem.set(err?.error?.message || 'What a retry would do could not be read.');
+          this.problem.set(loadErrorText(err, 'What a retry would do could not be read.'));
         },
       });
   }

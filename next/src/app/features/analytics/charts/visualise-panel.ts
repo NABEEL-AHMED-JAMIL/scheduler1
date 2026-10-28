@@ -11,6 +11,8 @@ import { AnalyticsService } from '../analytics.service';
 import { kindInfo } from '../widget-kinds';
 import { ChartAnswerCard } from './chart-answer-card';
 import { ChartAnswer, Suggestion, suggestCharts, suggestionAnswer, tableAnswer } from './chart-answer';
+import { AppLoading, loadErrorText } from '../../../shared/ui/loading';
+import { LoadError } from '../../../shared/ui/load-error';
 
 /** What is visualised: a file Analytics can read (a dataset, a run's upload), or a run's kept file read as rows. */
 export interface VisualiseSource {
@@ -42,12 +44,20 @@ interface Tried { suggestion: Suggestion; answer: ChartAnswer | null; error: str
  */
 @Component({
   selector: 'app-visualise-panel',
-  imports: [SidePanel, Icon, ChartAnswerCard],
+  imports: [SidePanel, Icon, ChartAnswerCard, AppLoading, LoadError],
   template: `
     <app-side-panel heading="Visualise" [subtitle]="data.name">
       <div class="flex flex-col gap-4 min-w-0" data-test="visualise">
-        @if (error()) {
+        <!-- Owner 2026-10-27: a read that failed offers Try again; a file that cannot be charted says why, plainly. -->
+        @if (error() && readFailed()) {
+          <app-load-error data-test="visualise-error" [message]="error()" (retry)="ngOnInit()" />
+        } @else if (error()) {
           <p class="text-sm text-crit-500 flex items-start gap-1.5" data-test="visualise-error"><app-icon name="alert" class="icon-crit mt-0.5 shrink-0" size="0.9em" />{{ error() }}</p>
+        }
+        @if (noSuggestion()) {
+          <p class="text-sm text-[color:var(--text-secondary)]" data-test="no-suggestion">
+            No column here lends itself to a suggested chart.@if (canAsk()) { Ask AI for one below. }
+          </p>
         }
         @if (queryable() && tried().length) {
           <div class="flex flex-wrap gap-1.5" role="tablist" aria-label="Suggested charts" data-test="suggestions">
@@ -64,7 +74,7 @@ interface Tried { suggestion: Suggestion; answer: ChartAnswer | null; error: str
           </div>
         }
         @if (loading()) {
-          <p class="text-sm text-[color:var(--text-muted)] flex items-center gap-2" data-test="visualise-loading"><app-icon name="refresh" class="spin" />{{ loading() }}</p>
+          <app-loading data-test="visualise-loading" shape="spinner" [label]="loading()" />
         }
         @if (shown(); as answer) {
           <app-chart-answer [answer]="answer" [pinnable]="queryable()" [canPin]="canPin()" [height]="340" />
@@ -105,6 +115,11 @@ export class VisualisePanel implements OnInit {
   readonly picked = signal(0);
   readonly loading = signal('');
   readonly error = signal('');
+  /** The error is a read that failed (Try again can help), not a file Visualise cannot chart. */
+  readonly readFailed = signal(false);
+  /** The columns were read, and not one suggestion fits them: said, rather than an empty panel. */
+  private readonly columnsRead = signal(false);
+  readonly noSuggestion = computed(() => this.columnsRead() && !this.error() && !this.tried().length);
   readonly held = signal<ChartAnswer | null>(null);
   readonly question = signal('');
   readonly asking = signal(false);
@@ -125,6 +140,8 @@ export class VisualisePanel implements OnInit {
   }
 
   ngOnInit(): void {
+    this.error.set('');
+    this.readFailed.set(false);
     if (this.queryable()) this.suggest();
     else if (this.data.runDatasetId != null) this.readKept();
     else this.error.set('There is nothing here to chart.');
@@ -144,10 +161,13 @@ export class VisualisePanel implements OnInit {
     const path = this.data.path!;
     const dataset = { datasetId: this.data.datasetId ?? null, name: this.data.name, connection, path };
     this.loading.set('Reading the columns…');
+    this.columnsRead.set(false);
+    this.runs?.unsubscribe();
     this.analytics.schema(connection, path).subscribe({
       next: res => {
-        if (res.status !== API_SUCCESS || !res.data) { this.loading.set(''); this.error.set(res.message || 'The columns could not be read.'); return; }
+        if (res.status !== API_SUCCESS || !res.data) { this.loading.set(''); this.failRead(res, 'The columns could not be read.'); return; }
         const suggestions = suggestCharts(res.data.columns ?? []);
+        this.columnsRead.set(true);
         this.tried.set(suggestions.map(suggestion => ({ suggestion, answer: null, error: '' })));
         this.loading.set('Running the suggested charts…');
         this.runs = from(suggestions.map((s, i) => [s, i] as const)).pipe(
@@ -167,8 +187,13 @@ export class VisualisePanel implements OnInit {
           })),
         ).subscribe({ complete: () => this.loading.set('') });
       },
-      error: (err: { error?: { message?: string } }) => { this.loading.set(''); this.error.set(err?.error?.message || 'The columns could not be read.'); },
+      error: (err: unknown) => { this.loading.set(''); this.failRead(err, 'The columns could not be read.'); },
     });
+  }
+
+  private failRead(err: unknown, fallback: string): void {
+    this.readFailed.set(true);
+    this.error.set(loadErrorText(err, fallback));
   }
 
   /** A run's kept file, read as rows (JSON) when it is small enough to chart in the page. */
@@ -186,7 +211,7 @@ export class VisualisePanel implements OnInit {
         if (!table) { this.error.set('This file is not a table of rows to chart.'); return; }
         this.held.set(tableAnswer(this.data.name, table.columns, table.rows.slice(0, KEPT_ROWS), table.rows.length > KEPT_ROWS));
       },
-      error: (err: { error?: { message?: string } }) => { this.loading.set(''); this.error.set(err?.error?.message || 'The file could not be read.'); },
+      error: (err: unknown) => { this.loading.set(''); this.failRead(err, 'The file could not be read.'); },
     });
   }
 

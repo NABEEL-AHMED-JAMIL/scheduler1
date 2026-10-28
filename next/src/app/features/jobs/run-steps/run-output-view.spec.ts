@@ -90,3 +90,37 @@ describe('Run output view', () => {
     expect(el.querySelector('[role="alert"]')).not.toBeNull();
   });
 });
+
+describe('Run output view -- sorting and states (owner 2026-10-27)', () => {
+  it('sorts a column by what it holds, both ways, each row keeping its own number', () => {
+    const { fixture, http } = mount({ name: 'accuracy.csv', runDatasetId: 6327, format: 'csv', rowCount: 3 });
+    http.expectOne(r => r.url.endsWith('/sourceJob.json/runDataset'))
+      .flush([{ grade: 'glioma', correct: 7 }, { grade: 'meningioma', correct: 12 }, { grade: 'pituitary', correct: 9 }]);
+    const view = fixture.componentInstance;
+    expect(view.sortedRows().map(r => r.n)).toEqual([1, 2, 3]);
+    view.sort.toggle('correct');
+    expect(view.sortedRows().map(r => r.cells[1])).toEqual(['7', '9', '12']);
+    view.sort.toggle('correct');
+    expect(view.sortedRows().map(r => r.n)).toEqual([2, 3, 1]);
+  });
+
+  it('is loading until the file answers, then says a table with no rows has none', () => {
+    const { fixture, http, el } = mount({ name: 'empty.csv', runDatasetId: 4, format: 'csv', rowCount: 0 });
+    expect(fixture.componentInstance.loading()).toBe(true);
+    http.expectOne(r => r.url.endsWith('/sourceJob.json/runDataset')).flush([]);
+    fixture.detectChanges();
+    expect(fixture.componentInstance.loading()).toBe(false);
+    expect(el.querySelector('[data-test="run-output-empty"]')?.textContent).toContain('This file has no rows.');
+  });
+
+  it('offers Try again after a failed read, and reads again', () => {
+    const { fixture, http, el } = mount({ name: 'gone.csv', runDatasetId: 3, format: 'csv', rowCount: 3 });
+    http.expectOne(r => r.url.endsWith('/sourceJob.json/runDataset')).flush('boom', { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+    expect(fixture.componentInstance.error()).toBe('The file could not be read; it may have expired.');
+    [...el.querySelectorAll('button')].find(b => b.textContent!.trim() === 'Try again')!.click();
+    expect(fixture.componentInstance.loading()).toBe(true);
+    http.expectOne(r => r.url.endsWith('/sourceJob.json/runDataset')).flush([{ a: 1 }]);
+    expect(fixture.componentInstance.rows().length).toBe(1);
+  });
+});

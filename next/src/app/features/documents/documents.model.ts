@@ -424,7 +424,11 @@ export interface DatasetRow {
   row: { fields: Record<string, unknown>; tables: Record<string, Record<string, unknown>[]> };
 }
 
-export interface DatasetPage { total: number; page: number; size: number; rows: DatasetRow[]; }
+export interface DatasetPage {
+  total: number; page: number; size: number; rows: DatasetRow[];
+  /** Owner 2026-10-27: false while some of the type's data is masked for the caller -- its fields then do not sort. */
+  fieldsSort?: boolean;
+}
 
 /** One change a reviewer sends: by fieldId, or a cell of a new row by table, row and column. */
 export interface CorrectionSent {

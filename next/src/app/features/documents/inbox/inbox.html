@@ -156,15 +156,15 @@
       <table class="table-modern">
         <thead>
           <tr>
-            <th>File</th>
-            <th class="text-right">Size</th>
-            <th>Uploaded by</th>
-            <th>Uploaded</th>
-            <th>SHA-256</th>
+            <th appSort="file" [sortBy]="sort">File</th>
+            <th class="text-right" appSort="size" [sortBy]="sort">Size</th>
+            <th appSort="uploadedBy" [sortBy]="sort">Uploaded by</th>
+            <th appSort="uploaded" [sortBy]="sort">Uploaded</th>
+            <th appSort="sha" [sortBy]="sort">SHA-256</th>
           </tr>
         </thead>
         <tbody>
-          @for (f of files(); track f.arrivalId) {
+          @for (f of sortedFiles(); track f.arrivalId) {
             <tr>
               <td class="min-w-44 max-w-96">
                 <app-data-text class="block font-medium" [value]="f.fileName" label="File" />

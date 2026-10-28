@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
-import { Subject, of, throwError } from 'rxjs';
+import { NEVER, Subject, of, throwError } from 'rxjs';
 import { PreviewDialog } from './preview-dialog';
 import { StorageService } from '../storage.service';
 import { API_SUCCESS } from '../../../core/api/api.config';
@@ -122,7 +122,7 @@ describe('PreviewDialog', () => {
   });
 
   it('a table the server cannot read says why, with Download beside it', () => {
-    const dialog = open('huge.xlsx', { previewTable: () => throwError(() => ({ error: { message: 'huge.xlsx is 40.0 MB -- download it instead.' } })) });
+    const dialog = open('huge.xlsx', { previewTable: () => throwError(() => ({ status: 413, error: { message: 'huge.xlsx is 40.0 MB -- download it instead.' } })) });
     expect(dialog.error()).toContain('40.0 MB');
   });
 });
@@ -204,5 +204,45 @@ describe('PreviewDialog after it is closed', () => {
     expect(created.filter(url => !revoked.includes(url))).toEqual([]);
     create.mockRestore();
     revoke.mockRestore();
+  });
+});
+
+describe('PreviewDialog -- sorting and loading (owner 2026-10-27)', () => {
+  const ARCHIVE = () => of({ status: API_SUCCESS, data: [
+    { name: 'exports/', directory: true, size: 0, compressedSize: 0, lastModified: 0 },
+    { name: 'exports/jobs.csv', directory: false, size: 800, compressedSize: 300, lastModified: 1_700_000_000_000 },
+    { name: 'exports/a-runs.csv', directory: false, size: 1200, compressedSize: 500, lastModified: 1_600_000_000_000 },
+  ] });
+
+  it('keeps the archive order until a heading is picked, then sorts by it both ways', () => {
+    const dialog = open('exports.zip', { previewArchive: ARCHIVE });
+    expect(dialog.sortedEntries().map(e => e.name)).toEqual(['exports/', 'exports/jobs.csv', 'exports/a-runs.csv']);
+    dialog.entrySort.toggle('size');
+    // Largest first; a folder has no size, so it goes last both ways.
+    expect(dialog.sortedEntries().map(e => e.name)).toEqual(['exports/a-runs.csv', 'exports/jobs.csv', 'exports/']);
+    dialog.entrySort.toggle('size');
+    expect(dialog.sortedEntries().map(e => e.name)).toEqual(['exports/jobs.csv', 'exports/a-runs.csv', 'exports/']);
+    dialog.entrySort.toggle('entry');
+    expect(dialog.sortedEntries().map(e => e.name)).toEqual(['exports/', 'exports/a-runs.csv', 'exports/jobs.csv']);
+  });
+
+  it('keeps loading while a JSON file that is not records is read as text', () => {
+    const dialog = open('config.json', {
+      previewTable: () => of({ status: 'ERROR', message: 'This JSON is not a list of records, so it reads better as text.' }),
+      previewText: () => NEVER,
+    });
+    expect(dialog.loading()).toBe(true);
+  });
+
+  it('keeps the page on screen when the next page fails, and says so with Try again', () => {
+    let calls = 0;
+    const previewTable = vi.fn(() => (calls++ === 0 ? table({ totalRows: 300 }) : throwError(() => ({ status: 500, error: { message: 'Storage timed out.' } }))));
+    const dialog = open('orders.csv', { previewTable });
+    dialog.tablePage(1);
+    expect(dialog.error()).toBe('');
+    expect(dialog.pageError()).toBe('Storage timed out.');
+    expect(dialog.table()?.rows.length).toBe(3);
+    dialog.retryPage();
+    expect(previewTable).toHaveBeenLastCalledWith('b', 'folder/orders.csv', 100, 100, undefined);
   });
 });

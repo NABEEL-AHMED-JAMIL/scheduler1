@@ -229,3 +229,30 @@ describe('Run page: View (owner 2026-10-20)', () => {
   });
 });
 
+describe('Run page: the Outputs tab -- sorting and states (owner 2026-10-27)', () => {
+  const file = (runOutputId: number, name: string, byteCount: number, stepIndex = 3) =>
+    ({ ...KEPT, runOutputId, name, byteCount, stepIndex, stepKey: stepIndex === 3 ? 'out' : 'publish' });
+
+  it('sorts the files inside each step, the steps keeping their order, both ways', () => {
+    try { localStorage.clear(); } catch { /* none */ }
+    const { fixture } = mount([file(1, 'b.json', 300), file(2, 'a.json', 100), file(3, 'c.json', 200), { ...UPLOAD, runOutputId: 4 }]);
+    const screen = fixture.componentInstance;
+    expect(screen.groups().map(g => g.rows.map(o => o.name))).toEqual([['b.json', 'a.json', 'c.json'], ['customers-clean.json']]);
+    screen.sort.toggle('file');
+    expect(screen.groups()[0].rows.map(o => o.name)).toEqual(['a.json', 'b.json', 'c.json']);
+    screen.sort.toggle('file');
+    expect(screen.groups()[0].rows.map(o => o.name)).toEqual(['c.json', 'b.json', 'a.json']);
+    screen.sort.toggle('size');
+    expect(screen.groups()[0].rows.map(o => o.byteCount)).toEqual([300, 200, 100]);
+    expect(screen.groups().map(g => g.step)).toEqual([4, 5]);
+  });
+
+  it('reads the files again on Try again after they could not be read', () => {
+    const { fixture, http, el, store } = mount('fail');
+    [...el.querySelectorAll('button')].find(b => b.textContent!.trim() === 'Try again')!.click();
+    expect(store.outputs()).toBeNull();
+    http.expectOne(r => r.url.endsWith('/sourceJob.json/runOutputs')).flush({ status: API_SUCCESS, data: { outputs: [KEPT] } });
+    fixture.detectChanges();
+    expect(store.outputList().length).toBe(1);
+  });
+});

@@ -5,15 +5,15 @@
   </app-page-header>
 
   <div class="grid grid-cols-2 md:grid-cols-4 stat-strip stat-row is-md is-start" role="list">
-    <app-stat-tile label="Settings" [value]="'' + settings().length" icon="settings" tone="info" foot="on the allow-list" />
-    <app-stat-tile label="Changed" [value]="'' + changedCount()" icon="edit" [tone]="changedCount() ? 'warn' : 'muted'" foot="from their default" />
-    <app-stat-tile label="Workspace values" [value]="'' + overrideCount()" icon="building" [tone]="overrideCount() ? 'info' : 'muted'" foot="a workspace's own" />
-    <app-stat-tile label="Read by the engine" [value]="cacheSeconds() + ' sec'" icon="clock" tone="muted" foot="at most this after a change" />
+    <!-- Owner 2026-10-27: the tiles wait for the settings read instead of showing 0 (and "30 sec") as if real. -->
+    <app-stat-tile label="Settings" [value]="'' + settings().length" icon="settings" tone="info" foot="on the allow-list" [loading]="state.pending()" [failed]="!!error() && !state.loaded()" />
+    <app-stat-tile label="Changed" [value]="'' + changedCount()" icon="edit" [tone]="changedCount() ? 'warn' : 'muted'" foot="from their default" [loading]="state.pending()" [failed]="!!error() && !state.loaded()" />
+    <app-stat-tile label="Workspace values" [value]="'' + overrideCount()" icon="building" [tone]="overrideCount() ? 'info' : 'muted'" foot="a workspace's own" [loading]="state.pending()" [failed]="!!error() && !state.loaded()" />
+    <app-stat-tile label="Read by the engine" [value]="cacheSeconds() + ' sec'" icon="clock" tone="muted" foot="at most this after a change" [loading]="state.pending()" [failed]="!!error() && !state.loaded()" />
   </div>
 
   @if (error()) {
-    <div class="card p-4 text-sm text-crit-500" role="alert">{{ error() }}
-      <button type="button" class="btn btn-default btn-sm ml-2" (click)="load()"><app-icon name="refresh" />Try again</button></div>
+    <section class="card" data-test="engine-error"><app-load-error [message]="error()" (retry)="load()" /></section>
   } @else {
     <section class="card overflow-hidden" aria-labelledby="dials-title" data-test="engine-dials">
       <div class="px-4 pt-4"><h2 class="section-title m-0" id="dials-title">Limits</h2>
@@ -32,8 +32,10 @@
             </tr>
           </thead>
           <tbody>
-            @if (loading() && !settings().length) {
-              <tr><td colspan="7" class="text-center text-[color:var(--text-muted)] py-6">Reading the engine settings…</td></tr>
+            @if (state.pending()) {
+              <tr><td colspan="7" class="p-0"><app-loading shape="rows" label="Loading engine settings…" [count]="5" /></td></tr>
+            } @else if (!settings().length) {
+              <tr><td colspan="7" class="text-center text-[color:var(--text-muted)] py-6">No engine setting is on the allow-list.</td></tr>
             }
             @for (s of settings(); track s.key) {
               <tr [attr.data-key]="s.key" [class.is-selected]="open() === s.key">
@@ -136,9 +138,18 @@
         <p class="section-sub">Every change and reset, newest first: who, when, from what to what.</p>
         <div class="overflow-x-auto mt-2">
           <table class="table-modern">
-            <thead><tr><th>When</th><th>Setting</th><th>For</th><th class="text-right">From</th><th class="text-right">To</th><th>By</th></tr></thead>
+            <thead><tr>
+              <th appSort="when" [sortBy]="historySort">When</th><th appSort="setting" [sortBy]="historySort">Setting</th>
+              <th appSort="for" [sortBy]="historySort">For</th><th class="text-right" appSort="from" [sortBy]="historySort">From</th>
+              <th class="text-right" appSort="to" [sortBy]="historySort">To</th><th appSort="by" [sortBy]="historySort">By</th>
+            </tr></thead>
             <tbody>
-              @for (h of history(); track h.id) {
+              @if (historyState.error()) {
+                <tr><td colspan="6" class="py-3"><app-inline-status [error]="historyState.error()" (retry)="loadHistory()" /></td></tr>
+              } @else if (historyState.pending()) {
+                <tr><td colspan="6" class="p-0"><app-loading shape="rows" label="Loading changes…" [count]="3" /></td></tr>
+              } @else {
+              @for (h of sortedHistory(); track h.id) {
                 <tr [attr.data-change]="h.id">
                   <td class="whitespace-nowrap text-xs">{{ h.changedAt ? (h.changedAt | serverTime:'dateTime') : '—' }}</td>
                   <td>{{ h.label }}@if (h.action === 'RESET') { <span class="pill pill-neutral ml-1">Reset</span> }</td>
@@ -149,6 +160,7 @@
                 </tr>
               } @empty {
                 <tr><td colspan="6" class="text-center text-[color:var(--text-muted)] py-4">No change yet: every setting is at its default.</td></tr>
+              }
               }
             </tbody>
           </table>
@@ -162,6 +174,9 @@
           <table class="table-modern">
             <thead><tr><th>Watermark</th><th>Value</th></tr></thead>
             <tbody>
+              @if (state.pending()) {
+                <tr><td colspan="2" class="p-0"><app-loading shape="rows" label="Loading watermarks…" [count]="2" /></td></tr>
+              }
               @for (w of watermarks(); track w.key) {
                 <tr [attr.data-key]="w.key">
                   <td><div class="mono text-xs font-medium">{{ w.key }}</div>@if (w.description) { <div class="text-xs text-[color:var(--text-secondary)]">{{ w.description }}</div> }</td>
@@ -170,6 +185,8 @@
                     @else { <span class="mono">{{ w.value }}</span> }
                   </td>
                 </tr>
+              } @empty {
+                @if (!state.pending()) { <tr><td colspan="2" class="text-center text-[color:var(--text-muted)] py-4">No watermark recorded yet.</td></tr> }
               }
             </tbody>
           </table>

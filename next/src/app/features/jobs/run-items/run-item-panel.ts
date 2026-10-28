@@ -14,6 +14,14 @@ import {
   retriedSentence, stepDescription, stepShortName,
 } from './run-items.model';
 import { ItemFilesData, RunItemFiles } from './run-item-files';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
+import { AppLoading, InlineStatus } from '../../../shared/ui/loading';
+import { LoadError } from '../../../shared/ui/load-error';
+import { BlurLoader } from '../../../shared/ui/blur-loader';
+
+/** A row of a step's data as the table draws it: its place in the data and its cells. */
+interface DataRow { n: number; cells: string[]; }
 
 /** The panel's question: which run and item, the step whose data to show first, and whether the reader may retry. */
 export interface ItemPanelData {
@@ -75,7 +83,7 @@ export function notMade(detail: ItemDetail): string[] {
  */
 @Component({
   selector: 'app-run-item-panel',
-  imports: [Icon, Segmented, ServerTimePipe],
+  imports: [Icon, Segmented, ServerTimePipe, SortHeader, AppLoading, InlineStatus, LoadError, BlurLoader],
   styles: `
     .ip-section { display: flex; flex-direction: column; gap: 0.5rem; }
     .ip-heading { font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-secondary); }
@@ -155,11 +163,15 @@ export function notMade(detail: ItemDetail): string[] {
       </header>
 
       <div class="side-panel-body flex flex-col gap-5">
-        @if (error()) {
-          <p class="text-sm text-crit-500" role="alert">{{ error() }}</p>
+        <!-- Owner 2026-10-27: a failed read says why with Try again; another attempt is read with the item kept, dimmed. -->
+        @if (error() && !detail()) {
+          <app-load-error [message]="error()" (retry)="load(dataStep())" />
         } @else if (!detail()) {
-          <p class="text-sm text-[color:var(--text-muted)]" aria-busy="true">Reading the item…</p>
+          <app-loading shape="panel" [count]="5" label="Reading the item…" />
         } @else {
+          @if (error()) { <app-inline-status [error]="error()" (retry)="load(dataStep())" /> }
+          <app-blur-loader [active]="loading()" label="Reading the item…">
+          <div class="flex flex-col gap-5">
           @let d = detail()!;
           @if (earlier()) {
             <p class="flex flex-wrap items-center gap-2 text-sm rounded-md px-3 py-2 bg-[color:var(--surface-sunken)]" data-test="item-earlier">
@@ -262,14 +274,14 @@ export function notMade(detail: ItemDetail): string[] {
                     <table class="table-modern">
                       <thead><tr>
                         @for (c of table().columns; track c) {
-                          <th [attr.data-col]="c">
+                          <th [attr.data-col]="c" [appSort]="c" [sortBy]="dataSort">
                             <span class="inline-flex items-center gap-1">{{ c }}@if (masked(c)) { <app-icon name="lock" size="0.85em" label="Masked" title="Masked for you" /> }</span>
                           </th>
                         }
                       </tr></thead>
                       <tbody>
-                        @for (r of table().rows; track $index) {
-                          <tr>@for (v of r; track $index) { <td class="max-w-80 truncate" [title]="v">{{ v }}</td> }</tr>
+                        @for (r of sortedData(); track r.n) {
+                          <tr>@for (v of r.cells; track $index) { <td class="max-w-80 truncate" [title]="v">{{ v }}</td> }</tr>
                         }
                       </tbody>
                     </table>
@@ -277,9 +289,9 @@ export function notMade(detail: ItemDetail): string[] {
                 }
                 @if (sd.truncated) { <p class="text-xs text-[color:var(--text-muted)]">The first {{ sd.rows.length }} of {{ sd.rowCount ?? 'more' }} rows.</p> }
               } @else if (dataError()) {
-                <p class="text-sm text-crit-500" role="alert">{{ dataError() }}</p>
+                <app-inline-status [error]="dataError()" (retry)="showData(dataStep() ?? '', true)" />
               } @else {
-                <p class="text-sm text-[color:var(--text-muted)]" aria-busy="true">Reading the step's data…</p>
+                <app-loading shape="rows" [count]="3" label="Reading the step's data…" />
               }
             </section>
           }
@@ -315,6 +327,8 @@ export function notMade(detail: ItemDetail): string[] {
               </div>
             </section>
           }
+          </div>
+          </app-blur-loader>
         }
       </div>
     </aside>
@@ -338,6 +352,8 @@ export class RunItemPanel implements OnInit {
   readonly attempt = signal<number | null>(null);
   readonly detail = signal<ItemDetail | null>(null);
   readonly error = signal('');
+  /** The item is being read (a first read, another attempt, or after a retry). */
+  readonly loading = signal(false);
   readonly retrying = signal(false);
   readonly dataStep = signal<string | null>(null);
   readonly stepData = signal<ItemData | null>(null);
@@ -363,6 +379,21 @@ export class RunItemPanel implements OnInit {
   readonly notMade = computed(() => { const d = this.detail(); return d ? notMade(d) : []; });
   readonly json = computed(() => prettyJson(this.stepData()?.rows ?? []));
   readonly table = computed(() => dataTable(this.stepData() ?? { columns: [], rows: [] }));
+  /**
+   * Owner 2026-10-27: the step's data table sorts by any of its columns (numbers, dates or text, by what each holds);
+   * the data's own order until one is picked, and Copy keeps that order.
+   */
+  readonly dataSort = createTableSort<DataRow>({
+    id: 'run-item-data',
+    columns: {},
+    dynamic: key => {
+      const at = this.table().columns.indexOf(key);
+      return at < 0 ? null : { value: r => r.cells[at], kind: 'auto' };
+    },
+    // Each step's data has its own columns: a choice made on one is not carried to the next panel.
+    remember: false,
+  });
+  readonly sortedData = computed(() => this.dataSort.apply(this.table().rows.map((cells, n) => ({ n, cells }))));
 
   readonly badge = formatBadge;
   readonly icon = fileIcon;
@@ -446,14 +477,16 @@ export class RunItemPanel implements OnInit {
   load(stepKey: string | null): void {
     this.request?.unsubscribe();
     this.error.set('');
+    this.loading.set(true);
     this.request = this.api.detail(this.data.jobQueueId, this.itemRef(), this.attempt(), this.data.status, this.data.search).subscribe({
       next: detail => {
+        this.loading.set(false);
         this.detail.set(detail);
         this.readPage(detail);
         const first = firstDataStep(detail, stepKey);
         if (first) this.showData(first, true); else { this.dataStep.set(null); this.stepData.set(null); }
       },
-      error: err => this.error.set(refusalText(err, 'The item could not be read.')),
+      error: err => { this.loading.set(false); this.error.set(refusalText(err, 'The item could not be read.')); },
     });
   }
 

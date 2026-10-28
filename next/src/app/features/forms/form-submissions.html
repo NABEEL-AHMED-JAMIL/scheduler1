@@ -25,9 +25,9 @@
   </app-page-header>
 
   @if (formsLoading()) {
-    <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]" role="status">Reading the forms…</div>
+    <div class="card"><app-loading shape="rows" label="Reading the forms…" /></div>
   } @else if (formsError()) {
-    <div class="card p-0"><app-load-error [message]="formsError()" (retry)="ngOnInit()" /></div>
+    <div class="card p-0"><app-load-error [message]="formsError()" (retry)="loadForms()" /></div>
   } @else if (!forms().length) {
     <div class="card p-8 flex flex-col items-center text-center gap-3">
       <span class="stat-glyph"><app-icon name="table" /></span>
@@ -65,17 +65,17 @@
       <table class="table-modern">
         <thead>
           <tr>
-            <th>#</th>
-            <th>Submitted by</th>
-            <th>Submitted</th>
-            <th>Status</th>
-            @if (hasApproval()) { <th>Stage</th><th>Approval</th> }
-            <th>Details</th>
+            <th appSort="id" [sortBy]="sort">#</th>
+            <th appSort="submittedBy" [sortBy]="sort">Submitted by</th>
+            <th appSort="submitted" [sortBy]="sort">Submitted</th>
+            <th appSort="status" [sortBy]="sort">Status</th>
+            @if (hasApproval()) { <th appSort="stage" [sortBy]="sort">Stage</th><th appSort="approval" [sortBy]="sort">Approval</th> }
+            <th appSort="details" [sortBy]="sort">Details</th>
             <th class="text-right">Answers</th>
           </tr>
         </thead>
         <tbody>
-          @for (s of shownRows(); track s.submissionId) {
+          @for (s of sortedRows(); track s.submissionId) {
             <tr [attr.data-submission]="s.submissionId">
               <td class="tabular">{{ s.submissionId }}</td>
               <td class="whitespace-nowrap">{{ submitter(s) }}</td>
@@ -125,9 +125,10 @@
                       @if (row.table; as t) {
                         <dd class="min-w-0 overflow-x-auto">
                           <table class="table-modern text-xs" [attr.aria-label]="row.label">
-                            <thead><tr>@for (c of t.columns; track c.key) { <th>{{ c.label }}</th> }</tr></thead>
+                            <thead><tr>@for (c of t.columns; track c.key) { <th [appSort]="c.key" [sortBy]="answerSort">{{ c.label }}</th> }</tr></thead>
                             <tbody>
-                              @for (r of t.rows; track $index) {
+                              <!-- Owner 2026-10-27: read-only rows with no state of their own, so $index stays a safe track. -->
+                              @for (r of answerSort.apply(t.rows); track $index) {
                                 <tr>@for (c of t.columns; track c.key) { <td>{{ cell(c, r[c.key]) }}</td> }</tr>
                               }
                             </tbody>

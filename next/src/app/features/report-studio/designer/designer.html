@@ -82,11 +82,15 @@
       <label class="rsd-chip rsd-brand" [title]="'The brand this template prints in: ' + brandWord()">
         <span>Brand:</span>
         <select class="rsd-brand-select" aria-label="Brand profile" [disabled]="!editable()" (change)="setBrand($any($event.target).value)">
-          <option value="" [selected]="!branding().profileId && !branding().disabled">Workspace default{{ !branding().profileId && !branding().disabled && brandWord() !== 'None yet' ? ' · ' + brandWord() : '' }}</option>
+          <option value="" [selected]="!branding().profileId && !branding().disabled">Workspace default{{ !branding().profileId && !branding().disabled && brandWord() !== 'None yet' && (usableState.loaded() || isPlatformAdmin()) ? ' · ' + brandWord() : '' }}</option>
           @for (p of profiles(); track p.profileId) { <option [value]="p.profileId" [selected]="branding().profileId === p.profileId">{{ p.name }}</option> }
           <option value="off" [selected]="!!branding().disabled">No branding</option>
         </select>
       </label>
+      @if (usableState.error()) {
+        <!-- Owner 2026-10-27: a failed read of the brand profiles says so, instead of offering only the defaults. -->
+        <button type="button" class="btn btn-default btn-xs" [title]="usableState.error()" (click)="loadUsable()"><app-icon name="refresh" />Brands: try again</button>
+      }
       <span class="flex-1"></span>
       <!-- ZT-R2: the label is its own span, cut with an ellipsis (a flex box's bare text is clipped mid-letter), named in full on hover. -->
       <button type="button" class="rsd-chip" (click)="openTestData()" [disabled]="isPlatformAdmin()"
@@ -135,8 +139,15 @@
                   }
                 </div>
               } @empty {
-                <p class="text-xs text-[color:var(--text-muted)]">No component matches.</p>
+                @if (paletteState.error()) {
+                  <app-inline-status [error]="paletteState.error()" (retry)="loadPalette()" />
+                } @else if (paletteState.pending()) {
+                  <app-loading shape="list" label="Loading components…" [count]="5" />
+                } @else {
+                  <p class="text-xs text-[color:var(--text-muted)]">{{ search().trim() ? 'No component matches.' : 'No component to add yet.' }}</p>
+                }
               }
+              @if (schemaError()) { <app-inline-status [error]="schemaError()" (retry)="loadPalette()" /> }
               <h3 class="rsd-eyebrow">Page parts</h3>
               <ul class="rsd-parts">
                 @for (p of pageParts(); track p.key) {
@@ -190,6 +201,13 @@
                 } @else {
                   <p class="text-xs text-[color:var(--text-muted)]">Paste JSON, pick a pipeline run's output, an upload or a saved test sample: the page fills with it at once.</p>
                 }
+                @if (inspecting() && !dataFields().length) {
+                  <app-loading shape="list" label="Reading the test data's fields…" [count]="4" />
+                } @else if (inspectError()) {
+                  <app-inline-status [error]="inspectError()" (retry)="inspectTestData()" />
+                } @else if (testSource() && !inspecting() && inspect() && !dataFields().length) {
+                  <p class="text-xs text-[color:var(--text-muted)]">This test data has no fields to use.</p>
+                }
                 @if (dataFields().length) {
                   <h3 class="rsd-eyebrow">Fields · click to use</h3>
                   <ul class="rsd-fields">
@@ -218,7 +236,8 @@
           <div class="rs-banner rs-banner-warn rsd-canvas-note" role="status" data-test-data-lost><app-icon name="alert" class="shrink-0" /><span class="min-w-0 flex-1 text-sm">{{ testDataLost() }}</span></div>
         }
         @if (drawError()) {
-          <div class="rs-banner rs-banner-crit rsd-canvas-note" role="alert"><app-icon name="alert" class="icon-crit shrink-0" /><span class="text-sm">{{ drawError() }}</span></div>
+          <div class="rs-banner rs-banner-crit rsd-canvas-note" role="alert"><app-icon name="alert" class="icon-crit shrink-0" /><span class="text-sm min-w-0 flex-1">{{ drawError() }}</span>
+            <button type="button" class="btn btn-default btn-sm shrink-0" (click)="draw(true)"><app-icon name="refresh" />Try again</button></div>
         }
         @if (previewDef()) {
           <div class="rs-banner rs-banner-info rsd-canvas-note" role="status" data-ai-preview-banner><app-icon name="sparkle" class="shrink-0" />
@@ -267,8 +286,13 @@
               </button>
             }
           }
+        } @else if (drawError()) {
+          <!-- Owner 2026-10-27: a first draw that failed is not a spinner that never stops: the banner above says why. -->
+          <p class="text-sm text-[color:var(--text-muted)] text-center py-16">The page is not drawn yet.</p>
+        } @else if (!def()) {
+          <p class="text-sm text-[color:var(--text-muted)] text-center py-16">This template has no layout to draw yet.</p>
         } @else {
-          <div class="flex justify-center py-16"><span class="spinner" role="status" aria-label="Drawing the page"></span></div>
+          <app-loading shape="spinner" label="Drawing the page…" />
         }
         @if (drawing()) { <span class="rsd-drawing spinner" role="status" aria-label="Drawing"></span> }
       </section>

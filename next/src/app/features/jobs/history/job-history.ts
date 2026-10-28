@@ -39,6 +39,10 @@ import {
 import { DocumentsApi } from '../../documents/documents.service';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
+import { AppLoading, InlineStatus, createLoadState, loadErrorText } from '../../../shared/ui/loading';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
+import { BlurLoader } from '../../../shared/ui/blur-loader';
 import { RunFacetsRail } from './run-facets-rail';
 import { RunItemsApi } from '../run-items/run-items.api';
 import { ItemCounts, countsLine } from '../run-items/run-items.model';
@@ -50,6 +54,8 @@ import { ExplorerFilter, NO_FILTER, RUN_WINDOWS, RunExplorerApi, RunFacets, acti
  * again on each status push.
  */
 const HISTORY_WINDOW = 500;
+/** Core's ceiling for one read of a schedule's history (SourceJobServiceImpl.RUN_HISTORY_MAX). */
+const HISTORY_MAX = 1000;
 /** MIG-364: the approved documents read with the runs -- enough to name the documents behind the runs on screen. */
 const APPROVALS_WINDOW = '200';
 /** Runs Executions shows when it is opened without a job: the newest of the last day. */
@@ -87,8 +93,8 @@ const TRIGGER_WORDS: Record<string, string> = {
 
 @Component({
   selector: 'app-job-history',
-  imports: [PageHeader, RefreshButton, AssistantDock, Icon, ServerTimePipe, RouterLink, TableShell, StatusPill, StatusFilterChip, Donut, BarChart, SplitBar, Pagination, StatStrip,
-    ReviewWaiting, RunFacetsRail],
+  imports: [PageHeader, RefreshButton, AppLoading, InlineStatus, BlurLoader, AssistantDock, Icon, ServerTimePipe, RouterLink, TableShell, StatusPill, StatusFilterChip, Donut, BarChart, SplitBar, Pagination, StatStrip,
+    ReviewWaiting, RunFacetsRail, SortHeader],
   templateUrl: './job-history.html',
   // UX review 2026-10-12 (B2/B3): this screen's own rules, in its lazy chunk rather than the console's first download.
   styles: `
@@ -195,6 +201,8 @@ export class JobHistory {
     if (!this.explorerDrawn() && this.facetsSettled() && this.reviewSettled() && !this.loading()) this.explorerDrawn.set(true);
   });
   readonly facetsUnavailable = signal(false);
+  /** Owner 2026-10-27: the counts failed to read (rather than not being this reader's): the rail offers Try again. */
+  readonly facetsRetryable = signal(false);
   private facetsRequest?: Subscription;
   readonly histogram = computed(() => histogramBars(this.facets()));
   readonly histogramSub = computed(() => {
@@ -219,7 +227,7 @@ export class JobHistory {
   private loadFacets(): void {
     this.facetsRequest?.unsubscribe();
     // The counts are Runs by date's (page queue): a reader holding Schedules alone gets the list without them, not a 403.
-    if (typeof this.auth.canOpen === 'function' && !this.auth.canOpen('queue')) { this.facets.set(null); this.facetsUnavailable.set(true); this.facetsSettled.set(true); return; }
+    if (typeof this.auth.canOpen === 'function' && !this.auth.canOpen('queue')) { this.facets.set(null); this.facetsUnavailable.set(true); this.facetsRetryable.set(false); this.facetsSettled.set(true); return; }
     this.facetsLoading.set(true);
     this.facetsRequest = this.explorerApi.facets(explorerBody(this.explorerFilter(), RECENT_WINDOW)).subscribe({
       next: r => {
@@ -228,10 +236,14 @@ export class JobHistory {
         const ok = r.status === API_SUCCESS && !!r.data && typeof r.data === 'object';
         this.facets.set(ok ? (r.data as RunFacets) : null);
         this.facetsUnavailable.set(!ok);
+        this.facetsRetryable.set(!ok);
       },
-      error: () => { this.facetsLoading.set(false); this.facetsSettled.set(true); this.facets.set(null); this.facetsUnavailable.set(true); },
+      error: () => { this.facetsLoading.set(false); this.facetsSettled.set(true); this.facets.set(null); this.facetsUnavailable.set(true); this.facetsRetryable.set(true); },
     });
   }
+
+  /** The rail's Try again: the counts alone, the list on screen stays. */
+  reloadFacets(): void { this.loadFacets(); }
   /** The server has runs older than the ones loaded; Load older reads the next window. */
   readonly hasMore = signal(false);
   /** Executions without a job: more ran in the last day than RECENT_WINDOW shows. */
@@ -240,6 +252,11 @@ export class JobHistory {
   readonly historyWindow = HISTORY_WINDOW;
   readonly loading = signal(true);
   readonly error = signal('');
+  /**
+   * Owner 2026-10-27: whether any list of runs has answered yet, so the status tiles show placeholders -- not eight
+   * zeros -- until it has, and "Not available right now" when the first read failed.
+   */
+  readonly runsAnswered = signal(false);
   /** The job is not there, so Try again cannot help: the page offers Back to jobs instead. */
   readonly missing = signal(false);
   readonly statusFilter = signal('');
@@ -273,14 +290,54 @@ export class JobHistory {
     ].filter((row): row is { label: string; positive: number; negative: number } => row !== null);
   });
 
+  /**
+   * Owner 2026-10-27 ("add a sort on each table"): the columns sort on the server (Core's RunListSort: run, queued, started,
+   * ended, duration, status), since a schedule's history and the window of Runs › Latest are read a window at a time. A new
+   * order reads the list again from its start; a schedule's "Load more" then goes on by offset in that order. The hour of a
+   * dashboard drill-down is read whole, so there the same columns sort the rows on screen. The list's own order is Run,
+   * newest first (job_queue_id descending, exactly Core's default), and that order sends no sort.
+   */
+  readonly sort = createTableSort<JobQueue>({
+    id: 'job-history',
+    server: true,
+    initial: { key: 'run', direction: 'desc' },
+    columns: {
+      run: { value: run => run.jobQueueId, kind: 'number' },
+      queued: { value: run => run.dateCreated, kind: 'date' },
+      // The Started cell: the start, else when the run was skipped.
+      started: { value: run => run.startTime ?? run.skipTime, kind: 'date' },
+      ended: { value: run => run.endTime, kind: 'date' },
+      duration: { value: run => this.durationSeconds(run), kind: 'number' },
+      status: { value: run => run.jobStatus, kind: 'status' },
+    },
+    onChange: () => {
+      this.pager.reset();
+      // The hour is all on screen: nothing to read again.
+      if (!this.isDrillDown()) this.load();
+    },
+  });
+
+  /** Where a sorted schedule history's next window starts (Core's nextOffset), or null at its end. */
+  readonly nextOffset = signal<number | null>(null);
+  /** What a read carries: the column and direction, or null for Core's own newest-first order (and its beforeId cursor). */
+  private order(): { sort: string; dir: 'asc' | 'desc' } | null {
+    const picked = this.sort.param();
+    return picked && !(picked.sort === 'run' && picked.dir === 'desc') ? picked : null;
+  }
+
+  /** Whether the list on screen is in a column's order the server applied (not newest first). */
+  readonly sortedByServer = computed(() => !!this.order() && !this.isDrillDown());
+
   readonly filtered = computed(() => {
     const status = this.statusFilter();
     const term = this.search().trim().toLowerCase();
-    return this.runs().filter(run => {
+    const rows = this.runs().filter(run => {
       if (status && run.jobStatus !== status) return false;
       if (!term) return true;
       return `${run.jobQueueId} ${run.jobStatusMessage ?? ''}`.toLowerCase().includes(term);
     });
+    // A drill-down's hour is read whole: sorted here. Elsewhere the rows come in the server's order.
+    return this.isDrillDown() && this.sort.param() ? [...rows].sort((a, b) => this.sort.compare(a, b)) : rows;
   });
 
   /**
@@ -348,6 +405,12 @@ export class JobHistory {
   readonly showInsights = signal(false);
   /** The job and its task, so the run list has the context the old screen showed beside it. */
   readonly detail = signal<any | null>(null);
+  /**
+   * Owner 2026-10-27: the details card's own read. It was simply absent until the answer and for ever after a failure;
+   * it now says it is loading, and why it could not be read with Try again.
+   */
+  readonly detailState = createLoadState(false);
+  private detailRequest?: Subscription;
   /**
    * UX review E3 (2026-10-13): the schedule's details start folded -- the runs are what the page is for, and the details
    * (timetable, triggers, the pipeline and its payload) sat above them at y≈850. The folded line says the pipeline and when.
@@ -484,15 +547,25 @@ export class JobHistory {
     });
   }
 
-  private loadDetail(): void {
-    if (!this.jobId()) { this.detail.set(null); return; }
-    this.http.get<ApiResponse<any>>(`${API_BASE}/sourceJob.json/fetchSourceJobDetailWithSourceJobId`,
+  loadDetail(): void {
+    this.detailRequest?.unsubscribe();
+    if (!this.jobId()) { this.detail.set(null); this.detailState.done(); return; }
+    // Another schedule's details must not stay up under this one's runs while its own are read.
+    // Untracked: the route effect calls this, and a tracked read of detail() made every answer start the read again --
+    // an endless loop (the hung console suite, 2026-10-27) whenever the answer's jobId was not this schedule's.
+    if (untracked(() => String(this.detail()?.jobId ?? '')) !== untracked(() => this.jobId())) this.detail.set(null);
+    this.detailState.start();
+    const fallback = "This schedule's details could not be read.";
+    // Only the newest read may land: a reply for the schedule the reader left must not fill this one's card.
+    this.detailRequest = this.http.get<ApiResponse<any>>(`${API_BASE}/sourceJob.json/fetchSourceJobDetailWithSourceJobId`,
       { params: { jobId: this.jobId() } }).subscribe({
       next: response => {
-        if (response.status === API_SUCCESS) this.detail.set(response.data ?? null);
+        if (response.status !== API_SUCCESS) { this.detailState.fail(response, fallback); return; }
+        this.detail.set(response.data ?? null);
+        this.detailState.done();
       },
-      // The run list is the point of the screen; losing the context panel should not break it.
-      error: () => this.detail.set(null),
+      // The run list is the point of the screen; losing the context panel does not break it, but it says so.
+      error: err => this.detailState.fail(err, fallback),
     });
   }
 
@@ -610,6 +683,8 @@ export class JobHistory {
         const job = jobs.find(j => String(j.jobId) === this.jobId());
         if (job) this.jobName.set(job.jobName);
       },
+      // Cosmetic: without the names, rows and the heading keep the schedule's number, as Runs by date's do.
+      error: () => {},
     });
   }
 
@@ -663,7 +738,7 @@ export class JobHistory {
           { params: drillParams })
       : this.http.get<ApiResponse<any>>(
           `${API_BASE}/sourceJob.json/fetchSourceJobQueueListWithJobId`,
-          { params: { jobId: this.jobId(), limit: HISTORY_WINDOW } });
+          { params: this.historyParams(silent) });
 
     // Only the latest read may land: a push arriving mid-read must not let an older answer
     // overwrite a newer one.
@@ -678,41 +753,65 @@ export class JobHistory {
             this.runs.set([]);
             this.error.set(`Schedule #${String(this.jobId()).trim()} does not exist or was deleted.`);
           } else if (!silent) {
-            this.error.set(response.message);
+            this.error.set(loadErrorText(response, 'The run history could not be read.'));
           }
           return;
         }
+        this.runsAnswered.set(true);
         const data = response.data ?? {};
         // The two endpoints name the same list differently.
         const fresh: JobQueue[] = data.sourceJobQueues ?? data.jobQueues ?? [];
         if (this.isDrillDown()) {
           this.runs.set(fresh);
           this.hasMore.set(false);
+        } else if (untracked(() => this.order())) {
+          // A column's order: the windows read so far, read again from the start (historyParams) -- ids do not say where
+          // a window ends in this order, so nothing older is merged below.
+          this.runs.set(fresh);
+          this.hasMore.set(!!data.hasMore);
+          this.nextOffset.set(typeof data.nextOffset === 'number' ? data.nextOffset : null);
         } else {
           // A re-read brings the newest window again; older windows the reader already loaded stay below it.
           const oldestFresh = Math.min(...fresh.map(run => run.jobQueueId));
           const older = silent && fresh.length ? this.runs().filter(run => run.jobQueueId < oldestFresh) : [];
           this.runs.set([...fresh, ...older]);
           if (!older.length) this.hasMore.set(!!data.hasMore);
+          this.nextOffset.set(null);
         }
         if (data.sourceJob?.jobName) this.jobName.set(data.sourceJob.jobName);
       },
       error: err => {
         this.loading.set(false);
-        if (!silent) this.error.set(err?.error?.message || 'Could not load the run history.');
+        if (!silent) this.error.set(loadErrorText(err, 'The run history could not be read.'));
       },
     });
+  }
+
+  /**
+   * A schedule's history read: the newest window, or -- in a column's order -- from the start by offset. A quiet re-read of
+   * a sorted list asks for as many as are on screen (up to Core's 1,000), so a status push does not drop the windows the
+   * reader loaded.
+   */
+  private historyParams(silent: boolean): Record<string, string | number> {
+    // Untracked: the route effect calls load(), and a new order reads again through the sort's onChange instead.
+    const order = untracked(() => this.order());
+    if (!order) return { jobId: this.jobId(), limit: HISTORY_WINDOW };
+    const limit = silent ? Math.min(Math.max(HISTORY_WINDOW, untracked(() => this.runs().length)), HISTORY_MAX) : HISTORY_WINDOW;
+    return { jobId: this.jobId(), limit, sort: order.sort, dir: order.dir, offset: 0 };
   }
 
   /** The newest runs of every job in the last day (at most RECENT_WINDOW), for Executions opened without a job. */
   private loadRecent(silent: boolean): void {
     this.request?.unsubscribe();
     this.loadFacets();
-    const body = explorerBody(this.explorerFilter(), RECENT_WINDOW);
+    // Owner 2026-10-27: in a column's order when one is picked -- the window's first RECENT_WINDOW in that order. The facets
+    // count the same window and take no order.
+    const body = { ...explorerBody(this.explorerFilter(), RECENT_WINDOW), ...(untracked(() => this.order()) ?? {}) };
     this.request = this.http.post<ApiResponse<any>>(`${API_BASE}/message.json/fetchLogs`, body).subscribe({
       next: response => {
         this.loading.set(false);
-        if (response.status !== API_SUCCESS) { if (!silent) this.error.set(response.message); return; }
+        if (response.status !== API_SUCCESS) { if (!silent) this.error.set(loadErrorText(response, 'The latest runs could not be read.')); return; }
+        this.runsAnswered.set(true);
         const payload = response.data;
         this.runs.set(Array.isArray(payload) ? payload : (payload?.sourceJobQueues ?? []));
         this.hasMore.set(false);
@@ -720,7 +819,7 @@ export class JobHistory {
       },
       error: err => {
         this.loading.set(false);
-        if (!silent) this.error.set(err?.error?.message || 'Could not load the latest runs.');
+        if (!silent) this.error.set(loadErrorText(err, 'The latest runs could not be read.'));
       },
     });
   }
@@ -742,17 +841,25 @@ export class JobHistory {
   loadOlder(): void {
     const loaded = this.runs();
     if (!this.jobId() || !loaded.length || this.loadingOlder()) return;
-    const beforeId = Math.min(...loaded.map(run => run.jobQueueId));
+    const order = this.order();
+    // Newest first pages by the oldest run on screen; a column's order by Core's offset (owner 2026-10-27).
+    const params: Record<string, string | number> = order
+      ? { jobId: this.jobId(), limit: HISTORY_WINDOW, sort: order.sort, dir: order.dir, offset: this.nextOffset() ?? loaded.length }
+      : { jobId: this.jobId(), limit: HISTORY_WINDOW, beforeId: Math.min(...loaded.map(run => run.jobQueueId)) };
     this.loadingOlder.set(true);
+    const asked = JSON.stringify(order);
     this.http.get<ApiResponse<any>>(`${API_BASE}/sourceJob.json/fetchSourceJobQueueListWithJobId`,
-      { params: { jobId: this.jobId(), limit: HISTORY_WINDOW, beforeId } }).subscribe({
+      { params }).subscribe({
       next: response => {
         this.loadingOlder.set(false);
+        // The reader picked another order meanwhile: this window belongs to the old one.
+        if (JSON.stringify(this.order()) !== asked) return;
         if (response.status !== API_SUCCESS) { this.toast.error(response.message || 'Could not read older runs.'); return; }
         const older: JobQueue[] = response.data?.jobQueues ?? [];
         const known = new Set(this.runs().map(run => run.jobQueueId));
         this.runs.update(list => [...list, ...older.filter(run => !known.has(run.jobQueueId))]);
         this.hasMore.set(!!response.data?.hasMore);
+        if (order) this.nextOffset.set(typeof response.data?.nextOffset === 'number' ? response.data.nextOffset : null);
       },
       error: err => {
         this.loadingOlder.set(false);

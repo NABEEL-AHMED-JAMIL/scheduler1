@@ -79,3 +79,24 @@ describe('RunReview', () => {
     expect(el.textContent).toContain('Only a workspace administrator decides a review.');
   });
 });
+
+describe('RunReview -- loading and a failed read (owner 2026-10-27)', () => {
+  it('is loading until the review answers, then says why it could not be read, with Try again', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [provideZonelessChangeDetection(), provideHttpClient(), provideHttpClientTesting(),
+      { provide: ToastService, useValue: { success: () => {}, error: () => {}, info: () => {} } }] });
+    const fixture = TestBed.createComponent(RunReview);
+    fixture.componentRef.setInput('jobQueueId', '7447');
+    fixture.detectChanges();
+    expect(fixture.componentInstance.loading()).toBe(true);
+    const http = TestBed.inject(HttpTestingController);
+    http.expectOne(r => r.url.endsWith('/sourceJob.json/review')).flush('boom', { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+    expect(fixture.componentInstance.loading()).toBe(false);
+    expect(fixture.componentInstance.error()).toBe("The run's review could not be read.");
+    const el = fixture.nativeElement as HTMLElement;
+    [...el.querySelectorAll('button')].find(b => b.textContent!.trim() === 'Try again')!.click();
+    http.expectOne(r => r.url.endsWith('/sourceJob.json/review')).flush({ status: API_SUCCESS, message: '', data: PENDING });
+    expect(fixture.componentInstance.review()?.reviewStatus).toBe('PENDING');
+  });
+});

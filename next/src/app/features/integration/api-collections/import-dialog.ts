@@ -10,7 +10,9 @@ import { Segmented, SegmentOption } from '../../../shared/ui/segmented';
 import { DataText } from '../../../shared/ui/data-text';
 import { StatStrip, StatStripItem } from '../../../shared/ui/stat-strip';
 import { formatSize } from '../../../shared/ui/format-size';
-import { ImportResult, brunoFiles, reportRows } from './api-collections.model';
+import { ImportResult, ReportRow, brunoFiles, reportRows } from './api-collections.model';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
 import { ApiCollectionsApi, BrunoImport, PostmanImport } from './api-collections.service';
 
 export interface ImportDialogData {
@@ -28,7 +30,7 @@ type Format = 'POSTMAN' | 'BRUNO';
  */
 @Component({
   selector: 'app-import-dialog',
-  imports: [FormDialog, Field, Icon, Segmented, DataText, StatStrip],
+  imports: [FormDialog, Field, Icon, Segmented, DataText, StatStrip, SortHeader],
   template: `
     <app-form-dialog [heading]="result() ? 'Import report' : 'Import a collection'"
                      [subtitle]="result() ? resultLine() : 'Postman v2.1 or Bruno. The files are read in your browser; nothing in them is run.'"
@@ -40,9 +42,13 @@ type Format = 'POSTMAN' | 'BRUNO';
           @if (rows().length) {
             <div class="overflow-x-auto">
             <table class="table-modern min-w-[36rem]">
-              <thead><tr><th>What</th><th>Item</th><th>Note</th></tr></thead>
+              <thead><tr>
+                <th appSort="kind" [sortBy]="sort">What</th>
+                <th appSort="item" [sortBy]="sort">Item</th>
+                <th appSort="note" [sortBy]="sort">Note</th>
+              </tr></thead>
               <tbody>
-                @for (row of rows(); track $index) {
+                @for (row of sortedRows(); track $index) {
                   <tr>
                     <td class="whitespace-nowrap">
                       <span class="pill" [class.pill-warn]="row.kind === 'Review'" [class.pill-crit]="row.kind === 'Skipped'"
@@ -121,6 +127,20 @@ export class ImportDialog {
   readonly result = signal<ImportResult | null>(null);
 
   readonly rows = computed(() => reportRows(this.result()?.report));
+  /**
+   * Owner 2026-10-27: the report sorts by its columns. Its own order -- what needs a look first, then skipped, converted,
+   * imported -- stays the natural one, and "What" sorts in that same order. Fresh each time the dialog opens.
+   */
+  readonly sort = createTableSort<ReportRow>({
+    id: 'api-collection-import-report',
+    remember: false,
+    columns: {
+      kind: { value: r => r.kind, kind: 'status', order: ['Review', 'Skipped', 'Converted', 'Imported'] },
+      item: r => r.item,
+      note: r => r.note,
+    },
+  });
+  readonly sortedRows = computed(() => this.sort.apply(this.rows()));
   readonly confirmLabel = computed(() => this.result() ? 'Open collection' : 'Import');
   readonly resultLine = computed(() => {
     const r = this.result();

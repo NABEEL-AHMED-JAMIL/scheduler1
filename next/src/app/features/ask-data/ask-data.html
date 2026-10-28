@@ -34,7 +34,7 @@
     </div>
     <div class="flex flex-wrap items-center gap-1.5" data-test="suggestions">
       @if (suggestionsLoading()) {
-        <span class="text-xs text-[color:var(--text-muted)] flex items-center gap-1.5"><app-icon name="refresh" class="spin" size="0.9em" />Looking at what your workspace has…</span>
+        <app-loading shape="inline" label="Looking at what your workspace has…" />
       } @else if (suggestionsError()) {
         <span class="text-xs text-crit-500 flex items-center gap-1.5"><app-icon name="alert" class="icon-crit" size="0.9em" />{{ suggestionsError() }}</span>
         <button type="button" class="btn btn-default btn-sm" (click)="loadSuggestions()"><app-icon name="refresh" />Try again</button>
@@ -45,6 +45,9 @@
       } @else {
         @if (suggestions().length) {
           <span class="text-xs text-[color:var(--text-muted)] mr-1">Try:</span>
+        } @else {
+          <!-- Owner 2026-10-27: never blank -- there is data, just no suggestion drawn from it. -->
+          <span class="text-xs text-[color:var(--text-muted)]" data-test="no-suggestions">No suggested question this time: type your own above.</span>
         }
         @for (s of suggestions(); track s) {
           <button type="button" class="pill pill-neutral hover-brand text-left whitespace-normal break-words max-w-full" [disabled]="asking()" (click)="use(s)">{{ s }}</button>
@@ -132,7 +135,7 @@
 
         @switch (t.state) {
           @case ('asking') {
-            <p class="text-sm text-[color:var(--text-muted)] flex items-center gap-2" data-test="asking">
+            <p class="text-sm text-[color:var(--text-muted)] flex items-center gap-2" data-test="asking" role="status">
               <app-icon name="refresh" class="spin" />Reading your data and asking the model… {{ elapsedText() }}
             </p>
           }

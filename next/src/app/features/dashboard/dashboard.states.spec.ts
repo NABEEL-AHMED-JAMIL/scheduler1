@@ -3,7 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { ApplicationRef, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
-import { Subject, of, throwError } from 'rxjs';
+import { NEVER, Subject, of, throwError } from 'rxjs';
 import { Dashboard } from './dashboard';
 import { DashboardService } from './dashboard.service';
 import { ToastService } from '../../shared/ui/toast.service';
@@ -512,5 +512,46 @@ describe('Dashboard staying current', () => {
     expect(d.updatedAt()).toBeNull();
     d.load();
     expect(d.updatedAt()).toBeInstanceOf(Date);
+  });
+});
+
+describe('Dashboard -- first load and the hour table sort (owner 2026-10-27)', () => {
+  it('is a first load, not "no runs", until the figures answer, and stays answered through a re-read', () => {
+    let answer: () => unknown = () => NEVER;
+    const { dashboard: d } = dashboard({ jobStatus: () => answer(), jobRunning: () => answer(), hourly: () => answer() });
+    d.load();
+    expect(d.firstLoad()).toBe(true);
+    answer = ok;
+    d.load();
+    expect(d.firstLoad()).toBe(false);
+    answer = () => NEVER;
+    d.load();
+    expect(d.loading()).toBe(true);
+    expect(d.firstLoad()).toBe(false);
+  });
+
+  it('a failed first read ends the first load, so each card can say why', () => {
+    const failed = () => throwError(() => ({ status: 500 }));
+    const { dashboard: d } = dashboard({ jobStatus: failed, jobRunning: failed, hourly: failed });
+    d.load();
+    expect(d.firstLoad()).toBe(false);
+    expect(d.loading()).toBe(false);
+  });
+
+  it('sorts the hour by a status count both ways, before the pager', () => {
+    try { localStorage.clear(); } catch { /* none */ }
+    const rows = [
+      { jobId: 1, jobName: 'Alpha', queue: 0, start: 0, running: 0, failed: 1, completed: 5, skip: 0, interrupt: 0, missed: 0, total: 6 },
+      { jobId: 2, jobName: 'Beta', queue: 0, start: 0, running: 0, failed: 3, completed: 1, skip: 0, interrupt: 0, missed: 0, total: 4 },
+    ];
+    const { dashboard: d } = dashboard({ breakdown: () => of({ status: 'SUCCESS', data: rows }) });
+    d.selectCell('2026-09-20', 9, 4);
+    expect(d.pagedBreakdown().map(r => r.jobId)).toEqual([1, 2]);
+    d.breakdownSort.toggle('failed');
+    expect(d.pagedBreakdown().map(r => r.jobId)).toEqual([2, 1]);
+    d.breakdownSort.toggle('failed');
+    expect(d.pagedBreakdown().map(r => r.jobId)).toEqual([1, 2]);
+    d.breakdownSort.toggle('schedule');
+    expect(d.sortedBreakdown().map(r => r.jobName)).toEqual(['Alpha', 'Beta']);
   });
 });

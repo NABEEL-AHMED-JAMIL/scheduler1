@@ -8,12 +8,17 @@
 
   <!-- Owner #22: the trends, scoped by the server -- a workspace administrator's own workspace, always. -->
   <section class="flex flex-col gap-4" data-test="cost-trends" aria-label="Cost trends">
-    @if (trendsLoading()) {
-      <div class="card p-12 text-center text-sm text-[color:var(--text-muted)]" role="status"><div class="spinner mx-auto mb-3"></div>Reading the trends…</div>
+    <!-- Owner 2026-10-27: a skeleton on the first read (and for another workspace); a new range blurs what is on screen. -->
+    @if (trendsLoading() && !trends()) {
+      <app-loading shape="tiles" label="Reading the trends…" />
+      <div class="card"><app-loading shape="panel" label="Reading the trends…" [count]="5" /></div>
     } @else if (trendsError()) {
-      <div class="card p-8 text-center"><app-icon name="alert" size="1.6rem" class="icon-crit" /><p class="text-sm text-crit-500 mt-2">{{ trendsError() }}</p>
-        <button type="button" class="btn btn-default btn-sm mt-3" (click)="load()"><app-icon name="refresh" />Try again</button></div>
+      <div class="card"><app-load-error [message]="trendsError()" (retry)="load()" /></div>
+    } @else if (!trends()) {
+      <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]">Nothing used in this range.</div>
     } @else if (trends(); as t) {
+      <app-blur-loader [active]="trendsLoading()" label="Refreshing…">
+      <div class="flex flex-col gap-4">
       <div class="grid grid-cols-2 md:grid-cols-4 stat-strip stat-row is-md is-start" role="list">
         <app-stat-tile [label]="'Last ' + months() + ' months'" [value]="money2(total())" icon="chart" tone="info" [foot]="scopeName()" />
         <app-stat-tile label="This month so far" [value]="money2(thisMonth())" icon="calendar" tone="info"
@@ -39,9 +44,9 @@
           <h2 class="font-semibold text-sm mb-2">By service</h2>
           <div class="overflow-x-auto">
             <table class="table-modern">
-              <thead><tr><th>Service</th><th class="text-right">Cost</th><th class="w-40">Share</th></tr></thead>
+              <thead><tr><th appSort="service" [sortBy]="serviceSort">Service</th><th class="text-right" appSort="cost" [sortBy]="serviceSort">Cost</th><th class="w-40" appSort="share" [sortBy]="serviceSort">Share</th></tr></thead>
               <tbody>
-                @for (s of serviceRows(); track s.service) {
+                @for (s of sortedServices(); track s.service) {
                   <tr><td>{{ s.service }}</td><td class="text-right tabular">{{ money2(s.amount) }}</td>
                     <td><div class="progress" role="meter" [attr.aria-label]="s.service + ' share'" aria-valuemin="0" aria-valuemax="100" [attr.aria-valuenow]="s.share">
                       <div class="progress-bar" [style.width.%]="s.share"></div></div></td></tr>
@@ -56,9 +61,9 @@
             <h2 class="font-semibold text-sm mb-2">By pipeline</h2>
             <div class="overflow-x-auto">
               <table class="table-modern">
-                <thead><tr><th>Pipeline</th><th class="text-right">Runs</th><th class="text-right">Cost</th><th class="hidden 2xl:table-cell">Last run</th></tr></thead>
+                <thead><tr><th appSort="pipeline" [sortBy]="pipelineSort">Pipeline</th><th class="text-right" appSort="runs" [sortBy]="pipelineSort">Runs</th><th class="text-right" appSort="cost" [sortBy]="pipelineSort">Cost</th><th class="hidden 2xl:table-cell" appSort="lastRun" [sortBy]="pipelineSort">Last run</th></tr></thead>
                 <tbody>
-                  @for (p of pipelineRows(); track p.taskDetailId ?? $index) {
+                  @for (p of shownPipelineRows(); track p.taskDetailId ?? $index) {
                     <tr><td class="max-w-56 truncate" [title]="p.pipeline || ''">{{ p.pipeline || 'Not tied to a pipeline' }}</td>
                       <td class="text-right tabular">{{ p.runs | number }}</td><td class="text-right tabular">{{ money2(p.cost) }}</td>
                       <td class="hidden 2xl:table-cell text-xs text-[color:var(--text-secondary)] whitespace-nowrap">{{ p.lastRunAt ? (p.lastRunAt | serverTime: 'recent') : '—' }}</td></tr>
@@ -73,9 +78,9 @@
             <h2 class="font-semibold text-sm mb-2">By workspace</h2>
             <div class="overflow-x-auto">
               <table class="table-modern">
-                <thead><tr><th>Workspace</th><th class="text-right">Cost</th><th class="w-40">Share</th></tr></thead>
+                <thead><tr><th appSort="workspace" [sortBy]="workspaceSort">Workspace</th><th class="text-right" appSort="cost" [sortBy]="workspaceSort">Cost</th><th class="w-40" appSort="share" [sortBy]="workspaceSort">Share</th></tr></thead>
                 <tbody>
-                  @for (w of workspaceRows(); track w.tenantId) {
+                  @for (w of sortedWorkspaces(); track w.tenantId) {
                     <tr><td><button type="button" class="link-inline" (click)="pickWorkspace(w.tenantId); directory.choose(w.tenantId)">{{ w.name }}</button></td>
                       <td class="text-right tabular">{{ money2(w.amount) }}</td>
                       <td><div class="progress" role="meter" [attr.aria-label]="w.name + ' share'" aria-valuemin="0" aria-valuemax="100" [attr.aria-valuenow]="w.share">
@@ -88,6 +93,8 @@
           </div>
         }
       </div>
+      </div>
+      </app-blur-loader>
     }
   </section>
 
@@ -95,12 +102,15 @@
   <!-- Cross-customer revenue: the platform's alone (billing.json/analytics is PLATFORM_ADMIN). -->
   <section class="flex flex-col gap-0 mt-2" data-test="revenue" aria-labelledby="revenue-title">
   <h2 class="text-lg font-semibold m-0 mb-3" id="revenue-title">Revenue across workspaces</h2>
-  @if (loading()) {
-    <div class="card p-12 text-center text-sm text-[color:var(--text-muted)]"><div class="spinner mx-auto mb-3"></div>Reading…</div>
+  @if (loading() && !data()) {
+    <app-loading shape="tiles" label="Reading the revenue…" [count]="5" />
+    <div class="card mt-4"><app-loading shape="rows" label="Reading the revenue…" /></div>
   } @else if (error()) {
-    <div class="card p-8 text-center"><app-icon name="alert" size="1.6rem" class="icon-crit" /><p class="text-sm text-crit-500 mt-2">{{ error() }}</p>
-      <button type="button" class="btn btn-default btn-sm mt-3" (click)="load()"><app-icon name="refresh" />Try again</button></div>
+    <div class="card"><app-load-error [message]="error()" (retry)="load()" /></div>
+  } @else if (!data()) {
+    <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]">No invoice in this range.</div>
   } @else if (data(); as d) {
+    <app-blur-loader [active]="loading()" label="Refreshing…">
     @if (unpriced().length) {
       <div class="step-notice step-notice-warn mb-3" role="alert" data-unpriced-warning>
         <app-icon name="alert" class="icon-warn shrink-0 mt-0.5" />
@@ -128,9 +138,9 @@
         <h2 class="font-semibold text-sm mb-2">By workspace</h2>
         <div class="overflow-x-auto">
         <table class="table-modern">
-          <thead><tr><th>Workspace</th><th class="text-right">Invoiced</th><th class="text-right">Open</th><th></th></tr></thead>
+          <thead><tr><th appSort="workspace" [sortBy]="tenantSort">Workspace</th><th class="text-right" appSort="invoiced" [sortBy]="tenantSort">Invoiced</th><th class="text-right" appSort="open" [sortBy]="tenantSort">Open</th><th appSort="status" [sortBy]="tenantSort"><span class="sr-only">State</span></th></tr></thead>
           <tbody>
-            @for (t of tenants(); track t.tenantId) {
+            @for (t of sortedTenants(); track t.tenantId) {
               <tr><td>{{ t.tenantName }}</td><td class="text-right tabular">{{ money2(t.invoiced) }}</td><td class="text-right tabular" [class.text-crit-500]="t.overdue > 0">{{ money2(t.open) }}</td>
                 <td>@if (t.status) { <span class="pill" [class]="'pill ' + (statusTone[t.status] || 'pill-neutral')">{{ statusLabel[t.status] || t.status }}</span> }</td></tr>
             }
@@ -145,9 +155,9 @@
       <p class="text-xs text-[color:var(--text-muted)] mb-2">From the meter, for the same range: what each workspace deleted, wrote and spent on models.</p>
       <div class="overflow-x-auto">
       <table class="table-modern">
-        <thead><tr><th>Workspace</th><th class="text-right">Metered cost</th><th class="text-right">Data deleted</th><th class="text-right">Data written</th><th class="text-right">Model tokens</th></tr></thead>
+        <thead><tr><th appSort="workspace" [sortBy]="churnSort">Workspace</th><th class="text-right" appSort="cost" [sortBy]="churnSort">Metered cost</th><th class="text-right" appSort="deleted" [sortBy]="churnSort">Data deleted</th><th class="text-right" appSort="written" [sortBy]="churnSort">Data written</th><th class="text-right" appSort="tokens" [sortBy]="churnSort">Model tokens</th></tr></thead>
         <tbody>
-          @for (c of churn(); track c.tenantId) {
+          @for (c of sortedChurn(); track c.tenantId) {
             <tr><td>{{ c.tenantName }}</td><td class="text-right tabular">{{ money2(c.amount) }}</td><td class="text-right tabular" [class.text-warn-500]="c.deletedBytes > 0">{{ fmtBytes(c.deletedBytes) }}</td><td class="text-right tabular">{{ fmtBytes(c.writtenBytes) }}</td><td class="text-right tabular">{{ c.tokens | number: '1.0-0' }}</td></tr>
           }
           @if (!churn().length) { <tr><td colspan="5" class="text-center text-[color:var(--text-muted)] py-4">Nothing metered in this range.</td></tr> }
@@ -161,12 +171,12 @@
         <span class="text-xs text-[color:var(--text-muted)]">{{ cardPayments().length }} by card through Stripe · latest {{ payments().length }}</span>
       </div>
       <p class="text-xs text-[color:var(--text-muted)] mb-2">Every workspace, newest first: cards paid on Stripe's page (and declined), slips, credit notes applied. Card data never reaches the platform.</p>
-      @if (paymentsError()) { <p class="text-xs text-crit-500">{{ paymentsError() }}</p> }
+      @if (paymentsError()) { <app-inline-status class="mb-2" [error]="paymentsError()" (retry)="loadPayments()" /> }
       <div class="overflow-x-auto">
       <table class="table-modern">
-        <thead><tr><th>Date</th><th>Workspace</th><th>Invoice</th><th>Method</th><th class="hidden lg:table-cell">Stripe payment</th><th class="text-right">Amount</th><th class="text-right">State</th></tr></thead>
+        <thead><tr><th appSort="date" [sortBy]="paymentSort">Date</th><th appSort="workspace" [sortBy]="paymentSort">Workspace</th><th appSort="invoice" [sortBy]="paymentSort">Invoice</th><th appSort="method" [sortBy]="paymentSort">Method</th><th class="hidden lg:table-cell" appSort="stripe" [sortBy]="paymentSort">Stripe payment</th><th class="text-right" appSort="amount" [sortBy]="paymentSort">Amount</th><th class="text-right" appSort="state" [sortBy]="paymentSort">State</th></tr></thead>
         <tbody>
-          @for (p of payments().slice(0, 50); track p.paymentId) {
+          @for (p of shownPayments(); track p.paymentId) {
             <tr>
               <td class="tabular text-xs whitespace-nowrap">{{ p.dateCreated | serverTime: 'day' }}</td>
               <td>{{ labels().get(p.tenantId) ?? p.tenantName ?? ('Workspace ' + p.tenantId) }}</td>
@@ -177,11 +187,15 @@
               <td class="text-right"><span class="pill" [class]="'pill ' + paymentState(p).tone" [title]="p.note || ''">{{ paymentState(p).label }}</span></td>
             </tr>
           }
-          @if (!payments().length) { <tr><td colspan="7" class="text-center text-[color:var(--text-muted)] py-4">No payment yet.</td></tr> }
+          @if (!payments().length) {
+            @if (paymentsLoading()) { <tr><td colspan="7" class="py-4"><app-loading shape="inline" label="Loading payments…" /></td></tr> }
+            @else if (!paymentsError()) { <tr><td colspan="7" class="text-center text-[color:var(--text-muted)] py-4">No payment yet.</td></tr> }
+          }
         </tbody>
       </table>
       </div>
     </div>
+    </app-blur-loader>
   }
   </section>
   }

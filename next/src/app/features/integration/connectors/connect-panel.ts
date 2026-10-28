@@ -9,6 +9,7 @@ import { Segmented, SegmentOption } from '../../../shared/ui/segmented';
 import { SidePanel } from '../../../shared/ui/side-panel';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { ConnectorsApi, StorageTarget } from './connectors.api';
+import { InlineStatus, createLoadState, loadErrorText } from '../../../shared/ui/loading';
 import {
   Connection, ConnectorCard, ConnectorField, Dataset, SCHEDULES, Stream, SyncMode, countText, modeText, needsCursor, settingsFields,
   suggestedCursor, suggestedMode,
@@ -50,7 +51,7 @@ export function stepText(step: Step, kindWord = 'tables'): string {
  */
 @Component({
   selector: 'app-connect-panel',
-  imports: [SidePanel, Icon, Segmented, Field],
+  imports: [SidePanel, Icon, Segmented, Field, InlineStatus],
   template: `
     <!-- UX final I2: the subtitle says what this step is (it repeated the title), the chooser is step 1 of the stepper
          when the panel opens on it, and the footer always has Cancel, with the step's primary at the right. -->
@@ -83,10 +84,14 @@ export function stepText(step: Step, kindWord = 'tables'): string {
               <input class="input" id="cName" [value]="name()" (input)="name.set($any($event.target).value)" maxlength="255" placeholder="ERP replica" />
             </app-field>
             <app-field label="Write to" for="cTarget" [required]="true" hint="Synced data lands in this workspace's bucket, under connectors/.">
-              <select class="input" id="cTarget" (change)="target.set($any($event.target).value)">
-                <option value="" [selected]="!target()">Choose a storage connection</option>
+              <select class="input" id="cTarget" (change)="target.set($any($event.target).value)" [attr.aria-busy]="targetsState.loading() || null">
+                <option value="" [selected]="!target()">{{ targetsState.loading() ? 'Loading storage connections…' : 'Choose a storage connection' }}</option>
                 @for (t of targets(); track t.alias) { <option [value]="t.alias" [selected]="target() === t.alias">{{ t.connectionName }} ({{ t.alias }})</option> }
               </select>
+              <!-- Owner 2026-10-27: the list said only "Choose a storage connection" while loading, when empty and when its read failed. -->
+              <app-inline-status [loading]="targetsState.loading()" [error]="targetsState.error()" [empty]="targetsState.loaded() && !targets().length"
+                                 label="Loading storage connections…" (retry)="loadTargets()"
+                                 emptyText="No active storage connection yet. A workspace administrator adds one under Connections › Storage." />
             </app-field>
           </div>
           @if (c.spec.auth === 'OAUTH') {
@@ -141,7 +146,10 @@ export function stepText(step: Step, kindWord = 'tables'): string {
             }
           </div>
           @if (discovering()) {
-            <p class="text-sm text-[color:var(--text-muted)]" role="status">Reading what the connection can sync…</p>
+            <app-inline-status [loading]="true" label="Reading what the connection can sync…" />
+          } @else if (discoverError()) {
+            <!-- Owner 2026-10-27: a failed read says why with Try again, not also "nothing to sync". -->
+            <app-inline-status [error]="discoverError()" (retry)="discover()" data-discover-error />
           } @else if (!choices().length) {
             <p class="text-sm text-[color:var(--text-muted)]">The connection has nothing to sync, or its user may not read anything.</p>
           }
@@ -275,6 +283,9 @@ export class ConnectPanel implements OnInit {
   readonly problem = signal<{ cause: string; fix: string | null } | null>(null);
   readonly connected = signal('');
   readonly discovering = signal(false);
+  readonly discoverError = signal('');
+  /** The storage connections the data may be written to. */
+  readonly targetsState = createLoadState();
   readonly choices = signal<Choice[]>([]);
   readonly tableSearch = signal('');
   readonly mode = signal<SyncMode>('FULL');
@@ -325,14 +336,24 @@ export class ConnectPanel implements OnInit {
     || this.chosen().every(c => !!c.cursor));
 
   ngOnInit(): void {
-    this.api.storageTargets().pipe(catchError(() => of(null))).subscribe(res => {
-      const live = (res?.data ?? []).filter(t => t.status === 'Active');
-      this.targets.set(live);
-      if (!this.target() && live.length === 1) this.target.set(live[0].alias);
-    });
+    this.loadTargets();
     if (this.data.connection) {
       this.discover();
     }
+  }
+
+  loadTargets(): void {
+    this.targetsState.start();
+    this.api.storageTargets().subscribe({
+      next: res => {
+        if (res.status !== API_SUCCESS) { this.targetsState.fail(res, 'The storage connections could not be read.'); return; }
+        const live = (res.data ?? []).filter(t => t.status === 'Active');
+        this.targets.set(live);
+        if (!this.target() && live.length === 1) this.target.set(live[0].alias);
+        this.targetsState.done();
+      },
+      error: err => this.targetsState.fail(err, 'The storage connections could not be read.'),
+    });
   }
 
   private cardOf(connection: Connection | null): ConnectorCard | null {
@@ -442,17 +463,21 @@ export class ConnectPanel implements OnInit {
     const connection = this.connection();
     if (!connection) return;
     this.discovering.set(true);
+    this.discoverError.set('');
     this.api.discover(connection.id).subscribe({
       next: res => {
         this.discovering.set(false);
         if (res.status !== API_SUCCESS) {
-          this.problem.set({ cause: res.message, fix: null });
+          this.discoverError.set(loadErrorText(res, 'What the connection can sync could not be read. Test the connection, then try again.'));
           return;
         }
         const kind = this.card()?.spec.sourceKind ?? 'table';
         this.choices.set((res.data ?? []).map(d => ({ dataset: d, on: false, cursor: suggestedCursor(d, kind) })));
       },
-      error: () => { this.discovering.set(false); this.problem.set({ cause: 'The connection could not be read.', fix: 'Test it again.' }); },
+      error: err => {
+        this.discovering.set(false);
+        this.discoverError.set(loadErrorText(err, 'What the connection can sync could not be read. Test the connection, then try again.'));
+      },
     });
   }
 

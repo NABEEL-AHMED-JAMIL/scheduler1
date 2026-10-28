@@ -4,7 +4,8 @@ import { TestBed } from '@angular/core/testing';
 import { HttpHeaders, HttpResponse } from '@angular/common/http';
 import { Dialog } from '@angular/cdk/dialog';
 import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
-import { of } from 'rxjs';
+import { NEVER, Observable, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { AuthService } from '../../core/auth/auth.service';
 import { ToastService } from '../../shared/ui/toast.service';
 import { StorageService } from '../objects/storage.service';
@@ -56,7 +57,8 @@ const INTAKES = [
 const MAILBOX = { configured: true, active: true, address: 'abcdefghij0123456789@docs.etl-console.local', domain: 'docs.etl-console.local',
   enabled: true, maxFiles: 20, maxFileSizeMb: 20 };
 
-function screenWith(opts: { admin?: boolean; tab?: string; view?: string; closed?: unknown; triggers?: unknown[]; schedules?: boolean; noWorkspace?: boolean } = {}) {
+function screenWith(opts: { admin?: boolean; tab?: string; view?: string; closed?: unknown; triggers?: unknown[]; schedules?: boolean; noWorkspace?: boolean;
+                            answers?: Record<string, () => Observable<unknown>> } = {}) {
   const api = {
     documentTriggers: vi.fn(() => ok(opts.triggers ?? [])),
     stats: vi.fn(() => ok(STATS)),
@@ -70,6 +72,7 @@ function screenWith(opts: { admin?: boolean; tab?: string; view?: string; closed
       active: action !== 'disable' }, action === 'rotate' ? 'A new email-in address is on; the old one no longer works.' : 'Email-in is on.')),
     datasetExport: vi.fn(() => of(new HttpResponse({ body: new Blob(['a,b']),
       headers: new HttpHeaders({ 'content-disposition': 'attachment; filename="purchase_order-dataset.csv"' }) }))),
+    ...Object.fromEntries(Object.entries(opts.answers ?? {}).map(([k, f]) => [k, vi.fn(f)])),
   };
   const opened: { component: unknown; data: unknown }[] = [];
   const dialog = { open: vi.fn((component: unknown, config: { data?: unknown }) => {
@@ -77,6 +80,7 @@ function screenWith(opts: { admin?: boolean; tab?: string; view?: string; closed
     return { closed: of(opts.closed) };
   }) };
   TestBed.resetTestingModule();
+  try { localStorage.clear(); } catch { /* none */ }
   TestBed.configureTestingModule({
     providers: [
       provideZonelessChangeDetection(),
@@ -264,7 +268,7 @@ describe('DocumentIntelligence -- dataset', () => {
     const { fixture, el, api, screen } = screenWith({ tab: 'dataset' });
     await fixture.whenStable();
     expect(screen.datasetType()).toBe('1001');
-    expect(api.dataset).toHaveBeenCalledWith(1001, 0, 50);
+    expect(api.dataset).toHaveBeenCalledWith(1001, 0, 50, null);
     const table = el.querySelector('[data-test="dataset"]')!;
     expect(table.textContent).toContain('Approved data');
     expect(table.textContent).toContain('Dock Supplies Ltd (LIVE-CHECK)');
@@ -272,6 +276,39 @@ describe('DocumentIntelligence -- dataset', () => {
     expect(table.textContent).toContain('1 row');
     expect(screen.cell(DATASET.rows[0] as never, 'total')).toBe('9820');
     expect(screen.cell(DATASET.rows[0] as never, 'delivery_date')).toBe('');
+  });
+
+  it('sorts on the service: no sort before a heading is picked, then Document, a field or a table from page 1 (owner 2026-10-27)', async () => {
+    const { fixture, el, api, screen } = screenWith({ tab: 'dataset' });
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const sortable = [...el.querySelectorAll('[data-test="dataset"] thead th')].filter(th => th.querySelector('button.th-sort')).length;
+    expect(sortable).toBe(2 + screen.datasetColumns().length + screen.datasetTables().length);
+    screen.datasetGoTo(2);
+    screen.datasetSort.toggle('document');
+    expect(screen.datasetPage()).toBe(1);
+    expect(api.dataset).toHaveBeenLastCalledWith(1001, 0, 50, { sort: 'document', dir: 'desc' });
+    const field = screen.datasetColumns()[0].key;
+    screen.datasetSort.toggle('fields.' + field);
+    expect(api.dataset).toHaveBeenLastCalledWith(1001, 0, 50, { sort: 'fields.' + field, dir: 'asc' });
+    const table = screen.datasetTables()[0]?.key;
+    if (table) {
+      screen.datasetSort.toggle('tables.' + table);
+      expect(api.dataset).toHaveBeenLastCalledWith(1001, 0, 50, { sort: 'tables.' + table, dir: 'desc' });
+    }
+    // Another type: a field's order does not carry over.
+    screen.pickDatasetType('1000');
+    expect(api.dataset).toHaveBeenLastCalledWith(1000, 0, 50, null);
+  });
+
+  it('says the fields do not sort while some of the data is masked for the person', async () => {
+    const { fixture, screen } = screenWith({ tab: 'dataset', answers: { dataset: () => ok({ ...DATASET, fieldsSort: false }) } });
+    await fixture.whenStable();
+    const field = 'fields.' + screen.datasetColumns()[0].key;
+    expect(screen.datasetSort.blockedReason(field)).toContain('masked');
+    screen.datasetSort.toggle(field);
+    expect(screen.datasetSort.key()).toBe('');
+    expect(screen.datasetSort.blockedReason('document')).toBe('');
   });
 
   it('downloads the dataset under the name the service gave it', async () => {
@@ -384,5 +421,97 @@ describe('DocumentIntelligence -- intake', () => {
     fixture.detectChanges();
     expect(el.querySelector('[data-test="mailbox-address"]')).not.toBeNull();
     expect(el.querySelector('[data-test="mailbox"]')?.textContent).not.toContain('New address');
+  });
+});
+
+describe('DocumentIntelligence -- sorting (owner 2026-10-27)', () => {
+  it('keeps the types in the API order until a heading is picked, then sorts by it both ways', async () => {
+    const { fixture, screen } = screenWith({ tab: 'types' });
+    await fixture.whenStable();
+    expect(screen.typesSorted().map(t => t.name)).toEqual(['Invoice', 'Purchase order', 'UI-CHECK old']);
+    screen.typeSort.toggle('type');
+    expect(screen.typesSorted().map(t => t.name)).toEqual(['Invoice', 'Purchase order', 'UI-CHECK old']);
+    screen.typeSort.toggle('type');
+    expect(screen.typesSorted().map(t => t.name)).toEqual(['UI-CHECK old', 'Purchase order', 'Invoice']);
+    screen.typeSort.toggle('fields');
+    expect(screen.typesSorted().map(t => t.typeKey)).toEqual(['invoice', 'purchase_order', 'ui_check_old']);
+  });
+
+  it('sorts the recent documents by state and by name', async () => {
+    const { fixture, screen } = screenWith();
+    await fixture.whenStable();
+    screen.recentSort.toggle('document');
+    expect(screen.recentSorted().map(r => r.name)).toEqual(['ocr-live-check.png', 'ocr-live-check.png', 'second.png']);
+    screen.recentSort.toggle('document');
+    expect(screen.recentSorted().map(r => r.name)).toEqual(['second.png', 'ocr-live-check.png', 'ocr-live-check.png']);
+  });
+
+  it('sorts what arrived, and says it covers the newest 100', async () => {
+    const { fixture, screen } = screenWith({ tab: 'intake' });
+    await fixture.whenStable();
+    screen.pickChannel('');
+    screen.intakeSort.toggle('file');
+    expect(screen.intakesSorted().map(i => i.intakeId)).toEqual([1003, 1001, 1002]);
+    expect(screen.intakeSort.note).toBe('Sorts the newest 100 shown');
+  });
+});
+
+describe('DocumentIntelligence -- loading, empty, error (owner 2026-10-27)', () => {
+  it('shows placeholders, not zeros, while the numbers load, and "not available" when they fail', async () => {
+    const pending = screenWith({ answers: { stats: () => NEVER } });
+    await pending.fixture.whenStable();
+    expect(pending.screen.statsState.pending()).toBe(true);
+    const failed = screenWith({ answers: { stats: () => throwError(() => new HttpErrorResponse({ status: 500 })) } });
+    await failed.fixture.whenStable();
+    expect(failed.screen.statsState.error()).toBe('The numbers could not be read.');
+    expect(failed.screen.statsState.loaded()).toBe(false);
+    // The types and the documents are still read after the numbers fail.
+    expect(failed.api.types).toHaveBeenCalled();
+  });
+
+  it('loads the types until they answer, then says there is none instead of spinning', async () => {
+    const pending = screenWith({ tab: 'types', answers: { types: () => NEVER } });
+    await pending.fixture.whenStable();
+    expect(pending.screen.typesState.loading()).toBe(true);
+    const empty = screenWith({ tab: 'types', answers: { types: () => ok([]) } });
+    await empty.fixture.whenStable();
+    empty.fixture.detectChanges();
+    expect(empty.screen.typesState.loading()).toBe(false);
+    expect(empty.el.querySelector('[data-test="types"]')!.textContent).toContain('No document types yet');
+  });
+
+  it('says the types could not be read, in plain words', async () => {
+    const { fixture, screen } = screenWith({ tab: 'types', answers: { types: () => throwError(() => new HttpErrorResponse({ status: 500 })) } });
+    await fixture.whenStable();
+    expect(screen.typesState.loading()).toBe(false);
+    expect(screen.typesError()).toBe('Could not load the document types.');
+  });
+
+  it('says the schedules are not known when they could not be read, never "Nothing yet"', async () => {
+    const { fixture, el, screen } = screenWith({ tab: 'types', answers: { documentTriggers: () => throwError(() => new HttpErrorResponse({ status: 500 })) } });
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(screen.triggersError()).toBe('The schedules could not be read.');
+    const cell = el.querySelector('[data-test="type-starts"][data-type="invoice"]')!;
+    expect(cell.textContent).toContain('Not known');
+    expect(cell.textContent).not.toContain('Nothing yet');
+  });
+
+  it('counts the approved data as loading while the types are still on the way', async () => {
+    const { fixture, screen } = screenWith({ tab: 'dataset', answers: { types: () => NEVER } });
+    await fixture.whenStable();
+    expect(screen.datasetBusy()).toBe(true);
+  });
+
+  it('stops "Reading the address…" when the address cannot be read, and reads it again on Try again', async () => {
+    const { fixture, el, screen, api } = screenWith({ tab: 'intake', answers: { mailbox: () => throwError(() => new HttpErrorResponse({ status: 503 })) } });
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(screen.mailboxError()).toBe('The email-in address could not be read.');
+    expect(el.querySelector('[data-test="mailbox-error"]')).not.toBeNull();
+    api.mailbox.mockReturnValue(ok(MAILBOX));
+    screen.loadMailbox();
+    expect(screen.mailboxError()).toBe('');
+    expect(screen.mailbox()?.address).toBe(MAILBOX.address);
   });
 });

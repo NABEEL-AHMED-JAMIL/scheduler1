@@ -117,8 +117,10 @@ describe('WidgetTable', () => {
     // in the body above it, as it is on the Data grid -- not a second action of the dialog.
     const footer = [...el.querySelectorAll('button')].filter(b => !b.closest('.overflow-y-auto'));
     expect(footer.map(b => b.textContent!.trim())).toEqual(['Close']);
-    const body = [...el.querySelectorAll('.overflow-y-auto button')].map(b => b.textContent!.trim());
+    // Besides it, the body holds only the column headings' sort buttons (owner 2026-10-27).
+    const body = [...el.querySelectorAll('.overflow-y-auto button')].filter(b => !b.closest('th')).map(b => b.textContent!.trim());
     expect(body).toEqual(['Wrap text']);
+    expect([...el.querySelectorAll('th button.th-sort')].map(b => b.textContent!.trim())).toEqual(['a']);
     footer[0].click();
     expect(close).toHaveBeenCalled();
   });

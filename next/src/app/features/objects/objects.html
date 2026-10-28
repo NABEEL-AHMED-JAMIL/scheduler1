@@ -306,9 +306,9 @@
                   <input type="checkbox" class="checkbox" [checked]="allSelected()" (change)="toggleSelectAll()"
                          aria-label="Select all files" />
                 </th>
-                <th>Name</th>
-                <th class="w-40">Modified</th>
-                <th class="w-24 text-right">Size</th>
+                <th appSort="name" [sortBy]="sort">Name</th>
+                <th appSort="modified" [sortBy]="sort" class="w-40">Modified</th>
+                <th appSort="size" [sortBy]="sort" class="w-24 text-right">Size</th>
                 <th class="w-36">Type</th>
                 <th class="w-16 th-actions">Actions</th>
               </tr>
@@ -392,7 +392,7 @@
         </div>
         </app-blur-loader>
 
-        @if (nextToken()) {
+        @if (hasMore()) {
           <div class="px-4 py-3 border-t text-center border-subtle">
             <!-- P2 #33: the filters read only the pages listed so far; with more in the folder, say so. -->
             @if (hasFilters()) {
@@ -400,9 +400,13 @@
                 The search and dates look at the {{ objects().length.toLocaleString('en-US') }} items listed so far; this folder has more. Load more to look further.
               </p>
             }
-            <button type="button" class="btn btn-default btn-sm" (click)="load(true)" [disabled]="loading()">
-              {{ loading() ? 'Loading…' : 'Load more' }}
-            </button>
+            @if (moreError()) {
+              <app-inline-status class="mb-2" [error]="moreError()" (retry)="load(true)" />
+            } @else {
+              <button type="button" class="btn btn-default btn-sm" (click)="load(true)" [disabled]="loading()">
+                {{ loading() ? 'Loading…' : 'Load more' }}
+              </button>
+            }
           </div>
         }
       }

@@ -124,3 +124,32 @@ describe('RetentionCard', () => {
     expect(on.toast.info).toHaveBeenCalledWith('Retention pass 1005 started.');
   });
 });
+
+describe('RetentionCard -- loading, error (owner 2026-10-27)', () => {
+  it('is loading (no table, no error) until the policy answers', () => {
+    const { el, http } = render({ admin: true });
+    expect(el.querySelector('app-loading')).not.toBeNull();
+    expect(el.querySelector('[data-retention-table]')).toBeNull();
+    expect(el.querySelector('[data-retention-error]')).toBeNull();
+    http.expectOne(r => r.url.endsWith('/setting.json/retention'));
+  });
+
+  it('says the policy could not be read, in plain words, with Try again', () => {
+    const { el, http, refresh, text } = render({ admin: true });
+    http.expectOne(r => r.url.endsWith('/setting.json/retention')).flush('boom', { status: 500, statusText: 'Server Error' });
+    refresh();
+    expect(el.querySelector('app-loading')).toBeNull();
+    expect(text(el.querySelector('[data-retention-error]'))).toContain('The retention policy could not be read.');
+    expect(text(el.querySelector('[data-retention-error]'))).toContain('Try again');
+  });
+
+  it('keeps the table when a re-read fails, and says so above it', () => {
+    const { el, http, answer, fixture, refresh } = render({ admin: true });
+    answer();
+    (fixture.componentInstance as RetentionCard).load();
+    http.expectOne(r => r.url.endsWith('/setting.json/retention')).flush('boom', { status: 500, statusText: 'Server Error' });
+    refresh();
+    expect(el.querySelector('[data-retention-table]')).not.toBeNull();
+    expect(el.querySelector('[data-retention-error]')).not.toBeNull();
+  });
+});

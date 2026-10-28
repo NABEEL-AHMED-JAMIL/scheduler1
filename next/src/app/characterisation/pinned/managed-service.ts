@@ -16,8 +16,13 @@ export const PINNED: Record<string, unknown> = {
     "buttons": [
       "Columns",
       "Grant",
+      "Granted",
       "Refresh",
-      "Revoke Sam Staff in Claude Demo"
+      "Revoke Sam Staff in Claude Demo",
+      "Revoked",
+      "Staff member",
+      "State",
+      "Workspace"
     ],
     "columns": [
       [
@@ -59,7 +64,10 @@ export const PINNED: Record<string, unknown> = {
     ],
     "buttons": [
       "Load older",
-      "Refresh"
+      "Refresh",
+      "Service",
+      "Staff member",
+      "When"
     ],
     "columns": [
       [
@@ -99,10 +107,18 @@ export const PINNED: Record<string, unknown> = {
     "buttons": [
       "Cards",
       "Columns",
+      "Created by",
+      "Data",
+      "Last run",
       "Only mine",
+      "Pipeline",
       "Refresh",
+      "Schedules",
       "Show schedules and details",
-      "Table"
+      "Status",
+      "Steps",
+      "Table",
+      "Updated by"
     ],
     "columns": [
       [
@@ -141,8 +157,8 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /managedService.json/actions?limit=50",
-      "GET /tenant.json/listTenants",
-      "GET /appUser.json/listUsers"
+      "GET /appUser.json/listUsers",
+      "GET /tenant.json/listTenants"
     ],
     "headings": [
       "Staff activity",
@@ -151,7 +167,11 @@ export const PINNED: Record<string, unknown> = {
     "buttons": [
       "Columns",
       "Load older",
-      "Refresh"
+      "Refresh",
+      "Service",
+      "Staff member",
+      "When",
+      "Workspace"
     ],
     "columns": [
       [

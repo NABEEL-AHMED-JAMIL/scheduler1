@@ -52,7 +52,8 @@ describe('console review 2026-10-07: layout', () => {
       'src/app/features/tenant-request/tenant-requests.html']) {
       expect(await read(file), file).not.toMatch(/<td[^>]*\btext-sm\b/);
     }
-    expect(await read('src/app/features/integration/api-clients/api-clients.html')).toContain('<th>Expires</th>');
+    // A plain heading cell (owner 2026-10-27: it may carry its sort, but no type size of its own).
+    expect(await read('src/app/features/integration/api-clients/api-clients.html')).toMatch(/<th(?![^>]*\bclass=)[^>]*>Expires<\/th>/);
   });
 
   it('gives the reports search room for its whole placeholder', async () => {

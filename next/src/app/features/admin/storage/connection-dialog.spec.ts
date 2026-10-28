@@ -92,19 +92,22 @@ describe('ConnectionDialog bucket discovery', () => {
     return { dialog, toast };
   }
 
+  // Owner 2026-10-27: said under the field (app-inline-status), not in a toast at the edge of the screen.
   it('reports a refusal as an error', () => {
-    const { toast } = discoverWith(of({ status: 'ERROR', message: 'Access denied.' }));
-    expect(toast.error).toHaveBeenCalledWith('Access denied.');
+    const { dialog, toast } = discoverWith(of({ status: 'ERROR', message: 'Access denied.' }));
+    expect(dialog.discoverError()).toBe('Access denied.');
+    expect(toast.error).not.toHaveBeenCalled();
   });
 
   it('reports a failed request as an error', () => {
-    const { toast } = discoverWith(throwError(() => ({ error: {} })));
-    expect(toast.error).toHaveBeenCalledWith('Could not list buckets.');
+    const { dialog } = discoverWith(throwError(() => ({ error: {} })));
+    expect(dialog.discoverError()).toBe('Could not list buckets.');
+    expect(dialog.discovering()).toBe(false);
   });
 
   it('reports an empty list as information, not a failure', () => {
-    const { toast } = discoverWith(of({ status: 'SUCCESS', message: 'No buckets on this server.', data: [] }));
-    expect(toast.info).toHaveBeenCalledWith('No buckets on this server.');
-    expect(toast.error).not.toHaveBeenCalled();
+    const { dialog } = discoverWith(of({ status: 'SUCCESS', message: 'No buckets on this server.', data: [] }));
+    expect(dialog.discoverNote()).toBe('No buckets on this server.');
+    expect(dialog.discoverError()).toBe('');
   });
 });

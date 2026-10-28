@@ -4,7 +4,8 @@ import { TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
 import { Dialog } from '@angular/cdk/dialog';
 import { ActivatedRoute, Router } from '@angular/router';
-import { Observable, of } from 'rxjs';
+import { Observable, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { AuthService } from '../../../core/auth/auth.service';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { compactCount, healthTone, KafkaConnections, KafkaProfile } from './kafka-connections';
@@ -53,6 +54,7 @@ const TENANTS = [
 
 function screenFor(isPlatformAdmin: boolean, profiles: KafkaProfile[], tenants = TENANTS) {
   TestBed.resetTestingModule();
+  try { localStorage.clear(); } catch { /* none: the sorts remember their choice there */ }
   TestBed.configureTestingModule({
     providers: [
       {
@@ -325,5 +327,51 @@ describe('Kafka health helpers', () => {
     expect(healthTone('Missing')).toBe('crit');
     expect(healthTone('Empty')).toBe('warn');
     expect(healthTone('whatever')).toBe('neutral');
+  });
+});
+
+describe('Kafka -- sorting the groups and topics (owner 2026-10-27)', () => {
+  const HEALTH = (groups: { group: string; lag: number; members: number }[]) => ({ checkedAt: '2026-10-05T20:09:16Z', reachable: true,
+    brokers: 1, controller: true, topics: [],
+    groups: groups.map(g => ({ ...g, state: 'Stable', topics: ['t'] })) });
+
+  it('keeps the groups furthest behind first, then sorts by a heading both ways', () => {
+    const screen = screenFor(false, [GLOBEX_DEFAULT]);
+    (screen as any).healthFor.set(screen.selectedId());
+    screen.health.set(HEALTH([{ group: 'b', lag: 5, members: 1 }, { group: 'a', lag: 50, members: 3 }, { group: 'c', lag: 0, members: 2 }]));
+    expect(screen.sortedGroups().map(g => g.group)).toEqual(['a', 'b', 'c']);
+    screen.groupSort.toggle('group');
+    expect(screen.sortedGroups().map(g => g.group)).toEqual(['a', 'b', 'c']);
+    screen.groupSort.toggle('group');
+    expect(screen.sortedGroups().map(g => g.group)).toEqual(['c', 'b', 'a']);
+    screen.groupSort.toggle('members');
+    expect(screen.sortedGroups().map(g => g.members)).toEqual([3, 2, 1]);
+  });
+
+  it('sorts the topics before paging them', () => {
+    const screen = screenFor(false, [GLOBEX_DEFAULT]);
+    screen.selectedId.set(GLOBEX_DEFAULT.kafkaConnectionProfileId);
+    (screen as any).topicsFor.set(GLOBEX_DEFAULT.kafkaConnectionProfileId);
+    (screen as any).taskTypes.set([{ sourceTaskTypeId: 1, serviceName: 'Zeta' }, { sourceTaskTypeId: 2, serviceName: 'Alpha' }]);
+    expect(screen.topicsShown().map(r => r.type.serviceName)).toEqual(['Zeta', 'Alpha']);
+    screen.topicSort.toggle('topic');
+    expect(screen.topicsShown().map(r => r.type.serviceName)).toEqual(['Alpha', 'Zeta']);
+    screen.topicSort.toggle('topic');
+    expect(screen.topicsShown().map(r => r.type.serviceName)).toEqual(['Zeta', 'Alpha']);
+  });
+});
+
+describe('Kafka -- loading and errors (owner 2026-10-27)', () => {
+  it('says the workspace names could not be read instead of failing silently', () => {
+    screenFor(true, [PLATFORM_DEFAULT]);
+    const http = TestBed.inject(HttpClient) as any;
+    const original = http.get;
+    http.get = (url: string, options?: any) => url.includes('listTenants')
+      ? throwError(() => new HttpErrorResponse({ status: 500 })) : original(url, options);
+    const screen = TestBed.runInInjectionContext(() => new KafkaConnections());
+    screen.ngOnInit();
+    expect(screen.tenantsState.loading()).toBe(false);
+    expect(screen.tenantsState.error()).toBe('The workspace names could not be read.');
+    expect(screen.workspaceName(GLOBEX_DEFAULT)).toBe('Tenant 1828');
   });
 });

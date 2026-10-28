@@ -13,6 +13,8 @@ import { sidePanelConfig } from '../../../shared/ui/side-panel';
 import { formatSize } from '../../../shared/ui/format-size';
 import { refusal } from '../../../shared/ui/bulk/bulk.model';
 import { RetentionApi } from './retention.api';
+import { AppLoading, InlineStatus } from '../../../shared/ui/loading';
+import { LoadError } from '../../../shared/ui/load-error';
 import {
   ClassResult, RetentionClass, RetentionHold, RetentionPreview, RetentionView, holdTarget, keepText, previewLine, readable, stateOf,
 } from './retention.model';
@@ -32,7 +34,7 @@ import { RetentionPlatformPanel } from './retention-platform-panel';
  */
 @Component({
   selector: 'app-retention-card',
-  imports: [Icon, ServerTimePipe, StatTile, Section],
+  imports: [Icon, ServerTimePipe, StatTile, Section, AppLoading, InlineStatus, LoadError],
   styles: `
     .retention-table { table-layout: fixed; min-width: 52rem; }
     .retention-table .retention-class-col { width: 34%; }
@@ -69,12 +71,17 @@ import { RetentionPlatformPanel } from './retention-platform-panel';
         </div>
         <div class="flex flex-col gap-3">
 
-        @if (error()) {
-          <p class="text-sm text-crit-500 flex items-start gap-1.5" role="alert" data-retention-error>
-            <app-icon name="alert" size="0.9em" class="mt-0.5 shrink-0" /><span>{{ error() }}</span>
-            <button type="button" class="link-inline ml-2" (click)="load()">Try again</button>
-          </p>
+        <!-- Owner 2026-10-27: a failed first read says why with Try again; a failed re-read (a pass being followed) keeps
+             the table and says so in a line above it, instead of replacing the section. -->
+        @if (error() && !view()) {
+          <app-load-error data-retention-error [message]="error()" (retry)="load()" />
         } @else if (view(); as v) {
+          @if (error()) {
+            <app-inline-status data-retention-error [error]="error()" (retry)="load()" />
+          }
+          @if (previewError()) {
+            <app-inline-status data-retention-preview-error [error]="previewError()" (retry)="runPreview()" />
+          }
           <div class="grid grid-cols-2 sm:grid-cols-4 stat-strip stat-row is-md is-start" role="list" data-retention-stats>
             <app-stat-tile label="Kept for a limited time" [value]="limitedCount() + ' of ' + configurableCount()" icon="clock"
                            [foot]="v.enabled ? 'removed by the daily pass' : 'retention is off: nothing is removed'" [tone]="v.enabled ? 'info' : 'muted'" />
@@ -184,7 +191,7 @@ import { RetentionPlatformPanel } from './retention-platform-panel';
             stay; their record in the run is marked expired.
           </p>
         } @else {
-          <p class="text-sm text-[color:var(--text-muted)] flex items-center gap-2"><span class="spinner"></span>Reading the retention policy…</p>
+          <app-loading shape="panel" [count]="5" label="Loading the retention policy…" />
         }
         </div>
       </app-section>
@@ -210,6 +217,10 @@ export class RetentionCard implements OnDestroy {
   readonly preview = signal<RetentionPreview | null>(null);
   readonly error = signal('');
   readonly previewing = signal(false);
+  /** Owner 2026-10-27: a preview that could not be made says so in the section, with Try again, not in a toast only. */
+  readonly previewError = signal('');
+  /** Each read's number: an answer for the workspace picked before (or an older poll) is dropped. */
+  private seq = 0;
   readonly starting = signal(false);
   private polling: ReturnType<typeof setTimeout> | null = null;
 
@@ -246,7 +257,9 @@ export class RetentionCard implements OnDestroy {
       const shown = this.visible();
       untracked(() => {
         this.preview.set(null);
+        this.previewError.set('');
         this.view.set(null);
+        this.error.set('');
         if (shown) this.load();
       });
     });
@@ -269,14 +282,16 @@ export class RetentionCard implements OnDestroy {
   }
 
   load(): void {
-    this.error.set('');
+    const seq = ++this.seq;
     this.api.view(this.scope()).subscribe({
       next: r => {
+        if (seq !== this.seq) return;
         if (r?.status !== API_SUCCESS || !r.data) { this.error.set(r?.message || 'The retention policy could not be read.'); return; }
+        this.error.set('');
         this.view.set(r.data);
         this.follow(r.data.running);
       },
-      error: err => this.error.set(refusal(err, 'The retention policy could not be read.')),
+      error: err => { if (seq === this.seq) this.error.set(refusal(err, 'The retention policy could not be read.')); },
     });
   }
 
@@ -289,13 +304,14 @@ export class RetentionCard implements OnDestroy {
   runPreview(): void {
     if (this.previewing()) return;
     this.previewing.set(true);
+    this.previewError.set('');
     this.api.preview(this.scope()).subscribe({
       next: r => {
         this.previewing.set(false);
-        if (r?.status !== API_SUCCESS || !r.data) { this.toast.error(r?.message || 'The preview could not be made.'); return; }
+        if (r?.status !== API_SUCCESS || !r.data) { this.previewError.set(r?.message || 'The preview could not be made.'); return; }
         this.preview.set(r.data);
       },
-      error: err => { this.previewing.set(false); this.toast.error(refusal(err, 'The preview could not be made.')); },
+      error: err => { this.previewing.set(false); this.previewError.set(refusal(err, 'The preview could not be made.')); },
     });
   }
 

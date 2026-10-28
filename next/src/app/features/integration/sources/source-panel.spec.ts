@@ -2,7 +2,8 @@ import { describe, it, expect, vi } from 'vitest';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { DIALOG_DATA, Dialog, DialogRef } from '@angular/cdk/dialog';
-import { of } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { ApiCollectionsApi } from '../api-collections/api-collections.service';
 import { SourcesApi } from './sources.service';
@@ -223,5 +224,44 @@ describe('SourcePanel -- the page', () => {
     const el = fixture.nativeElement as HTMLElement;
     expect(Array.from(el.querySelectorAll('[data-test="preview-rows"] th')).map(th => th.textContent!.trim())).toEqual(['customer_id', 'name', 'ssn']);
     expect(el.querySelector('[data-test="preview-rows"]')!.textContent).toContain('***');
+  });
+});
+
+describe('SourcePanel -- loading, empty, error (owner 2026-10-27)', () => {
+  const FAILS = () => throwError(() => new HttpErrorResponse({ status: 500 }));
+
+  it('is loading until the source answers, and a failure says so with Try again', () => {
+    panelWith({}, { get: vi.fn(() => NEVER) });
+    expect(TestBed.runInInjectionContext(() => new SourcePanel()).loading()).toBe(true);
+    let calls = 0;
+    panelWith({}, { get: vi.fn(() => (calls++ === 0 ? FAILS() : of({ status: 'SUCCESS', message: '', data: FILE }))) });
+    const panel = TestBed.runInInjectionContext(() => new SourcePanel());
+    expect(panel.loading()).toBe(false);
+    expect(panel.loadError()).toBe('The source could not be read.');
+    panel.readSource();
+    expect(panel.loadError()).toBe('');
+    expect(panel.edit()?.storageAlias).toBe('ui-review-s3');
+  });
+
+  it('a picker says it is loading, then that it is empty, then why its read failed -- and Try again reads it again', () => {
+    panelWith({ sourceId: null }, { buckets: vi.fn(() => NEVER) });
+    expect(TestBed.runInInjectionContext(() => new SourcePanel()).picker('buckets').loading).toBe(true);
+    panelWith({ sourceId: null }, { buckets: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [] })) });
+    const empty = TestBed.runInInjectionContext(() => new SourcePanel());
+    expect(empty.picker('buckets')).toEqual({ loading: false, error: '', loaded: true });
+    expect(empty.bucketOptions()).toEqual([]);
+    const { stub } = panelWith({ sourceId: null }, { buckets: vi.fn(FAILS) });
+    const failed = TestBed.runInInjectionContext(() => new SourcePanel());
+    expect(failed.picker('buckets').error).toBe('The storage connections could not be read.');
+    failed.retryPickers();
+    expect(stub.buckets).toHaveBeenCalledTimes(2);
+  });
+
+  it('the collection\'s APIs say they are loading, and a failure is said under the fields, not lost', () => {
+    panelWith({}, { get: vi.fn(() => of({ status: 'SUCCESS', message: '', data: { ...FILE, kind: 'API', format: null, storageAlias: null,
+      path: null, requestId: 70, version: 2, environmentId: 41 } })) }, { get: vi.fn(FAILS) });
+    const panel = TestBed.runInInjectionContext(() => new SourcePanel());
+    expect(panel.collectionLoading()).toBe(false);
+    expect(panel.collectionError()).toBe('The collection could not be read.');
   });
 });

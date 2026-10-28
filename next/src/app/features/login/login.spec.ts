@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { of } from 'rxjs';
+import { NEVER, Observable, of, throwError } from 'rxjs';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { Login, safeReturn } from './login';
@@ -202,5 +202,43 @@ describe('Login -- two-factor and single sign-on (MIG-353)', () => {
     expect(safeReturn('//evil.example')).toBe('/');
     expect(safeReturn('https://evil.example')).toBe('/');
     expect(safeReturn(null)).toBe('/');
+  });
+});
+
+/** Owner 2026-10-27: a sign-in link's company sign-in says it is being checked, and why it is not there. */
+describe('Login -- the sign-in link\'s company sign-in', () => {
+  function withSso(discover: () => Observable<unknown>) {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [Login],
+      providers: [
+        provideRouter([]),
+        { provide: AuthService, useValue: { login: () => undefined } },
+        { provide: SignInApi, useValue: { ssoDiscover: discover } },
+        { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({ sso: 'acme' }) } } },
+      ],
+    });
+    const fixture = TestBed.createComponent(Login);
+    fixture.detectChanges();
+    return { fixture, page: fixture.componentInstance, el: fixture.nativeElement as HTMLElement };
+  }
+
+  it('is checking until the link answers', () => {
+    const { page } = withSso(() => NEVER);
+    expect(page.ssoChecking()).toBe(true);
+    expect(page.ssoNote()).toBe('');
+  });
+
+  it('says the link has no company sign-in', () => {
+    const { page, fixture, el } = withSso(() => of({ status: 'SUCCESS', data: { sso: false } }));
+    fixture.detectChanges();
+    expect(page.ssoChecking()).toBe(false);
+    expect(el.querySelector('[data-test=sso-note]')!.textContent).toContain('not available for this link');
+  });
+
+  it('says the check failed, in plain words', () => {
+    const { page } = withSso(() => throwError(() => ({ status: 500 })));
+    expect(page.ssoChecking()).toBe(false);
+    expect(page.ssoNote()).toContain('could not be checked just now');
   });
 });

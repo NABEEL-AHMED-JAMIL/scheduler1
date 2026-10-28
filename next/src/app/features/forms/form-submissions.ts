@@ -13,6 +13,9 @@ import { DocumentsApi } from '../documents/documents.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { PageHeader } from '../../shared/ui/page-header';
 import { RefreshButton } from '../../shared/ui/refresh-button';
+import { createTableSort } from '../../shared/ui/sort';
+import { SortHeader } from '../../shared/ui/sort-header';
+import { AppLoading, loadErrorText } from '../../shared/ui/loading';
 
 /**
  * Forms › Submissions (Wave 5 Forms lite; page 'form-submissions'): what a form collected, newest first -- who sent it
@@ -39,7 +42,7 @@ export function defaultForm(forms: FormSummary[]): FormSummary | undefined {
 
 @Component({
   selector: 'app-form-submissions',
-  imports: [RefreshButton, PageHeader, StatStrip, Icon, TableShell, LoadError, ServerTimePipe, RouterLink],
+  imports: [RefreshButton, PageHeader, SortHeader, AppLoading, StatStrip, Icon, TableShell, LoadError, ServerTimePipe, RouterLink],
   templateUrl: './form-submissions.html',
 })
 export class FormSubmissions implements OnInit {
@@ -111,6 +114,34 @@ export class FormSubmissions implements OnInit {
   });
   readonly submissions = signal<Submission[]>([]);
   readonly loading = signal(false);
+  /**
+   * Owner 2026-10-27: every column with a value sorts, over the newest SUBMISSIONS_READ the page holds (the headers say
+   * so); the service's newest-first order until one is picked.
+   */
+  readonly sort = createTableSort<Submission>({
+    id: 'form-submissions',
+    columns: {
+      id: { value: s => s.submissionId, kind: 'number' },
+      submittedBy: s => this.submitter(s),
+      submitted: { value: s => s.submittedAt, kind: 'date' },
+      status: { value: s => this.statusText(s), kind: 'status' },
+      stage: s => s.workflowStage,
+      approval: { value: s => (s.workflowStatus ? this.approvalText(s.workflowStatus) : null), kind: 'status' },
+      details: s => s.reason || (s.workflowStatus === 'Rejected' ? s.workflowReason : null) || (s.storageKey ? `${s.bucket}/${s.storageKey}` : null),
+    },
+    note: `Sorts the newest ${SUBMISSIONS_READ} shown`,
+  });
+  readonly sortedRows = computed(() => this.sort.apply(this.shownRows()));
+  /**
+   * A table answer's rows (columns from the form's table field): one sort for every such grid, by the column's key, typed
+   * from the values. Not remembered: the grids open and close with each submission.
+   */
+  readonly answerSort = createTableSort<Record<string, unknown>>({
+    id: 'form-submission-answer-table',
+    columns: {},
+    dynamic: k => ({ value: r => r[k], kind: 'auto' }),
+    remember: false,
+  });
   readonly error = signal('');
   readonly open = signal<number | null>(null);
   readonly exporting = signal(false);
@@ -119,12 +150,16 @@ export class FormSubmissions implements OnInit {
   readonly statusText = submissionStatusText;
   readonly tone = submissionTone;
 
-  ngOnInit(): void {
+  ngOnInit(): void { this.loadForms(); }
+
+  /** Owner 2026-10-27: Try again clears the last error first (it stayed on screen after a read that worked). */
+  loadForms(): void {
     this.formsLoading.set(true);
+    this.formsError.set('');
     this.api.list(true).subscribe({
       next: r => {
         this.formsLoading.set(false);
-        if (r.status !== API_SUCCESS) { this.formsError.set(r.message); return; }
+        if (r.status !== API_SUCCESS) { this.formsError.set(loadErrorText(r, 'The forms could not be read.')); return; }
         const forms = formsOf(r.data);
         this.forms.set(forms);
         const wanted = Number(this.formId());
@@ -133,11 +168,13 @@ export class FormSubmissions implements OnInit {
         const first = forms.find(f => f.formId === wanted) ?? defaultForm(forms);
         if (first) this.choose(first.formId);
       },
-      error: err => { this.formsLoading.set(false); this.formsError.set(err?.error?.message || 'The forms could not be read.'); },
+      error: err => { this.formsLoading.set(false); this.formsError.set(loadErrorText(err, 'The forms could not be read.')); },
     });
   }
 
   choose(formId: number): void {
+    // Another form is another list: the last one's rows go, so they are never shown under this form's name.
+    if (this.selected() !== formId) this.submissions.set([]);
     this.selected.set(formId);
     this.open.set(null);
     void this.router.navigate([], { queryParams: { formId }, replaceUrl: true });
@@ -154,12 +191,18 @@ export class FormSubmissions implements OnInit {
     this.loading.set(true);
     this.error.set('');
     this.api.submissionsOf(formId, SUBMISSIONS_READ).subscribe({
+      // A late answer for a form no longer picked is dropped: it would fill this form's list with another's rows.
       next: r => {
+        if (this.selected() !== formId) return;
         this.loading.set(false);
-        if (r.status !== API_SUCCESS) { this.error.set(r.message); return; }
+        if (r.status !== API_SUCCESS) { this.error.set(loadErrorText(r, 'The submissions could not be read.')); return; }
         this.submissions.set(submissionsOf(r.data));
       },
-      error: err => { this.loading.set(false); this.error.set(err?.error?.message || 'The submissions could not be read.'); },
+      error: err => {
+        if (this.selected() !== formId) return;
+        this.loading.set(false);
+        this.error.set(loadErrorText(err, 'The submissions could not be read.'));
+      },
     });
   }
 

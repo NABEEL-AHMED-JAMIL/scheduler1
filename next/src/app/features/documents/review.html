@@ -36,7 +36,8 @@
   @if (noWorkspace()) {
     <app-needs-workspace what="Documents are" todo="review documents, correct and approve them" icon="file" />
   } @else if (loading() && !detail()) {
-    <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]">Loading the document…</div>
+    <!-- Owner 2026-10-27: the shared loader, announced to a screen reader (the plain line was not). -->
+    <div class="card"><app-loading shape="panel" label="Loading the document…" [count]="6" /></div>
   } @else if (missing()) {
     <!-- ZT-D10 (ZT-A10's rule): a document that is not here (deleted, or another workspace's link) is said as that, with the way back. -->
     <div class="card p-8 flex flex-col items-center text-center gap-2" data-test="document-missing">

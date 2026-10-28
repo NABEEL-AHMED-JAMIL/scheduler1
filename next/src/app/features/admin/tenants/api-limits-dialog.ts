@@ -5,6 +5,8 @@ import { Field } from '../../../shared/ui/field';
 import { FormDialog } from '../../../shared/ui/form-dialog';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { ApiClientsApi, ApiLimitsRow } from '../../integration/api-clients/api-clients.api';
+import { AppLoading, loadErrorText } from '../../../shared/ui/loading';
+import { LoadError } from '../../../shared/ui/load-error';
 
 export interface ApiLimitsDialogData {
   tenantId: number;
@@ -26,7 +28,7 @@ export function boundValue(text: string): number | null {
  */
 @Component({
   selector: 'app-api-limits-dialog',
-  imports: [Field, FormDialog],
+  imports: [Field, FormDialog, AppLoading, LoadError],
   template: `
     <app-form-dialog [heading]="'API limits: ' + data.tenantName"
         subtitle="Bounds for this workspace's API clients. Empty: the platform's default. They hold from the next call."
@@ -60,8 +62,11 @@ export function boundValue(text: string): number | null {
             @if (l.quotaUsedPercent != null) { ({{ l.quotaUsedPercent }}% of the quota) }
           </div>
         </div>
+      } @else if (loadError()) {
+        <!-- Owner 2026-10-27: a failed read in red, with Try again, not a muted line where the loading text was. -->
+        <app-load-error [message]="loadError()" (retry)="load()" />
       } @else {
-        <p class="text-sm text-[color:var(--text-muted)]">{{ loadError() || 'Reading the limits…' }}</p>
+        <app-loading shape="panel" [count]="4" label="Loading the limits…" />
       }
       @if (!valid()) { <p class="text-sm text-[color:var(--color-crit-500)]" role="alert">Each limit is a whole number, or empty.</p> }
       @if (error()) { <p class="text-sm text-[color:var(--color-crit-500)]" role="alert">{{ error() }}</p> }
@@ -93,10 +98,15 @@ export class ApiLimitsDialog {
   }
 
   constructor() {
+    this.load();
+  }
+
+  load(): void {
+    this.loadError.set('');
     this.api.limits(this.data.tenantId).subscribe({
       next: r => {
         if (r.status !== API_SUCCESS || !r.data) {
-          this.loadError.set(r.message || 'The limits could not be read.');
+          this.loadError.set(loadErrorText(r, 'The limits could not be read.'));
           return;
         }
         const l = r.data;
@@ -109,7 +119,7 @@ export class ApiLimitsDialog {
         this.workspaceBurst.set(own(l.bounds.workspaceBurst, l.defaults.workspaceBurst));
         this.monthly.set(l.bounds.monthlyCalls == null ? '' : String(l.bounds.monthlyCalls));
       },
-      error: err => this.loadError.set(err?.error?.message || 'The limits could not be read.'),
+      error: err => this.loadError.set(loadErrorText(err, 'The limits could not be read.')),
     });
   }
 

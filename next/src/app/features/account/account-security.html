@@ -43,6 +43,10 @@
                    [value]="newPassword()" (input)="newPassword.set($any($event.target).value)" />
           </app-field>
           <app-password-rules [rules]="rules()" [password]="newPassword()" />
+          @if (rulesState.loading() || rulesState.error()) {
+            <app-inline-status [loading]="rulesState.loading()" [error]="rulesState.error()"
+                               label="Loading your workspace's password rules…" (retry)="loadRules()" />
+          }
         </div>
       </div>
       @if (passwordError()) {
@@ -88,23 +92,29 @@
           }
         </div>
       </div>
-      @if (sessionsError()) {
-        <p class="field-note text-crit-500 mt-3" role="alert">{{ sessionsError() }}</p>
+      <!-- Owner 2026-10-27: loading until the first answer, the reason with Try again on a failure, and a Refresh keeps
+           the rows under a blur instead of swapping them for a word. -->
+      @if (sessionsError() && !sessionsState.loaded()) {
+        <app-load-error [message]="sessionsError()" (retry)="loadSessions()" />
+      } @else if (sessionsState.pending()) {
+        <app-loading shape="rows" label="Loading your sessions…" [count]="2" />
       } @else {
+        @if (sessionsError()) { <app-inline-status [error]="sessionsError()" (retry)="loadSessions()" /> }
+        <app-blur-loader [active]="sessionsLoading()" label="Refreshing…">
         <div class="overflow-x-auto mt-3">
           <table class="table-modern" data-test="sessions">
             <thead>
               <tr>
-                <th>Device</th>
-                <th>Address</th>
-                <th>Signed in</th>
-                <th>Last active</th>
-                <th>How</th>
+                <th appSort="device" [sortBy]="sessionSort">Device</th>
+                <th appSort="address" [sortBy]="sessionSort">Address</th>
+                <th appSort="signedIn" [sortBy]="sessionSort">Signed in</th>
+                <th appSort="lastActive" [sortBy]="sessionSort">Last active</th>
+                <th appSort="how" [sortBy]="sessionSort">How</th>
                 <th class="text-right th-actions">Actions</th>
               </tr>
             </thead>
             <tbody>
-              @for (s of sessions(); track s.sessionId) {
+              @for (s of sortedSessions(); track s.sessionId) {
                 <tr>
                   <td class="max-w-64">
                     <div class="flex items-center gap-2 min-w-0">
@@ -125,12 +135,13 @@
                 </tr>
               } @empty {
                 <tr><td colspan="6" class="text-center text-sm text-[color:var(--text-muted)] py-6">
-                  {{ sessionsLoading() ? 'Loading…' : 'No other sessions.' }}
+                  No signed-in session was found. Refresh to read them again.
                 </td></tr>
               }
             </tbody>
           </table>
         </div>
+        </app-blur-loader>
       }
     </section>
   </div>

@@ -18,6 +18,8 @@ import {
   COUNTING, EXECUTION, EXEC_SECONDS, JOB_NAME, NO_DURATION, RUN_ID, SECONDS, Pivot, aggregate,
   buildPivot, formatMeasure, withReadableDays, ADDITIVE} from './pivot';
 import { dayLabel, formatDuration } from '../../shared/ui/time-format';
+import { createTableSort } from '../../shared/ui/sort';
+import { SortHeader } from '../../shared/ui/sort-header';
 
 const EMPTY: RunData = { task: [], status: [], owner: [], day: [], job: [], tenant: [], rows: [] };
 
@@ -39,7 +41,7 @@ const EMPTY: RunData = { task: [], status: [], owner: [], day: [], job: [], tena
  */
 @Component({
   selector: 'app-report-pivot',
-  imports: [Icon, StatusPill, TableShell, ReportChart, Pagination, Segmented],
+  imports: [Icon, StatusPill, TableShell, ReportChart, Pagination, Segmented, SortHeader],
   templateUrl: './report-pivot.html',
   // The spacing used to come from the .page wrapper this markup sat inside. Without it the
   // shape card, the chart and the grid render flush against each other, and an Angular host is
@@ -83,6 +85,23 @@ export class ReportPivot {
   /** Runs behind the cell the reader clicked, shown in a drawer. */
   readonly drillTitle = signal('');
   readonly drillRows = signal<RunRow[]>([]);
+  /**
+   * Owner 2026-10-27: the runs behind a cell sort by any column, before the first 300 are cut; in the data's order
+   * until one is picked. A day sorts by its place in the dictionary (date order), a duration nothing measured last.
+   */
+  readonly drillSort = createTableSort<RunRow>({
+    id: 'run-analytics-drill',
+    columns: {
+      run: { value: r => r[RUN_ID], kind: 'number' },
+      schedule: r => r[JOB_NAME],
+      pipeline: r => this.labelOf(r, 0),
+      owner: r => this.labelOf(r, 2),
+      day: { value: r => r[3], kind: 'number', first: 'desc' },
+      duration: { value: r => (r[SECONDS] >= 0 ? r[SECONDS] : null), kind: 'number' },
+      outcome: { value: r => this.labelOf(r, 1), kind: 'status' },
+    },
+  });
+  readonly drillShown = computed(() => this.drillSort.apply(this.drillRows()).slice(0, 300));
 
   readonly chart = signal<ChartKind>('grouped');
   readonly chartKinds: ChartKind[] =
@@ -204,6 +223,33 @@ export class ReportPivot {
   /** Highest total first, or the order the dimension came in (chronological for Day, A-Z else). */
   readonly rowOrder = signal<'total' | 'natural'>('total');
   readonly rowPager = createPager<number>(25);
+  /**
+   * Owner 2026-10-27: every column of the grid sorts -- the row label, each column's numbers ("c:" and its label) and
+   * the All total. Until a heading is picked the Row order switch decides; picking a heading sorts on top of it, and the
+   * switch or new dimensions go back to it. Rows are the indexes of the full pivot. A value the measure could not
+   * take (-1, a duration nothing finished for) is no value, so it sorts last both ways. Not remembered: the columns
+   * change with the dimensions.
+   */
+  readonly gridSort = createTableSort<number>({
+    id: 'run-analytics-pivot',
+    columns: {
+      // Day labels are readable dates; the dictionary keeps days in date order, so a day sorts by its place in it.
+      label: { value: i => (this.rowDim().key === 'day' ? i : this.fullPivot().rowLabels[i]), kind: 'auto' },
+      all: { value: i => this.measured(this.fullPivot().rowTotals[i]), kind: 'number' },
+    },
+    dynamic: key => {
+      if (!key.startsWith('c:')) return null;
+      const label = key.slice(2);
+      return { value: (i: number) => {
+        const ci = this.fullPivot().colLabels.indexOf(label);
+        return ci < 0 ? null : this.measured(this.fullPivot().matrix[i]?.[ci]);
+      }, kind: 'number' };
+    },
+    remember: false,
+  });
+  private measured(v: number | undefined): number | null { return v == null || v < 0 ? null : v; }
+  /** The grid heading's sort key for a column. */
+  colKey(label: string): string { return 'c:' + label; }
 
   /** The rows the reader asked for, in the order they asked for. Totals follow the rows shown. */
   readonly pivot = computed<Pivot>(() => {
@@ -215,6 +261,8 @@ export class ReportPivot {
       // Stable on ties, so equal rows keep the dictionary's order instead of shuffling.
       order = [...order].sort((a, b) => (full.rowTotals[b] - full.rowTotals[a]) || (a - b));
     }
+    // A heading picked sorts the rows by its column, stably over the order above.
+    if (this.gridSort.key()) order = this.gridSort.apply(order);
     if (!q && order.every((v, i) => v === i)) return full;
     const cellRows = order.map(i => full.cellRows[i]);
     const measure = this.measure();
@@ -269,7 +317,7 @@ export class ReportPivot {
     this.pivot().rowLabels.length - this.chartPivot().rowLabels.length);
 
   setRowSearch(text: string): void { this.rowSearch.set(text); this.rowPager.reset(); }
-  setRowOrder(order: 'total' | 'natural'): void { this.rowOrder.set(order); this.rowPager.reset(); }
+  setRowOrder(order: 'total' | 'natural'): void { this.rowOrder.set(order); this.gridSort.reset(); this.rowPager.reset(); }
 
   readonly title = computed(() =>
     `${MEASURE_LABELS[this.measure()]} by ${this.rowDim().label.toLowerCase()}` +
@@ -301,6 +349,7 @@ export class ReportPivot {
   /** New rows, new order: days read in date order, everything else busiest first. */
   private rowsReshaped(): void {
     this.rowOrder.set(this.rowDim().key === 'day' ? 'natural' : 'total');
+    this.gridSort.reset();
     this.rowPager.reset();
   }
   setMeasure(value: string): void { this.measure.set(value as Measure); }

@@ -2,14 +2,16 @@ import { WorkspaceSelect } from '../../../shared/ui/workspace-select';
 import { WorkspaceDirectory } from '../../../core/workspaces/workspace-directory';
 import { Avatar } from '../../../shared/ui/avatar';
 import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
+import { API_SUCCESS } from '../../../core/api/api.config';
 import { TableShell } from '../../../shared/ui/data-table';
 import { Icon } from '../../../shared/ui/icon';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { ActionsPage, ActivityKind, ManagedAction, ManagedServiceApi, StaffCandidate, personName, staffOf } from './managed-service.api';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
+import { InlineStatus, createLoadState, loadErrorText } from '../../../shared/ui/loading';
+import { SortDirection, createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
 
 /** Words that read as initials, not as words, when a resource or action name is split. */
 const INITIALS: Record<string, string> = { ai: 'AI', api: 'API', apis: 'APIs', sql: 'SQL', url: 'URL', id: 'ID', ids: 'IDs', kafka: 'Kafka',
@@ -115,12 +117,11 @@ export const ACTIONS_PAGE = 50;
  */
 @Component({
   selector: 'app-staff-activity',
-  imports: [WorkspaceSelect, RefreshButton, PageHeader, TableShell, Icon, ServerTimePipe, Avatar],
+  imports: [WorkspaceSelect, RefreshButton, PageHeader, TableShell, Icon, ServerTimePipe, Avatar, InlineStatus, SortHeader],
   templateUrl: './staff-activity.html',
 })
 export class StaffActivity implements OnInit {
   private readonly api = inject(ManagedServiceApi);
-  private readonly http = inject(HttpClient);
 
   /** From the route's data: which of the two pages this is. */
   readonly scope = input<'platform' | 'workspace'>('platform');
@@ -130,9 +131,42 @@ export class StaffActivity implements OnInit {
   readonly loading = signal(true);
   readonly loadingMore = signal(false);
   readonly error = signal('');
+  /** Owner 2026-10-27: an older page that failed is said by its button; the rows already shown stay. */
+  readonly olderError = signal('');
+  /** The platform's staff list for the filter (platform scope): loading, failed (with Try again), or read. */
+  readonly staffState = createLoadState(false);
+  /** Each newest-page read's number: a filter changed meanwhile, the newer read answers. */
+  private seq = 0;
   readonly nextBeforeId = signal<number | null>(null);
-  readonly hasMore = computed(() => this.nextBeforeId() !== null);
-  readonly tenants = signal<{ tenantId: number; tenantName: string }[]>([]);
+  /** A sorted audit's next page (owner 2026-10-27): Identity pages it by offset, the id cursor only walks the id order. */
+  readonly nextOffset = signal<number | null>(null);
+  readonly hasMore = computed(() => this.nextBeforeId() !== null || this.nextOffset() !== null);
+
+  /**
+   * Owner 2026-10-27 ("add a sort on each table"): Identity sorts the whole audit (sort/dir on its allow-list: createdAt,
+   * staff, workspace, service), so the order covers every page, not only the rows loaded; a new order reads from the
+   * first page again and the next pages go on by offset. Newest first is the audit's own order (rows are written with the
+   * time they ran, in id order), so When descending is the initial one and keeps the id cursor, sending no sort. Staff
+   * member sorts by the name shown (full name, else username); "Change or read" is not on the allow-list.
+   */
+  readonly sort = createTableSort<ManagedAction>({
+    id: 'staff-activity',
+    server: true,
+    initial: { key: 'createdAt', direction: 'desc' },
+    columns: {
+      createdAt: { value: a => a.createdAt, kind: 'date', param: 'createdAt' },
+      staff: { value: a => personName(a), kind: 'text', param: 'staff' },
+      workspace: { value: a => a.tenantName, kind: 'text', param: 'workspace' },
+      service: { value: a => a.service, kind: 'text', param: 'service' },
+    },
+    onChange: () => this.load(),
+  });
+
+  /** What a read sends for the order: nothing for newest first (the id cursor's order), else the column and dir. */
+  sortParams(): { sort: string; dir: SortDirection } | null {
+    const p = this.sort.param();
+    return p && !(p.sort === 'createdAt' && p.dir === 'desc') ? p : null;
+  }
   private readonly platformStaff = signal<StaffCandidate[]>([]);
   /** Everyone the log has shown so far: a workspace administrator cannot list our staff, only see who acted. */
   private readonly seen = signal<Map<number, StaffCandidate>>(new Map());
@@ -161,48 +195,66 @@ export class StaffActivity implements OnInit {
 
   ngOnInit(): void {
     this.load();
+    // The workspace filter is the shared app-workspace-select, which reads its own list: no workspace read here.
     if (!this.showWorkspace()) return;
-    this.http.get<ApiResponse<{ tenantId: number; tenantName: string; status?: string }[]>>(`${API_BASE}/tenant.json/listTenants`)
-      .subscribe({
-        next: r => this.tenants.set((r.status === API_SUCCESS ? r.data ?? [] : []).filter(t => t.status !== 'Delete')
-          .map(t => ({ tenantId: t.tenantId, tenantName: t.tenantName })).sort((a, b) => a.tenantName.localeCompare(b.tenantName))),
-        error: () => this.tenants.set([]),
-      });
+    this.loadStaff();
+  }
+
+  loadStaff(): void {
+    this.staffState.start();
     this.api.users().subscribe({
-      next: r => this.platformStaff.set(r.status === API_SUCCESS ? staffOf(r.data ?? []) : []),
-      error: () => this.platformStaff.set([]),
+      next: r => {
+        if (r.status !== API_SUCCESS) { this.staffState.fail(r, 'The staff could not be read.'); return; }
+        this.platformStaff.set(staffOf(r.data ?? []));
+        this.staffState.done();
+      },
+      error: err => this.staffState.fail(err, 'The staff could not be read.'),
     });
   }
 
   /** The newest page, for the filters as they are now. */
   load(): void {
+    const seq = ++this.seq;
     this.loading.set(true);
     this.error.set('');
-    this.fetch(null, page => this.rows.set(page), () => this.loading.set(false));
+    this.olderError.set('');
+    this.fetch(null, null, page => this.rows.set(page), () => this.loading.set(false),
+      words => this.error.set(words), () => seq === this.seq);
   }
 
   loadOlder(): void {
     const before = this.nextBeforeId();
-    if (before === null || this.loadingMore()) return;
+    const offset = this.nextOffset();
+    if ((before === null && offset === null) || this.loadingMore()) return;
+    const seq = this.seq;
     this.loadingMore.set(true);
-    this.fetch(before, page => this.rows.update(rows => [...rows, ...page]), () => this.loadingMore.set(false));
+    this.olderError.set('');
+    // A failed older page must not swap the rows already shown for the table's error block.
+    this.fetch(before, offset, page => this.rows.update(rows => [...rows, ...page]), () => this.loadingMore.set(false),
+      words => this.olderError.set(words), () => seq === this.seq);
   }
 
-  private fetch(beforeId: number | null, take: (rows: ManagedAction[]) => void, done: () => void): void {
+  private fetch(beforeId: number | null, offset: number | null, take: (rows: ManagedAction[]) => void, done: () => void,
+                failed: (words: string) => void, current: () => boolean): void {
     const kind = this.kindFilter();
-    this.api.actions({ tenantId: this.showWorkspace() ? this.tenantFilter() : null, appUserId: this.staffFilter(), beforeId,
-      limit: ACTIONS_PAGE, ...(kind ? { kind } : {}) }).subscribe({
+    const sort = this.sortParams();
+    this.api.actions({ tenantId: this.showWorkspace() ? this.tenantFilter() : null, appUserId: this.staffFilter(),
+      beforeId: sort ? null : beforeId, limit: ACTIONS_PAGE, ...(kind ? { kind } : {}),
+      ...(sort ? { ...sort, offset: offset ?? 0 } : {}) }).subscribe({
       next: (r: ActionsPage) => {
+        if (!current()) return;
         done();
-        if (r.status !== API_SUCCESS) { this.error.set(r.message || 'The activity could not be read.'); return; }
+        if (r.status !== API_SUCCESS) { failed(loadErrorText(r, 'The activity could not be read.')); return; }
         const page = r.data ?? [];
         take(page);
-        this.nextBeforeId.set(r.paging?.nextBeforeId ?? null);
+        this.nextBeforeId.set(sort ? null : r.paging?.nextBeforeId ?? null);
+        this.nextOffset.set(sort ? r.paging?.nextOffset ?? null : null);
         this.remember(page);
       },
       error: err => {
+        if (!current()) return;
         done();
-        this.error.set(err?.error?.message || 'The activity could not be read.');
+        failed(loadErrorText(err, 'The activity could not be read.'));
       },
     });
   }

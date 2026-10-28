@@ -44,6 +44,7 @@ function screen(answers: boolean[] = []) {
   const toast = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
   const opened: unknown[] = [];
   TestBed.resetTestingModule();
+  try { localStorage.clear(); } catch { /* none: the sort remembers its choice there */ }
   TestBed.configureTestingModule({
     imports: [EngineSettings],
     providers: [provideHttpClient(), provideHttpClientTesting(), { provide: ToastService, useValue: toast },
@@ -140,5 +141,63 @@ describe('Engine settings (owner #24)', () => {
     expect(dialValueError(memory, '12.5')).toBe('Digits only: no commas, spaces, signs or decimals.');
     expect(dialValueError(memory, '8')).toBe('Enter a whole number from 16 to 4,096 MB.');
     expect(dialValueError(memory, '512')).toBeNull();
+  });
+});
+
+describe('Engine settings -- sorting, loading, empty, error (owner 2026-10-27)', () => {
+  function bare() {
+    TestBed.resetTestingModule();
+    try { localStorage.clear(); } catch { /* none */ }
+    TestBed.configureTestingModule({
+      imports: [EngineSettings],
+      providers: [provideHttpClient(), provideHttpClientTesting(), { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn(), info: vi.fn() } },
+        { provide: AuthService, useValue: { isPlatformAdmin: () => false, isManagedSession: () => false } },
+        { provide: Dialog, useValue: { open: () => ({ closed: of(false) }) } }],
+    });
+    const fixture = TestBed.createComponent(EngineSettings);
+    fixture.detectChanges();
+    return { fixture, component: fixture.componentInstance, el: fixture.nativeElement as HTMLElement, http: TestBed.inject(HttpTestingController) };
+  }
+
+  it('sorts the changes by a heading, both ways', () => {
+    const { component } = screen();
+    component.history.set([
+      { id: 1, key: 'A', label: 'Beta', tenantId: null, action: 'SET', oldValue: '5', newValue: '10', changedByName: 'X', changedAt: '2026-10-01T10:00:00Z' },
+      { id: 2, key: 'B', label: 'Alpha', tenantId: null, action: 'SET', oldValue: '50', newValue: '9', changedByName: 'Y', changedAt: '2026-10-02T10:00:00Z' },
+    ]);
+    component.historySort.toggle('setting');
+    expect(component.sortedHistory().map(h => h.label)).toEqual(['Alpha', 'Beta']);
+    component.historySort.toggle('setting');
+    expect(component.sortedHistory().map(h => h.label)).toEqual(['Beta', 'Alpha']);
+    component.historySort.toggle('to');
+    expect(component.sortedHistory().map(h => h.newValue)).toEqual(['10', '9']);
+  });
+
+  it('is loading, with the tiles waiting and no "No change yet", until the reads answer', () => {
+    const { component, el } = bare();
+    expect(component.state.pending()).toBe(true);
+    expect(component.historyState.pending()).toBe(true);
+    expect(el.textContent).not.toContain('No change yet');
+    expect(el.textContent).not.toContain('No engine setting');
+  });
+
+  it('says the history is empty once it answers empty', () => {
+    const { component, fixture, el, http } = bare();
+    http.expectOne(r => r.url === ENDPOINT && r.method === 'GET').flush({ status: API_SUCCESS, message: '', data: ANSWER });
+    http.expectOne(r => r.url === `${ENDPOINT}/history`).flush({ status: API_SUCCESS, message: '', data: [] });
+    fixture.detectChanges();
+    expect(component.historyState.pending()).toBe(false);
+    expect(el.querySelector('[data-test="engine-history"]')!.textContent).toContain('No change yet');
+  });
+
+  it('a failed history says so with Try again instead of "No change yet"; a failed settings read says why', () => {
+    const { component, fixture, el, http } = bare();
+    http.expectOne(r => r.url === ENDPOINT && r.method === 'GET').flush('Internal Server Error', { status: 500, statusText: 'Server Error' });
+    http.expectOne(r => r.url === `${ENDPOINT}/history`).flush('Internal Server Error', { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+    expect(component.loading()).toBe(false);
+    expect(component.error()).toBe('The engine settings could not be read.');
+    expect(component.historyState.error()).toBe('The changes could not be read.');
+    expect(el.querySelector('[data-test="engine-error"] app-load-error')).not.toBeNull();
   });
 });

@@ -4,6 +4,7 @@ import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { API_SUCCESS } from '../../../core/api/api.config';
 import { SidePanel } from '../../../shared/ui/side-panel';
 import { LoadError } from '../../../shared/ui/load-error';
+import { AppLoading, createLoadState } from '../../../shared/ui/loading';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { ApiClientRow, ApiClientsApi, ClientChangeRow } from './api-clients.api';
 
@@ -22,13 +23,14 @@ const FIELDS: Record<string, string> = {
  */
 @Component({
   selector: 'app-client-history-panel',
-  imports: [SidePanel, LoadError, ServerTimePipe],
+  imports: [SidePanel, LoadError, ServerTimePipe, AppLoading],
   template: `
     <app-side-panel heading="History" [subtitle]="data.client.name + ' · ' + data.client.clientId">
       @if (error()) {
         <app-load-error [message]="error()" (retry)="load()" />
       } @else if (loading()) {
-        <p class="text-sm text-[color:var(--text-muted)]"><span class="spinner inline-block align-middle mr-2"></span>Reading…</p>
+        <!-- Owner 2026-10-27: the shared loader, so a screen reader hears what is loading. -->
+        <app-loading shape="list" label="Loading the history…" [count]="3" />
       } @else if (!rows().length) {
         <p class="text-sm text-[color:var(--text-muted)]">No change kept yet: clients made before 19 Oct 2026 start their history at their next change.</p>
       } @else {
@@ -59,23 +61,23 @@ export class ClientHistoryPanel {
   private readonly api = inject(ApiClientsApi);
 
   readonly rows = signal<ClientChangeRow[]>([]);
-  readonly loading = signal(true);
-  readonly error = signal('');
+  readonly state = createLoadState();
+  readonly loading = this.state.loading;
+  readonly error = this.state.error;
 
   constructor() {
     this.load();
   }
 
   load(): void {
-    this.loading.set(true);
-    this.error.set('');
+    this.state.start();
     this.api.history(this.data.client.clientId, this.data.sandbox, this.data.tenantId).subscribe({
       next: r => {
-        this.loading.set(false);
-        if (r.status === API_SUCCESS) this.rows.set(r.data ?? []);
-        else this.error.set(r.message || 'Could not read the history.');
+        if (r.status !== API_SUCCESS) { this.state.fail(r, 'The history could not be read.'); return; }
+        this.rows.set(r.data ?? []);
+        this.state.done();
       },
-      error: err => { this.loading.set(false); this.error.set(err?.error?.message || 'Could not read the history.'); },
+      error: err => this.state.fail(err, 'The history could not be read.'),
     });
   }
 

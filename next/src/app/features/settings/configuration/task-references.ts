@@ -14,6 +14,9 @@ import { TaskReferenceDialog, TaskReferenceDialogData } from './task-reference-d
 import { TaskReference, TaskReferenceKind, TenantOption, workspaceLabel } from './configuration.models';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
+import { InlineStatus, createLoadState } from '../../../shared/ui/loading';
 
 const ENDPOINT = () => `${API_BASE}/setting.json/taskReferences`;
 
@@ -37,7 +40,7 @@ const COPY: Record<TaskReferenceKind, { title: string; singular: string; subtitl
  */
 @Component({
   selector: 'app-task-references',
-  imports: [WorkspaceSelect, RefreshButton, PageHeader, TableShell, Icon, ServerTimePipe],
+  imports: [WorkspaceSelect, RefreshButton, PageHeader, TableShell, Icon, ServerTimePipe, SortHeader, InlineStatus],
   templateUrl: './task-references.html',
 })
 export class TaskReferences implements OnInit {
@@ -53,8 +56,12 @@ export class TaskReferences implements OnInit {
   readonly isHomePage = computed(() => this.kind() === 'HOME_PAGE');
 
   readonly rows = signal<TaskReference[]>([]);
-  readonly loading = signal(true);
-  readonly error = signal('');
+  /** Owner 2026-10-27: the list's read, loading until its first answer. */
+  readonly state = createLoadState();
+  readonly loading = this.state.loading;
+  readonly error = this.state.error;
+  /** The workspace names (platform administrators); the New dialog's workspace choices come from here too. */
+  readonly tenantsState = createLoadState(false);
   readonly search = signal('');
 
   readonly isPlatformAdmin = computed(() => this.auth.isPlatformAdmin());
@@ -71,14 +78,37 @@ export class TaskReferences implements OnInit {
       || (r.description ?? '').toLowerCase().includes(term));
   });
 
+  /**
+   * Owner 2026-10-27: every column that holds a value sorts; the API's order until one is picked. One id for both kinds:
+   * the two lists have the same columns.
+   */
+  readonly sort = createTableSort<TaskReference>({
+    id: 'task-references',
+    columns: {
+      name: r => r.name,
+      workspace: r => this.workspaceName(r.tenantId),
+      value: r => r.value,
+      usedBy: { value: r => r.usedByTasks, kind: 'number' },
+      changed: { value: r => r.updatedAt || r.createdAt, kind: 'date' },
+    },
+  });
+  readonly sorted = computed(() => this.sort.apply(this.filtered()));
+
   ngOnInit(): void {
-    if (this.isPlatformAdmin()) {
-      this.http.get<ApiResponse<TenantOption[]>>(`${API_BASE}/tenant.json/listTenants`).subscribe({
-        next: r => { if (r.status === API_SUCCESS) this.tenants.set(r.data ?? []); },
-        error: () => {},
-      });
-    }
+    if (this.isPlatformAdmin()) this.loadTenants();
     this.load();
+  }
+
+  loadTenants(): void {
+    this.tenantsState.start();
+    this.http.get<ApiResponse<TenantOption[]>>(`${API_BASE}/tenant.json/listTenants`).subscribe({
+      next: r => {
+        if (r.status !== API_SUCCESS) { this.tenantsState.fail(r, 'The workspace names could not be read.'); return; }
+        this.tenants.set(r.data ?? []);
+        this.tenantsState.done();
+      },
+      error: err => this.tenantsState.fail(err, 'The workspace names could not be read.'),
+    });
   }
 
   setTenant(value: string | null | undefined): void {
@@ -89,21 +119,19 @@ export class TaskReferences implements OnInit {
   private ticket = 0;
   load(): void {
     const ticket = ++this.ticket;
-    this.loading.set(true);
-    this.error.set('');
+    this.state.start();
     const params: Record<string, string> = { kind: this.kind() };
     if (this.tenantFilter()) params['tenantId'] = this.tenantFilter();
     this.http.get<ApiResponse<TaskReference[]>>(ENDPOINT(), { params }).subscribe({
       next: response => {
         if (ticket !== this.ticket) return;
-        this.loading.set(false);
-        if (response.status !== API_SUCCESS) { this.error.set(response.message); return; }
+        if (response.status !== API_SUCCESS) { this.state.fail(response, `The ${this.copy().title.toLowerCase()} could not be read.`); return; }
         this.rows.set(response.data ?? []);
+        this.state.done();
       },
       error: err => {
         if (ticket !== this.ticket) return;
-        this.loading.set(false);
-        this.error.set(err?.error?.message || `Could not load the ${this.copy().title.toLowerCase()}.`);
+        this.state.fail(err, `The ${this.copy().title.toLowerCase()} could not be read.`);
       },
     });
   }

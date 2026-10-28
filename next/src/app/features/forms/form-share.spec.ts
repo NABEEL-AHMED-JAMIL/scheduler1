@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { of } from 'rxjs';
+import { NEVER, Observable, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { ToastService } from '../../shared/ui/toast.service';
 import { FormShare } from './form-share';
 import { FormsApi } from './forms.service';
@@ -18,9 +19,10 @@ const ON: ShareLinks = { enabled: true, shareable: true, whyNot: null, links: [
     usedCount: 0, requireSignIn: true },
 ] };
 
-function render(state: ShareLinks = ON) {
+function render(state: ShareLinks = ON, links?: () => Observable<unknown>) {
+  try { localStorage.clear(); } catch { /* none */ }
   const api = {
-    shareLinks: vi.fn(() => of({ status: 'SUCCESS', message: '', data: state })),
+    shareLinks: vi.fn(links ?? (() => of({ status: 'SUCCESS', message: '', data: state }))),
     setSharePolicy: vi.fn(() => of({ status: 'SUCCESS', message: '', data: { enabled: true, canChange: true } })),
     createShareLink: vi.fn(() => of({ status: 'SUCCESS', message: 'Link made.', data: { ...ON.links[0], linkId: 1002, token: 'tok_new' } })),
     revokeShareLink: vi.fn(() => of({ status: 'SUCCESS', message: 'Link revoked: it opens nothing now.', data: ON.links[0] })),
@@ -103,5 +105,46 @@ describe('Form share by link', () => {
 
   it('builds the address from the origin and the token', () => {
     expect(shareUrl('https://etl.example/', 'abc')).toBe('https://etl.example/f/abc');
+  });
+});
+
+describe('Form share by link -- sorting, loading, error (owner 2026-10-27)', () => {
+  it('keeps the service order until a heading is picked, then sorts by it both ways', () => {
+    const { screen } = render();
+    expect(screen.links().map(l => l.linkId)).toEqual([1001, 1000]);
+    screen.sort.toggle('link');
+    expect(screen.links().map(l => l.linkId)).toEqual([1001, 1000]);
+    screen.sort.toggle('link');
+    expect(screen.links().map(l => l.linkId)).toEqual([1000, 1001]);
+    screen.sort.toggle('used');
+    expect(screen.links().map(l => l.usedCount)).toEqual([3, 0]);
+  });
+
+  it('shows the loader until the links answer', () => {
+    const { el, screen } = render(ON, () => NEVER);
+    expect(screen.loading()).toBe(true);
+    expect(el.querySelector('app-loading')).not.toBeNull();
+    expect(el.textContent).not.toContain('No links yet.');
+  });
+
+  it('says there is no link once an empty list answers', () => {
+    const { el } = render({ enabled: true, shareable: true, whyNot: null, links: [] });
+    expect(el.textContent).toContain('No links yet.');
+  });
+
+  it('says why the links could not be read, with Try again', () => {
+    const { el, screen } = render(ON, () => throwError(() => new HttpErrorResponse({ status: 500 })));
+    expect(screen.loading()).toBe(false);
+    expect(screen.error()).toBe('The links could not be read.');
+    expect(el.querySelector('app-load-error')?.textContent).toContain('Try again');
+  });
+
+  it('keeps the card and the links on screen while it reads them again', () => {
+    const { el, screen, api, fixture } = render();
+    api.shareLinks.mockReturnValue(NEVER as never);
+    screen.load();
+    fixture.detectChanges();
+    expect(screen.loading()).toBe(true);
+    expect(el.querySelector('[data-share-links]')).not.toBeNull();
   });
 });

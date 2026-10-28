@@ -36,7 +36,10 @@
             <th class="w-8"><input type="checkbox" [checked]="allPicked()" [disabled]="!pickable().length || deleting()"
                                    (change)="togglePage($any($event.target).checked)" aria-label="Select the deletable reports on this page" data-pick-page /></th>
           }
-          <th>Report</th><th>Template</th><th>Version</th><th>Files</th><th>Status</th><th>Signed</th><th>Last job</th><th>Updated</th>
+          <!-- Owner 2026-10-27: these headings sort every report on the server (reportLibrary.json's allow-list). -->
+          <th appSort="report" [sortBy]="reportSort">Report</th><th appSort="template" [sortBy]="reportSort">Template</th>
+          <th appSort="version" [sortBy]="reportSort">Version</th><th>Files</th><th appSort="status" [sortBy]="reportSort">Status</th>
+          <th>Signed</th><th>Last job</th><th appSort="updated" [sortBy]="reportSort">Updated</th>
           @if (canGenerate()) { <th class="text-right"><span class="sr-only">Actions</span></th> }
         </tr></thead>
         <tbody>
@@ -108,7 +111,10 @@
         </div>
       </ng-container>
       <table class="table-modern">
-        <thead><tr><th>Job</th><th>Report</th><th>Template</th><th>Progress</th><th>Made</th><th>Started</th><th>Finished</th></tr></thead>
+        <!-- Owner 2026-10-27: these headings sort every job on the server (reportLibrary.json's allow-list). -->
+        <thead><tr><th appSort="job" [sortBy]="jobSort">Job</th><th appSort="report" [sortBy]="jobSort">Report</th>
+          <th appSort="template" [sortBy]="jobSort">Template</th><th appSort="progress" [sortBy]="jobSort">Progress</th><th>Made</th>
+          <th appSort="started" [sortBy]="jobSort">Started</th><th appSort="finished" [sortBy]="jobSort">Finished</th></tr></thead>
         <tbody>
           @for (j of jobs(); track j.jobId) {
             <tr>

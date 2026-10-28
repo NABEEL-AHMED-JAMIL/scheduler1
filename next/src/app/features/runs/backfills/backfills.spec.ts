@@ -4,7 +4,10 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { Dialog } from '@angular/cdk/dialog';
-import { of } from 'rxjs';
+import { NEVER, Observable, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
+import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
+import { BackfillsApi } from './backfills.api';
 import { Backfills } from './backfills';
 import { BackfillDetail } from './backfill-detail';
 import { Backfill, doneOf, durationText, lookOf, money, periodsText, progressParts } from './backfills.api';
@@ -107,5 +110,72 @@ describe('backfill words', () => {
     expect(lookOf('QUEUED').word).toBe('Running');
     // A cancelled period never ran: not done.
     expect(doneOf({ counts: { ...ROW.counts, cancelled: 3 } })).toBe(6);
+  });
+});
+
+describe('Runs › Backfills -- loading, empty, error (owner 2026-10-27)', () => {
+  it('shows a skeleton, not an empty card, until the list answers, then says none is there', () => {
+    const { fixture, http, el } = page();
+    expect(el.querySelector('app-loading')).not.toBeNull();
+    expect(el.querySelector('[data-test="backfills-list"]')).toBeNull();
+    http.expectOne(r => r.url.endsWith('/sourceJob.json/backfills'))
+      .flush({ status: API_SUCCESS, data: { rows: [], total: 0, page: 1, limit: 25, maxOpen: 3, maxConcurrency: 4 } });
+    fixture.detectChanges();
+    expect(el.textContent).toContain('No backfills');
+  });
+
+  it('says the list could not be read, with Try again', () => {
+    const { fixture, http, el } = page();
+    http.expectOne(r => r.url.endsWith('/sourceJob.json/backfills')).flush('boom', { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+    expect(el.textContent).toContain('The backfills could not be read.');
+    [...el.querySelectorAll('button')].find(b => b.textContent!.trim() === 'Try again')!.click();
+    http.expectOne(r => r.url.endsWith('/sourceJob.json/backfills'));
+  });
+
+  it('keeps the list when a quiet poll fails', () => {
+    const { fixture, http, el } = page();
+    http.expectOne(r => r.url.endsWith('/sourceJob.json/backfills'))
+      .flush({ status: API_SUCCESS, data: { rows: [ROW], total: 1, page: 1, limit: 25, maxOpen: 3, maxConcurrency: 4 } });
+    fixture.componentInstance.load(true);
+    http.expectOne(r => r.url.endsWith('/sourceJob.json/backfills')).flush('boom', { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+    expect(fixture.componentInstance.error()).toBe('');
+    expect(el.querySelector('[data-backfill="12"]')).not.toBeNull();
+  });
+});
+
+describe('Backfill detail -- loading and errors (owner 2026-10-27)', () => {
+  function detail(answer: () => Observable<unknown>) {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [
+      { provide: DialogRef, useValue: { close: () => {} } },
+      { provide: DIALOG_DATA, useValue: { backfillId: 12, canAct: true } },
+      { provide: BackfillsApi, useValue: { detail: () => answer() } },
+      { provide: ToastService, useValue: { success: () => {}, error: () => {}, info: () => {} } },
+    ] });
+    const panel = TestBed.runInInjectionContext(() => new BackfillDetail());
+    panel.ngOnInit();
+    return panel;
+  }
+
+  it('is loading until the backfill answers', () => {
+    const panel = detail(() => NEVER);
+    expect(panel.loading()).toBe(true);
+    expect(panel.backfill()).toBeNull();
+  });
+
+  it('says why it could not be read, and keeps the backfill when a later filter fails', () => {
+    let answer: () => Observable<unknown> = () => throwError(() => new HttpErrorResponse({ status: 500 }));
+    const panel = detail(() => answer());
+    expect(panel.loading()).toBe(false);
+    expect(panel.error()).toBe('The backfill could not be read.');
+    answer = () => of({ status: API_SUCCESS, data: { ...ROW, periods: [] } });
+    panel.load();
+    expect(panel.error()).toBe('');
+    answer = () => throwError(() => new HttpErrorResponse({ status: 500 }));
+    panel.pick('FAILED');
+    expect(panel.backfill()?.backfillId).toBe(12);
+    expect(panel.error()).toBe('The backfill could not be read.');
   });
 });

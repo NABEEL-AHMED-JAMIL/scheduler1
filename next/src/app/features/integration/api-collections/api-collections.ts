@@ -27,6 +27,8 @@ import { PageHeader } from '../../../shared/ui/page-header';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
 import { WorkspaceSelect } from '../../../shared/ui/workspace-select';
 import { WorkspaceDirectory } from '../../../core/workspaces/workspace-directory';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
 
 /**
  * API Collections (MIG-247, Integration menu, page key api-collections): the workspace's reusable APIs.
@@ -44,7 +46,7 @@ import { WorkspaceDirectory } from '../../../core/workspaces/workspace-directory
 @Component({
   selector: 'app-api-collections',
   imports: [RefreshButton, PageHeader, Icon, SensitivityTag, TableShell, StatusPill, StatStrip, ViewToggle, Pagination, DataText, ServerTimePipe, CdkMenu, CdkMenuItem,
-    CdkMenuTrigger, RouterLink, ManagedBanner, WorkspaceSelect],
+    CdkMenuTrigger, RouterLink, ManagedBanner, WorkspaceSelect, SortHeader],
   templateUrl: './api-collections.html',
 })
 export class ApiCollections implements OnInit {
@@ -72,8 +74,31 @@ export class ApiCollections implements OnInit {
 
   readonly sourceLabel = sourceLabel;
 
-  /** The page's rows with the state filter applied. */
-  readonly filtered = computed(() => this.rows().filter(r => !this.statusFilter() || r.status === this.statusFilter()));
+  /**
+   * The page's rows. Owner 2026-10-27: the state filter is the server's now (apiCollection.json/list status) -- it used to
+   * narrow only the page read, so page 1 could look empty while later pages held matches, and the count was everyone's.
+   */
+  readonly filtered = computed(() => this.rows());
+  /**
+   * Owner 2026-10-27 ("add a sort on each table"): the collections are paged, so they sort on the server and a new order
+   * goes back to the first page; the table and the cards show that order. No order picked: newest first, as before, and
+   * no sort is sent.
+   */
+  readonly sort = createTableSort<CollectionRow>({
+    id: 'api-collections',
+    server: true,
+    columns: {
+      name: { value: c => c.name, param: 'name' },
+      source: { value: c => sourceLabel(c.sourceFormat), param: 'source' },
+      sensitivity: { value: c => c.sensitivity, param: 'sensitivity' },
+      apis: { value: c => c.requestCount, kind: 'number', param: 'apis' },
+      folders: { value: c => c.folderCount, kind: 'number', param: 'folders' },
+      version: { value: c => c.currentVersion, kind: 'number', param: 'version' },
+      updated: { value: c => c.dateUpdated || c.dateCreated, kind: 'date', param: 'updated' },
+      state: { value: c => c.status, kind: 'status', param: 'state' },
+    },
+    onChange: () => { this.page.set(1); this.load(); },
+  });
   readonly hasFilters = computed(() => !!this.search().trim() || !!this.statusFilter());
   readonly emptyMessage = computed(() => this.hasFilters() ? 'No collection matches the current filters.'
     : this.canManage() ? 'No API collections yet. Create one, or import a Postman or Bruno collection, then add and test its APIs.'
@@ -115,7 +140,7 @@ export class ApiCollections implements OnInit {
     this.loading.set(true);
     this.error.set('');
     const asked = this.tenantId();
-    this.api.list(this.search(), this.page(), this.size(), asked).subscribe({
+    this.api.list(this.search(), this.page(), this.size(), asked, { status: this.statusFilter() || null, ...(this.sort.param() ?? {}) }).subscribe({
       next: r => {
         if (asked !== this.tenantId()) return;
         this.loading.set(false);
@@ -139,9 +164,18 @@ export class ApiCollections implements OnInit {
     this.searchTimer = setTimeout(() => { this.searchTimer = null; this.page.set(1); this.load(); }, 300);
   }
 
+  /** A state picked: the server narrows to it, from the first page (owner 2026-10-27). */
+  setStatusFilter(value: string): void {
+    this.statusFilter.set(value);
+    this.page.set(1);
+    this.load();
+  }
+
   clearFilters(): void {
+    const reread = !!this.search() || !!this.statusFilter();
     this.statusFilter.set('');
-    if (this.search()) { this.search.set(''); this.page.set(1); this.load(); }
+    this.search.set('');
+    if (reread) { this.page.set(1); this.load(); }
   }
 
   goTo(page: number): void { this.page.set(page); this.load(); }

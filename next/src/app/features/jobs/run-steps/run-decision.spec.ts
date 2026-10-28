@@ -3,7 +3,8 @@ import { provideZonelessChangeDetection, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
-import { of } from 'rxjs';
+import { NEVER, Observable, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { AuthService } from '../../../core/auth/auth.service';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { WorkflowsApi } from '../../workflows/workflows.api';
@@ -19,12 +20,12 @@ const PENDING = (you: Record<string, unknown>) => ({ status: 'SUCCESS', message:
 const TASK = { id: 1121, instanceId: 1115, stepKey: 'review', stepType: 'approval', name: "Review the run's results", state: 'Open',
   requestTitle: 'Review run #8209', subjectId: 'pipeline-run:8209', list: 'teams' };
 
-function box(opts: { review: unknown; tasks?: unknown[]; inbox?: boolean }) {
+function box(opts: { review: unknown; tasks?: unknown[]; inbox?: boolean; answer?: () => Observable<unknown>; reviewRead?: () => Observable<unknown> }) {
   const get = vi.fn((url: string) => url.includes('/appUser.json/teams/list')
-    ? of({ status: 'SUCCESS', message: '', data: [{ teamId: 1063, name: 'Reviewer', members: [] }] }) : of(opts.review));
+    ? of({ status: 'SUCCESS', message: '', data: [{ teamId: 1063, name: 'Reviewer', members: [] }] }) : opts.reviewRead ? opts.reviewRead() : of(opts.review));
   const post = vi.fn(() => of({ status: 'SUCCESS', message: 'The internal review is recorded: the run\'s results are APPROVED.' }));
   const api = {
-    forSubject: vi.fn(() => of({ status: 'SUCCESS', message: '', data: opts.tasks ?? [] })),
+    forSubject: vi.fn(opts.answer ?? (() => of({ status: 'SUCCESS', message: '', data: opts.tasks ?? [] }))),
     act: vi.fn(() => of({ status: 'SUCCESS', message: 'Approved.', data: {} })),
   };
   const toast = { success: vi.fn(), error: vi.fn() };
@@ -122,5 +123,35 @@ describe('Run page: Next steps', () => {
   it('draws nothing for a run that needs no review', () => {
     const { el } = box({ review: { status: 'SUCCESS', data: { jobQueueId: 1, jobId: 2, reviewStatus: 'NOT_REQUIRED', required: [], decisions: [] } } });
     expect(el.querySelector('[data-test="next-steps"]')).toBeNull();
+  });
+});
+
+describe('Run page: Next steps -- loading and errors (owner 2026-10-27)', () => {
+  const REVIEWER = { party: 'internal', canDecide: false };
+
+  it('says it is checking whether the reader decides, not who else does, while their task is looked up', () => {
+    const { el, fixture } = box({ review: PENDING(REVIEWER), answer: () => NEVER });
+    fixture.detectChanges();
+    expect(fixture.componentInstance.taskLoading()).toBe(true);
+    expect(el.querySelector('[data-test="who-decides"]')).toBeNull();
+    expect(el.querySelector('[data-test="decision-buttons"]')).toBeNull();
+  });
+
+  it('says the task lookup failed, with Try again that asks again', () => {
+    let answer: () => Observable<unknown> = () => throwError(() => new HttpErrorResponse({ status: 500 }));
+    const { fixture, api } = box({ review: PENDING(REVIEWER), answer: () => answer() });
+    expect(fixture.componentInstance.taskError()).toBe('Whether you decide this could not be checked.');
+    answer = () => of({ status: 'SUCCESS', message: '', data: [TASK] });
+    fixture.componentInstance.findTask();
+    expect(api.forSubject).toHaveBeenCalledTimes(2);
+    expect(fixture.componentInstance.taskError()).toBe('');
+    expect(fixture.componentInstance.task()?.id).toBe(1121);
+  });
+
+  it('says the review could not be read instead of drawing nothing', () => {
+    const { el, fixture } = box({ review: null, reviewRead: () => throwError(() => new HttpErrorResponse({ status: 500 })) });
+    fixture.detectChanges();
+    expect(fixture.componentInstance.error()).toBe("This run's review could not be read.");
+    expect(el.querySelector('[data-test="review-error"]')?.textContent).toContain('Try again');
   });
 });

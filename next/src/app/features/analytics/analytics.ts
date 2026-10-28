@@ -56,6 +56,10 @@ import { ToastService } from '../../shared/ui/toast.service';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { formatDuration } from '../../shared/ui/time-format';
 import { PageHeader } from '../../shared/ui/page-header';
+import { AppLoading, InlineStatus, loadErrorText } from '../../shared/ui/loading';
+import { LoadError } from '../../shared/ui/load-error';
+import { createTableSort } from '../../shared/ui/sort';
+import { SortHeader } from '../../shared/ui/sort-header';
 
 /**
  * The tabs a dataset is read through -- document 02's ten.
@@ -267,6 +271,9 @@ export interface CompactRow {
   nullLabel: string;
   /** Always carries its "≈", because it is built on the HyperLogLog sketch. */
   distinctLabel: string;
+  /** The figures under the two labels, for sorting (owner 2026-10-27): null where nothing was measured. */
+  nullPercent: number | null;
+  distinctPercent: number | null;
   /**
    * 06's "key metric": the one figure that says most about THIS column.
    *
@@ -623,7 +630,7 @@ export const CANVAS_WRAP_KEY = 'result:canvas';
     Icon, TableShell, SqlEditor, BarChart, Donut, RankedBar, Histogram, FilterBuilder, DataGrid,
     DatasetRegistry, RouterLink, ColumnCard, DatasetOverview, StatStrip, FormDialog,
     CdkMenu, CdkMenuItem, CdkMenuTrigger, DataText, WrapToggle,
-    WidgetChart, KindPicker, ThemePicker, ChartPalette,
+    WidgetChart, KindPicker, ThemePicker, ChartPalette, AppLoading, InlineStatus, LoadError, SortHeader,
   ],
   templateUrl: './analytics.html',
   host: { '(document:keydown.escape)': 'onEscape()' },
@@ -840,6 +847,16 @@ export class Analytics implements OnInit {
   readonly entries = signal<ObjectSummary[]>([]);
   readonly browsing = signal(false);
   readonly browseError = signal('');
+  /**
+   * Owner 2026-10-27: the storage connections' read. The picker was an empty select while it ran, a failure showed only
+   * inside the files panel, and a deep link (?connection&path) sat on "Pick a file to read it." until it answered.
+   */
+  readonly bucketsLoading = signal(false);
+  readonly bucketsError = signal('');
+  /** A failed folder listing, shown in place of the list (the old folder's files used to stay under the new crumbs). */
+  readonly listError = signal('');
+  /** Whether the address names a dataset to open once the connections are in. */
+  readonly deepLinked = computed(() => !!this.route?.snapshot.queryParamMap.get('connection') && !!this.route?.snapshot.queryParamMap.get('path'));
 
   /**
    * Filters the current folder by name.
@@ -1165,9 +1182,16 @@ export class Analytics implements OnInit {
 
   ngOnInit(): void {
     if (this.noWorkspace()) return;
+    this.loadBuckets();
+  }
+
+  loadBuckets(): void {
+    this.bucketsLoading.set(true);
+    this.bucketsError.set('');
     this.storage.buckets().subscribe({
       next: response => {
-        if (response.status !== API_SUCCESS) { this.browseError.set(response.message); return; }
+        this.bucketsLoading.set(false);
+        if (response.status !== API_SUCCESS) { this.bucketsError.set(loadErrorText(response, 'Your storage connections could not be read.')); return; }
         this.connections.set(response.data ?? []);
         // Open on the first READABLE connection rather than an empty shell: the screen's whole
         // job is reading data, and an empty picker shows nothing about what it does. First
@@ -1190,9 +1214,12 @@ export class Analytics implements OnInit {
         const first = this.readableConnections()[0];
         if (first) this.pickConnection(first.bucket);
       },
-      error: () => this.browseError.set('Could not load your storage connections.'),
+      error: err => { this.bucketsLoading.set(false); this.bucketsError.set(loadErrorText(err, 'Your storage connections could not be read.')); },
     });
   }
+
+  /** Try again on a folder listing that failed. */
+  retryBrowse(): void { this.browse(); }
 
   // ---- browsing ------------------------------------------------------------------------
 
@@ -1247,6 +1274,7 @@ export class Analytics implements OnInit {
     if (!connection) return;
     this.browsing.set(true);
     this.browseError.set('');
+    this.listError.set('');
     const epoch = ++this.browseEpoch;
     this.storage.listObjects(connection, this.prefix()).subscribe({
       next: response => {
@@ -1254,13 +1282,14 @@ export class Analytics implements OnInit {
         // spinner, which belongs to the request that is still out.
         if (epoch !== this.browseEpoch) return;
         this.browsing.set(false);
-        if (response.status !== API_SUCCESS) { this.browseError.set(response.message); return; }
+        if (response.status !== API_SUCCESS) { this.entries.set([]); this.listError.set(loadErrorText(response, 'This folder could not be listed.')); return; }
         this.entries.set(response.data?.objects ?? []);
       },
       error: err => {
         if (epoch !== this.browseEpoch) return;
         this.browsing.set(false);
-        this.browseError.set(err?.error?.message || 'Could not list this folder.');
+        this.entries.set([]);
+        this.listError.set(loadErrorText(err, 'This folder could not be listed.'));
       },
     });
   }
@@ -2030,6 +2059,8 @@ export class Analytics implements OnInit {
         nullLabel: column.measured ? `${this.percent(column.nullPercent)}%` : 'N/A',
         distinctLabel: column.distinctPercent === null
           ? 'N/A' : `≈ ${this.percent(column.distinctPercent)}%`,
+        nullPercent: column.measured ? column.nullPercent : null,
+        distinctPercent: column.distinctPercent,
         metricName,
         metricValue,
         metricEstimated,
@@ -2042,6 +2073,25 @@ export class Analytics implements OnInit {
       };
     });
   });
+
+  /**
+   * Owner 2026-10-27, "add a sort on each table": the Compact table sorts by any field; until a heading is picked the
+   * columns keep the dataset's own order. Null and Distinct sort by their figures, not their labels; Quality puts the
+   * loudest finding first.
+   */
+  readonly compactSort = createTableSort<CompactRow>({
+    id: 'analytics-compact',
+    columns: {
+      column: r => r.name,
+      type: r => r.shortType,
+      sample: { value: r => (r.sampleKind === 'value' ? r.sample : null), kind: 'auto' },
+      nulls: { value: r => r.nullPercent, kind: 'number' },
+      distinct: { value: r => r.distinctPercent, kind: 'number' },
+      metric: { value: r => (r.metricValue === 'N/A' ? null : r.metricValue), kind: 'auto' },
+      quality: { value: r => r.level ?? (r.checked ? 'clear' : 'not checked'), kind: 'status', order: ['crit', 'warn', 'note', 'clear', 'not checked'] },
+    },
+  });
+  readonly sortedCompactRows = computed(() => this.compactSort.apply(this.compactRows()));
 
   // ---- the profile view: aggregates, not columns ------------------------------------------
 
@@ -2263,6 +2313,21 @@ export class Analytics implements OnInit {
   readonly sql = signal('');
   readonly running = signal(false);
   readonly result = signal<QueryResult | null>(null);
+  /**
+   * Owner 2026-10-27, "add a sort on each table": the SQL result sorts by any of its columns, each typed from its own
+   * values. Columns come from the statement, so they are read by name from the row array; the statement's own order
+   * (its ORDER BY) stays until a heading is picked. A result stopped at the row ceiling sorts only what came back.
+   */
+  readonly resultSort = createTableSort<(string | null)[]>({
+    id: 'analytics-sql-result',
+    columns: {},
+    note: 'Sorts the rows this query returned',
+    dynamic: key => {
+      const at = this.result()?.columns.indexOf(key) ?? -1;
+      return at < 0 ? null : { value: row => row[at], kind: 'auto' };
+    },
+  });
+  readonly sortedResultRows = computed(() => this.resultSort.apply(this.result()?.rows ?? []));
 
   /**
    * The statement that produced the result now in hand, and the reason Charts can be a tab.
@@ -2623,19 +2688,25 @@ export class Analytics implements OnInit {
     this.secondLoading.set(true);
     this.analytics.schema(this.connection(), path).subscribe({
       next: response => {
+        // A reply for a dataset picked away from must not fill the new one's columns.
+        if (this.secondPath() !== path) return;
         this.secondLoading.set(false);
         if (response.status !== API_SUCCESS || !response.data) {
-          this.secondError.set(response.message || 'That dataset could not be read.');
+          this.secondError.set(loadErrorText(response, 'That dataset could not be read.'));
           return;
         }
         this.secondColumns.set(response.data.columns ?? []);
       },
       error: err => {
+        if (this.secondPath() !== path) return;
         this.secondLoading.set(false);
-        this.secondError.set(err?.error?.message || 'That dataset could not be read.');
+        this.secondError.set(loadErrorText(err, 'That dataset could not be read.'));
       },
     });
   }
+
+  /** Try again on the second dataset's columns. */
+  retrySecond(): void { this.pickSecond(this.secondPath()); }
 
   clearSecond(): void {
     this.secondPath.set('');
@@ -3161,14 +3232,14 @@ export class Analytics implements OnInit {
       next: response => {
         this.savedLoading.set(false);
         if (response.status !== API_SUCCESS) {
-          this.savedError.set(response.message || 'Your saved queries could not be loaded.');
+          this.savedError.set(loadErrorText(response, 'Your saved queries could not be read.'));
           return;
         }
         this.savedQueries.set(response.data ?? []);
       },
       error: err => {
         this.savedLoading.set(false);
-        this.savedError.set(err?.error?.message || 'Your saved queries could not be loaded.');
+        this.savedError.set(loadErrorText(err, 'Your saved queries could not be read.'));
       },
     });
   }
@@ -3181,14 +3252,14 @@ export class Analytics implements OnInit {
       next: response => {
         this.runsLoading.set(false);
         if (response.status !== API_SUCCESS) {
-          this.runsError.set(response.message || 'The run history could not be loaded.');
+          this.runsError.set(loadErrorText(response, 'The run history could not be read.'));
           return;
         }
         this.recentRuns.set(response.data ?? []);
       },
       error: err => {
         this.runsLoading.set(false);
-        this.runsError.set(err?.error?.message || 'The run history could not be loaded.');
+        this.runsError.set(loadErrorText(err, 'The run history could not be read.'));
       },
     });
   }
@@ -5069,14 +5140,14 @@ export class Analytics implements OnInit {
       next: response => {
         this.analysesLoading.set(false);
         if (response.status !== API_SUCCESS || !response.data) {
-          this.analysesError.set(response.message || 'Saved analyses could not be read.');
+          this.analysesError.set(loadErrorText(response, 'Saved analyses could not be read.'));
           return;
         }
         this.analyses.set(response.data);
       },
       error: err => {
         this.analysesLoading.set(false);
-        this.analysesError.set(err?.error?.message || 'Saved analyses could not be read.');
+        this.analysesError.set(loadErrorText(err, 'Saved analyses could not be read.'));
       },
     });
   }

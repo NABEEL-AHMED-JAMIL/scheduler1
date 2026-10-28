@@ -76,11 +76,13 @@ describe('TaskEdit refusals with no message', () => {
     expect(errors[0]).toBeTruthy();
   });
 
+  // Owner 2026-10-27: under the Topic field with Try again, not a toast (a read's failure stays where the list would be).
   it('says something when the topics are refused', () => {
     const { component, errors } = editor(() => of({}), { topics: () => of({ status: 'ERROR', message: '' }) });
     component.pickProfile('5');
-    expect(errors).toHaveLength(1);
-    expect(errors[0]).toBeTruthy();
+    expect(errors).toHaveLength(0);
+    expect(component.topicsError()).toBe('The topics could not be read.');
+    expect(component.topicHint()).toBe('The topics could not be read.');
   });
 });
 

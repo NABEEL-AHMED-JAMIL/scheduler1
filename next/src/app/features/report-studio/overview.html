@@ -79,9 +79,11 @@
             <p class="p-4 text-sm text-[color:var(--text-muted)]">No reports yet. Publish a template, then create a report from a pipeline run or pasted data.</p>
           } @else {
             <table class="table-modern">
-              <thead><tr><th>Report</th><th>Version</th><th>Status</th><th>Signed</th><th>Updated</th><th class="w-12"><span class="sr-only">Open</span></th></tr></thead>
+              <thead><tr><th appSort="report" [sortBy]="reportSort">Report</th><th appSort="version" [sortBy]="reportSort">Version</th>
+                <th appSort="status" [sortBy]="reportSort">Status</th><th appSort="signed" [sortBy]="reportSort">Signed</th>
+                <th appSort="updated" [sortBy]="reportSort">Updated</th><th class="w-12"><span class="sr-only">Open</span></th></tr></thead>
               <tbody>
-                @for (r of d.recentReports; track r.reportId) {
+                @for (r of sortedReports(); track r.reportId) {
                   <tr>
                     <td class="max-w-80">
                       <a class="link-inline font-medium" [routerLink]="['/reports/library', r.reportId]">{{ r.name }}</a>
@@ -110,9 +112,10 @@
             <p class="p-4 text-sm text-[color:var(--text-muted)]">No jobs yet.</p>
           } @else {
             <table class="table-modern">
-              <thead><tr><th>Job · report</th><th>Started by</th><th>Progress</th><th>Started</th><th></th></tr></thead>
+              <thead><tr><th appSort="job" [sortBy]="jobSort">Job · report</th><th appSort="startedBy" [sortBy]="jobSort">Started by</th>
+                <th appSort="progress" [sortBy]="jobSort">Progress</th><th appSort="started" [sortBy]="jobSort">Started</th><th></th></tr></thead>
               <tbody>
-                @for (j of d.recentJobs; track j.jobId) {
+                @for (j of sortedJobs(); track j.jobId) {
                   <tr>
                     <td class="max-w-80"><span class="font-medium mono">{{ j.label }}</span> · {{ j.reportName }}
                       <div class="text-xs text-[color:var(--text-muted)]">{{ j.templateName }}@if (j.templateVersion) { · v{{ j.templateVersion }} }</div></td>
@@ -164,10 +167,17 @@
               </dl>
             </div>
           } @empty {
+            @if (pipelinesError()) {
+              <p class="text-sm text-crit-500 flex flex-wrap items-center gap-2" role="alert">{{ pipelinesError() }}
+                <button type="button" class="btn btn-default btn-xs" (click)="connect(d)"><app-icon name="refresh" />Try again</button></p>
+            } @else if (pipelinesLoading()) {
+              <app-loading shape="list" label="Looking for the pipelines behind the reports…" [count]="2" />
+            } @else {
             <p class="text-sm text-[color:var(--text-muted)]">
               @if ((d.pipelineRuns ?? []).length) { Reports were made from {{ d.pipelineRuns!.length }} pipeline run{{ d.pipelineRuns!.length === 1 ? '' : 's' }} lately; their schedules are not ones you can open. }
               @else { No report has been made from a pipeline run yet. Pick a run's output when you create one. }
             </p>
+            }
           }
           @if (canData()) { <a class="link-inline text-sm" routerLink="/reports/data">Inspect source and schema →</a> }
         </section>
@@ -196,6 +206,7 @@
       </aside>
     </div>
   } @else {
-    <div class="flex justify-center py-16"><span class="spinner" role="status" aria-label="Loading"></span></div>
+    <app-loading shape="tiles" label="Loading the overview…" [count]="4" />
+    <app-loading shape="rows" label="Loading recent reports and jobs…" [count]="5" />
   }
 </div>

@@ -78,8 +78,13 @@
     @case ('map') {
       @if (store.timeline(); as t) {
         <section class="card overflow-clip" data-test="run-map-tab"><app-run-map [timeline]="t" /></section>
-      } @else {
-        <p class="card p-4 text-sm text-[color:var(--text-muted)]">{{ store.legacy() ? 'This run was not taken by the step engine, so it has no map.' : 'Reading the run\'s steps…' }}</p>
+      } @else if (store.legacy()) {
+        <p class="card p-4 text-sm text-[color:var(--text-muted)]">This run was not taken by the step engine, so it has no map.</p>
+      } @else if (store.readError()) {
+        <!-- Owner 2026-10-27: a failed read of the steps said "Reading the run's steps…" for ever; it now says why, with Try again. -->
+        <div class="card" data-test="run-map-error"><app-load-error message="The run's steps could not be read." (retry)="store.retry()" /></div>
+      } @else if (!(error() && !run())) {
+        <div class="card"><app-loading shape="panel" label="Reading the run's steps…" /></div>
       }
     }
     @case ('ai') {
@@ -93,8 +98,11 @@
         <app-run-items [jobQueueId]="jobQueueId()" [first]="itemsFirst()" [initialStatus]="itemStatus()" [runDuration]="duration()"
                        [canRetry]="canOpenSchedule()" [refreshKey]="loads()" (statusChange)="itemStatusChanged($event)" (retried)="refresh()"
                        [jobId]="canOpenSchedule() ? jobId() : null" [refs]="itemRefs()" />
-      } @else {
-        <p class="card p-4 text-sm text-[color:var(--text-muted)]" aria-busy="true">Reading the run's items…</p>
+      } @else if (itemsError()) {
+        <!-- Owner 2026-10-27: a failed read says so here instead of moving to Steps as though the run had no items. -->
+        <div class="card" data-test="run-items-error"><app-load-error [message]="itemsError()" (retry)="retryItems()" /></div>
+      } @else if (!(error() && !run())) {
+        <div class="card"><app-loading shape="rows" label="Reading the run's items…" /></div>
       }
     }
     @case ('outputs') {
@@ -103,7 +111,7 @@
     @case ('log') {
       <app-run-log [entries]="logs()" [loading]="loading()" [error]="error()" [bucket]="bucket()" [follow]="autoRefreshing()"
                    [fileName]="'run-' + jobQueueId()" [(step)]="logStep"
-                   [names]="approvals.logNames()">
+                   [names]="approvals.logNames()" (retry)="load()">
         @if (logsRemovedNote()) {
           <p above class="px-4 py-2 text-xs text-[color:var(--text-secondary)] border-b border-subtle" data-test="log-retention">{{ logsRemovedNote() }}</p>
         }

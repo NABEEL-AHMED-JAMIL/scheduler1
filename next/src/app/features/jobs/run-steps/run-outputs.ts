@@ -11,6 +11,10 @@ import { PreviewDialog, PreviewData } from '../../objects/preview/preview-dialog
 import { RunTimelineStore } from './run-timeline.store';
 import { copyText } from '../../../shared/ui/clipboard.util';
 import { ToastService } from '../../../shared/ui/toast.service';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
+import { AppLoading } from '../../../shared/ui/loading';
+import { LoadError } from '../../../shared/ui/load-error';
 
 /**
  * The run page's Outputs tab (Wave 4, sourceJob.json/runOutputs): what the run put out -- kept files download through
@@ -19,7 +23,7 @@ import { ToastService } from '../../../shared/ui/toast.service';
  */
 @Component({
   selector: 'app-run-outputs',
-  imports: [Icon, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger],
+  imports: [Icon, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, SortHeader, AppLoading, LoadError],
   styles: `
     .ro-table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
     .ro-table th { text-align: left; font-weight: 600; font-size: 0.6875rem; letter-spacing: 0.04em; text-transform: uppercase;
@@ -46,17 +50,24 @@ import { ToastService } from '../../../shared/ui/toast.service';
                  [value]="query()" (input)="query.set($any($event.target).value)" data-test="output-search" />
         }
       </div>
+      <!-- Owner 2026-10-27: a failed read offers Try again; the files wait on the steps' read, so a failure of that one
+           is said here too instead of "Reading the run's files…" for ever. -->
       @if (store.outputs() === 'error') {
-        <p class="px-4 py-3 text-xs text-[color:var(--text-muted)]">The run's files could not be read.</p>
+        <app-load-error message="The run's files could not be read." (retry)="store.retryOutputs()" />
+      } @else if (store.outputs() === null && store.legacy()) {
+        <p class="px-4 py-3 text-xs text-[color:var(--text-muted)]">This run was not taken by the step engine, so it recorded no files.</p>
+      } @else if (store.outputs() === null && store.readError()) {
+        <app-load-error message="The run's steps could not be read, so neither could its files." (retry)="store.retry()" />
       } @else if (store.outputs() === null) {
-        <p class="px-4 py-3 text-xs text-[color:var(--text-muted)]">
-          {{ store.legacy() ? 'This run was not taken by the step engine, so it recorded no files.' : 'Reading the run\'s files…' }}</p>
+        <app-loading shape="rows" [count]="3" label="Reading the run's files…" />
       } @else if (!files().length) {
         <p class="px-4 py-3 text-xs text-[color:var(--text-muted)]">No files were recorded for this run.</p>
       } @else {
         <div class="overflow-x-auto">
           <table class="ro-table">
-            <thead><tr><th>File</th><th>Type</th><th>Size</th><th>Kept</th><th class="text-right"><span class="sr-only">Actions</span></th></tr></thead>
+            <thead><tr><th appSort="file" [sortBy]="sort">File</th><th appSort="type" [sortBy]="sort">Type</th>
+              <th appSort="size" [sortBy]="sort">Size</th><th appSort="kept" [sortBy]="sort">Kept</th>
+              <th class="text-right"><span class="sr-only">Actions</span></th></tr></thead>
             <tbody>
               @for (g of groups(); track g.key) {
                 <tr class="ro-group">
@@ -205,7 +216,23 @@ export class RunOutputs {
       if (!byStep.has(key)) byStep.set(key, { key, step: (o.stepIndex ?? 0) + 1, stepKey: o.stepKey ?? '', rows: [] });
       byStep.get(key)!.rows.push(o);
     }
-    return [...byStep.values()].sort((a, b) => a.step - b.step);
+    // Owner 2026-10-27: a sort orders the files inside each step; the steps keep their order.
+    return [...byStep.values()].sort((a, b) => a.step - b.step).map(g => ({ ...g, rows: this.sort.apply(g.rows) }));
+  });
+
+  /**
+   * Owner 2026-10-27: the columns sort, inside each step's group. Size sorts by the bytes (a report's pages and a table's
+   * rows come with them); Kept by when the file is kept until -- an upload kept in a bucket has no end and goes last.
+   */
+  readonly sort = createTableSort<RunOutput>({
+    id: 'run-outputs',
+    columns: {
+      file: o => o.name,
+      type: o => this.typeOf(o),
+      size: { value: o => o.byteCount ?? o.rowCount, kind: 'number' },
+      kept: { value: o => (o.kind === 'file' ? o.expiresAt : null), kind: 'date' },
+    },
+    initial: null,
   });
 
   isFolded(key: string): boolean { return this.folded().has(key); }

@@ -30,7 +30,8 @@
         { label: 'Untested',   value: summary().untested, foot: 'never verified', icon: 'clock', tone: 'warn' }
       ]; track tile.label) {
         <app-stat-tile [label]="tile.label" [value]="tile.value" [icon]="tile.icon"
-                       [tone]="$any(tile.tone)" [foot]="tile.foot" />
+                       [tone]="$any(tile.tone)" [foot]="tile.foot"
+                       [loading]="!loaded() && !error()" [failed]="!!error() && !loaded()" />
       }
     </div>
     @if (isFiltered()) {
@@ -174,16 +175,16 @@
                    [attr.aria-label]="allShownSelected() ? 'Clear selection' : 'Select all shown'"
                    (change)="toggleAll()" />
           </th>
-          <th>Name</th>
-          <th>Alias</th>
-          <th>Provider</th>
-          <th>Target</th>
-          @if (canSeeWorkspace()) { <th>Workspace</th> }
-          <th>Credentials</th>
-          <th>Last test</th>
-          <th class="hidden 2xl:table-cell">Created by</th>
-          <th class="hidden 2xl:table-cell">Updated by</th>
-          <th class="text-right">State</th>
+          <th appSort="name" [sortBy]="sort">Name</th>
+          <th appSort="alias" [sortBy]="sort">Alias</th>
+          <th appSort="provider" [sortBy]="sort">Provider</th>
+          <th appSort="target" [sortBy]="sort">Target</th>
+          @if (canSeeWorkspace()) { <th appSort="workspace" [sortBy]="sort">Workspace</th> }
+          <th appSort="credentials" [sortBy]="sort">Credentials</th>
+          <th appSort="lastTest" [sortBy]="sort">Last test</th>
+          <th class="hidden 2xl:table-cell" appSort="createdBy" [sortBy]="sort">Created by</th>
+          <th class="hidden 2xl:table-cell" appSort="updatedBy" [sortBy]="sort">Updated by</th>
+          <th class="text-right" appSort="state" [sortBy]="sort">State</th>
           <th class="w-12 col-pin-right th-actions">Actions</th>
         </tr>
       </thead>

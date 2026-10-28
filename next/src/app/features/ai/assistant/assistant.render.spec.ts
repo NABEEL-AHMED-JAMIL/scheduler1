@@ -4,7 +4,8 @@ import { TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
 import { Dialog } from '@angular/cdk/dialog';
 import { ActivatedRoute, provideRouter } from '@angular/router';
-import { Subject, of } from 'rxjs';
+import { NEVER, Observable, Subject, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { JobEvent, JobEventsService } from '../../../core/socket/job-events.service';
 import { AuthService } from '../../../core/auth/auth.service';
 import { ToastService } from '../../../shared/ui/toast.service';
@@ -18,7 +19,8 @@ const m = (x: Partial<AssistantMessage>): AssistantMessage => ({ messageId: 1, c
   toolRunId: null, runStatus: null, card: null, links: [], artifact: null, ...x });
 
 /** The page as drawn: the card's buttons, a blocked call, the result's links, model text kept as text. */
-function render(messages: AssistantMessage[], calls: unknown[] = [], policy: unknown = { status: 'SUCCESS', message: '', data: { levels: [] } }) {
+function render(messages: AssistantMessage[], calls: unknown[] = [], policy: unknown = { status: 'SUCCESS', message: '', data: { levels: [] } },
+                policyAnswer?: () => Observable<unknown>) {
   const api = {
     conversations: () => of({ status: 'SUCCESS', data: [CONV] }),
     conversation: () => of({ status: 'SUCCESS', data: { conversation: CONV, messages } }),
@@ -36,7 +38,7 @@ function render(messages: AssistantMessage[], calls: unknown[] = [], policy: unk
       provideZonelessChangeDetection(),
       provideRouter([]),
       { provide: AssistantApi, useValue: api },
-      { provide: DataPolicyApi, useValue: { get: vi.fn(() => of(policy)) } },
+      { provide: DataPolicyApi, useValue: { get: vi.fn(() => (policyAnswer ? policyAnswer() : of(policy))) } },
       { provide: HttpClient, useValue: {
         get: (url: string) => of(url.endsWith('/appUser.json/me') ? { status: 'SUCCESS', data: { tenantName: 'Acme' } } : { status: 'SUCCESS', data: [] }),
         post: () => of({ status: 'SUCCESS', data: [] }) } },
@@ -238,5 +240,33 @@ describe('AI Assistant -- its width', () => {
     const styles = ((Assistant as unknown as { ɵcmp: { styles: string[] } }).ɵcmp.styles ?? []).join('\n');
     const base = styles.slice(0, styles.indexOf('@media'));
     expect(base).toMatch(/\.ai-grid[^{]*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)/);
+  });
+});
+
+describe('AI Assistant -- the Context tab loads, or says why not (owner 2026-10-27)', () => {
+  function contextWith(policyAnswer: () => Observable<unknown>) {
+    const drawn = render([], [], null, policyAnswer);
+    drawn.fixture.componentInstance.tab.set('context');
+    drawn.fixture.detectChanges();
+    return drawn;
+  }
+
+  it('is loading, not "…", until the data policy answers', () => {
+    const { fixture, el } = contextWith(() => NEVER);
+    expect(fixture.componentInstance.policyLoading()).toBe(true);
+    expect(el.querySelector('[data-context] app-loading')).not.toBeNull();
+  });
+
+  it('shows the defaults once an empty policy answers', () => {
+    const { fixture } = contextWith(() => of({ status: 'SUCCESS', message: '', data: { levels: [] } }));
+    expect(fixture.componentInstance.policyLoading()).toBe(false);
+    expect(fixture.componentInstance.policyHeadline()).toBe('Defaults (not saved)');
+  });
+
+  it('says the policy could not be read, in plain words, with Try again', () => {
+    const { fixture, el } = contextWith(() => throwError(() => new HttpErrorResponse({ status: 500 })));
+    expect(fixture.componentInstance.policyLoading()).toBe(false);
+    expect(fixture.componentInstance.policyError()).toBe('The data policy could not be read.');
+    expect(el.textContent).toContain('Try again');
   });
 });

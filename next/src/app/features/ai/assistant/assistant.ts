@@ -41,6 +41,8 @@ import { PolicyLevel, levelSummary, levelsOf, policyState } from '../../admin/da
 import { sensitivityText } from '../../../shared/ui/sensitivity';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { elapsedDuration, formatDuration } from '../../../shared/ui/time-format';
+import { AppLoading, InlineStatus, loadErrorText } from '../../../shared/ui/loading';
+import { LoadError } from '../../../shared/ui/load-error';
 
 interface Connection { connectionId: number; name: string; isDefault?: boolean; status?: string; defaultModel?: string | null; provider?: string; }
 interface TraceState { loading: boolean; error: string; trace: ToolTrace | null; }
@@ -90,7 +92,7 @@ export const PROGRESS_MS = [1000, 2000] as const;
 @Component({
   selector: 'app-assistant',
   imports: [PageHeader, Icon, StatusPill, ServerTimePipe, StickToBottom, RouterLink, ModelSetupBanner, ManagedBanner, RunFollow,
-    FlowPanel, TracePanel, ChartAnswerSlot, ConversationList, Markdown],
+    FlowPanel, TracePanel, ChartAnswerSlot, ConversationList, Markdown, AppLoading, InlineStatus, LoadError],
   templateUrl: './assistant.html',
   // Escape closes the history laid over the thread, as it closes a side panel.
   host: { '(document:keydown.escape)': 'historyOpen.set(false)' },
@@ -180,6 +182,19 @@ export class Assistant implements OnInit {
 
   readonly tools = signal<ToolDef[]>([]);
   readonly toolsError = signal('');
+  /**
+   * Owner 2026-10-27: the Context tab's three reads say they are loading -- it read "—", "…" and "0 of 0" before they
+   * answered -- and a failed one says why with Try again.
+   */
+  readonly toolsLoading = signal(true);
+  readonly workspaceLoading = signal(true);
+  readonly policyLoading = signal(true);
+  /** The model picker's read: on a failure the header says so instead of quietly offering only the default. */
+  readonly connectionsError = signal('');
+  /** The run finished but its answer could not be read: the error line offers Check again. */
+  readonly answerUnread = signal(false);
+  /** The conversation being opened, for Try again after it failed to open. */
+  private openingId: number | null = null;
   readonly allowed = computed(() => allowedTools(this.tools()));
   readonly askFirst = computed(() => askFirstNames(this.tools()));
   readonly blocked = computed(() => this.tools().filter(t => toolState(t).label === 'Blocked'));
@@ -330,33 +345,43 @@ export class Assistant implements OnInit {
 
   loadTools(): void {
     this.toolsError.set('');
+    this.toolsLoading.set(true);
     this.api.tools().subscribe({
-      next: r => { if (r.status === API_SUCCESS) this.tools.set(r.data ?? []); else this.toolsError.set(r.message); },
-      error: err => this.toolsError.set(err?.error?.message || 'Could not load the tools.'),
+      next: r => {
+        this.toolsLoading.set(false);
+        if (r.status === API_SUCCESS) this.tools.set(r.data ?? []); else this.toolsError.set(loadErrorText(r, 'The tools could not be read.'));
+      },
+      error: err => { this.toolsLoading.set(false); this.toolsError.set(loadErrorText(err, 'The tools could not be read.')); },
     });
   }
 
   private loadWorkspace(): void {
+    this.workspaceLoading.set(true);
     // MIG-254: a staff member's managed session belongs to no workspace's people, so appUser.json/me refuses it;
     // the session's own answer (openSession) named the workspace.
     if (this.auth.isManagedSession()) {
       const user = this.auth.user();
       this.workspace.set(user ? workspaceName({ tenantId: user.tenantId, tenantName: user.tenantName }) : '');
+      this.workspaceLoading.set(false);
       return;
     }
+    // The name only labels the Context tab: a failed read falls back to "this workspace" (cosmetic, left quiet).
     this.http.get<ApiResponse<{ tenantId?: number | null; tenantName?: string | null }>>(`${API_BASE}/appUser.json/me`).subscribe({
-      next: r => this.workspace.set(r.status === API_SUCCESS && r.data ? workspaceName(r.data) : ''),
-      error: () => this.workspace.set(''),
+      next: r => { this.workspaceLoading.set(false); this.workspace.set(r.status === API_SUCCESS && r.data ? workspaceName(r.data) : ''); },
+      error: () => { this.workspaceLoading.set(false); this.workspace.set(''); },
     });
   }
 
-  private loadPolicy(): void {
+  loadPolicy(): void {
+    this.policyError.set('');
+    this.policyLoading.set(true);
     this.policies.get().subscribe({
       next: r => {
-        if (r.status !== API_SUCCESS) { this.policyError.set(r.message || 'The data policy could not be read.'); return; }
+        this.policyLoading.set(false);
+        if (r.status !== API_SUCCESS) { this.policyError.set(loadErrorText(r, 'The data policy could not be read.')); return; }
         this.policyLevels.set(levelsOf(r.data));
       },
-      error: err => this.policyError.set(err?.error?.message || 'The data policy could not be read.'),
+      error: err => { this.policyLoading.set(false); this.policyError.set(loadErrorText(err, 'The data policy could not be read.')); },
     });
   }
 
@@ -364,20 +389,33 @@ export class Assistant implements OnInit {
   policyLevelSummary(level: PolicyLevel): string { return levelSummary(level); }
 
   /** Model connections are an administrator's to list (aiConnection.json is TENANT_ADMIN); a tenant user gets the default. */
-  private loadConnections(): void {
+  loadConnections(): void {
+    this.connectionsError.set('');
     this.http.get<ApiResponse<Connection[]>>(`${API_BASE}/aiConnection.json/list`).subscribe({
-      next: r => this.connections.set(r.status === API_SUCCESS ? r.data ?? [] : []),
-      error: () => this.connections.set([]),
+      next: r => {
+        if (r.status === API_SUCCESS) { this.connections.set(r.data ?? []); return; }
+        this.connections.set([]);
+        this.connectionsError.set(loadErrorText(r, 'The model connections could not be read.'));
+      },
+      error: err => { this.connections.set([]); this.connectionsError.set(loadErrorText(err, 'The model connections could not be read.')); },
     });
   }
+
+  /** Try again on a conversation that failed to open. */
+  retryOpen(): void { if (this.openingId != null) this.open(this.openingId); }
+
+  /** Try again on a run's tool calls that could not be read. */
+  retryTrace(toolRunId: number): void { this.showTrace(toolRunId, true); }
 
   /** Opens a conversation: its messages, and the address names it so a reload comes back to it. */
   open(conversationId: number): void {
     if (this.working()) return;
+    this.openingId = conversationId;
     this.threadLoading.set(true);
     this.threadError.set('');
     this.threadMissing.set(false);
     this.error.set('');
+    this.answerUnread.set(false);
     this.stopped.set(false);
     this.renaming.set(false);
     this.pickedFlow.set(null);
@@ -388,7 +426,7 @@ export class Assistant implements OnInit {
         this.threadLoading.set(false);
         if (r.status !== API_SUCCESS || !r.data) {
           if (/not found/i.test(r.message ?? '')) this.threadMissing.set(true);
-          else this.threadError.set(r.message || 'Could not open the conversation.');
+          else this.threadError.set(loadErrorText(r, 'The conversation could not be opened.'));
           return;
         }
         this.conversation.set(r.data.conversation);
@@ -401,7 +439,7 @@ export class Assistant implements OnInit {
       error: err => {
         this.threadLoading.set(false);
         if (err?.status === 404) this.threadMissing.set(true);
-        else this.threadError.set(err?.error?.message || 'Could not open the conversation.');
+        else this.threadError.set(loadErrorText(err, 'The conversation could not be opened.'));
       },
     });
   }
@@ -583,7 +621,7 @@ export class Assistant implements OnInit {
         }
         this.showTrace(f.runId, true);
       },
-      error: () => { this.settle(); this.error.set('The answer could not be read; check again in a moment.'); },
+      error: () => { this.settle(); this.error.set('The answer could not be read; check again in a moment.'); this.answerUnread.set(true); },
     });
   }
 
@@ -666,8 +704,8 @@ export class Assistant implements OnInit {
     this.api.trace(toolRunId).subscribe({
       next: r => this.setTrace(toolRunId, r.status === API_SUCCESS && r.data
         ? { loading: false, error: '', trace: r.data }
-        : { loading: false, error: r.message || 'Could not read the tool calls.', trace: null }),
-      error: err => this.setTrace(toolRunId, { loading: false, error: err?.error?.message || 'Could not read the tool calls.', trace: null }),
+        : { loading: false, error: loadErrorText(r, 'The tool calls could not be read.'), trace: null }),
+      error: err => this.setTrace(toolRunId, { loading: false, error: loadErrorText(err, 'The tool calls could not be read.'), trace: null }),
     });
   }
 

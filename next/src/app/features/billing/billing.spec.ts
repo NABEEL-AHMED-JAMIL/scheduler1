@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { NEVER, of, throwError } from 'rxjs';
 import { provideRouter } from '@angular/router';
+import { HttpErrorResponse } from '@angular/common/http';
 import { Billing } from './billing';
 import { BillingApi, UsageQuery } from './billing.service';
 import { WorkspacePicker } from './workspace-picker';
@@ -42,6 +43,7 @@ function page(platformAdmin = false, rows: object[] = LINES, days: object[] = DA
     ready: (then: () => void) => then(), isPlatformAdmin: () => platformAdmin,
   };
   TestBed.resetTestingModule();
+  try { localStorage.clear(); } catch { /* none */ }
   TestBed.configureTestingModule({ providers: [
     { provide: BillingApi, useValue: api }, { provide: WorkspacePicker, useValue: workspaces },
     { provide: AuthService, useValue: { isPlatformAdmin: () => platformAdmin } },
@@ -385,7 +387,7 @@ describe('Billing, rendered', () => {
   });
 
   it('says the drill-down could not be read rather than that nothing was recorded', () => {
-    const { fixture, el, component } = view({ subjects: vi.fn(() => throwError(() => ({ error: { message: 'The meter is down.' } }))) });
+    const { fixture, el, component } = view({ subjects: vi.fn(() => throwError(() => new HttpErrorResponse({ status: 503, error: { message: 'The meter is down.' } }))) });
     component.toggleLine(component.lines()[0]);
     fixture.detectChanges();
     expect(component.subjectsError()).toBe('The meter is down.');
@@ -447,5 +449,89 @@ describe('Billing, a day picked on the chart', () => {
     component.pickDay('2026-10-12');
     component.shiftMonth(-1);
     expect(component.selectedDay()).toBeNull();
+  });
+});
+
+describe('Billing -- sorting the lines (owner 2026-10-27)', () => {
+  it('keeps the meter order until a heading is picked, then sorts by amount both ways', () => {
+    const { component } = page();
+    const meters = () => component.sortedLines().map(l => l.meter);
+    expect(meters()).toEqual(component.shownLines().map(l => l.meter));
+    component.sort.toggle('amount');
+    expect(meters()).toEqual(['seats.user_days', 'ai.tokens.in', 'storage.gb_hours', 'storage.bytes.deleted', 'storage.ops.delete']);
+    component.sort.toggle('amount');
+    expect(meters()).toEqual(['storage.ops.delete', 'storage.bytes.deleted', 'storage.gb_hours', 'ai.tokens.in', 'seats.user_days']);
+  });
+
+  it('sorts the meter names A to Z', () => {
+    const { component } = page();
+    component.sort.toggle('meter');
+    expect(component.sortedLines().map(l => l.label)[0]).toBe('Bytes deleted (data churn)');
+  });
+
+  it('sorts the subjects behind a line by events', () => {
+    const { component, api } = page();
+    api.subjects.mockReturnValue(of({ status: API_SUCCESS, data: { rows: [
+      { subject_type: 'object', subject_id: 'a.csv', quantity: '1', events: 2, last: '2026-09-18T10:00:00Z', actor_user_id: null },
+      { subject_type: 'object', subject_id: 'b.csv', quantity: '5', events: 9, last: '2026-09-17T10:00:00Z', actor_user_id: null },
+    ] } }) as never);
+    component.toggleLine(component.lines()[1]);
+    component.subjectSort.toggle('events');
+    expect(component.sortedSubjects().map(s => s.subject_id)).toEqual(['b.csv', 'a.csv']);
+    component.subjectSort.toggle('events');
+    expect(component.sortedSubjects().map(s => s.subject_id)).toEqual(['a.csv', 'b.csv']);
+  });
+});
+
+describe('Billing -- loading, empty, error (owner 2026-10-27)', () => {
+  it('shows placeholders, not $0.00, until the month answers', () => {
+    const { component, api } = page();
+    expect(component.figuresLoading()).toBe(false);
+    api.usageByMeter.mockReturnValue(NEVER as never);
+    component.load();
+    // A reload of the same month keeps its figures (Refresh spins); another month waits for its own.
+    expect(component.loading()).toBe(true);
+    expect(component.figuresLoading()).toBe(false);
+    component.shiftMonth(-1);
+    expect(component.figuresLoading()).toBe(true);
+  });
+
+  it('is pending from the start while a platform administrator\'s workspaces are read', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [
+      { provide: BillingApi, useValue: { usageByMeter: () => NEVER, usageByDay: () => NEVER } },
+      { provide: WorkspacePicker, useValue: { tenantId: () => null, effective: () => null, effectiveId: () => null, effectiveIsSandbox: () => false, chosenId: () => null, options: () => [], ready: () => {}, isPlatformAdmin: () => true } },
+      { provide: AuthService, useValue: { isPlatformAdmin: () => true } },
+      { provide: ToastService, useValue: { success: () => {}, error: () => {} } },
+    ] });
+    const component = TestBed.runInInjectionContext(() => new Billing());
+    component.ngOnInit();
+    expect(component.state.pending()).toBe(true);
+    expect(component.loading()).toBe(true);
+    expect(component.figuresLoading()).toBe(true);
+  });
+
+  it('is empty once an empty month answers', () => {
+    const { component } = page(false, [], []);
+    expect(component.loading()).toBe(false);
+    expect(component.state.pending()).toBe(false);
+    expect(component.figuresLoading()).toBe(false);
+    expect(component.byService()).toEqual([]);
+  });
+
+  it('says the meter could not be read, in plain words, and stops loading', () => {
+    const fail = () => throwError(() => new HttpErrorResponse({ status: 500, error: 'Internal Server Error' }));
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [
+      { provide: BillingApi, useValue: { usageByMeter: fail, usageByDay: fail } },
+      { provide: WorkspacePicker, useValue: { tenantId: () => null, effective: () => null, effectiveId: () => null, effectiveIsSandbox: () => false, chosenId: () => null, options: () => [], ready: (then: () => void) => then(), isPlatformAdmin: () => false } },
+      { provide: AuthService, useValue: { isPlatformAdmin: () => false } },
+      { provide: ToastService, useValue: { success: () => {}, error: () => {} } },
+    ] });
+    const component = TestBed.runInInjectionContext(() => new Billing());
+    component.ngOnInit();
+    expect(component.loading()).toBe(false);
+    expect(component.error()).toBe('The metering service did not answer.');
+    expect(component.notConfigured()).toBe(false);
   });
 });

@@ -98,6 +98,9 @@ export interface FailedQuery {
   days: string[];
   signature: string | null;
   page: number;
+  /** Owner 2026-10-27 ("add a sort on each table"): Core's run, pipeline, kind, ended (+ workspace, platform); none is newest first. */
+  sort?: string;
+  dir?: 'asc' | 'desc';
 }
 
 export interface RetryPlan {

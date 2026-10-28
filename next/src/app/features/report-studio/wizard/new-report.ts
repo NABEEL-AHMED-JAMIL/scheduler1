@@ -25,8 +25,15 @@ import { UsableProfile } from '../assets.model';
 import {
   collections, componentsOf, firstRecord, innerPath, itemFields, lengthAt, pagesOf, primaryNames, rootPathOf, sampleText, scalars, valueAt, walk,
 } from '../designer/designer-model';
+import { AppLoading, InlineStatus, createLoadState, loadErrorText } from '../../../shared/ui/loading';
+import { LoadError } from '../../../shared/ui/load-error';
+import { BlurLoader } from '../../../shared/ui/blur-loader';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
 
 type Step = 1 | 2 | 3 | 4;
+/** One row of the sample table: the cells as shown, and the raw values a column sorts by. */
+interface SampleTableRow { cells: string[]; raw: unknown[]; }
 type SourceView = 'sample' | 'schema' | 'json';
 
 /** A template field the report needs: the data contract's (or, with none, what the template binds). */
@@ -103,7 +110,7 @@ export function neededFields(def: TemplateDefinition): NeededField[] {
 @Component({
   selector: 'app-new-report',
   imports: [PageHeader, Icon, StatusPill, RsTimePipe, FormsModule, RouterLink, ReportSourcePicker, ProblemList, PdfPages, WorkspaceSelect, Pagination,
-    AssetPicture],
+    AssetPicture, AppLoading, InlineStatus, LoadError, BlurLoader, SortHeader],
   templateUrl: './new-report.html',
   styleUrl: './new-report.css',
 })
@@ -122,6 +129,17 @@ export class NewReport implements OnInit {
   readonly thumbs = signal<Record<string, string>>({});
   readonly search = signal('');
   readonly loadingTemplates = signal(true);
+  /**
+   * Owner 2026-10-27: step 1's own read. Its failure is said in its place with Try again (not as the top banner over
+   * "No published template yet"), and a search or a page keeps the cards under a blur once they have come.
+   */
+  readonly templatesError = signal('');
+  readonly templatesLoaded = signal(false);
+  /** The template being opened (a card clicked, or ?templateId / ?reportId): the step says so until step 2. */
+  readonly picking = signal(false);
+  /** What Try again in the top banner asks again: the template or report read that failed. */
+  private retryLast: (() => void) | null = null;
+  readonly canRetry = signal(false);
   readonly error = signal('');
   readonly t = signal<TemplateDetail | null>(null);
   readonly def = signal<TemplateDefinition | null>(null);
@@ -150,6 +168,10 @@ export class NewReport implements OnInit {
   /** Phase 4: "Mark this version as COPY" -- the version carries COPY on every page. */
   readonly markCopy = signal(false);
   readonly job = signal<JobRow | null>(null);
+  /** A failed read of the job's progress (step 4): said, with Check again, instead of a bar stuck at its last state. */
+  readonly pollError = signal('');
+  /** The Brand profile choices (step 3): loading, or why they could not be read. */
+  readonly profilesState = createLoadState(false);
   readonly generating = signal(false);
   readonly generateError = signal('');
   private readonly key = idempotencyKey();
@@ -202,8 +224,32 @@ export class NewReport implements OnInit {
     const rows = valueAt(this.sample(), list.path);
     if (!Array.isArray(rows)) return null;
     const cols = itemFields(this.schema(), list.path).filter(f => !/object|list|array/i.test(f.type)).slice(0, 6).map(f => f.path);
-    return { path: list.path, cols, rows: rows.slice(0, 8).map(r => cols.map(c => sampleText(valueAt(r, c)))) };
+    return { path: list.path, cols, rows: rows.slice(0, 8).map((r): SampleTableRow => {
+      const raw = cols.map(c => valueAt(r, c));
+      return { cells: raw.map(v => sampleText(v)), raw };
+    }) };
   });
+  /**
+   * Owner 2026-10-27: the sample sorts by any of its columns (which come from the data: typed by what they hold) and the
+   * schema by field, type or "can be empty". The sample's columns change with the source, so its choice is not remembered.
+   */
+  readonly sampleSort = createTableSort<SampleTableRow>({
+    id: 'report-new-sample', columns: {}, remember: false,
+    dynamic: k => {
+      const at = this.sampleTable()?.cols.indexOf(k) ?? -1;
+      return at < 0 ? null : { value: r => r.raw[at], kind: 'auto' };
+    },
+  });
+  readonly sortedSample = computed(() => this.sampleSort.apply(this.sampleTable()?.rows ?? []));
+  readonly schemaSort = createTableSort<SchemaField>({
+    id: 'report-new-schema',
+    columns: {
+      field: f => f.path,
+      type: f => f.type,
+      nullable: { value: f => f.nullable, kind: 'bool' },
+    },
+  });
+  readonly sortedSchema = computed(() => this.schemaSort.apply(this.schema()));
   readonly sampleScalars = computed(() => scalars(this.schema()).slice(0, 12).map(f => ({ path: f.path, value: sampleText(valueAt(this.sample(), f.path)) })));
 
   readonly rows = computed<MatchRow[]>(() => {
@@ -263,30 +309,51 @@ export class NewReport implements OnInit {
     const reportId = q.get('reportId');
     const templateId = q.get('templateId');
     if (reportId) {
-      this.api.report(reportId).subscribe({
-        next: r => {
-          this.report.set(r);
-          this.name.set(r.name);
-          this.failedJob.set(r.jobs.find(j => j.status === 'FAILED' && j.jobId === r.jobs[0]?.jobId) ?? null);
-          this.pick(r.templateId, true);
-        },
-        error: e => this.error.set(studioError(e, 'The report could not be read.').message),
-      });
+      this.prefillReport(reportId);
     } else if (templateId) {
       this.pick(templateId, true);
     }
     this.readTemplates();
   }
 
+  /** Generate again from a report (?reportId): its name, its failed job and its template. */
+  private prefillReport(reportId: string): void {
+    this.picking.set(true);
+    this.fail('', null);
+    this.api.report(reportId).subscribe({
+      next: r => {
+        this.report.set(r);
+        this.name.set(r.name);
+        this.failedJob.set(r.jobs.find(j => j.status === 'FAILED' && j.jobId === r.jobs[0]?.jobId) ?? null);
+        this.pick(r.templateId, true);
+      },
+      error: e => { this.picking.set(false); this.fail(studioError(e, 'The report could not be read.').message, () => this.prefillReport(reportId)); },
+    });
+  }
+
+  /** The top banner's words, and what its Try again reads again (null: nothing to try again). */
+  private fail(message: string, retry: (() => void) | null): void {
+    this.error.set(message);
+    this.retryLast = retry;
+    this.canRetry.set(!!retry);
+  }
+
+  retryError(): void {
+    const again = this.retryLast;
+    if (again) again();
+  }
+
   /** Step 1's cards: one page of the published templates, with the search, as the service answers it. */
   readTemplates(): void {
     this.loadingTemplates.set(true);
+    this.templatesError.set('');
     const asked = ++this.templatesAsked;
     this.api.list({ state: 'LIVE', q: this.search(), limit: this.templateSize(), offset: (this.templatePage() - 1) * this.templateSize() },
       this.auth.isPlatformAdmin() ? this.tenantId() : null).subscribe({
       next: lib => {
         if (asked !== this.templatesAsked) return;
         this.loadingTemplates.set(false);
+        this.templatesLoaded.set(true);
         this.templates.set(lib.templates);
         this.templateTotal.set(lib.total);
         lib.templates.forEach(t => { if (!this.thumbs()[t.templateId]) this.thumb(t.templateId); });
@@ -294,7 +361,7 @@ export class NewReport implements OnInit {
       error: e => {
         if (asked !== this.templatesAsked) return;
         this.loadingTemplates.set(false);
-        this.error.set(studioError(e, 'The templates could not be read.').message);
+        this.templatesError.set(studioError(e, 'The templates could not be read.').message);
       },
     });
   }
@@ -318,23 +385,36 @@ export class NewReport implements OnInit {
 
   /** Step 1: a published template picked; its newest published version is what the report is made from. */
   pick(templateId: string, jump = false): void {
-    this.error.set('');
+    this.fail('', null);
+    this.picking.set(true);
+    const again = () => this.pick(templateId, jump);
     this.api.template(templateId).subscribe({
       next: t => {
-        if (!t.currentPublishedVersion) { this.error.set(`${t.name} has no published version yet: publish it first.`); return; }
+        if (!t.currentPublishedVersion) { this.picking.set(false); this.fail(`${t.name} has no published version yet: publish it first.`, null); return; }
         this.t.set(t);
         if (!this.report()) this.name.set(this.name() || t.name);
         this.api.version(templateId, String(t.currentPublishedVersion)).subscribe({
           next: v => {
+            this.picking.set(false);
             this.def.set(v.definition ?? null);
-            this.api.usable(t.templateId).subscribe({ next: u => this.profiles.set(u.profiles), error: () => this.profiles.set([]) });
+            this.loadProfiles(t.templateId);
             if (v.definition) this.rootPath.set(rootPathOf(v.definition));
             if (jump || this.step() === 1) this.go(2);
           },
-          error: e => this.error.set(studioError(e, 'The template version could not be read.').message),
+          error: e => { this.picking.set(false); this.fail(studioError(e, 'The template version could not be read.').message, again); },
         });
       },
-      error: e => this.error.set(studioError(e, 'The template could not be read.').message),
+      error: e => { this.picking.set(false); this.fail(studioError(e, 'The template could not be read.').message, again); },
+    });
+  }
+
+  /** The brand profiles this report may be made in (step 3's Brand profile). */
+  loadProfiles(templateId = this.t()?.templateId ?? ''): void {
+    if (!templateId) return;
+    this.profilesState.start();
+    this.api.usable(templateId).subscribe({
+      next: u => { this.profiles.set(u.profiles); this.profilesState.done(); },
+      error: e => this.profilesState.fail(e, 'The brand profiles could not be read.'),
     });
   }
 
@@ -346,20 +426,30 @@ export class NewReport implements OnInit {
 
   // ---------------------------------------------------------------- step 2: the data and the matching
 
+  /** Try again after the data could not be read: the same source and root path. */
+  retryRead(): void { this.read(); }
+
   private read(): void {
     const s = this.source();
     if (!s) return;
     this.inspecting.set(true);
     this.inspectError.set('');
+    // A source picked while the last one is still being read: only the newest answer counts.
+    const asked = ++this.readAsked;
     this.api.inspect(s, this.rootPath().trim() || '$').subscribe({
       next: r => {
+        if (asked !== this.readAsked) return;
         this.inspecting.set(false);
         this.inspect.set(r);
         this.autoMatch(r.schema);
       },
-      error: e => { this.inspecting.set(false); this.inspect.set(null); this.inspectError.set(studioError(e, 'The data could not be read.').message); },
+      error: e => {
+        if (asked !== this.readAsked) return;
+        this.inspecting.set(false); this.inspect.set(null); this.inspectError.set(studioError(e, 'The data could not be read.').message);
+      },
     });
   }
+  private readAsked = 0;
 
   /** A field the data names exactly as the template does is matched as it is; everything else waits for the person. */
   private autoMatch(schema: SchemaField[]): void {
@@ -416,6 +506,10 @@ export class NewReport implements OnInit {
               this.pdfUrl.set(URL.createObjectURL(blob));
               const pages = Number(res.headers.get('X-Report-Pages'));
               this.pages.set(Number.isFinite(pages) && pages > 0 ? pages : null);
+            } else {
+              // Owner 2026-10-27: an answer without a PDF (the checks' problems instead) is said, not a spinner for ever.
+              this.checkError.set(this.errors().length ? 'The PDF was not made: fix the problems the checks list, then check again.'
+                : 'The PDF could not be made; check again.');
             }
           },
           error: e => { this.checking.set(false); this.checkError.set(studioError(e, 'The PDF could not be made.').message); },
@@ -468,10 +562,20 @@ export class NewReport implements OnInit {
 
   private follow(jobId: string): void {
     this.poll?.unsubscribe();
+    this.pollError.set('');
     this.poll = interval(1500).pipe(switchMap(() => this.api.job(jobId))).subscribe({
       next: job => { this.job.set(job); if (!isRunning(job.status)) this.poll?.unsubscribe(); },
-      error: () => this.poll?.unsubscribe(),
+      error: e => {
+        this.poll?.unsubscribe();
+        this.pollError.set(loadErrorText(e, 'The job\'s progress could not be read; it may still be running.'));
+      },
     });
+  }
+
+  /** Check again after a progress read failed. */
+  checkJobAgain(): void {
+    const j = this.job();
+    if (j) this.follow(j.jobId);
   }
 
   /** A platform administrator picked a workspace: its reports are in the library. */

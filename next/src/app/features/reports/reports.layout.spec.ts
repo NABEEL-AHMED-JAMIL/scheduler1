@@ -19,26 +19,35 @@ const classesOf = (source: string, marker: string, tag = 'td'): string[] => {
   return (/\sclass="([^"]*)"/.exec(head)?.[1] ?? '').split(/\s+/);
 };
 
+/**
+ * Where a heading cell with this text starts, whatever attributes it carries (owner 2026-10-27: sortable headings
+ * carry appSort and [sortBy]); `cls` names a class it must have. -1 when there is none.
+ */
+const thAt = (html: string, text: string, cls = ''): number => {
+  const re = new RegExp(`<th\\b[^>]*${cls ? `class="[^"]*\\b${cls}\\b[^"]*"[^>]*` : ''}>${text}</th>`);
+  return html.search(re);
+};
+
 describe('status columns stay on screen', () => {
   /** Owner 2026-10-12: on every run list the status sits right before the message; the pinned column holds the actions. */
   it('puts the Queue status before the message and pins the in-flight menu', async () => {
     const html = await read('queue/queue.html');
-    expect(html.indexOf('<th class="w-32">Status</th>')).toBeGreaterThan(-1);
-    expect(html.indexOf('<th class="w-32">Status</th>')).toBeLessThan(html.indexOf('<th>Message</th>'));
+    expect(thAt(html, 'Status', 'w-32')).toBeGreaterThan(-1);
+    expect(thAt(html, 'Status', 'w-32')).toBeLessThan(thAt(html, 'Message'));
     expect(classesOf(html, '>Actions</th>', 'th')).toContain('col-pin-right');
     expect(classesOf(html, '[cdkMenuTriggerFor]="menu"', 'td')).toContain('col-pin-right');
   });
 
   it('gives the Failed runs status its own header before the error and pins the run link', async () => {
     const html = await read('reports/reports.html');
-    expect(html.indexOf('<th class="w-32">Status</th>')).toBeLessThan(html.indexOf('<th>Error</th>'));
+    expect(thAt(html, 'Status', 'w-32')).toBeLessThan(thAt(html, 'Error'));
     expect(classesOf(html, '(click)="openRunLogs(failure)"', 'td')).toContain('col-pin-right');
   });
 
   it('puts the Runs status before the message, the pinned column keeping only the actions', async () => {
     const html = await read('jobs/history/job-history.html');
-    expect(html.indexOf('<th class="w-32">Status</th>')).toBeGreaterThan(-1);
-    expect(html.indexOf('<th class="w-32">Status</th>')).toBeLessThan(html.indexOf('<th>Message</th>'));
+    expect(thAt(html, 'Status', 'w-32')).toBeGreaterThan(-1);
+    expect(thAt(html, 'Status', 'w-32')).toBeLessThan(thAt(html, 'Message'));
     expect(html).not.toContain('Status · Logs');
     expect(classesOf(html, 'data-test="run-retry"', 'button')).toContain('btn-icon');
   });

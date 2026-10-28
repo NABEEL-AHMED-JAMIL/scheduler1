@@ -20,7 +20,9 @@ import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { copyText } from '../../../shared/ui/clipboard.util';
 import { confirmWith } from '../../../shared/ui/confirm';
-import { createSort } from '../../../shared/ui/sort';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
+import { loadErrorText } from '../../../shared/ui/loading';
 import { createPager } from '../../../shared/ui/pager';
 import { Pagination } from '../../../shared/ui/pagination';
 import { CopyButton } from '../../../shared/ui/copy-button';
@@ -91,7 +93,7 @@ interface ResourceCount {
 
 @Component({
   selector: 'app-tenants',
-  imports: [RefreshButton, PageHeader, MineFilter, CdkMenu, CdkMenuItem, CdkMenuTrigger, ViewToggle, StatTile, Icon, ServerTimePipe, StatusPill, TableShell, Pagination, CopyButton],
+  imports: [RefreshButton, PageHeader, MineFilter, CdkMenu, CdkMenuItem, CdkMenuTrigger, ViewToggle, StatTile, Icon, ServerTimePipe, StatusPill, TableShell, Pagination, CopyButton, SortHeader],
   templateUrl: './tenants.html',
 })
 export class Tenants implements OnInit {
@@ -109,11 +111,34 @@ export class Tenants implements OnInit {
   readonly tenants = signal<Tenant[]>([]);
   readonly loading = signal(true);
   readonly error = signal('');
+  /** Owner 2026-10-27: the list has answered once; until then the tiles show a placeholder, not 0 and $0.00. */
+  readonly loaded = signal(false);
   readonly search = signal('');
   readonly statusFilter = signal('');
   /** Which tenant's status change is in flight, or null; guards suspend/reactivate/delete. */
   readonly busy = signal<number | null>(null);
-  readonly sort = createSort<Tenant>('tenantName');
+  /**
+   * Owner 2026-10-27: the shared column sort (typed, empty values last, remembered per viewer), by name A to Z as before.
+   * The cards keep their "Sort by" select, which drives the same sort.
+   */
+  readonly sort = createTableSort<Tenant>({
+    id: 'tenants',
+    initial: { key: 'tenantName', direction: 'asc' },
+    columns: {
+      tenantName: t => t.tenantName,
+      state: { value: t => t.status, kind: 'status' },
+      plan: t => t.plan,
+      userCount: { value: t => t.userCount, kind: 'number' },
+      sourceJobCount: { value: t => t.sourceJobCount, kind: 'number' },
+      sourceTaskCount: { value: t => t.sourceTaskCount, kind: 'number' },
+      runsThisMonth: { value: t => t.runsThisMonth, kind: 'number' },
+      storageBytes: { value: t => t.storageBytes, kind: 'number' },
+      costThisMonth: { value: t => t.costThisMonth, kind: 'number' },
+      openAlerts: { value: t => t.openAlerts, kind: 'number' },
+      admin: t => t.adminName || t.adminEmail,
+      dateCreated: { value: t => t.dateCreated, kind: 'date' },
+    },
+  });
 
   readonly resources: ResourceCount[] = [
     { key: 'userCount', label: 'Users', icon: 'users' },
@@ -220,12 +245,25 @@ export class Tenants implements OnInit {
       if (!term) return true;
       return `${tenant.tenantName} ${tenant.tenantCode}`.toLowerCase().includes(term);
     });
-    return this.sort.apply(this.mine(rows), (row, key) => (row as any)[key]);
+    return this.mine(rows);
   });
+  /**
+   * The cards' direction button: the same column, the other way. A heading's third click goes back to the table's own
+   * order, so from the column's second direction this takes two steps (back to name, then the column's first way).
+   */
+  flipSort(): void {
+    const key = this.sort.key();
+    const direction = this.sort.direction();
+    this.sort.toggle(key);
+    if (this.sort.key() !== key || this.sort.direction() === direction) this.sort.toggle(key);
+  }
+
+  /** The rows in the chosen order, before the pager (both views follow it). */
+  readonly sorted = computed(() => this.sort.apply(this.filtered()));
 
   /** Paged like Users, in both views; a few hundred workspaces were all drawn at once. */
   readonly pager = createPager<Tenant>();
-  readonly paged = computed(() => this.pager.slice(this.filtered()));
+  readonly paged = computed(() => this.pager.slice(this.sorted()));
   goToPage(next: number): void { this.pager.goTo(next, this.filtered().length); }
   setPageSize(size: number): void { this.pager.setSize(size); }
   setSearch(term: string): void { this.search.set(term); this.pager.reset(); }
@@ -260,6 +298,10 @@ export class Tenants implements OnInit {
   readonly figures = signal<ReadonlyMap<number, WorkspaceFigure>>(new Map());
   readonly figuresMonth = signal('');
   readonly figuresError = signal('');
+  /** Billing's figures are on their way: the cost tile waits for them instead of saying $0.00 (owner 2026-10-27). */
+  readonly figuresLoading = signal(false);
+  readonly tilesLoading = computed(() => !this.loaded() && !this.error());
+  readonly tilesFailed = computed(() => !!this.error() && !this.loaded());
   /** The workspaces with billing's figures on them. */
   readonly rows = computed<Tenant[]>(() => {
     const figures = this.figures();
@@ -288,14 +330,18 @@ export class Tenants implements OnInit {
     if (typeof this.auth.isPlatformAdmin === 'function' && !this.auth.isPlatformAdmin()) return;
     let billing: BillingApi | null = null;
     try { billing = this.injector.get(BillingApi, null); } catch { billing = null; }
-    billing?.workspaceFigures?.()?.subscribe({
+    const read = billing?.workspaceFigures?.();
+    if (!read) return;
+    this.figuresLoading.set(true);
+    read.subscribe({
       next: r => {
+        this.figuresLoading.set(false);
         if (r?.status !== API_SUCCESS || !r.data) { this.figuresError.set(r?.message || 'Billing could not say what the workspaces cost.'); return; }
         this.figures.set(new Map((r.data.workspaces ?? []).map(f => [f.tenantId, f])));
         this.figuresMonth.set(r.data.month ?? '');
         this.figuresError.set('');
       },
-      error: () => this.figuresError.set('Billing could not say what the workspaces cost.'),
+      error: () => { this.figuresLoading.set(false); this.figuresError.set('Billing could not say what the workspaces cost.'); },
     });
   }
 
@@ -305,6 +351,10 @@ export class Tenants implements OnInit {
     this.readFigures();
   }
 
+  /**
+   * The "managed by me" badges and Only mine's managed workspaces. Left silent on a failure on purpose: the list, the
+   * tiles and the workspaces this person created all still show; only the badge is missing (owner 2026-10-27 audit).
+   */
   private readManaged(): void {
     if (typeof this.auth.isPlatformAdmin === 'function' && !this.auth.isPlatformAdmin()) return;
     this.managed.myWorkspaces?.()?.subscribe({
@@ -325,13 +375,14 @@ export class Tenants implements OnInit {
         this.loading.set(false);
         if (response.status === API_SUCCESS) {
           this.tenants.set(response.data ?? []);
+          this.loaded.set(true);
         } else {
-          this.error.set(response.message || 'Tenants could not be loaded.');
+          this.error.set(loadErrorText(response, 'Tenants could not be loaded.'));
         }
       },
-      error: () => {
+      error: err => {
         this.loading.set(false);
-        this.error.set('Tenants could not be loaded.');
+        this.error.set(loadErrorText(err, 'Tenants could not be loaded.'));
       },
     });
   }

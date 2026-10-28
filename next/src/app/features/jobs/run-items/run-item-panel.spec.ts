@@ -89,8 +89,9 @@ describe('Run item panel', () => {
     data$().flush({ status: API_SUCCESS, data: DATA });
     component.mode.set('table');
     fixture.detectChanges();
-    expect(el.querySelector('[data-test="data-table"] th[data-col="patient_name"] app-icon')).not.toBeNull();
-    expect(el.querySelector('[data-test="data-table"] th[data-col="answer"] app-icon')).toBeNull();
+    // The lock, by its title: since 2026-10-27 every heading also carries the sort glyph (an app-icon of its own).
+    expect(el.querySelector('[data-test="data-table"] th[data-col="patient_name"] app-icon[title="Masked for you"]')).not.toBeNull();
+    expect(el.querySelector('[data-test="data-table"] th[data-col="answer"] app-icon[title="Masked for you"]')).toBeNull();
     (el.querySelector('[data-step="transcribe"] button') as HTMLButtonElement).click();
     expect(data$().request.params.get('stepKey')).toBe('transcribe');
   });
@@ -155,3 +156,27 @@ describe('Run item panel', () => {
   });
 });
 
+describe('Run item panel -- the step data sorts, and the reads say when they fail (owner 2026-10-27)', () => {
+  it('sorts the step data by a column both ways, keeping each row', () => {
+    const { detail, data$, component } = mount();
+    detail();
+    data$().flush({ status: API_SUCCESS, data: { ...DATA, columns: ['name', 'score'],
+      rows: [{ name: 'b', score: 2 }, { name: 'a', score: 10 }, { name: 'c', score: 1 }] } });
+    expect(component.sortedData().map(r => r.cells[0])).toEqual(['b', 'a', 'c']);
+    component.dataSort.toggle('score');
+    expect(component.sortedData().map(r => r.cells[1])).toEqual(['1', '2', '10']);
+    component.dataSort.toggle('score');
+    expect(component.sortedData().map(r => r.cells[0])).toEqual(['a', 'b', 'c']);
+  });
+
+  it('is loading until the item answers, then says why it could not be read, with Try again', () => {
+    const { fixture, http, el, component } = mount();
+    expect(component.loading()).toBe(true);
+    http.expectOne(r => r.url.endsWith('/sourceJob.json/runItems/detail')).flush('boom', { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+    expect(component.loading()).toBe(false);
+    expect(component.error()).toBe('The item could not be read.');
+    ([...el.querySelectorAll('button')].find(b => b.textContent!.trim() === 'Try again') as HTMLButtonElement).click();
+    expect(component.loading()).toBe(true);
+  });
+});

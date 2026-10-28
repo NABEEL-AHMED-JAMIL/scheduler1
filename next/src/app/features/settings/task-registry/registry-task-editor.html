@@ -13,14 +13,17 @@
   </app-page-header>
 
   @if (loading()) {
-    <div class="card p-12 text-center text-sm text-[color:var(--text-muted)]">
-      <div class="spinner mx-auto mb-3" role="status" aria-label="Loading"></div>Loading…
-    </div>
+    <div class="card"><app-loading shape="panel" label="Loading the registry task…" [count]="6" /></div>
   } @else if (error()) {
     <div class="card p-10 text-center" role="alert">
       <app-icon name="alert" size="1.5rem" class="icon-crit block mx-auto mb-2" />
       <p class="text-sm text-crit-500">{{ error() }}</p>
-      <a routerLink="/settings/task-registry" class="btn btn-default btn-sm mt-3">Back to Task Registry</a>
+      <div class="flex flex-wrap justify-center gap-2 mt-3">
+        @if (errorRetryable()) {
+          <button type="button" class="btn btn-default btn-sm" (click)="retry()"><app-icon name="refresh" />Try again</button>
+        }
+        <a routerLink="/settings/task-registry" class="btn btn-default btn-sm">Back to Task Registry</a>
+      </div>
     </div>
   } @else if (ready()) {
     @if (isPlatformAdmin() && !isEdit()) {
@@ -229,8 +232,10 @@
 
         @if (isEdit()) {
           <app-section title="Used by" [card]="true" [level]="3" sub="The pipelines that name this registry task.">
-            @if (users() === null) {
-              <p class="text-sm text-[color:var(--text-muted)]">Not known right now.</p>
+            @if (usersError()) {
+              <app-inline-status [error]="usersError()" (retry)="loadUsers()" />
+            } @else if (usersLoading() || users() === null) {
+              <app-loading shape="inline" label="Loading the pipelines that use it…" />
             } @else if (!users()!.length) {
               <p class="text-sm text-[color:var(--text-muted)]" data-test="used-by-none">No pipeline uses it yet: changing it affects nobody.</p>
             } @else {

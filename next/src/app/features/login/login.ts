@@ -13,6 +13,7 @@ import { MfaEnrolment } from '../account/account-security.api';
 import { MfaEnrolmentPanel } from '../account/mfa-enrolment';
 import { RecoveryCodes } from '../account/recovery-codes';
 import { SignInApi, SignInStep, SignedIn, rememberFlow } from './sign-in.api';
+import { AppLoading } from '../../shared/ui/loading';
 
 /** What the page says after the workspace's idle sign-out ended a session (MIG-353). Here, not in AuthService: the
  * initial bundle carries AuthService. */
@@ -35,7 +36,7 @@ export function safeReturn(requested: string | null | undefined): string {
 
 @Component({
   selector: 'app-login',
-  imports: [ConsolePreview, Icon, BrandMark, ReactiveFormsModule, Field, RouterLink, MfaEnrolmentPanel, RecoveryCodes],
+  imports: [ConsolePreview, Icon, BrandMark, ReactiveFormsModule, Field, RouterLink, MfaEnrolmentPanel, RecoveryCodes, AppLoading],
   templateUrl: './login.html',
 })
 export class Login implements OnInit {
@@ -63,6 +64,12 @@ export class Login implements OnInit {
   /** MIG-353 part 5: a workspace's own sign-in link (/login?sso=<key>), and the company sign-in by address. */
   readonly ssoKey = this.route.snapshot.queryParamMap.get('sso') ?? '';
   readonly ssoName = signal('');
+  /**
+   * Owner 2026-10-27: the sign-in link's company sign-in is looked up -- "Checking…" while it is, and a line when the
+   * link has none or the check failed, instead of the page silently looking like a plain sign-in.
+   */
+  readonly ssoChecking = signal(!!this.ssoKey);
+  readonly ssoNote = signal('');
   readonly companyEmail = signal('');
 
   /**
@@ -87,8 +94,15 @@ export class Login implements OnInit {
   ngOnInit(): void {
     if (this.ssoKey) {
       this.api().ssoDiscover({ loginKey: this.ssoKey }).subscribe({
-        next: r => { if (r.status === API_SUCCESS && r.data?.sso) this.ssoName.set(r.data.displayName || 'your company'); },
-        error: () => {},
+        next: r => {
+          this.ssoChecking.set(false);
+          if (r.status === API_SUCCESS && r.data?.sso) this.ssoName.set(r.data.displayName || 'your company');
+          else this.ssoNote.set('Company sign-in is not available for this link. Sign in with your username and password.');
+        },
+        error: () => {
+          this.ssoChecking.set(false);
+          this.ssoNote.set('Company sign-in could not be checked just now. Sign in with your username and password, or reload the page to try again.');
+        },
       });
     }
   }

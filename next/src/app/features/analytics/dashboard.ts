@@ -13,6 +13,7 @@ import { confirmWith } from '../../shared/ui/confirm';
 import { ActivatedRoute, ParamMap, Router, RouterLink } from '@angular/router';
 import { CdkMenu, CdkMenuGroup, CdkMenuItem, CdkMenuItemRadio, CdkMenuTrigger } from '@angular/cdk/menu';
 import { LoadError } from '../../shared/ui/load-error';
+import { AppLoading, InlineStatus, loadErrorText } from '../../shared/ui/loading';
 import { WidgetTableDialog, WidgetTableData } from './widget-table';
 import { KINDS } from './widget-kinds';
 import { AnalyticsWidget, WidgetState as TileState } from './analytics-widget';
@@ -105,7 +106,7 @@ export { DatasetRegistry } from './dataset-registry';
  */
 @Component({
   selector: 'app-dashboards',
-  imports: [PageHeader, NeedsWorkspace, Icon, LoadError, RouterLink, CdkMenu, CdkMenuGroup, CdkMenuItem, CdkMenuItemRadio, CdkMenuTrigger, FilterBuilder, AnalyticsWidget, WidgetChart, Field, ServerTimePipe, KindPicker, ThemePicker, BoardFilterBar, BoardTable],
+  imports: [PageHeader, NeedsWorkspace, Icon, LoadError, RouterLink, CdkMenu, CdkMenuGroup, CdkMenuItem, CdkMenuItemRadio, CdkMenuTrigger, FilterBuilder, AnalyticsWidget, WidgetChart, Field, ServerTimePipe, KindPicker, ThemePicker, BoardFilterBar, BoardTable, AppLoading, InlineStatus],
   templateUrl: './dashboard.html',
   styleUrls: ['./dashboard.css', './board/board.css'],
 })
@@ -247,18 +248,28 @@ export class Dashboards implements OnInit, OnDestroy {
     this.boardColumnsLoading.set(true);
     this.analytics.schema(connection, path, this.board()?.analyticsDashboardId).subscribe({
       next: response => {
+        // A reply for a dataset picked away from must not fill the new one's columns.
+        if (this.boardFilterOn() !== key) return;
         this.boardColumnsLoading.set(false);
         if (response.status !== API_SUCCESS || !response.data) {
-          this.boardColumnsError.set(response.message || 'That dataset could not be read.');
+          this.boardColumnsError.set(loadErrorText(response, 'That dataset could not be read.'));
           return;
         }
         this.boardColumns.set(response.data.columns ?? []);
       },
       error: err => {
+        if (this.boardFilterOn() !== key) return;
         this.boardColumnsLoading.set(false);
-        this.boardColumnsError.set(err?.error?.message || 'That dataset could not be read.');
+        this.boardColumnsError.set(loadErrorText(err, 'That dataset could not be read.'));
       },
     });
+  }
+
+  /** Try again on the board filter dataset's columns. */
+  retryFilterColumns(): void {
+    const key = this.boardFilterOn();
+    this.boardFilterOn.set('');
+    this.chooseFilterDataset(key);
   }
 
   /**
@@ -1203,6 +1214,9 @@ export class Dashboards implements OnInit, OnDestroy {
 
   // ---- the sources a widget can point at --------------------------------------------------
 
+  /** Try again on the saved analyses and queries a widget can point at. */
+  retrySources(): void { this.loadSources(); }
+
   private loadSources(): void {
     this.sourcesError.set('');
     let arrived = 0;
@@ -1216,11 +1230,11 @@ export class Dashboards implements OnInit, OnDestroy {
     this.analytics.fetchAllAnalyses().subscribe({
       next: response => {
         if (response.status === API_SUCCESS && response.data) this.analyses.set(response.data);
-        else this.sourcesError.set(response.message || 'Saved analyses could not be read.');
+        else this.sourcesError.set(loadErrorText(response, 'Saved analyses could not be read.'));
         settle();
       },
       error: err => {
-        this.sourcesError.set(err?.error?.message || 'Saved analyses could not be read.');
+        this.sourcesError.set(loadErrorText(err, 'Saved analyses could not be read.'));
         settle();
       },
     });
@@ -1228,13 +1242,13 @@ export class Dashboards implements OnInit, OnDestroy {
       next: response => {
         if (response.status === API_SUCCESS && response.data) this.queries.set(response.data);
         else if (!this.sourcesError()) {
-          this.sourcesError.set(response.message || 'Saved queries could not be read.');
+          this.sourcesError.set(loadErrorText(response, 'Saved queries could not be read.'));
         }
         settle();
       },
       error: err => {
         if (!this.sourcesError()) {
-          this.sourcesError.set(err?.error?.message || 'Saved queries could not be read.');
+          this.sourcesError.set(loadErrorText(err, 'Saved queries could not be read.'));
         }
         settle();
       },

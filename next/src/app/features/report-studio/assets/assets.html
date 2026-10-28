@@ -18,11 +18,11 @@
     <div class="flex flex-col gap-4 min-w-0">
       <div class="tabs" role="tablist" aria-label="Assets and branding">
         <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'assets'" [attr.aria-selected]="tab() === 'assets'" (click)="setTab('assets')">
-          Assets <span class="rs-count">{{ counts().all }}</span></button>
+          Assets @if (loaded()) { <span class="rs-count">{{ counts().all }}</span> }</button>
         <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'profiles'" [attr.aria-selected]="tab() === 'profiles'" (click)="setTab('profiles')">
-          Brand profiles <span class="rs-count">{{ profiles().length }}</span></button>
+          Brand profiles @if (loaded()) { <span class="rs-count">{{ profiles().length }}</span> }</button>
         <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'restricted'" [attr.aria-selected]="tab() === 'restricted'" (click)="setTab('restricted')">
-          Signatures and stamps <span class="rs-count">{{ restrictedCount() }}</span></button>
+          Signatures and stamps @if (loaded()) { <span class="rs-count">{{ restrictedCount() }}</span> }</button>
       </div>
 
       @if (error()) {
@@ -47,9 +47,11 @@
           </select>
         </div>
 
-        @if (loading()) {
-          <div class="flex justify-center py-12"><span class="spinner" role="status" aria-label="Loading"></span></div>
-        } @else if (!shown().length) {
+        @if (!loaded()) {
+          <app-loading shape="cards" [label]="tab() === 'restricted' ? 'Loading signatures and stamps…' : 'Loading assets…'" [count]="6" />
+        } @else {
+        <app-blur-loader [active]="loading()" label="Refreshing…">
+        @if (!shown().length) {
           <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]">
             @if (filtering()) { No asset matches the filters. }
             @else if (tab() === 'restricted') { No signatures or stamps yet.@if (canCustodian()) { Upload one: it waits for an approver. } }
@@ -81,6 +83,8 @@
             }
           </div>
         }
+        </app-blur-loader>
+        }
         <!-- Owner 2026-10-20: the cards page on the service, with the console's pager. -->
         <app-pagination [total]="total()" [page]="page()" [size]="size()" (goTo)="goTo($event)" (setSize)="setSize($event)" />
       }
@@ -91,6 +95,9 @@
             <div><h2 class="section-title">Brand profiles</h2><p class="text-xs text-[color:var(--text-muted)]">Optional defaults so every report looks the same.</p></div>
             @if (tab() === 'assets' && profiles().length) { <button type="button" class="link-inline text-sm" (click)="setTab('profiles')">View all <app-icon name="arrowRight" /></button> }
           </div>
+          @if (!loaded()) {
+            <app-loading shape="list" label="Loading brand profiles…" [count]="3" />
+          } @else {
           <ul class="divide-y divide-[color:var(--border-subtle)]">
             @for (p of profiles(); track p.profileId) {
               <li class="rsa-profile">
@@ -110,6 +117,7 @@
                 @if (canLibrary()) { <button type="button" class="link-inline" (click)="newProfile()">Make one</button> }</li>
             }
           </ul>
+          }
         </section>
       }
     </div>

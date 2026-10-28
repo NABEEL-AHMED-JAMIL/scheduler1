@@ -11,12 +11,20 @@ import { ReportStudioApi } from '../report-studio.api';
   host: { class: 'rsa-pic' },
   template: `
     @if (src(); as s) { <img [src]="s" [alt]="alt()" [style.max-height]="maxHeight()" /> }
-    @else { <span class="rsa-pic-empty" aria-hidden="true">{{ failed() ? 'No picture' : '' }}</span> }
+    @else {
+      <!-- Owner 2026-10-27: the quiet box has a name for a screen reader too -- loading, or that there is no picture. -->
+      <span class="rsa-pic-empty" [class.rsa-pic-loading]="!failed()" role="img" [attr.aria-busy]="failed() ? null : 'true'"
+            [attr.aria-label]="failed() ? 'No picture' + (alt() ? ' of ' + alt() : '') : 'Loading the picture' + (alt() ? ' of ' + alt() : '') + '…'">{{ failed() ? 'No picture' : '' }}</span>
+    }
   `,
   styles: `
     :host { display: grid; place-items: center; min-width: 0; }
     img { max-width: 100%; object-fit: contain; display: block; }
     .rsa-pic-empty { font-size: 0.75rem; color: var(--text-muted); }
+    .rsa-pic-loading { display: block; width: 3.5rem; height: 2rem; border-radius: var(--radius-sm); background: var(--surface-sunken);
+      animation: rsa-pic-pulse 1.4s ease-in-out infinite; }
+    @keyframes rsa-pic-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+    @media (prefers-reduced-motion: reduce) { .rsa-pic-loading { animation: none; } }
   `,
 })
 export class AssetPicture {

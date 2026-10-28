@@ -12,6 +12,10 @@ import { RefreshButton } from '../../../shared/ui/refresh-button';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { DateRange, DateRangePicker, rangeKey, rangeText, restoreRange } from '../../../shared/ui/date-range';
 import { sidePanelConfig } from '../../../shared/ui/side-panel';
+import { AppLoading, InlineStatus, loadErrorText } from '../../../shared/ui/loading';
+import { BlurLoader } from '../../../shared/ui/blur-loader';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
 import { BulkBar } from '../../../shared/ui/bulk/bulk-bar';
 import { BulkAnswer, BulkRequest, BulkSelection, BulkSource } from '../../../shared/ui/bulk/bulk.model';
 import { refusal } from '../../../shared/ui/bulk/bulk.model';
@@ -38,7 +42,7 @@ const RETRY_CAP = 50;
  */
 @Component({
   selector: 'app-failed-runs',
-  imports: [PageHeader, RefreshButton, DateRangePicker, Icon, ServerTimePipe, DecimalPipe, BulkBar],
+  imports: [PageHeader, RefreshButton, DateRangePicker, Icon, ServerTimePipe, DecimalPipe, BulkBar, AppLoading, InlineStatus, BlurLoader, SortHeader],
   templateUrl: './failed-runs.html',
   styles: `
     .failed-explorer { display: grid; grid-template-columns: 15rem minmax(0, 1fr); gap: 1rem; align-items: start; }
@@ -96,6 +100,31 @@ export class FailedRuns implements OnInit {
   readonly error = signal('');
   readonly expanded = signal<Set<FacetName>>(new Set());
 
+  /**
+   * Owner 2026-10-27 ("add a sort on each table"): Run, Pipeline, Kind, Ended -- and Workspace for a platform administrator
+   * -- sort on the server, over every run the filters leave in the window Core read, before the page is cut. The list's own
+   * order is Ended, newest first (exactly Core's default), and sends no sort; a new order goes back to the first page.
+   */
+  readonly sort = createTableSort<FailedRun>({
+    id: 'runs-failed',
+    server: true,
+    initial: { key: 'ended', direction: 'desc' },
+    columns: {
+      run: { value: r => r.runId, kind: 'number' },
+      workspace: { value: r => r.workspace ?? r.tenantId, kind: 'text' },
+      pipeline: { value: r => r.pipeline, kind: 'text' },
+      kind: { value: r => r.kindLabel, kind: 'text' },
+      ended: { value: r => r.endedAt, kind: 'date' },
+    },
+    onChange: () => this.reset(),
+  });
+
+  /** Whether the rows are in a column's order rather than newest first. */
+  readonly sorted = computed(() => {
+    const picked = this.sort.param();
+    return !!picked && !(picked.sort === 'ended' && picked.dir === 'desc');
+  });
+
   readonly items = computed(() => this.answer()?.items ?? []);
   readonly groups = computed(() => this.answer()?.groups ?? []);
   readonly total = computed(() => this.answer()?.total ?? 0);
@@ -145,9 +174,12 @@ export class FailedRuns implements OnInit {
     const w = windowOf(this.range().from, this.range().to);
     const f = this.filter();
     const ids = (values: string[]) => values.filter(v => /^\d+$/.test(v)).map(Number);
+    // Workspace is a platform administrator's column only: a remembered one is not sent on a workspace's own screen.
+    const picked = this.sorted() && (this.platform() || this.sort.key() !== 'workspace') ? this.sort.param() : null;
     return {
       from: w.from, to: w.to, tenantIds: ids(f.tenantIds), taskDetailIds: ids(f.taskDetailIds), jobIds: ids(f.jobIds),
       tasks: f.tasks, kinds: f.kinds, days: f.days, signature: this.signature(), page: this.page(),
+      ...(picked ? { sort: picked.sort, dir: picked.dir } : {}),
     };
   }
 
@@ -161,7 +193,7 @@ export class FailedRuns implements OnInit {
         if (r?.status === API_SUCCESS && r.data) {
           this.answer.set(r.data);
         } else {
-          this.error.set(r?.message || 'The failed runs could not be read.');
+          this.error.set(loadErrorText(r, 'The failed runs could not be read.'));
         }
       },
       error: err => {

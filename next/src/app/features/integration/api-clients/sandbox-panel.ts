@@ -1,4 +1,4 @@
-import { Component, OnChanges, OnInit, SimpleChanges, inject, input, signal } from '@angular/core';
+import { Component, OnChanges, OnInit, SimpleChanges, computed, inject, input, signal } from '@angular/core';
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { ActivatedRoute, RouterLink } from '@angular/router';
@@ -10,6 +10,10 @@ import { confirmWith } from '../../../shared/ui/confirm';
 import { ApiClientRow, ApiClientWithSecret, ApiClientsApi, SandboxInfo, ScopeRow } from './api-clients.api';
 import { ClientDialog, ClientDialogData, ClientDialogResult } from './client-dialog';
 import { SecretDialog, SecretDialogData } from './secret-dialog';
+import { AppLoading, createLoadState } from '../../../shared/ui/loading';
+import { BlurLoader } from '../../../shared/ui/blur-loader';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
 
 /**
  * MIG-336: API Clients › Sandbox. Our team makes a workspace a sandbox on request -- a separate workspace with sample
@@ -19,7 +23,7 @@ import { SecretDialog, SecretDialogData } from './secret-dialog';
  */
 @Component({
   selector: 'app-sandbox-panel',
-  imports: [Icon, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger],
+  imports: [Icon, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, AppLoading, BlurLoader, SortHeader],
   template: `
     <section id="sandbox" class="scroll-mt-20 mt-6" data-sandbox>
       <div class="flex items-center justify-between gap-2 mb-2">
@@ -34,14 +38,17 @@ import { SecretDialog, SecretDialogData } from './secret-dialog';
         }
       </div>
 
-      @if (loading()) {
-        <div class="card p-4 text-sm text-[color:var(--text-muted)]">Looking for your sandbox…</div>
+      <!-- Owner 2026-10-27: a skeleton on the first read (and for another workspace); a reload after New test key,
+           New secret or Revoke keeps the keys on screen under the blur instead of blanking the section. -->
+      @if (loading() && !sandbox()) {
+        <div class="card p-0" data-sandbox-loading><app-loading shape="panel" label="Loading your sandbox…" [count]="2" /></div>
       } @else if (error()) {
         <div class="card p-4 text-sm flex flex-wrap items-center gap-2" role="alert">
           <span class="text-[color:var(--warn-text)]">{{ error() }}</span>
           <button type="button" class="btn btn-default btn-sm" (click)="load()">Try again</button>
         </div>
       } @else if (sandbox(); as s) {
+        <app-blur-loader [active]="loading()" label="Refreshing…">
         <div class="card p-0">
           <div class="px-4 py-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-subtle text-sm">
             <span class="pill pill-info">Test</span>
@@ -56,16 +63,16 @@ import { SecretDialog, SecretDialogData } from './secret-dialog';
               <table class="table-modern" data-sandbox-clients>
                 <thead>
                   <tr>
-                    <th>Name</th>
-                    <th>Client id</th>
+                    <th appSort="name" [sortBy]="sort">Name</th>
+                    <th appSort="clientId" [sortBy]="sort">Client id</th>
                     <th>Scopes</th>
-                    <th>Last used</th>
-                    <th class="text-right">State</th>
+                    <th appSort="lastUsed" [sortBy]="sort">Last used</th>
+                    <th class="text-right" appSort="state" [sortBy]="sort">State</th>
                     <th class="w-12 th-actions">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  @for (c of clients(); track c.clientId) {
+                  @for (c of sorted(); track c.clientId) {
                     <tr [class.row-inactive]="c.status !== 'Active'">
                       <td class="max-w-64"><div class="flex items-center gap-1.5 min-w-0"><span class="pill pill-info">Test</span><span class="font-medium truncate">{{ c.name }}</span></div></td>
                       <td class="mono text-xs text-[color:var(--text-secondary)]">{{ c.clientId }}</td>
@@ -103,6 +110,7 @@ import { SecretDialog, SecretDialogData } from './secret-dialog';
             in the <a class="md-link" routerLink="/developers/portal">Developer portal</a>.
           </p>
         </div>
+        </app-blur-loader>
       } @else {
         <div class="card p-4 text-sm text-[color:var(--text-secondary)]" data-no-sandbox>
           No sandbox yet. Our team makes one for your workspace on request: a separate workspace with sample pipelines and data,
@@ -125,8 +133,21 @@ export class SandboxPanel implements OnInit, OnChanges {
 
   readonly sandbox = signal<SandboxInfo | null>(null);
   readonly clients = signal<ApiClientRow[]>([]);
-  readonly loading = signal(true);
-  readonly error = signal('');
+  /** The sandbox read and then its keys' read, as one state: the section is loading until both have answered. */
+  readonly state = createLoadState();
+  readonly loading = this.state.loading;
+  readonly error = this.state.error;
+  /** Owner 2026-10-27: the test keys sort by any column; the API's order until one is picked. */
+  readonly sort = createTableSort<ApiClientRow>({
+    id: 'api-client-sandbox-keys',
+    columns: {
+      name: c => c.name,
+      clientId: c => c.clientId,
+      lastUsed: { value: c => c.lastUsedAt, kind: 'date' },
+      state: { value: c => c.status, kind: 'status' },
+    },
+  });
+  readonly sorted = computed(() => this.sort.apply(this.clients()));
   readonly busy = signal<string | null>(null);
 
   ngOnInit(): void {
@@ -144,7 +165,6 @@ export class SandboxPanel implements OnInit, OnChanges {
 
   /** The Developer portal links here as #sandbox; the page is drawn only once the panel has read it. */
   private settled(): void {
-    this.loading.set(false);
     if (this.route.snapshot.fragment !== 'sandbox') return;
     setTimeout(() => {
       const el = document.getElementById('sandbox');
@@ -153,24 +173,23 @@ export class SandboxPanel implements OnInit, OnChanges {
   }
 
   load(): void {
-    this.loading.set(true);
-    this.error.set('');
+    this.state.start();
     const asked = this.tenantId();
     this.api.sandbox(asked).subscribe({
       next: r => {
         if (asked !== this.tenantId()) return;
         if (r.status !== API_SUCCESS) {
-          this.error.set(r.message || 'Your sandbox could not be read.');
+          this.state.fail(r, 'Your sandbox could not be read.');
           this.settled();
           return;
         }
         this.sandbox.set(r.data ?? null);
         if (r.data) this.loadClients(asked);
-        else this.settled();
+        else { this.state.done(); this.settled(); }
       },
       error: err => {
         if (asked !== this.tenantId()) return;
-        this.error.set(err?.error?.message || 'Your sandbox could not be read.');
+        this.state.fail(err, 'Your sandbox could not be read.');
         this.settled();
       },
     });
@@ -181,13 +200,13 @@ export class SandboxPanel implements OnInit, OnChanges {
     this.api.sandboxList(asked).subscribe({
       next: r => {
         if (asked !== this.tenantId()) return;
-        if (r.status === API_SUCCESS) this.clients.set(r.data ?? []);
-        else this.error.set(r.message || 'The sandbox\'s test keys could not be read.');
+        if (r.status === API_SUCCESS) { this.clients.set(r.data ?? []); this.state.done(); }
+        else this.state.fail(r, 'The sandbox\'s test keys could not be read.');
         this.settled();
       },
       error: err => {
         if (asked !== this.tenantId()) return;
-        this.error.set(err?.error?.message || 'The sandbox\'s test keys could not be read.');
+        this.state.fail(err, 'The sandbox\'s test keys could not be read.');
         this.settled();
       },
     });

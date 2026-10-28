@@ -3,7 +3,7 @@ import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Dialog } from '@angular/cdk/dialog';
 import { provideRouter } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { Confirm } from '../../../shared/ui/confirm';
@@ -84,6 +84,10 @@ function build(opts: { view?: DefinitionView; jobs?: unknown[]; jobIds?: number[
   };
   const toast = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
   TestBed.resetTestingModule();
+  // The sort remembers its choice per viewer; only those entries go (a test may have set the layout before building).
+  try {
+    for (const k of Object.keys(localStorage)) if (k.startsWith('etl_table_sort:')) localStorage.removeItem(k);
+  } catch { /* none */ }
   TestBed.configureTestingModule({
     imports: [StepBuilder],
     providers: [
@@ -737,5 +741,59 @@ describe('StepBuilder -- List or Flow', () => {
     expect(opened.at(-1)!.data.step.key).toBe('keep');
     node('@start').dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(opened.length).toBe(before + 1);
+  });
+});
+
+describe('StepBuilder -- loading, errors and the versions\' sort (owner 2026-10-27)', () => {
+  const AI = { code: 'ai_prompt', name: 'AI prompt', kind: 'Process', description: 'Runs a saved prompt per row.', runsInEngine: true,
+    enabled: true, available: true, overridable: true, overridden: false,
+    configSchema: { type: 'object', properties: { promptId: { type: 'integer', format: 'prompt' } } } };
+
+  it('Add step says the Task Registry is loading, then why it could not be read, and reads it again', () => {
+    const { builder, api } = build();
+    api.tasks.mockReturnValue(NEVER as never);
+    builder.reloadTasks();
+    expect(builder.tasksState.loading()).toBe(true);
+    api.tasks.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 500 })) as never);
+    builder.reloadTasks();
+    expect(builder.tasksState.error()).toBe('The Task Registry could not be read: Add step has nothing to offer.');
+    api.tasks.mockReturnValue(of({ status: 'SUCCESS', message: '', data: TASKS }) as never);
+    builder.reloadTasks();
+    expect(builder.tasksState.error()).toBe('');
+  });
+
+  it('a step\'s choice list that cannot be read still opens the panel, says which list, and is read again after Try again', () => {
+    const { builder, api, opened, fixture } = build({ tasks: [...TASKS, AI] });
+    api.prompts.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 500 })) as never);
+    builder.add('ai_prompt');
+    fixture.detectChanges();
+    expect(opened.filter(o => o.component === StepPanel).pop()!.data.prompts).toEqual([]);
+    expect(builder.choiceErrors()[0]).toContain('The prompts could not be read');
+    expect(builder.openingKey()).toBeNull();
+    builder.retryChoices();
+    api.prompts.mockReturnValue(of([{ id: 41, label: 'Wound assessment' }]) as never);
+    builder.open(2);
+    expect(api.prompts).toHaveBeenCalledTimes(2);
+    expect(builder.choiceErrors()).toEqual([]);
+  });
+
+  it('marks the step as opening while its lists are read', () => {
+    const { builder, api } = build({ tasks: [...TASKS, AI] });
+    api.prompts.mockReturnValue(NEVER as never);
+    builder.add('ai_prompt');
+    expect(builder.openingKey()).not.toBeNull();
+  });
+
+  it('sorts the versions by a heading, both ways', () => {
+    const view: DefinitionView = { ...VIEW, version: 2, versions: [
+      { version: 2, pipelineDefinitionId: 1001, createdByName: 'Bo', dateCreated: '2026-10-02T10:00:00Z' },
+      { version: 1, pipelineDefinitionId: 1000, createdByName: 'Ada', dateCreated: '2026-09-29T04:14:59Z' },
+    ] };
+    const { builder } = build({ view });
+    expect(builder.sortedVersions().map(v => v.version)).toEqual([2, 1]);
+    builder.versionSort.toggle('by');
+    expect(builder.sortedVersions().map(v => v.createdByName)).toEqual(['Ada', 'Bo']);
+    builder.versionSort.toggle('by');
+    expect(builder.sortedVersions().map(v => v.createdByName)).toEqual(['Bo', 'Ada']);
   });
 });

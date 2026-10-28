@@ -6,6 +6,8 @@ import { FormDialog } from '../../shared/ui/form-dialog';
 import { Field } from '../../shared/ui/field';
 import { Observable } from 'rxjs';
 import { API_SUCCESS } from '../../core/api/api.config';
+import { InlineStatus } from '../../shared/ui/loading';
+import { RouterLink } from '@angular/router';
 
 export interface ReportDestinationOptions {
   /** Where the report goes. Posting it to an endpoint ("Submit") was removed (owner, 2026-09-28). */
@@ -30,7 +32,7 @@ export interface ReportDestinationResult {
  */
 @Component({
   selector: 'app-report-destination-dialog',
-  imports: [Combobox, FormDialog, Field],
+  imports: [Combobox, FormDialog, Field, InlineStatus, RouterLink],
   template: `
     <form (submit)="submit($event)">
       <app-form-dialog heading="Save into a bucket" subtitle="Written as a file inside the folder you name."
@@ -39,15 +41,19 @@ export interface ReportDestinationResult {
                        (confirmed)="submit()" (cancelled)="ref.close()">
         <div class="form-stack">
             <app-field label="Connection" for="bucket" [required]="true">
-              @if (bucketsError()) {
-                <p class="field-note text-crit-500" role="alert">{{ bucketsError() }}</p>
-              } @else {
+              @if (!bucketsError()) {
                 <!-- The workspace's own connections, as the Object Browser offers them. It was free
                      text, and a typo showed up only as a toast after the dialog had closed. -->
                 <app-combobox id="bucket" [selected]="bucket()" (selectedChange)="bucket.set($event)"
                               [options]="bucketOptions()" [allowClear]="false"
                               [placeholder]="loadingBuckets() ? 'Reading connections…' : 'Search connections…'" />
               }
+              <!-- Owner 2026-10-27: loading, none (with where to add one) and a failed read with Try again. -->
+              <app-inline-status [loading]="loadingBuckets()" [error]="bucketsError()" label="Reading connections…"
+                                 [empty]="bucketsRead() && !bucketOptions().length" emptyText="No storage connection yet."
+                                 (retry)="loadBuckets()">
+                <a class="link-inline" routerLink="/connections/storage" (click)="ref.close()">Add one in Connections</a>
+              </app-inline-status>
             </app-field>
             <app-field label="Folder" for="folder">
               <input id="folder" class="input" placeholder="reports"
@@ -74,16 +80,23 @@ export class ReportDestinationDialog {
   private readonly connections = signal<BucketSummary[]>([]);
   readonly loadingBuckets = signal(false);
   readonly bucketsError = signal('');
+  /** The connections answered (empty or not), so "none yet" is never said before they did. */
+  readonly bucketsRead = signal(false);
+  private readonly storage = inject(StorageService);
   readonly bucketOptions = computed(() =>
     this.connections().map(b => ({ value: b.bucket, label: b.label || b.bucket, hint: b.provider })));
 
-  constructor() {
+  constructor() { this.loadBuckets(); }
+
+  loadBuckets(): void {
     this.loadingBuckets.set(true);
-    inject(StorageService).buckets().subscribe({
+    this.bucketsError.set('');
+    this.storage.buckets().subscribe({
       next: response => {
         this.loadingBuckets.set(false);
         if (response.status !== API_SUCCESS) { this.bucketsError.set(response.message || 'The connections could not be read.'); return; }
         this.connections.set(response.data ?? []);
+        this.bucketsRead.set(true);
       },
       error: err => {
         this.loadingBuckets.set(false);

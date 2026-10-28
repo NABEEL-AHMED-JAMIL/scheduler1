@@ -22,6 +22,8 @@ import { BulkBar } from '../../shared/ui/bulk/bulk-bar';
 import { BulkReviewApi } from '../../shared/ui/bulk/bulk-review.api';
 import { NeedsWorkspace } from '../../shared/ui/needs-workspace';
 import { BULK_CAP, BulkSelection } from '../../shared/ui/bulk/bulk.model';
+import { createTableSort } from '../../shared/ui/sort';
+import { SortHeader } from '../../shared/ui/sort-header';
 
 /**
  * The review queue (MIG-272, Documents > Review queue, page key document-review): the documents Document Intelligence
@@ -31,7 +33,7 @@ import { BULK_CAP, BulkSelection } from '../../shared/ui/bulk/bulk.model';
  */
 @Component({
   selector: 'app-review-queue',
-  imports: [RefreshButton, PageHeader, RouterLink, Icon, TableShell, StatusPill, Pagination, ServerTimePipe, ConfidenceBar, BulkBar, NeedsWorkspace],
+  imports: [RefreshButton, PageHeader, RouterLink, Icon, TableShell, StatusPill, Pagination, ServerTimePipe, ConfidenceBar, BulkBar, NeedsWorkspace, SortHeader],
   template: `
     <div class="page">
       <app-page-header>
@@ -46,7 +48,8 @@ import { BULK_CAP, BulkSelection } from '../../shared/ui/bulk/bulk.model';
           @if (!noWorkspace()) {
             <div class="flex items-center gap-2">
               <app-refresh-button [loading]="loading()" (refresh)="load()" />
-              <button type="button" class="btn btn-primary btn-sm" [disabled]="!firstFree()" (click)="start()"><app-icon name="play" />Start reviewing</button>
+              <button type="button" class="btn btn-primary btn-sm" [disabled]="!startable()" (click)="start()" data-start
+                      title="Opens the oldest document waiting that nobody else holds, whatever the list is sorted by"><app-icon name="play" />Start reviewing</button>
             </div>
           }
         </div>
@@ -91,13 +94,13 @@ import { BULK_CAP, BulkSelection } from '../../shared/ui/bulk/bulk.model';
                          (change)="bulk.setPage(pageRows(), $any($event.target).checked)" />
                 </th>
               }
-              <th>Document</th>
-              <th>Type</th>
-              <th class="text-right">To check</th>
-              <th>Least sure</th>
-              <th>Waiting since</th>
-              <th>Claimed</th>
-              <th class="text-right">State</th>
+              <th appSort="document" [sortBy]="sort">Document</th>
+              <th appSort="type" [sortBy]="sort">Type</th>
+              <th class="text-right" appSort="toCheck" [sortBy]="sort">To check</th>
+              <th appSort="leastSure" [sortBy]="sort">Least sure</th>
+              <th appSort="waitingSince" [sortBy]="sort">Waiting since</th>
+              <th appSort="claimed" [sortBy]="sort">Claimed</th>
+              <th class="text-right" appSort="state" [sortBy]="sort">State</th>
             </tr>
           </thead>
           <tbody>
@@ -168,9 +171,32 @@ export class ReviewQueue implements OnInit {
 
   readonly me = computed(() => this.auth.user()?.appUserId ?? null);
   readonly hasFilters = computed(() => this.status() !== 'Review' || !!this.typeId() || !!this.claimed() || !!this.confidence() || !!this.age());
-  /** The first document in Review nobody else holds. */
+  /** The first document in Review nobody else holds, on the page shown. */
   readonly firstFree = computed(() => this.status() !== 'Review' ? null
     : this.items().find(e => !(e.claimActive && e.claimedBy != null && e.claimedBy !== this.me())) ?? null);
+
+  /**
+   * Owner 2026-10-27 ("add a sort on each table"): the queue is paged, so it sorts on the server (documentReview.json/queue
+   * sort/dir) and a new order goes back to page 1. Document sorts by its number (the file's name is another service's).
+   * No order picked: oldest first, as before, and no sort is sent. "Start reviewing" keeps to the queue's own order --
+   * the oldest document nobody else holds -- whatever the viewer sorts by.
+   */
+  readonly sort = createTableSort<Extraction>({
+    id: 'document-review-queue',
+    server: true,
+    columns: {
+      document: { value: e => e.extractionId, kind: 'number', param: 'document' },
+      type: { value: e => e.documentTypeName || e.documentTypeKey, param: 'type' },
+      toCheck: { value: e => e.reviewCount, kind: 'number', param: 'toCheck' },
+      leastSure: { value: e => e.minConfidence, kind: 'number', param: 'leastSure', first: 'asc' },
+      waitingSince: { value: e => e.dateFinished || e.dateCreated, kind: 'date', param: 'waitingSince', first: 'asc' },
+      claimed: { value: e => e.claimedByName, param: 'claimed' },
+      state: { value: e => this.label(e), kind: 'status', param: 'state' },
+    },
+    onChange: () => { this.page.set(1); this.load(); },
+  });
+  /** Start reviewing can go: in the queue's own order there is a free one on the page, or the page is sorted otherwise. */
+  readonly startable = computed(() => this.sort.key() ? this.status() === 'Review' && this.total() > 0 : !!this.firstFree());
 
   /**
    * Bulk review (2026-10-12): whoever may open the review queue decides its documents one by one, so may decide them in
@@ -226,7 +252,7 @@ export class ReviewQueue implements OnInit {
   load(): void {
     this.loading.set(true);
     this.error.set('');
-    this.api.queue({ ...this.filters(), page: this.page() - 1, size: this.size() }).subscribe({
+    this.api.queue({ ...this.filters(), page: this.page() - 1, size: this.size(), ...(this.sort.param() ?? {}) }).subscribe({
       next: r => {
         this.loading.set(false);
         if (r.status !== API_SUCCESS || !r.data) { this.error.set(r.message || 'Could not load the queue.'); return; }
@@ -268,9 +294,23 @@ export class ReviewQueue implements OnInit {
   setSize(size: number): void { this.size.set(size); this.page.set(1); this.load(); }
 
   start(): void {
+    if (this.sort.key()) { this.startInQueueOrder(); return; }
     const first = this.firstFree();
     if (first) this.router.navigate(['/review/documents', first.extractionId]);
     else this.toast.info('Nothing is waiting that someone else has not claimed.');
+  }
+
+  /** The list is in the viewer's order: the queue's own (oldest first, the same filters) is read to find who is next. */
+  private startInQueueOrder(): void {
+    this.api.queue({ ...this.filters(), page: 0, size: PAGE_SIZES[0] }).subscribe({
+      next: r => {
+        const first = r.status === API_SUCCESS ? (r.data?.items ?? []).find(e => this.pickable(e)) : undefined;
+        if (first) this.router.navigate(['/review/documents', first.extractionId]);
+        else if (r.status === API_SUCCESS) this.toast.info('Nothing is waiting that someone else has not claimed.');
+        else this.toast.error(r.message || 'The queue could not be read.');
+      },
+      error: err => this.toast.error(refusalText(err, 'The queue could not be read.')),
+    });
   }
 
   nameOf(e: Extraction): string {

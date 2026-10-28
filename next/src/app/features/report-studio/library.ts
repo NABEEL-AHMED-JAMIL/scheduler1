@@ -21,6 +21,8 @@ import { RsTabCounts } from './rs-tab-counts';
 import { ToastService } from '../../shared/ui/toast.service';
 import { confirmWith } from '../../shared/ui/confirm';
 import { PageLimitActions } from './page-limit-actions';
+import { SortHeader } from '../../shared/ui/sort-header';
+import { SortState, TableSort, createTableSort } from '../../shared/ui/sort';
 
 type View = 'reports' | 'jobs';
 
@@ -34,7 +36,7 @@ type View = 'reports' | 'jobs';
  */
 @Component({
   selector: 'app-report-library',
-  imports: [PageHeader, WorkspaceSelect, RefreshButton, Icon, TableShell, StatusPill, Segmented, Pagination, RsTimePipe, RouterLink, PageLimitActions],
+  imports: [PageHeader, WorkspaceSelect, RefreshButton, Icon, TableShell, StatusPill, Segmented, Pagination, RsTimePipe, RouterLink, PageLimitActions, SortHeader],
   styles: `
     .rs-bulk-bar { position: sticky; bottom: 0.75rem; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem;
       margin: 0.5rem 0.75rem; padding: 0.5rem 0.75rem; border: 1px solid var(--border-strong); border-radius: var(--radius-lg);
@@ -75,6 +77,53 @@ export class ReportLibrary implements OnInit {
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
   /** Answers come back in any order: only the latest read's is kept. */
   private asked = 0;
+
+  /**
+   * Owner 2026-10-27 ("add a sort on each table"): both lists sort on the server (reportLibrary.json's sort and dir, an
+   * allow-list per list), so a sort covers every report or job, not only the page shown. Reports arrive newest change
+   * first, which is Updated, newest first: that is the table's own order, and the request names no sort until another
+   * one is picked. Jobs arrive newest queued first, which no column shows: no column is marked until one is picked. A new
+   * order goes back to page 1.
+   */
+  private static readonly REPORTS_ORDER: SortState = { key: 'updated', direction: 'desc' };
+  readonly reportSort = createTableSort<ReportRow>({
+    id: 'report-library', server: true, initial: ReportLibrary.REPORTS_ORDER,
+    columns: {
+      report: { value: r => r.name, kind: 'text', param: 'name' },
+      template: { value: r => r.templateName, kind: 'text', param: 'template' },
+      version: { value: r => r.currentVersion, kind: 'number', param: 'version' },
+      status: { value: r => r.status, kind: 'status', param: 'status' },
+      updated: { value: r => r.updatedAt, kind: 'date', param: 'updatedAt' },
+    },
+    onChange: () => this.resort('reports'),
+  });
+  readonly jobSort = createTableSort<JobRow>({
+    id: 'report-jobs', server: true, initial: null,
+    columns: {
+      job: { value: j => j.jobNo, kind: 'number', param: 'job' },
+      report: { value: j => j.reportName, kind: 'text', param: 'report' },
+      template: { value: j => j.templateName, kind: 'text', param: 'template' },
+      progress: { value: j => j.status, kind: 'status', param: 'status' },
+      started: { value: j => j.startedAt || j.createdAt, kind: 'date', param: 'startedAt' },
+      finished: { value: j => j.finishedAt, kind: 'date', param: 'finishedAt' },
+    },
+    onChange: () => this.resort('jobs'),
+  });
+
+  /** A new order for the list on screen: from the first page again. */
+  private resort(list: View): void {
+    if (list !== this.view()) return;
+    this.page.set(1);
+    this.read();
+  }
+
+  /** What a read carries for this sort: nothing for the list's own order (so the service keeps it), else sort and dir. */
+  private static sortParams<T>(sort: TableSort<T>, own: SortState | null): { sort?: string; dir?: 'asc' | 'desc' } {
+    const p = sort.param();
+    const s = sort.state();
+    if (!p || (own && s.key === own.key && s.direction === own.direction)) return {};
+    return { sort: p.sort, dir: p.dir };
+  }
 
   readonly views: SegmentOption<View>[] = [{ id: 'reports', label: 'Reports' }, { id: 'jobs', label: 'Generation jobs' }];
   readonly canGenerate = computed(() => this.auth.canOpen('report-generate') && !this.auth.isPlatformAdmin());
@@ -202,7 +251,8 @@ export class ReportLibrary implements OnInit {
     this.error.set('');
     const asked = ++this.asked;
     const view = this.view();
-    const query: LibraryQuery = { status: this.status(), q: this.search(), limit: this.size(), offset: (this.page() - 1) * this.size() };
+    const query: LibraryQuery = { status: this.status(), q: this.search(), limit: this.size(), offset: (this.page() - 1) * this.size(),
+      ...(view === 'jobs' ? ReportLibrary.sortParams(this.jobSort, null) : ReportLibrary.sortParams(this.reportSort, ReportLibrary.REPORTS_ORDER)) };
     const failed = (e: unknown) => {
       if (asked !== this.asked) return;
       this.error.set(studioError(e, view === 'jobs' ? 'The jobs could not be read.' : 'The reports could not be read.').message);

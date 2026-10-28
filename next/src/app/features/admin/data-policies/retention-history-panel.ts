@@ -7,6 +7,8 @@ import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { formatSize } from '../../../shared/ui/format-size';
 import { refusal } from '../../../shared/ui/bulk/bulk.model';
 import { RetentionApi } from './retention.api';
+import { AppLoading } from '../../../shared/ui/loading';
+import { LoadError } from '../../../shared/ui/load-error';
 import { RetentionAuditLine, RetentionPass, readable, stateOf } from './retention.model';
 
 export interface RetentionHistoryPanelData {
@@ -25,13 +27,14 @@ const LABELS: Record<string, string> = {
  */
 @Component({
   selector: 'app-retention-history-panel',
-  imports: [SidePanel, ServerTimePipe],
+  imports: [SidePanel, ServerTimePipe, AppLoading, LoadError],
   styles: `.retention-history-table th, .retention-history-table td { text-align: left; }
     .retention-history-table tbody th { text-transform: none; letter-spacing: normal; font-weight: 500; }`,
   template: `
     <app-side-panel heading="Retention history" subtitle="The last passes and every change, with who made it" data-test="retention-history-panel">
+      <!-- Owner 2026-10-27: a skeleton while the history is read, and Try again when it could not be. -->
       @if (error()) {
-        <p class="text-sm text-crit-500" role="alert">{{ error() }}</p>
+        <app-load-error [message]="error()" (retry)="load()" />
       } @else if (loaded()) {
         <div class="flex flex-col gap-4">
           <section aria-labelledby="retention-passes-title">
@@ -90,7 +93,7 @@ const LABELS: Record<string, string> = {
           </section>
         </div>
       } @else {
-        <p class="text-sm text-[color:var(--text-muted)] flex items-center gap-2"><span class="spinner"></span>Reading the history…</p>
+        <app-loading shape="panel" [count]="6" label="Loading the retention history…" />
       }
       <div foot class="flex items-center gap-2 w-full">
         <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="ref.close()">Close</button>
@@ -113,6 +116,12 @@ export class RetentionHistoryPanel implements OnInit {
   readonly formatSize = formatSize;
 
   ngOnInit(): void {
+    this.load();
+  }
+
+  load(): void {
+    this.error.set('');
+    this.loaded.set(false);
     forkJoin([this.api.passes(this.data.tenantId, 10), this.api.audit(this.data.tenantId, 100)]).subscribe({
       next: ([p, a]) => {
         if (p?.status !== API_SUCCESS || a?.status !== API_SUCCESS) {

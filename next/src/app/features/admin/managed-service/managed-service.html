@@ -11,7 +11,9 @@
       <div class="flex items-center gap-2">
         <app-workspace-select [allowAll]="true" [value]="tenantFilter()" (valueChange)="setTenant($event === null ? '' : '' + $event)" />
         <app-refresh-button [loading]="loading()" (refresh)="load()" />
-        <button type="button" class="btn btn-primary btn-sm" (click)="openGrant()"><app-icon name="plus" />Grant</button>
+        <!-- Owner 2026-10-27: Grant waits for the staff and workspace lists, so its dialog never opens on empty ones. -->
+        <button type="button" class="btn btn-primary btn-sm" (click)="openGrant()" [disabled]="listsLoading()"
+                [attr.title]="listsLoading() ? 'Loading staff and workspaces…' : null"><app-icon name="plus" [busy]="listsLoading()" />Grant</button>
       </div>
     </div>
   </app-page-header>
@@ -23,9 +25,11 @@
     <ng-container toolbar>
       <select class="input max-w-48 min-w-0" aria-label="Filter by staff member" [value]="staffFilter() ?? ''"
               (change)="setStaff($any($event.target).value)">
-        <option value="">Every staff member</option>
+        <option value="">{{ staffState.loading() ? 'Loading staff…' : 'Every staff member' }}</option>
         @for (s of staff(); track s.appUserId) { <option [value]="s.appUserId">{{ name(s) }}</option> }
       </select>
+      @if (staffState.error()) { <app-inline-status [error]="staffState.error()" (retry)="loadStaff()" /> }
+      @if (tenantsState.error()) { <app-inline-status [error]="tenantsState.error()" (retry)="loadTenants()" /> }
       <label class="inline-flex items-center gap-1.5 text-sm whitespace-nowrap">
         <input type="checkbox" class="checkbox" [checked]="includeRevoked()"
                (change)="setIncludeRevoked($any($event.target).checked)" />Include revoked
@@ -38,16 +42,16 @@
     <table class="table-modern">
       <thead>
         <tr>
-          <th>Staff member</th>
-          <th>Workspace</th>
-          <th>Granted</th>
-          <th>Revoked</th>
-          <th class="text-right">State</th>
+          <th appSort="staff" [sortBy]="sort">Staff member</th>
+          <th appSort="workspace" [sortBy]="sort">Workspace</th>
+          <th appSort="granted" [sortBy]="sort">Granted</th>
+          <th appSort="revoked" [sortBy]="sort">Revoked</th>
+          <th class="text-right" appSort="state" [sortBy]="sort">State</th>
           <th class="w-12 th-actions">Actions</th>
         </tr>
       </thead>
       <tbody>
-        @for (g of grants(); track g.grantId) {
+        @for (g of sorted(); track g.grantId) {
           <tr [class.opacity-70]="!isLive(g)">
             <td class="max-w-64">
               <div class="font-medium truncate">{{ name(g) }}</div>

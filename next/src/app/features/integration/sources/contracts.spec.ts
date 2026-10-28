@@ -2,7 +2,8 @@ import { describe, it, expect, vi } from 'vitest';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { DIALOG_DATA, Dialog, DialogRef } from '@angular/cdk/dialog';
-import { of } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { SourcesApi } from './sources.service';
 import { ContractPanel, ContractPanelData } from './contract-panel';
@@ -201,5 +202,102 @@ describe('TemplateDialog', () => {
     d.tenantId.set(2924);
     d.install('wound_result');
     expect(api.install).toHaveBeenCalledWith('wound_result', 2924);
+  });
+});
+
+// ------------------------------------------------------------------------------------------- owner 2026-10-27
+const FAILS = () => throwError(() => new HttpErrorResponse({ status: 500 }));
+
+describe('ContractPanel -- sorting (owner 2026-10-27)', () => {
+  const data = (c: ContractRow): ContractPanelData => ({ contract: c, canManage: true });
+
+  it('shows the versions newest first, and sorts them oldest first on a click', () => {
+    try { localStorage.clear(); } catch { /* none */ }
+    setup(data(WOUND));
+    const panel = TestBed.runInInjectionContext(() => new ContractPanel());
+    expect(panel.sortedVersions().map(v => v.version)).toEqual([2, 1]);
+    panel.versionSort.toggle('version');
+    expect(panel.sortedVersions().map(v => v.version)).toEqual([1, 2]);
+    panel.versionSort.toggle('version');
+    expect(panel.sortedVersions().map(v => v.version)).toEqual([2, 1]);
+  });
+
+  it('sorts a check\'s errors by path both ways', () => {
+    try { localStorage.clear(); } catch { /* none */ }
+    setup(data(WOUND));
+    const panel = TestBed.runInInjectionContext(() => new ContractPanel());
+    panel.payload.set('{}');
+    panel.validate();
+    expect(panel.sortedErrors().map(e => e.path)).toEqual(['$.captured_at', '$.case_id']);
+    panel.errorSort.toggle('path');
+    panel.errorSort.toggle('path');
+    expect(panel.sortedErrors().map(e => e.path)).toEqual(['$.case_id', '$.captured_at']);
+  });
+});
+
+describe('ContractPanel -- loading, empty, error (owner 2026-10-27)', () => {
+  const data = (c: ContractRow): ContractPanelData => ({ contract: c, canManage: true });
+
+  it('is loading until the contract answers', () => {
+    setup(data(WOUND), stubApi({ contract: vi.fn(() => NEVER) }));
+    const panel = TestBed.runInInjectionContext(() => new ContractPanel());
+    expect(panel.loading()).toBe(true);
+    expect(panel.state.pending()).toBe(true);
+  });
+
+  it('says there is no version (and no schema) instead of "Loading…" forever', () => {
+    setup(data(WOUND), stubApi({ contract: vi.fn(() => of({ status: 'SUCCESS', message: '', data: { contract: { ...WOUND, activeVersion: null, currentVersion: null }, versions: [] } })) }));
+    const fixture = TestBed.createComponent(ContractPanel);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(fixture.componentInstance.loading()).toBe(false);
+    expect(el.querySelector('[data-no-versions]')?.textContent).toContain('No version yet.');
+    expect(el.querySelector('[data-no-schema]')).not.toBeNull();
+    expect(el.textContent).not.toContain('Loading…');
+  });
+
+  it('says the contract could not be read in plain words, and a version that failed offers Try again', () => {
+    setup(data(WOUND), stubApi({ contract: vi.fn(FAILS) }));
+    const failed = TestBed.runInInjectionContext(() => new ContractPanel());
+    expect(failed.loading()).toBe(false);
+    expect(failed.loadError()).toBe('The contract could not be read.');
+    setup(data(WOUND), stubApi({ contractVersion: vi.fn(FAILS) }));
+    const panel = TestBed.runInInjectionContext(() => new ContractPanel());
+    expect(panel.versionLoading()).toBe(false);
+    expect(panel.versionError()).toBe('The version could not be read.');
+  });
+});
+
+describe('ContractSampleDialog -- sorting the proposed fields (owner 2026-10-27)', () => {
+  it('keeps the schema\'s order, sorts by field both ways, and keeps the ticks on their fields', () => {
+    setup({} as ContractSampleData);
+    const d = TestBed.runInInjectionContext(() => new ContractSampleDialog());
+    d.sample.set('{"case_id": "x", "notes": null}');
+    d.propose();
+    expect(d.sortedFields().map(f => f.path)).toEqual(['case_id', 'notes']);
+    d.sort.toggle('field');
+    d.sort.toggle('field');
+    expect(d.sortedFields().map(f => f.path)).toEqual(['notes', 'case_id']);
+    expect(d.required()).toEqual(['case_id']);
+  });
+});
+
+describe('TemplateDialog -- loading, empty, error (owner 2026-10-27)', () => {
+  it('is loading until the templates answer, then says when there are none', () => {
+    setup({ installed: [] } as TemplateDialogData, stubApi({ templates: vi.fn(() => NEVER) }));
+    expect(TestBed.runInInjectionContext(() => new TemplateDialog()).loading()).toBe(true);
+    setup({ installed: [] } as TemplateDialogData, stubApi({ templates: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [] })) }));
+    const d = TestBed.runInInjectionContext(() => new TemplateDialog());
+    expect(d.loading()).toBe(false);
+    expect(d.listState.error()).toBe('');
+    // The template then says "No contract template is available yet." instead of nothing.
+    expect(d.groups()).toEqual([]);
+  });
+
+  it('says the templates could not be read, in plain words, with Try again', () => {
+    setup({ installed: [] } as TemplateDialogData, stubApi({ templates: vi.fn(FAILS) }));
+    const d = TestBed.runInInjectionContext(() => new TemplateDialog());
+    expect(d.loading()).toBe(false);
+    expect(d.listState.error()).toBe('The templates could not be read.');
   });
 });

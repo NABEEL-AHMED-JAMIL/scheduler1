@@ -128,3 +128,19 @@ describe('ImportDialog -- the report', () => {
     expect(stub.import).toHaveBeenCalledWith(expect.not.objectContaining({ tenantId: expect.anything() }), 2960);
   });
 });
+
+describe('ImportDialog -- sorting the report (owner 2026-10-27)', () => {
+  it('keeps what needs a look first, sorts by item both ways, and "What" in the report\'s own order', async () => {
+    const { dialog } = dialogWith();
+    dialog.postmanFile.set(json('c.json', { item: [] }));
+    await dialog.run();
+    expect(dialog.sortedRows().map(r => r.kind)).toEqual(['Review', 'Skipped', 'Imported', 'Imported']);
+    dialog.sort.toggle('item');
+    expect(dialog.sortedRows().map(r => r.item)).toEqual(['collection auth', 'Patients/Get', 'Patients/List', 'Patients/Upload']);
+    dialog.sort.toggle('item');
+    expect(dialog.sortedRows().map(r => r.item)).toEqual(['Patients/Upload', 'Patients/List', 'Patients/Get', 'collection auth']);
+    dialog.sort.toggle('kind');
+    dialog.sort.toggle('kind');
+    expect(dialog.sortedRows().map(r => r.kind)).toEqual(['Imported', 'Imported', 'Skipped', 'Review']);
+  });
+});

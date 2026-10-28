@@ -326,3 +326,27 @@ describe('Run item files', () => {
     expect((el.querySelector('[data-test="file-download"]') as HTMLButtonElement).disabled).toBe(true);
   });
 });
+
+describe('Run item files -- loading, empty, error (owner 2026-10-27)', () => {
+  it('is loading, not empty, until the files answer, then says the step kept none', () => {
+    const { fixture, files, el } = mount();
+    expect(fixture.componentInstance.loading()).toBe(true);
+    expect(el.textContent).not.toContain('This step kept no files for the item.');
+    files().flush({ status: API_SUCCESS, data: { ...FILES(0), total: 0, files: [] } });
+    fixture.detectChanges();
+    expect(fixture.componentInstance.loading()).toBe(false);
+    expect(el.textContent).toContain('This step kept no files for the item.');
+  });
+
+  it('says the files could not be read, with Try again that reads them again', () => {
+    const { fixture, files, el } = mount();
+    files().flush('boom', { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+    expect(fixture.componentInstance.loading()).toBe(false);
+    expect(fixture.componentInstance.error()).toBe('The files could not be read.');
+    [...el.querySelectorAll('button')].find(b => b.textContent!.trim() === 'Try again')!.click();
+    expect(fixture.componentInstance.loading()).toBe(true);
+    files().flush({ status: API_SUCCESS, data: { ...FILES(0), total: 0, files: [] } });
+    expect(fixture.componentInstance.error()).toBe('');
+  });
+});

@@ -159,3 +159,37 @@ describe('Run page: the Log tab', () => {
     expect(el.querySelector('[data-test="log-empty"]')?.textContent).toContain('No lines match the filters.');
   });
 });
+
+describe('Run page: the Log tab -- loading, empty, error (owner 2026-10-27)', () => {
+  it('says the run reported no entries once an empty log answers', () => {
+    const { el } = mount([]);
+    expect(el.querySelector('[data-test="log-empty"]')?.textContent).toContain('This run reported no log entries.');
+  });
+
+  it('is loading, not empty, while the first read is out', () => {
+    const { fixture, el } = mount([]);
+    fixture.componentRef.setInput('loading', true);
+    fixture.detectChanges();
+    expect(el.querySelector('[data-test="log-empty"]')).toBeNull();
+    expect(el.querySelector('app-loading')).not.toBeNull();
+  });
+
+  it('shows the error with Try again when no line ever arrived', () => {
+    const { fixture, el, component } = mount([]);
+    let retried = 0;
+    component.retry.subscribe(() => retried++);
+    fixture.componentRef.setInput('error', 'The run could not be read.');
+    fixture.detectChanges();
+    const tryAgain = [...el.querySelectorAll('button')].find(b => b.textContent!.trim() === 'Try again')!;
+    tryAgain.click();
+    expect(retried).toBe(1);
+  });
+
+  it('keeps the lines on screen when a later poll fails, and says so above them', () => {
+    const { fixture, el, lines } = mount();
+    fixture.componentRef.setInput('error', 'The run could not be read.');
+    fixture.detectChanges();
+    expect(lines().length).toBe(5);
+    expect(el.querySelector('[data-test="log-stale"]')?.textContent).toContain('The run could not be read.');
+  });
+});

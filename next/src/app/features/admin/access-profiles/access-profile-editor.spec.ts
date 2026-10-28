@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router } from '@angular/router';
-import { of } from 'rxjs';
+import { NEVER, Observable, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { AuthService } from '../../../core/auth/auth.service';
 import { PageCatalogueEntry, PageKey } from '../../../core/auth/page-keys';
 import { ToastService } from '../../../shared/ui/toast.service';
@@ -171,6 +172,35 @@ describe('AccessProfileEditor', () => {
   it('says so when the profile is not in the workspace', () => {
     const { page } = editor(REAL, [], 99);
     expect(page.error()).toContain('not in this workspace');
+    // Trying again cannot bring it back: only the way back is offered.
+    expect(page.retryable()).toBe(false);
+  });
+
+  it('is loading until the catalogue answers, and a failed read can be tried again (owner 2026-10-27)', () => {
+    let answer: () => Observable<unknown> = () => NEVER;
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: AccessProfilesService, useValue: { pages: () => answer(), list: () => of({ status: 'SUCCESS', message: '', data: [] }), save: vi.fn() } },
+        { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn() } },
+        { provide: AuthService, useValue: { isPlatformAdmin: () => false } },
+        { provide: Router, useValue: { navigate: vi.fn() } },
+        { provide: ActivatedRoute, useValue: { snapshot: { paramMap: { get: () => null }, queryParamMap: { get: () => null } } } },
+      ],
+    });
+    const page = TestBed.runInInjectionContext(() => new AccessProfileEditor());
+    page.ngOnInit();
+    expect(page.loading()).toBe(true);
+    expect(page.error()).toBe('');
+    answer = () => throwError(() => new HttpErrorResponse({ status: 500, error: 'Internal Server Error' }));
+    page.load();
+    expect(page.loading()).toBe(false);
+    expect(page.error()).toBe('The page catalogue could not be loaded.');
+    expect(page.retryable()).toBe(true);
+    answer = () => of({ status: 'SUCCESS', message: '', data: REAL });
+    page.load();
+    expect(page.error()).toBe('');
+    expect(page.pages().length).toBe(REAL.length);
   });
 });
 

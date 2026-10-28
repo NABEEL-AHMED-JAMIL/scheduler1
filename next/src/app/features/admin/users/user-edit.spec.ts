@@ -4,7 +4,8 @@ import { TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
 import { Dialog } from '@angular/cdk/dialog';
 import { ActivatedRoute, Router } from '@angular/router';
-import { of } from 'rxjs';
+import { NEVER, Observable, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { AuthService } from '../../../core/auth/auth.service';
 import { AvatarCache } from '../../../shared/ui/avatar';
 import { ToastService } from '../../../shared/ui/toast.service';
@@ -26,10 +27,13 @@ const PEOPLE: AppUser[] = [
   { appUserId: 4699, username: 'peer@w.test', fullName: 'Peer', userRole: 'TENANT_ADMIN', status: 'Active', tenantId: 2960 },
 ];
 
-function page(id: number, role: 'TENANT_ADMIN' | 'PLATFORM_ADMIN' = 'TENANT_ADMIN', me = ME) {
+type Answers = Record<string, (...args: never[]) => Observable<unknown>>;
+function page(id: number, role: 'TENANT_ADMIN' | 'PLATFORM_ADMIN' = 'TENANT_ADMIN', me = ME,
+              over: { security?: Answers; profiles?: Answers; get?: () => Observable<unknown> } = {}) {
   TestBed.resetTestingModule();
+  try { localStorage.clear(); } catch { /* none */ }
   const http = {
-    get: vi.fn(() => of({ status: 'SUCCESS', message: '', data: PEOPLE })),
+    get: vi.fn(over.get ?? (() => of({ status: 'SUCCESS', message: '', data: PEOPLE }))),
     put: vi.fn(() => of({ status: 'SUCCESS', message: 'User updated.' })),
     post: vi.fn(() => of({ status: 'SUCCESS', message: 'Picture updated.', data: { avatarVersion: 'abcdef0123' } })),
     delete: vi.fn(() => of({ status: 'SUCCESS', message: 'Picture removed.', data: { avatarVersion: null } })),
@@ -42,6 +46,7 @@ function page(id: number, role: 'TENANT_ADMIN' | 'PLATFORM_ADMIN' = 'TENANT_ADMI
       lastActiveAt: '2026-10-19T11:00:00Z', idleExpiresAt: '2026-10-19T11:30:00Z' }] })),
     endSessionOf: vi.fn(() => of({ status: 'SUCCESS', message: 'Ended.' })),
     workspaceHistory: vi.fn(() => of({ status: 'SUCCESS', message: '', data: { items: [], total: 0, limit: 8, offset: 0 } })),
+    ...over.security,
   };
   const profiles = {
     pages: () => of({ status: 'SUCCESS', message: '', data: [
@@ -52,6 +57,7 @@ function page(id: number, role: 'TENANT_ADMIN' | 'PLATFORM_ADMIN' = 'TENANT_ADMI
       { pageAccessProfileId: 1064, profileName: 'Viewer', defaultProfile: false, pageKeys: ['jobs', 'objects'], userCount: 0 }] }),
     people: () => of({ status: 'SUCCESS', message: '', data: [{ appUserId: 4684, fullName: 'Member', username: 'member@w.test', status: 'Active',
       pageAccessProfileId: 1063, pageAccessProfileName: 'Reviewer', pageKeys: ['queue', 'objects'], allowedExceptions: ['objects'] }] }),
+    ...over.profiles,
   };
   TestBed.configureTestingModule({
     providers: [
@@ -157,5 +163,56 @@ describe('UserEdit behaviour', () => {
   it('lists whom they manage, for where escalations go', () => {
     const { edit } = page(ME);
     expect(edit.reportNames()).toBe('Member');
+  });
+});
+
+const FAILED = () => throwError(() => new HttpErrorResponse({ status: 500, error: 'Internal Server Error' }));
+
+describe('UserEdit -- sorting their sessions (owner 2026-10-27)', () => {
+  it('keeps the server order, then sorts by when they signed in, newest first, and back', () => {
+    const two = () => of({ status: 'SUCCESS', message: '', data: [
+      { sessionId: 'old', method: 'PASSWORD', ip: null, userAgent: null, signedInAt: '2026-10-18T10:00:00Z', lastActiveAt: '2026-10-19T09:00:00Z', idleExpiresAt: '' },
+      { sessionId: 'new', method: 'MFA', ip: null, userAgent: null, signedInAt: '2026-10-19T10:00:00Z', lastActiveAt: '2026-10-19T10:30:00Z', idleExpiresAt: '' }] });
+    const { edit } = page(4684, 'TENANT_ADMIN', ME, { security: { sessionsOf: two } });
+    expect(edit.sortedSessions().map(s => s.sessionId)).toEqual(['old', 'new']);
+    edit.sessionSort.toggle('signedIn');
+    expect(edit.sortedSessions().map(s => s.sessionId)).toEqual(['new', 'old']);
+    edit.sessionSort.toggle('signedIn');
+    expect(edit.sortedSessions().map(s => s.sessionId)).toEqual(['old', 'new']);
+  });
+});
+
+describe('UserEdit -- loading, empty, error (owner 2026-10-27)', () => {
+  it('is loading until the person answers, and the reads around them are pending, not "none"', () => {
+    const { edit } = page(4684, 'TENANT_ADMIN', ME, { get: () => NEVER });
+    expect(edit.loading()).toBe(true);
+    expect(edit.person()).toBeNull();
+    expect(edit.standingState.pending()).toBe(true);
+  });
+
+  it('says a failed read can be tried again, and a person not on the list cannot', () => {
+    const failed = page(4684, 'TENANT_ADMIN', ME, { get: FAILED }).edit;
+    expect(failed.loading()).toBe(false);
+    expect(failed.error()).toBe('Could not load the user.');
+    expect(failed.retryable()).toBe(true);
+    const gone = page(9999).edit;
+    expect(gone.retryable()).toBe(false);
+  });
+
+  it('says what could not be read around the person instead of showing it as "none"', () => {
+    const { edit } = page(4684, 'TENANT_ADMIN', ME, {
+      security: { people: FAILED, workspaceHistory: FAILED },
+      profiles: { list: FAILED, pages: FAILED },
+    });
+    expect(edit.standingState.error()).toBe('How they sign in could not be read.');
+    expect(edit.historyState.error()).toBe('Their history could not be read.');
+    expect(edit.profilesState.error()).toBe('The access profiles could not be read.');
+    expect(edit.catalogueState.error()).toBe('What they can see could not be worked out.');
+  });
+
+  it('knows the history is empty once it answers with nothing', () => {
+    const { edit } = page(4684);
+    expect(edit.historyState.loaded()).toBe(true);
+    expect(edit.history()).toEqual([]);
   });
 });

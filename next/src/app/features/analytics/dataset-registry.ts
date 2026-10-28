@@ -6,6 +6,7 @@ import { confirmWith } from '../../shared/ui/confirm';
 import { AnalyticsService, RegisteredDataset } from './analytics.service';
 import { ToastService } from '../../shared/ui/toast.service';
 import { openVisualise } from './charts/visualise-open';
+import { AppLoading, InlineStatus, loadErrorText } from '../../shared/ui/loading';
 
 /**
  * The dataset registry: naming a location once, and finding it again.
@@ -29,7 +30,7 @@ import { openVisualise } from './charts/visualise-open';
  */
 @Component({
   selector: 'app-dataset-registry',
-  imports: [Icon],
+  imports: [Icon, AppLoading, InlineStatus],
   template: `
     <div class="card p-4 space-y-3 min-w-0">
       <div class="flex items-baseline gap-2 flex-wrap">
@@ -77,10 +78,11 @@ import { openVisualise } from './charts/visualise-open';
         <p class="text-xs text-crit-500">{{ registerError() }}</p>
       }
 
-      @if (loading()) {
-        <p class="text-xs text-[color:var(--text-muted)] py-2">Reading the registry…</p>
+      <!-- Owner 2026-10-27: list-shaped loading on the first read; a re-read keeps the list (the refresh icon spins). -->
+      @if (loading() && !datasets().length) {
+        <app-loading shape="list" label="Loading the registry…" [count]="3" />
       } @else if (error()) {
-        <p class="text-xs text-crit-500 py-2">{{ error() }}</p>
+        <app-inline-status class="py-1" [error]="error()" (retry)="load()" />
       } @else if (!datasets().length) {
         <p class="text-xs text-[color:var(--text-muted)] py-2">
           Nothing registered yet. A registered dataset is a name for a connection and a path —
@@ -180,14 +182,14 @@ export class DatasetRegistry implements OnInit {
       next: response => {
         this.loading.set(false);
         if (response.status !== API_SUCCESS || !response.data) {
-          this.error.set(response.message || 'The registry could not be read.');
+          this.error.set(loadErrorText(response, 'The registry could not be read.'));
           return;
         }
         this.datasets.set(response.data);
       },
       error: err => {
         this.loading.set(false);
-        this.error.set(err?.error?.message || 'The registry could not be read.');
+        this.error.set(loadErrorText(err, 'The registry could not be read.'));
       },
     });
   }

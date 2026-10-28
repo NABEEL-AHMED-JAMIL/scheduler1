@@ -9,6 +9,9 @@ import { rowsOf } from '../../analytics/charts/visualise-panel';
 import { Segmented, SegmentOption } from '../../../shared/ui/segmented';
 import { copyText } from '../../../shared/ui/clipboard.util';
 import { ToastService } from '../../../shared/ui/toast.service';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
+import { AppLoading, loadErrorText } from '../../../shared/ui/loading';
 
 /** A kept file the run page can show: a PDF as itself, a table of rows as a table. */
 export interface RunOutputViewData { name: string; runDatasetId: number; format: string | null; rowCount: number | null; }
@@ -22,6 +25,9 @@ const PDF = ['pdf'];
 const TABLE = ['csv', 'json', 'jsonl', 'ndjson', 'tsv', 'xlsx', 'parquet'];
 /** A kept JSON file opens as formatted JSON (owner 2026-10-20: an insight is one object, not a table); Table is one click away. */
 const JSON_FORMATS = ['json', 'jsonl', 'ndjson'];
+/** A kept table's row as the viewer draws it: its place in the file (the # column) and its cells. */
+export interface ViewRow { n: number; cells: (string | null)[]; }
+
 /** The most characters of formatted JSON drawn; the rest is in the download. */
 export const VIEW_JSON_CHARS = 200_000;
 
@@ -65,7 +71,7 @@ export function viewKind(name: string, format: string | null | undefined): 'pdf'
  */
 @Component({
   selector: 'app-run-output-view',
-  imports: [Icon, PdfViewer, Segmented],
+  imports: [Icon, PdfViewer, Segmented, SortHeader, AppLoading],
   template: `
     <div class="card shadow-2xl w-[72rem] max-w-[calc(100vw-2rem)] h-[88vh] flex flex-col overflow-hidden"
          role="dialog" [attr.aria-label]="'View ' + data.name" data-test="run-output-view">
@@ -83,7 +89,15 @@ export function viewKind(name: string, format: string | null | undefined): 'pdf'
         <div class="flex flex-col items-center justify-center gap-3 py-20 text-center" role="alert">
           <app-icon name="alert" size="1.75rem" class="icon-crit" />
           <p class="text-sm text-crit-500 max-w-md">{{ error() }}</p>
+          @if (retryable()) {
+            <button type="button" class="btn btn-default btn-sm" (click)="read()"><app-icon name="refresh" />Try again</button>
+          }
         </div>
+      } @else if (loading()) {
+        <app-loading class="flex-1" shape="spinner" label="Reading the file…" />
+      } @else if (kind === 'table' && !isJson && !rows().length) {
+        <!-- Owner 2026-10-27: a kept table with no rows says so; it used to spin for ever. -->
+        <p class="py-20 text-center text-sm text-[color:var(--text-muted)]" data-test="run-output-empty">This file has no rows.</p>
       } @else if (kind === 'pdf' && url()) {
         <app-pdf-viewer [src]="url()" />
       } @else if (kind === 'table' && isJson && mode() === 'json' && jsonText() !== null) {
@@ -103,15 +117,15 @@ export function viewKind(name: string, format: string | null | undefined): 'pdf'
             <table class="table-modern preview-grid">
               <thead>
                 <tr>
-                  <th class="tabular text-[color:var(--text-muted)] text-right">#</th>
-                  @for (c of columns(); track $index) { <th [title]="c">{{ c }}</th> }
+                  <th class="tabular text-[color:var(--text-muted)] text-right" appSort="#" [sortBy]="sort">#</th>
+                  @for (c of columns(); track $index) { <th [title]="c" [appSort]="c" [sortBy]="sort">{{ c }}</th> }
                 </tr>
               </thead>
               <tbody>
-                @for (r of rows(); track $index; let i = $index) {
+                @for (r of sortedRows(); track r.n) {
                   <tr>
-                    <td class="tabular text-right text-[color:var(--text-muted)]">{{ i + 1 }}</td>
-                    @for (v of r; track $index) { <td [title]="v ?? ''">{{ v ?? '' }}</td> }
+                    <td class="tabular text-right text-[color:var(--text-muted)]">{{ r.n }}</td>
+                    @for (v of r.cells; track $index) { <td [title]="v ?? ''">{{ v ?? '' }}</td> }
                   </tr>
                 }
               </tbody>
@@ -119,10 +133,7 @@ export function viewKind(name: string, format: string | null | undefined): 'pdf'
           </div>
         </div>
       } @else {
-        <div class="flex flex-col items-center justify-center gap-3 py-20">
-          <div class="spinner" role="status" aria-label="Reading"></div>
-          <p class="text-sm text-[color:var(--text-muted)]">Reading the file…</p>
-        </div>
+        <p class="py-20 text-center text-sm text-[color:var(--text-muted)]" data-test="run-output-empty">This file has nothing to show as a table.</p>
       }
     </div>
   `,
@@ -138,6 +149,26 @@ export class RunOutputView implements OnInit {
   readonly rows = signal<(string | null)[][]>([]);
   readonly total = signal<number | null>(null);
   readonly error = signal('');
+  /**
+   * Owner 2026-10-27: the read's own flag. The spinner was the template's catch-all, so a shape it did not expect (a
+   * first row with no keys) spun for ever; it now spins only while the read is out, and Try again follows a failed read.
+   */
+  readonly loading = signal(true);
+  readonly retryable = signal(false);
+  /** The rows with their place in the file, so a sort keeps each row's own number. */
+  readonly indexed = computed<ViewRow[]>(() => this.rows().map((cells, i) => ({ n: i + 1, cells })));
+  /** Owner 2026-10-27: the columns sort, each read as numbers, dates or text by what it holds; the file's order until then. */
+  readonly sort = createTableSort<ViewRow>({
+    id: 'run-output-view',
+    columns: { '#': { value: r => r.n, kind: 'number', first: 'asc' } },
+    dynamic: key => {
+      const at = this.columns().indexOf(key);
+      return at < 0 ? null : { value: r => r.cells[at], kind: 'auto' };
+    },
+    // A dialog that opens fresh for each file: the next file's columns are not this one's.
+    remember: false,
+  });
+  readonly sortedRows = computed(() => this.sort.apply(this.indexed()));
   private readonly toast = inject(ToastService);
   readonly isJson = JSON_FORMATS.includes((this.data.format || this.data.name.split('.').pop() || '').toLowerCase());
   readonly modes: SegmentOption<'json' | 'table'>[] = [{ id: 'json', label: 'JSON' }, { id: 'table', label: 'Table' }];
@@ -167,27 +198,47 @@ export class RunOutputView implements OnInit {
       : `${total.toLocaleString()} row${total === 1 ? '' : 's'}`;
   }
 
-  ngOnInit(): void {
+  ngOnInit(): void { this.read(); }
+
+  read(): void {
+    this.loading.set(true);
+    this.error.set('');
+    this.retryable.set(false);
+    const failed = (err: unknown) => {
+      this.loading.set(false);
+      this.retryable.set(true);
+      this.error.set(loadErrorText(err, 'The file could not be read; it may have expired.'));
+    };
     const params = { runDatasetId: String(this.data.runDatasetId), format: this.kind === 'pdf' ? 'pdf' : 'json' };
     if (this.kind === 'pdf') {
       // Closed before the PDF arrives: no object URL is made that nothing would release.
       this.http.get(`${API_BASE}/sourceJob.json/runDataset`, { params, responseType: 'blob' }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-        next: blob => this.url.set(URL.createObjectURL(new Blob([blob], { type: 'application/pdf' }))),
-        error: () => this.error.set('The file could not be read; it may have expired.'),
+        next: blob => {
+          const old = this.url();
+          if (old) URL.revokeObjectURL(old);
+          this.url.set(URL.createObjectURL(new Blob([blob], { type: 'application/pdf' })));
+          this.loading.set(false);
+        },
+        // A blob error's body is a blob, so the words are the fallback's.
+        error: () => failed(null),
       });
       return;
     }
-    if (this.kind !== 'table') { this.error.set('This file can only be downloaded.'); return; }
+    if (this.kind !== 'table') { this.loading.set(false); this.error.set('This file can only be downloaded.'); return; }
     if ((this.data.rowCount ?? 0) > VIEW_READ_ROWS) {
+      this.loading.set(false);
       this.error.set(`This file has ${this.data.rowCount!.toLocaleString()} rows: download it, or open it with Visualise.`);
       return;
     }
     this.http.get<unknown>(`${API_BASE}/sourceJob.json/runDataset`, { params }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: body => {
+        this.loading.set(false);
         if (this.isJson) this.jsonText.set(prettyJson(body));
         const table = rowsOf(body);
         if (!table) {
           if (this.isJson) { this.mode.set('json'); return; }
+          // An empty list is a table with no rows, not a file that is not a table.
+          if (Array.isArray(body) && !body.length) { this.total.set(0); return; }
           this.error.set('This file is not a table of rows.');
           return;
         }
@@ -195,7 +246,7 @@ export class RunOutputView implements OnInit {
         this.columns.set(table.columns);
         this.rows.set(table.rows.slice(0, VIEW_ROWS));
       },
-      error: (err: { error?: { message?: string } }) => this.error.set(err?.error?.message || 'The file could not be read; it may have expired.'),
+      error: err => failed(err),
     });
   }
 }

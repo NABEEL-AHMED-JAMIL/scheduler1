@@ -29,6 +29,9 @@ import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { profileLabel } from './platform-default';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
+import { AppLoading, InlineStatus, createLoadState } from '../../../shared/ui/loading';
 
 /** As much of a tenant.json/listTenants row as this screen reads. */
 export interface TenantName {
@@ -151,7 +154,7 @@ export function healthTone(state: string | null | undefined): 'ok' | 'warn' | 'c
 
 @Component({
   selector: 'app-kafka-connections',
-  imports: [RefreshButton, PageHeader, MineFilter, StatStrip, ServerTimePipe, StatusPill, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger, CopyButton, RouterLink, BlurLoader, ManagedBanner],
+  imports: [RefreshButton, PageHeader, MineFilter, StatStrip, ServerTimePipe, StatusPill, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger, CopyButton, RouterLink, BlurLoader, ManagedBanner, SortHeader, AppLoading, InlineStatus],
   styles: [ONE_PANE_BELOW_1024],
   templateUrl: './kafka-connections.html',
 })
@@ -214,12 +217,29 @@ export class KafkaConnections implements OnInit {
     return rows.filter(r => `${r.type.serviceName} ${r.type.description ?? ''} ${this.topicOf(r.type.queueTopicPartition)}`
       .toLowerCase().includes(term));
   });
+  /**
+   * Owner 2026-10-27: the topics sort by any column holding a value, before the paging, so the order covers every topic
+   * of the connection; the live columns read the health answer (a topic it does not mention sorts last). API order until
+   * a heading is picked.
+   */
+  readonly topicSort = createTableSort<{ type: TaskType }>({
+    id: 'kafka-topics',
+    columns: {
+      topic: r => r.type.serviceName,
+      partitions: { value: r => this.topicHealth(r.type)?.partitions, kind: 'number' },
+      readBy: r => this.topicHealth(r.type)?.consumers[0]?.group,
+      lag: { value: r => this.topicHealth(r.type)?.lag, kind: 'number' },
+      pipelines: { value: r => this.pipelineCount(r.type), kind: 'number' },
+      state: { value: r => this.topicHealth(r.type)?.state ?? r.type.status ?? 'Active', kind: 'status' },
+    },
+  });
+  readonly topicsSorted = computed(() => this.topicSort.apply(this.topicsMatching()));
   /** One page of the matching topics: a long list is paged, not drawn whole (scale review P2 #37). */
   readonly topicPage = signal(0);
   readonly topicPages = computed(() => Math.max(1, Math.ceil(this.topicsMatching().length / TOPIC_PAGE)));
   readonly topicsShown = computed(() => {
     const page = Math.min(this.topicPage(), this.topicPages() - 1);
-    return this.topicsMatching().slice(page * TOPIC_PAGE, (page + 1) * TOPIC_PAGE);
+    return this.topicsSorted().slice(page * TOPIC_PAGE, (page + 1) * TOPIC_PAGE);
   });
   setTopicSearch(term: string): void { this.topicSearch.set(term); this.topicPage.set(0); }
 
@@ -246,6 +266,19 @@ export class KafkaConnections implements OnInit {
     return this.healthByTopic()[this.topicOf(type.queueTopicPartition)] ?? null;
   }
   readonly groups = computed(() => (this.currentHealth()?.groups ?? []).slice().sort((a, b) => b.lag - a.lag || a.group.localeCompare(b.group)));
+  /** Owner 2026-10-27: the groups sort by any column; by default the furthest behind first, as they always were. */
+  readonly groupSort = createTableSort<GroupHealth>({
+    id: 'kafka-groups',
+    columns: {
+      group: g => g.group,
+      state: { value: g => g.state, kind: 'status' },
+      members: { value: g => g.members, kind: 'number' },
+      topics: g => g.topics.join(', '),
+      lag: { value: g => g.lag, kind: 'number' },
+    },
+    initial: { key: 'lag', direction: 'desc' },
+  });
+  readonly sortedGroups = computed(() => this.groupSort.apply(this.groups()));
 
   /** The health row: what an operator looks at first. */
   readonly kpis = computed<StatStripItem[]>(() => {
@@ -505,6 +538,11 @@ export class KafkaConnections implements OnInit {
    * read; nothing here invents one for a tenant that list does not mention.
    */
   private readonly tenants = signal<TenantName[]>([]);
+  /**
+   * Owner 2026-10-27: the names' read. A failure used to be silent; the rows still fall back to "Tenant <id>", but the
+   * Add topic dialog's workspace choices come from this list too, so the page says the names are missing.
+   */
+  readonly tenantsState = createLoadState(false);
 
   /** A tenant sees only its own profiles, so the column would be one repeated value for them. */
   readonly canSeeWorkspace = this.auth.isPlatformAdmin;
@@ -611,13 +649,16 @@ export class KafkaConnections implements OnInit {
    * buys a 403 for a column they are not shown. Failing to get the names leaves workspaceName on
    * its "Tenant <id>" fallback rather than taking the profile list down with it.
    */
-  private loadTenants(): void {
+  loadTenants(): void {
     if (!this.canSeeWorkspace()) return;
+    this.tenantsState.start();
     this.http.get<ApiResponse<TenantName[]>>(`${API_BASE}/tenant.json/listTenants`).subscribe({
       next: response => {
-        if (response.status === API_SUCCESS) this.tenants.set(response.data ?? []);
+        if (response.status !== API_SUCCESS) { this.tenantsState.fail(response, 'The workspace names could not be read.'); return; }
+        this.tenants.set(response.data ?? []);
+        this.tenantsState.done();
       },
-      error: () => {},
+      error: err => this.tenantsState.fail(err, 'The workspace names could not be read.'),
     });
   }
 

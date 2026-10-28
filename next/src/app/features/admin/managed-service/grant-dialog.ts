@@ -15,6 +15,9 @@ export interface GrantDialogData {
   /** Preselected from the page's filters, when one is set. */
   tenantId?: number | null;
   appUserId?: number | null;
+  /** Owner 2026-10-27: why a list could not be read, said under its field instead of an empty list read as "none". */
+  staffError?: string;
+  tenantsError?: string;
 }
 
 /**
@@ -30,7 +33,7 @@ export interface GrantDialogData {
         confirmLabel="Grant" busyLabel="Granting…" [saving]="saving()" [confirmDisabled]="!ready()"
         (cancelled)="ref.close(false)" (confirmed)="save()">
       <app-field label="Staff member" for="grantStaff"
-          [hint]="data.staff.length ? 'Active platform administrators.' : 'No active platform administrator to grant.'">
+          [hint]="data.staffError ? data.staffError + ' Close and try again.' : data.staff.length ? 'Active platform administrators.' : 'No active platform administrator to grant.'">
         <select id="grantStaff" class="input" [value]="appUserId() ?? ''" (change)="appUserId.set(num($any($event.target).value))"
                 cdkFocusInitial>
           <option value="">Choose a staff member</option>
@@ -39,7 +42,7 @@ export interface GrantDialogData {
           }
         </select>
       </app-field>
-      <app-field label="Workspace" for="grantWorkspace">
+      <app-field label="Workspace" for="grantWorkspace" [hint]="data.tenantsError ? data.tenantsError + ' Close and try again.' : ''">
         <select id="grantWorkspace" class="input" [value]="tenantId() ?? ''" (change)="tenantId.set(num($any($event.target).value))">
           <option value="">Choose a workspace</option>
           @for (t of data.tenants; track t.tenantId) {

@@ -6,6 +6,7 @@ import { Icon } from '../../../shared/ui/icon';
 import { SidePanel } from '../../../shared/ui/side-panel';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { ToastService } from '../../../shared/ui/toast.service';
+import { AppLoading, InlineStatus, loadErrorText } from '../../../shared/ui/loading';
 import { reasonText, refusal } from '../../../shared/ui/bulk/bulk.model';
 import { FailedRun, FailedRunsApi, RetryPlan } from './failed-runs.api';
 import { backfillLink, backfillRetryNote } from '../../jobs/retry/run-retry';
@@ -25,7 +26,7 @@ export interface FailedRunPanelData {
  */
 @Component({
   selector: 'app-failed-run-panel',
-  imports: [SidePanel, Icon, RouterLink, ServerTimePipe],
+  imports: [SidePanel, Icon, RouterLink, ServerTimePipe, AppLoading, InlineStatus],
   styles: `
     .failed-error { border: 1px solid var(--border-subtle); background: var(--surface-inset); border-radius: var(--radius-lg);
       padding: 0.75rem; font-family: var(--font-mono, ui-monospace, monospace); }
@@ -70,7 +71,7 @@ export interface FailedRunPanelData {
         <section class="mt-6" data-test="failed-retry">
           <h3 class="text-sm font-semibold mb-1">Retry from the failed step</h3>
           @if (planLoading()) {
-            <p class="text-sm text-[color:var(--text-secondary)] flex items-center gap-2"><span class="spinner"></span>Checking what a retry would do…</p>
+            <app-loading shape="inline" label="Checking what a retry would do…" />
           } @else if (plan(); as p) {
             @if (p.resumable) {
               <p class="text-sm m-0">Attempt {{ p.nextAttempt }} resumes from step {{ (p.fromIndex ?? 0) + 1 }} &lt;{{ p.fromKey }}&gt;,
@@ -79,7 +80,8 @@ export interface FailedRunPanelData {
               <p class="text-sm m-0 text-[color:var(--text-secondary)]" data-test="failed-retry-refusal">{{ reason(p) }}</p>
             }
           } @else if (planError()) {
-            <p class="text-sm text-crit-500 m-0">{{ planError() }}</p>
+            <!-- Owner 2026-10-27: the reason with Try again (and a role the reader hears). -->
+            <app-inline-status [error]="planError()" (retry)="readPlan()" />
           }
           @if (done()) { <p class="text-sm text-ok-500 mt-2 mb-0" role="status" data-test="failed-retried">{{ done() }}</p> }
           @if (sendError()) { <p class="text-sm text-crit-500 mt-2 mb-0" role="alert">{{ sendError() }}</p> }
@@ -122,12 +124,17 @@ export class FailedRunPanel implements OnInit {
 
   ngOnInit(): void {
     if (!this.data.canRetry) return;
+    this.readPlan();
+  }
+
+  readPlan(): void {
     this.planLoading.set(true);
+    this.planError.set('');
     this.api.retryPlan(this.run.runId).subscribe({
       next: r => {
         this.planLoading.set(false);
         if (r?.data) this.plan.set(r.data);
-        else this.planError.set(r?.message || 'What a retry would do could not be read.');
+        else this.planError.set(loadErrorText(r, 'What a retry would do could not be read.'));
       },
       error: err => {
         this.planLoading.set(false);

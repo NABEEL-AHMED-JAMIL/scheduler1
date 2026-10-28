@@ -32,8 +32,11 @@
              (input)="search.set($any($event.target).value)" />
     </div>
     @if (galleryError()) {
-      <p class="text-sm text-[color:var(--crit-text)]" role="alert">{{ galleryError() }}</p>
+      <app-inline-status [error]="galleryError()" (retry)="loadGallery()" data-gallery-error />
     }
+    @if (galleryState.pending() || (galleryState.loading() && !cards().length)) {
+      <app-loading shape="cards" label="Loading connectors…" [count]="6" />
+    } @else {
     <div class="connector-gallery">
       @for (c of shownCards(); track c.spec.key) {
         <div class="connector-card" [class.is-unavailable]="!!blocked(c)" [attr.data-connector]="c.spec.key">
@@ -53,9 +56,12 @@
           }
         </div>
       } @empty {
-        <p class="text-sm text-[color:var(--text-muted)]">No connector matches.</p>
+        @if (!galleryError()) {
+          <p class="text-sm text-[color:var(--text-muted)]" data-no-connector>{{ cards().length ? 'No connector matches.' : 'No connector is available yet.' }}</p>
+        }
       }
     </div>
+    }
   </section>
 
   <app-table-shell heading="Connections" columnsKey="connector-hub" [loading]="loading()" [error]="error()" [isEmpty]="!shownConnections().length"
@@ -77,10 +83,18 @@
       </ng-container>
       <table class="table-modern">
         <thead>
-          <tr><th>Connection</th><th>Connector</th><th>Mode</th><th>Last sync</th><th class="text-right">Rows</th><th class="text-right">Lag</th><th>Status</th></tr>
+          <tr>
+            <th appSort="name" [sortBy]="sort">Connection</th>
+            <th appSort="connector" [sortBy]="sort">Connector</th>
+            <th appSort="mode" [sortBy]="sort">Mode</th>
+            <th appSort="lastSync" [sortBy]="sort">Last sync</th>
+            <th class="text-right" appSort="rows" [sortBy]="sort">Rows</th>
+            <th class="text-right" appSort="lag" [sortBy]="sort">Lag</th>
+            <th appSort="status" [sortBy]="sort">Status</th>
+          </tr>
         </thead>
         <tbody>
-          @for (c of shownConnections(); track c.id) {
+          @for (c of sortedConnections(); track c.id) {
             <tr class="cursor-pointer" [attr.data-connection]="c.id" (click)="open(c.id, c.name)" tabindex="0" (keydown.enter)="open(c.id, c.name)">
               <td class="min-w-0">
                 <button type="button" class="link-inline font-medium text-left truncate max-w-md block" [title]="c.name"

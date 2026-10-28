@@ -16,6 +16,9 @@ import {
 } from './connectors.model';
 import { ConnectPanel, ConnectPanelData } from './connect-panel';
 import { formatDuration } from '../../../shared/ui/time-format';
+import { AppLoading, loadErrorText } from '../../../shared/ui/loading';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
 
 /** What the page hands the panel: the connection to open, the gallery (for Add tables), and a way to say the list changed. */
 export interface ConnectionPanelData {
@@ -32,11 +35,11 @@ export interface ConnectionPanelData {
  */
 @Component({
   selector: 'app-connection-panel',
-  imports: [SidePanel, Icon, LoadError, ServerTimePipe],
+  imports: [SidePanel, Icon, LoadError, ServerTimePipe, AppLoading, SortHeader],
   template: `
     <app-side-panel [heading]="detail()?.connection?.name || data.name" [subtitle]="subtitle()">
       @if (loading() && !detail()) {
-        <p class="text-sm text-[color:var(--text-muted)]" role="status">Reading the connection…</p>
+        <app-loading shape="panel" label="Loading the connection…" [count]="6" />
       } @else if (error()) {
         <app-load-error [message]="error()" (retry)="load()" />
       } @else if (detail(); as d) {
@@ -103,10 +106,16 @@ export interface ConnectionPanelData {
             @if (d.streams.length) {
               <div class="overflow-x-auto">
                 <table class="table-modern" data-streams>
-                  <thead><tr><th>Stream</th><th>Mode</th><th>Schedule</th><th class="text-right">Rows</th><th>Last sync</th><th class="text-right">Lag</th>
+                  <thead><tr>
+                    <th appSort="name" [sortBy]="streamSort">Stream</th>
+                    <th appSort="mode" [sortBy]="streamSort">Mode</th>
+                    <th appSort="schedule" [sortBy]="streamSort">Schedule</th>
+                    <th class="text-right" appSort="rows" [sortBy]="streamSort">Rows</th>
+                    <th appSort="lastSync" [sortBy]="streamSort">Last sync</th>
+                    <th class="text-right" appSort="lag" [sortBy]="streamSort">Lag</th>
                     <th>Sensitive</th>@if (isAdmin()) { <th></th> }</tr></thead>
                   <tbody>
-                    @for (s of d.streams; track s.id) {
+                    @for (s of sortedStreams(); track s.id) {
                       <tr [attr.data-stream]="s.name">
                         <td class="mono max-w-xs truncate" [title]="s.folder">{{ s.name }}</td>
                         <td class="whitespace-nowrap">{{ modeText(s.mode) }}@if (s.cursorColumn) { <span class="block text-xs text-[color:var(--text-muted)]">by {{ s.cursorColumn }}</span> }</td>
@@ -145,9 +154,16 @@ export interface ConnectionPanelData {
             @if (d.runs.length) {
               <div class="overflow-x-auto">
                 <table class="table-modern" data-runs>
-                  <thead><tr><th>Started</th><th>Stream</th><th>Status</th><th class="text-right">Rows</th><th>Took</th><th>Why</th></tr></thead>
+                  <thead><tr>
+                    <th appSort="started" [sortBy]="runSort">Started</th>
+                    <th appSort="stream" [sortBy]="runSort">Stream</th>
+                    <th appSort="status" [sortBy]="runSort">Status</th>
+                    <th class="text-right" appSort="rows" [sortBy]="runSort">Rows</th>
+                    <th appSort="took" [sortBy]="runSort">Took</th>
+                    <th appSort="why" [sortBy]="runSort">Why</th>
+                  </tr></thead>
                   <tbody>
-                    @for (r of d.runs; track r.id) {
+                    @for (r of sortedRuns(); track r.id) {
                       <tr [attr.data-run]="r.syncId">
                         <td class="whitespace-nowrap">{{ r.startedAt | serverTime: 'recent' }}
                           <span class="block text-xs text-[color:var(--text-muted)]">{{ triggerText(r) }}</span></td>
@@ -215,6 +231,32 @@ export class ConnectionPanel implements OnInit {
   readonly addWord = computed(() => this.card()?.spec.sourceKind === 'file' ? 'folders' : this.card()?.spec.sourceKind === 'endpoint'
     ? 'requests' : 'tables');
 
+  /** Owner 2026-10-27: the streams and the runs sort by their columns; both keep the service's order until then. */
+  readonly streamSort = createTableSort<Stream>({
+    id: 'connector-hub-streams',
+    columns: {
+      name: s => s.name,
+      mode: s => modeText(s.mode),
+      schedule: { value: s => s.scheduleMinutes, kind: 'number', first: 'asc' },
+      rows: { value: s => s.rowsTotal, kind: 'number' },
+      lastSync: { value: s => s.lastSyncAt, kind: 'date' },
+      lag: { value: s => s.lagSeconds, kind: 'number' },
+    },
+  });
+  readonly sortedStreams = computed(() => this.streamSort.apply(this.detail()?.streams ?? []));
+  readonly runSort = createTableSort<SyncRun>({
+    id: 'connector-hub-runs',
+    columns: {
+      started: { value: r => r.startedAt, kind: 'date' },
+      stream: r => r.stream,
+      status: { value: r => r.status, kind: 'status' },
+      rows: { value: r => r.rows, kind: 'number' },
+      took: { value: r => this.tookMs(r), kind: 'number' },
+      why: r => r.error || r.errorFix,
+    },
+  });
+  readonly sortedRuns = computed(() => this.runSort.apply(this.detail()?.runs ?? []));
+
   readonly countText = countText;
   readonly lagText = lagText;
   readonly modeText = modeText;
@@ -241,8 +283,16 @@ export class ConnectionPanel implements OnInit {
         this.error.set('');
         this.detail.set(res.data);
       },
-      error: () => { this.loading.set(false); this.error.set('Connector Hub could not be reached.'); },
+      error: err => { this.loading.set(false); this.error.set(loadErrorText(err, 'The connection could not be read.')); },
     });
+  }
+
+  /** How long a finished run took, in milliseconds, for sorting the Took column; null while it runs. */
+  private tookMs(run: SyncRun): number | null {
+    if (!run.finishedAt) return null;
+    const start = instantOf(run.startedAt);
+    const end = instantOf(run.finishedAt);
+    return start && end ? Math.max(0, end.getTime() - start.getTime()) : null;
   }
 
   triggerText(run: SyncRun): string {

@@ -7,6 +7,8 @@ import { Icon } from '../../../shared/ui/icon';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { SidePanel } from '../../../shared/ui/side-panel';
 import { StatusPill } from '../../../shared/ui/status-pill';
+import { AppLoading, loadErrorText } from '../../../shared/ui/loading';
+import { LoadError } from '../../../shared/ui/load-error';
 import { StepsApi } from '../../tasks/steps/steps.service';
 import { UsageOf, UsagePipeline, UsageRun } from '../../tasks/steps/task-usage.model';
 
@@ -37,7 +39,7 @@ export interface TaskUsagePanelData {
  */
 @Component({
   selector: 'app-task-usage-panel',
-  imports: [SidePanel, Icon, RouterLink, StatusPill, ServerTimePipe],
+  imports: [SidePanel, Icon, RouterLink, StatusPill, ServerTimePipe, AppLoading, LoadError],
   template: `
     <app-side-panel [heading]="heading()" [subtitle]="subtitle()">
       @if (data.countsOnly) {
@@ -46,9 +48,10 @@ export interface TaskUsagePanelData {
           on Platform › Workspaces to see them.
         </p>
       } @else if (loading()) {
-        <div class="py-10 text-center text-sm text-[color:var(--text-muted)]"><div class="spinner mx-auto mb-2" role="status" aria-label="Loading"></div>Loading…</div>
+        <app-loading shape="list" [label]="data.list === 'runs' ? 'Loading runs…' : 'Loading pipelines…'" [count]="5" />
       } @else if (error()) {
-        <p class="text-sm text-crit-500 py-6 text-center" role="alert">{{ error() }}</p>
+        <!-- Owner 2026-10-27: the reason and a Try again, not a dead end. -->
+        <app-load-error [message]="error()" (retry)="load()" />
       } @else {
         @if (shownCount() > 6) {
           <div class="search-field mb-3">
@@ -60,6 +63,9 @@ export interface TaskUsagePanelData {
         @if (data.list === 'pipelines') {
           @if (!pipelines().length) {
             <p class="text-sm text-[color:var(--text-muted)] py-6 text-center" data-test="usage-empty">No pipeline uses it{{ data.tenantId || !isAll ? ' in this workspace' : '' }}.</p>
+          }
+          @if (pipelines().length && !shownPipelines().length) {
+            <p class="text-sm text-[color:var(--text-muted)] py-6 text-center">No pipeline matches "{{ search() }}".</p>
           }
           <ul class="side-panel-list" data-test="usage-pipelines">
             @for (p of shownPipelines(); track p.taskDetailId) {
@@ -84,6 +90,9 @@ export interface TaskUsagePanelData {
           }
           @if (total() > runs().length) {
             <p class="text-xs text-[color:var(--text-muted)] mb-2">The newest {{ runs().length }} of {{ total() }} runs this month.</p>
+          }
+          @if (runs().length && !shownRuns().length) {
+            <p class="text-sm text-[color:var(--text-muted)] py-6 text-center">No run matches "{{ search() }}".</p>
           }
           <ul class="side-panel-list" data-test="usage-runs">
             @for (r of shownRuns(); track r.jobQueueId) {
@@ -146,25 +155,31 @@ export class TaskUsagePanel implements OnInit {
 
   ngOnInit(): void {
     if (this.data.countsOnly) { this.loading.set(false); return; }
-    const failed = (message?: string) => { this.loading.set(false); this.error.set(message || 'The list could not be read.'); };
+    this.load();
+  }
+
+  load(): void {
+    this.loading.set(true);
+    this.error.set('');
+    const failed = (err: unknown) => { this.loading.set(false); this.error.set(loadErrorText(err, 'The list could not be read.')); };
     if (this.data.list === 'runs') {
       this.api.taskRuns(this.data.of, this.data.tenantId).subscribe({
         next: r => {
-          if (r.status !== API_SUCCESS) { failed(r.message); return; }
+          if (r.status !== API_SUCCESS) { failed(r); return; }
           this.loading.set(false);
           this.runs.set(r.data?.runs ?? []);
           this.total.set(r.data?.total ?? 0);
         },
-        error: err => failed(err?.error?.message),
+        error: err => failed(err),
       });
     } else {
       this.api.taskPipelines(this.data.of, this.data.tenantId).subscribe({
         next: r => {
-          if (r.status !== API_SUCCESS) { failed(r.message); return; }
+          if (r.status !== API_SUCCESS) { failed(r); return; }
           this.loading.set(false);
           this.pipelines.set(r.data ?? []);
         },
-        error: err => failed(err?.error?.message),
+        error: err => failed(err),
       });
     }
   }

@@ -3,7 +3,8 @@ import { TestBed } from '@angular/core/testing';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { StaffActivity, changeText, readText, targetText } from './staff-activity';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideHttpClient } from '@angular/common/http';
@@ -35,7 +36,8 @@ describe('MIG-254: Staff activity (platform administrators)', () => {
   it('reads the newest page of every workspace, with the workspaces and staff to filter by', () => {
     const { page, api, get, text } = setup('platform', [{ data: [row(9), row(8)], next: null }]);
     expect(api.actions).toHaveBeenCalledWith({ tenantId: null, appUserId: null, beforeId: null, limit: 50 });
-    expect(get).toHaveBeenCalled();
+    // Owner 2026-10-27: the workspace list was read and never used (the header's app-workspace-select reads its own).
+    expect(get.mock.calls.filter(c => String((c as unknown[])[0]).includes('/tenant.json/listTenants'))).toEqual([]);
     expect(page.staff().map(s => s.appUserId)).toEqual([5001]);
     expect(page.rows().map(r => r.id)).toEqual([9, 8]);
     expect(text()).toContain('Staff activity');
@@ -145,5 +147,25 @@ describe('ZT-A12 follow-up: data reads in a managed session (owner 2026-10-21)',
     const both = TestBed.inject(HttpTestingController).expectOne(r => r.url.endsWith('/managedService.json/actions'));
     expect(both.request.params.has('kind')).toBe(false);
     both.flush({ status: 'SUCCESS', data: [] });
+  });
+});
+
+describe('Staff activity -- loading, errors (owner 2026-10-27)', () => {
+  it('keeps the rows when an older page fails, and says so by the button', () => {
+    const { page, api } = setup('platform', [{ data: [row(9), row(8)], next: 8 }]);
+    api.actions.mockImplementationOnce(() => throwError(() => new HttpErrorResponse({ status: 500, error: 'Internal Server Error' })) as never);
+    page.loadOlder();
+    expect(page.rows().map(r => r.id)).toEqual([9, 8]);
+    expect(page.error()).toBe('');
+    expect(page.olderError()).toBe('The activity could not be read.');
+    expect(page.loadingMore()).toBe(false);
+  });
+
+  it('says the staff list could not be read instead of offering nobody', () => {
+    const { page, api, text } = setup('platform', [{ data: [row(9)], next: null }]);
+    api.users.mockImplementationOnce(() => throwError(() => new HttpErrorResponse({ status: 500 })) as never);
+    page.loadStaff();
+    expect(page.staffState.error()).toBe('The staff could not be read.');
+    expect(text()).toContain('The staff could not be read.');
   });
 });

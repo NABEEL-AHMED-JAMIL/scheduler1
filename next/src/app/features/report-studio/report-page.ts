@@ -31,6 +31,9 @@ import { askVoidReason } from './void-dialog';
 import { sidePanelConfig } from '../../shared/ui/side-panel';
 import { formatDuration } from '../../shared/ui/time-format';
 import { PageLimitActions } from './page-limit-actions';
+import { AppLoading, InlineStatus, createLoadState, loadErrorText } from '../../shared/ui/loading';
+import { createTableSort } from '../../shared/ui/sort';
+import { SortHeader } from '../../shared/ui/sort-header';
 
 type Tab = 'details' | 'versions' | 'activity' | 'access';
 
@@ -43,7 +46,7 @@ type Tab = 'details' | 'versions' | 'activity' | 'access';
  */
 @Component({
   selector: 'app-report-page',
-  imports: [PageHeader, RefreshButton, Icon, StatusPill, RsTimePipe, LoadError, ProblemList, RouterLink, FormsModule, NgTemplateOutlet, PageLimitActions],
+  imports: [PageHeader, RefreshButton, Icon, StatusPill, RsTimePipe, LoadError, ProblemList, RouterLink, FormsModule, NgTemplateOutlet, PageLimitActions, AppLoading, InlineStatus, SortHeader],
   templateUrl: './report-page.html',
   styleUrl: './report-page.css',
 })
@@ -69,8 +72,14 @@ export class ReportPage implements OnInit {
   /** The page the small view shows (owner 2026-10-20: Back and Next). */
   readonly thumbPage = signal(1);
   readonly thumbLoading = signal(false);
+  /** Owner 2026-10-27: the small view says when its page could not be drawn, instead of an empty paper. */
+  readonly thumbError = signal('');
   /** The template's versions a report can be made from (published, and the ones superseded since). */
   readonly templateVersions = signal<VersionRow[]>([]);
+  /** The Template version choices' read: loading, none, or why it failed (owner 2026-10-27). */
+  readonly versionsState = createLoadState(false);
+  /** Following a queued job: a progress read that fails says so (and can be asked again), not a job "running" for ever. */
+  readonly pollError = signal('');
   readonly againVersion = signal<number | null>(null);
   readonly againData = signal<'same' | 'other'>('same');
   /** Phase 4: "Mark this version as COPY" -- the new version carries COPY on every page. */
@@ -124,6 +133,18 @@ export class ReportPage implements OnInit {
   readonly me = computed(() => this.auth.user()?.appUserId ?? null);
   readonly approving = signal(false);
 
+  /** Owner 2026-10-27: the versions sort by version, when, template or approval; the service's order until one is picked. */
+  readonly versionSort = createTableSort<ReportVersionRow>({
+    id: 'report-versions',
+    columns: {
+      version: { value: v => v.version, kind: 'number' },
+      generated: { value: v => v.createdAt, kind: 'date' },
+      template: { value: v => v.templateVersion, kind: 'number' },
+      signed: { value: v => this.signedWord(v), kind: 'status', order: ['Signed', 'Approved', 'Waiting', 'Superseded'] },
+    },
+  });
+  readonly sortedVersions = computed(() => this.versionSort.apply(this.r()?.versions ?? []));
+
   constructor() {
     inject(DestroyRef).onDestroy(() => {
       this.poll?.unsubscribe();
@@ -163,6 +184,7 @@ export class ReportPage implements OnInit {
   private loadThumb(r: ReportDetail, page = 1): void {
     if (!r.currentVersion || !this.current()?.outputs.some(o => o.format === 'PDF')) return;
     this.thumbLoading.set(true);
+    this.thumbError.set('');
     this.api.reportThumbnail(r.reportId, r.currentVersion, this.auth.isPlatformAdmin() ? r.tenantId : null, page).subscribe({
       next: res => {
         this.thumbLoading.set(false);
@@ -172,8 +194,23 @@ export class ReportPage implements OnInit {
         this.thumb.set(URL.createObjectURL(res.body));
         this.thumbPage.set(page);
       },
-      error: () => { this.thumbLoading.set(false); /* the card keeps the page it had */ },
+      // The card keeps the page it had, and says this one could not be drawn.
+      error: e => { this.thumbLoading.set(false); this.thumbError.set(loadErrorText(e, 'The page preview is not available right now.')); },
     });
+  }
+
+  retryThumb(): void {
+    const r = this.r();
+    if (r) this.loadThumb(r, this.thumb() ? this.thumbPage() : 1);
+  }
+
+  /** The Signed column's word for a version, as the cell shows it (for its sort). */
+  signedWord(v: ReportVersionRow): string | null {
+    if (v.approval?.signed) return 'Signed';
+    if (v.approval) return 'Approved';
+    if (this.waiting(v)) return 'Waiting';
+    if (this.superseded(v)) return 'Superseded';
+    return null;
   }
 
   /** Back (-1) or Next (+1) in the small view, within the version's pages. */
@@ -195,14 +232,17 @@ export class ReportPage implements OnInit {
     });
   }
 
-  private loadVersions(templateId: string): void {
+  loadVersions(templateId = this.r()?.templateId ?? ''): void {
+    if (!templateId) return;
+    this.versionsState.start();
     this.api.template(templateId).subscribe({
       next: t => {
         const made = t.versions.filter(v => v.state !== 'DRAFT');
         this.templateVersions.set(made);
         this.againVersion.set(t.currentPublishedVersion ?? made[0]?.version ?? null);
+        this.versionsState.done();
       },
-      error: () => this.templateVersions.set([]),
+      error: e => this.versionsState.fail(e, 'The template\'s versions could not be read.'),
     });
   }
 
@@ -380,13 +420,23 @@ export class ReportPage implements OnInit {
 
   private follow(jobId: string): void {
     this.poll?.unsubscribe();
+    this.pollError.set('');
     this.poll = interval(1500).pipe(switchMap(() => this.api.job(jobId))).subscribe({
       next: job => {
         this.againJob.set(job);
         if (!isRunning(job.status)) { this.poll?.unsubscribe(); this.load(); }
       },
-      error: () => this.poll?.unsubscribe(),
+      error: e => {
+        this.poll?.unsubscribe();
+        this.pollError.set(loadErrorText(e, 'The job\'s progress could not be read; it may still be running.'));
+      },
     });
+  }
+
+  /** Try again after a progress read failed: follows the same job again. */
+  checkAgain(): void {
+    const j = this.againJob();
+    if (j) this.follow(j.jobId);
   }
 
   readonly keptWords = REPORT_KEPT_WORDS;

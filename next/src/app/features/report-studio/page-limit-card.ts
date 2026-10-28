@@ -7,6 +7,8 @@ import { AuthService } from '../../core/auth/auth.service';
 import { WorkspaceDirectory } from '../../core/workspaces/workspace-directory';
 import { ReportStudioApi, studioError } from './report-studio.api';
 import { PageLimit } from './report-studio.model';
+import { AppLoading } from '../../shared/ui/loading';
+import { LoadError } from '../../shared/ui/load-error';
 
 /** Who can raise a workspace's limit, in words. */
 export function raiseWords(p: Pick<PageLimit, 'raisedBy' | 'ceiling' | 'hardMax'>): string {
@@ -30,7 +32,7 @@ export function pagesIn(value: unknown, max: number): number | null {
  */
 @Component({
   selector: 'app-page-limit-card',
-  imports: [FormsModule, Icon, WorkspaceSelect],
+  imports: [FormsModule, Icon, WorkspaceSelect, AppLoading, LoadError],
   styles: `
     .plc-row { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: flex-end; padding: 0.75rem 0; border-top: 1px solid var(--border-subtle); }
     .plc-row:first-of-type { border-top: 0; }
@@ -54,7 +56,7 @@ export function pagesIn(value: unknown, max: number): number | null {
       @if (platformAdmin() && !tenantId()) {
         <p class="text-sm text-[color:var(--text-muted)]" data-test="page-limit-pick">Pick a workspace to see its page limit and set its ceiling.</p>
       } @else if (error()) {
-        <p class="text-sm text-crit-500" role="alert">{{ error() }}</p>
+        <app-load-error [message]="error()" (retry)="load()" />
       } @else if (limit(); as p) {
         <div class="plc-row">
           <label class="flex flex-col gap-1"><span class="label">Most pages in one report</span>
@@ -92,7 +94,7 @@ export function pagesIn(value: unknown, max: number): number | null {
           </div>
         }
       } @else {
-        <div class="flex justify-center py-4"><span class="spinner" role="status" aria-label="Loading"></span></div>
+        <app-loading shape="panel" label="Loading the page limit…" [count]="2" />
       }
     </section>
   `,
@@ -126,12 +128,17 @@ export class PageLimitCard implements OnInit {
   load(): void {
     this.error.set('');
     this.pageError.set('');
-    if (this.platformAdmin() && !this.tenantId()) { this.limit.set(null); return; }
+    // Owner 2026-10-27: another workspace's numbers are not left on screen (and editable) while this one's are read.
+    this.limit.set(null);
+    const asked = ++this.asked;
+    if (this.platformAdmin() && !this.tenantId()) return;
     this.api.pageLimit(this.platformAdmin() ? this.tenantId() : null).subscribe({
-      next: p => this.apply(p),
-      error: e => this.error.set(studioError(e, 'The page limit could not be read.').message),
+      next: p => { if (asked === this.asked) this.apply(p); },
+      error: e => { if (asked === this.asked) this.error.set(studioError(e, 'The page limit could not be read.').message); },
     });
   }
+  /** Answers come back in any order (a quick workspace switch): only the latest is shown. */
+  private asked = 0;
 
   private apply(p: PageLimit): void {
     this.limit.set(p);

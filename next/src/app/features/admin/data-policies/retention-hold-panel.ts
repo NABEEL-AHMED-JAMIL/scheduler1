@@ -5,6 +5,7 @@ import { Icon } from '../../../shared/ui/icon';
 import { SidePanel } from '../../../shared/ui/side-panel';
 import { refusal } from '../../../shared/ui/bulk/bulk.model';
 import { RetentionApi } from './retention.api';
+import { InlineStatus, createLoadState } from '../../../shared/ui/loading';
 import { RetentionHold } from './retention.model';
 
 export interface RetentionHoldPanelData {
@@ -20,7 +21,7 @@ type Scope = 'WORKSPACE' | 'PIPELINE' | 'RUN';
  */
 @Component({
   selector: 'app-retention-hold-panel',
-  imports: [SidePanel, Icon],
+  imports: [SidePanel, Icon, InlineStatus],
   template: `
     <app-side-panel heading="Place a legal hold" subtitle="Nothing in its scope is removed while it is on" data-test="retention-hold-panel">
       <div class="form-lock flex flex-col gap-4">
@@ -40,9 +41,14 @@ type Scope = 'WORKSPACE' | 'PIPELINE' | 'RUN';
           <div>
             <label class="label" for="hold-job">Pipeline</label>
             <select id="hold-job" class="input" [value]="jobId() ?? ''" (change)="jobId.set(+$any($event.target).value || null)" data-test="hold-job">
-              <option value="">Choose a pipeline</option>
+              <option value="">{{ pipelinesState.loading() ? 'Loading pipelines…' : 'Choose a pipeline' }}</option>
               @for (p of pipelines(); track p.jobId) { <option [value]="p.jobId">{{ p.jobName }} (#{{ p.jobId }})</option> }
             </select>
+            <!-- Owner 2026-10-27: the list's state under the field -- a failed read left an empty list and a disabled
+                 Place with no word. -->
+            <app-inline-status [loading]="pipelinesState.loading()" [error]="pipelinesState.error()"
+                               [empty]="pipelinesState.loaded() && !pipelines().length" label="Loading pipelines…"
+                               emptyText="No pipeline in this workspace yet." (retry)="loadPipelines()" />
           </div>
         }
         @if (scope() === 'RUN') {
@@ -81,14 +87,24 @@ export class RetentionHoldPanel implements OnInit {
   readonly pipelines = signal<{ jobId: number; jobName: string }[]>([]);
   readonly saving = signal(false);
   readonly error = signal('');
+  readonly pipelinesState = createLoadState();
 
   readonly ready = computed(() => !!this.reason().trim()
     && (this.scope() === 'WORKSPACE' || (this.scope() === 'PIPELINE' && !!this.jobId()) || (this.scope() === 'RUN' && !!this.runId())));
 
   ngOnInit(): void {
+    this.loadPipelines();
+  }
+
+  loadPipelines(): void {
+    this.pipelinesState.start();
     this.api.pipelines().subscribe({
-      next: r => this.pipelines.set((r?.data ?? []).map(j => ({ jobId: j.jobId, jobName: j.jobName }))),
-      error: () => this.pipelines.set([]),
+      next: r => {
+        if (r?.status !== API_SUCCESS) { this.pipelinesState.fail(r, 'The pipelines could not be read.'); return; }
+        this.pipelines.set((r.data ?? []).map(j => ({ jobId: j.jobId, jobName: j.jobName })));
+        this.pipelinesState.done();
+      },
+      error: err => this.pipelinesState.fail(err, 'The pipelines could not be read.'),
     });
   }
 

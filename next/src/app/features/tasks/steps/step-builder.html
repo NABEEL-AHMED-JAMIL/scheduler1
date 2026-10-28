@@ -136,9 +136,10 @@
         @if (meta().versions.length) {
           <div class="overflow-x-auto">
             <table class="table-modern">
-              <thead><tr><th>Version</th><th>Saved</th><th>By</th></tr></thead>
+              <thead><tr><th appSort="version" [sortBy]="versionSort">Version</th><th appSort="saved" [sortBy]="versionSort">Saved</th>
+                <th appSort="by" [sortBy]="versionSort">By</th></tr></thead>
               <tbody>
-                @for (v of meta().versions; track v.pipelineDefinitionId) {
+                @for (v of sortedVersions(); track v.pipelineDefinitionId) {
                   <tr>
                     <td class="mono text-xs">v{{ v.version }}@if (v.version === meta().version) { <span class="pill pill-brand ml-1.5">Current</span> }</td>
                     <td class="text-xs whitespace-nowrap">{{ v.dateCreated | serverTime:'dateTime' }}</td>
@@ -199,13 +200,20 @@
                 <app-icon name="table" />Test with sample
               </button>
               <div class="w-full sm:w-72">
-                <app-combobox id="addStep" ariaLabel="Add step" placeholder="Add step from the Task Registry…" [allowClear]="false"
+                <app-combobox id="addStep" ariaLabel="Add step" [placeholder]="tasksState.pending() ? 'Loading the Task Registry…' : 'Add step from the Task Registry…'" [allowClear]="false"
                               [options]="taskOptions()" [selected]="addPick()" (selectedChange)="add($event)" />
+                <app-inline-status [loading]="tasksState.loading()" [error]="tasksState.error()" label="Loading the Task Registry…" (retry)="reloadTasks()" />
               </div>
             }
           </div>
         </div>
 
+        @if (choiceErrors().length) {
+          <!-- Owner 2026-10-27: a step's choice list that could not be read is said, not just left empty in its panel. -->
+          <div class="mb-2" data-test="choice-errors">
+            <app-inline-status [error]="choiceErrors().join(' ') + ' Its box is empty until it is read again.'" (retry)="retryChoices()" />
+          </div>
+        }
         @if (layout() === 'flow') {
           <div data-test="step-flow">
             <ng-container #flowHost />
@@ -240,8 +248,9 @@
                         </button>
                       }
                       <span class="step-index">{{ i + 1 }}</span>
-                      <button type="button" class="step-open" [attr.aria-label]="'Open step ' + step.key" (click)="open(i)">
+                      <button type="button" class="step-open" [attr.aria-label]="'Open step ' + step.key" [attr.aria-busy]="openingKey() === step.key || null" (click)="open(i)">
                         <span class="block text-sm font-medium truncate">{{ step.name || step.key }}
+                          @if (openingKey() === step.key) { <app-loading shape="inline" label="Opening…" /> }
                           @if (step.name) { <span class="mono text-xs text-[color:var(--text-muted)] ml-1">{{ step.key }}</span> }
                         </span>
                         <span class="block text-xs text-[color:var(--text-secondary)] truncate">

@@ -120,6 +120,12 @@
                     data-test="sso-continue">
               <app-icon name="building" />Continue with {{ ssoName() }}
             </button>
+          } @else if (ssoChecking()) {
+            <div class="mb-5"><app-loading shape="inline" label="Checking company sign-in…" /></div>
+          } @else if (ssoNote()) {
+            <p class="text-sm text-[color:var(--text-muted)] mb-5 flex items-start gap-1.5" role="status" data-test="sso-note">
+              <app-icon name="info" size="0.95em" class="mt-0.5 shrink-0" />{{ ssoNote() }}
+            </p>
           }
 
           <form [formGroup]="form" (ngSubmit)="submit()" novalidate class="form-stack">

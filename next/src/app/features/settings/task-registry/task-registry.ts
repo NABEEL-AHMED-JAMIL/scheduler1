@@ -35,6 +35,9 @@ import { TaskPanel, TaskPanelData, TaskPanelResult } from './task-panel';
 import { REGISTRY_KINDS, RegistryRow, TASK_STATES, filterRows, kindCounts, registryRows } from './task-registry.model';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
+import { InlineStatus, loadErrorText } from '../../../shared/ui/loading';
 
 /** The whole scope's pipeline numbers, from pipeline.json/list, whatever filter is on. */
 interface PipelineSummary { total: number; active: number; fields: number; topics: number; untopped: number; }
@@ -59,7 +62,7 @@ const EMPTY_SUMMARY: PipelineSummary = { total: 0, active: 0, fields: 0, topics:
  */
 @Component({
   selector: 'app-task-registry',
-  imports: [WorkspaceSelect, RefreshButton, PageHeader, MineFilter, StatTile, TableShell, TaskStatePill, TaskSwitch, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger, RouterLink, Combobox, Pagination, ManagedBanner, ServerTimePipe],
+  imports: [WorkspaceSelect, RefreshButton, PageHeader, MineFilter, StatTile, TableShell, TaskStatePill, TaskSwitch, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger, RouterLink, Combobox, Pagination, ManagedBanner, ServerTimePipe, SortHeader, InlineStatus],
   templateUrl: './task-registry.html',
 })
 export class TaskRegistry implements OnInit {
@@ -80,12 +83,16 @@ export class TaskRegistry implements OnInit {
   readonly tasks = signal<StepTaskEntry[]>([]);
   readonly tasksLoading = signal(true);
   readonly tasksError = signal('');
+  /** Owner 2026-10-27: whether the registry has answered once -- until then its tiles wait instead of showing 0. */
+  readonly tasksLoaded = signal(false);
 
   /** The pipelines, whole (up to LIST_LIMIT): the Legacy rows. */
   readonly forms = signal<Pipeline[]>([]);
   readonly loading = signal(true);
   readonly error = signal('');
   readonly summary = signal<PipelineSummary>(EMPTY_SUMMARY);
+  /** Whether the pipelines have answered once (the Legacy tile waits for it). */
+  readonly pipelinesLoaded = signal(false);
   readonly truncated = computed(() => isProbablyTruncated(this.forms().length));
 
   // ---- filters ------------------------------------------------------------------------------------------------
@@ -154,6 +161,8 @@ export class TaskRegistry implements OnInit {
 
   // ---- owner #16: the audit -----------------------------------------------------------------------------------------
   readonly changes = signal<TaskChange[]>([]);
+  /** Owner 2026-10-27: a failed read of the changes says so (it used to read as "no change"). */
+  readonly changesError = signal('');
   readonly switching = signal<string | null>(null);
 
   /** Switches a task on or off in this workspace, or (null) back to its default; the row shows Core's answer. */
@@ -178,8 +187,25 @@ export class TaskRegistry implements OnInit {
   readonly rows = computed(() => registryRows(this.pipelinesOnly() ? this.tasks().filter(t => t.kind === 'Legacy' || t.code === 'legacy') : this.tasks(), this.forms()));
   readonly counts = computed(() => kindCounts(this.rows()));
   readonly filtered = computed(() => filterRows(this.rows(), { kind: this.kindFilter(), state: this.stateFilter(), search: this.search() }));
+  /**
+   * Owner 2026-10-27: every column that holds a value sorts, before the paging. The natural order (step tasks by kind,
+   * then the Legacy pipelines) is not one column, so nothing is sorted until a heading is picked.
+   */
+  readonly sort = createTableSort<RegistryRow>({
+    id: 'task-registry',
+    columns: {
+      task: r => r.name,
+      kind: r => r.kind,
+      service: r => r.service,
+      io: r => `${r.input} → ${r.output}`,
+      pipelines: { value: r => (this.countsKnown() ? this.countOf(r).pipelines : null), kind: 'number' },
+      runs: { value: r => (this.countsKnown() ? this.countOf(r).runs : null), kind: 'number' },
+      state: { value: r => r.state, kind: 'status' },
+    },
+  });
+  readonly sorted = computed(() => this.sort.apply(this.filtered()));
   readonly pager = createPager<RegistryRow>();
-  readonly shown = computed(() => this.pager.slice(this.filtered()));
+  readonly shown = computed(() => this.pager.slice(this.sorted()));
 
   readonly taskTiles = computed(() => {
     const steps = this.rows().filter(r => !r.legacy);
@@ -241,10 +267,14 @@ export class TaskRegistry implements OnInit {
 
   /** The workspace's switch and block changes, newest first (a platform administrator's: the chosen workspace's). */
   loadChanges(): void {
+    this.changesError.set('');
     if (this.isPlatformAdmin() && !this.tenantFilter()) { this.changes.set([]); return; }
     this.api.taskHistory(null, this.tenantParam()).subscribe({
-      next: r => this.changes.set(r.status === API_SUCCESS ? (r.data ?? []).slice(0, 12) : []),
-      error: () => this.changes.set([]),
+      next: r => {
+        if (r.status !== API_SUCCESS) { this.changes.set([]); this.changesError.set(loadErrorText(r, 'The recent changes could not be read.')); return; }
+        this.changes.set((r.data ?? []).slice(0, 12));
+      },
+      error: err => { this.changes.set([]); this.changesError.set(loadErrorText(err, 'The recent changes could not be read.')); },
     });
   }
 
@@ -314,17 +344,18 @@ export class TaskRegistry implements OnInit {
     this.api.tasks(this.tenantParam()).subscribe({
       next: r => {
         this.tasksLoading.set(false);
-        if (r.status !== API_SUCCESS) { this.tasksError.set(r.message || 'The Task Registry could not be read.'); return; }
+        if (r.status !== API_SUCCESS) { this.tasksError.set(loadErrorText(r, 'The Task Registry could not be read.')); return; }
         this.tasks.set(r.data ?? []);
+        this.tasksLoaded.set(true);
       },
-      error: err => { this.tasksLoading.set(false); this.tasksError.set(err?.error?.message || 'The Task Registry could not be read.'); },
+      error: err => { this.tasksLoading.set(false); this.tasksError.set(loadErrorText(err, 'The Task Registry could not be read.')); },
     });
   }
 
   private loadTicket = 0;
   loadPipelines(): void {
     const ticket = ++this.loadTicket;
-    if (this.ownSignIn()) { this.loading.set(false); this.error.set(''); this.forms.set([]); this.summary.set(EMPTY_SUMMARY); return; }
+    if (this.ownSignIn()) { this.loading.set(false); this.error.set(''); this.forms.set([]); this.summary.set(EMPTY_SUMMARY); this.pipelinesLoaded.set(true); return; }
     this.loading.set(true);
     this.error.set('');
     const params: Record<string, string> = { page: '1', limit: String(LIST_LIMIT) };
@@ -336,14 +367,15 @@ export class TaskRegistry implements OnInit {
         // A slower answer to an earlier filter must not overwrite the newest one.
         if (ticket !== this.loadTicket) return;
         this.loading.set(false);
-        if (response.status !== API_SUCCESS) { this.error.set(response.message); return; }
+        if (response.status !== API_SUCCESS) { this.error.set(loadErrorText(response, 'The pipelines could not be read.')); return; }
         this.forms.set(response.data?.rows ?? []);
         this.summary.set(response.data?.summary ?? EMPTY_SUMMARY);
+        this.pipelinesLoaded.set(true);
       },
       error: err => {
         if (ticket !== this.loadTicket) return;
         this.loading.set(false);
-        this.error.set(err?.error?.message || 'Could not load pipelines.');
+        this.error.set(loadErrorText(err, 'The pipelines could not be read.'));
       },
     });
   }

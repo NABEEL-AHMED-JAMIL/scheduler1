@@ -49,11 +49,19 @@ export const PINNED: Record<string, unknown> = {
       "Cards",
       "Columns",
       "Copy",
+      "Created by",
+      "Data",
       "Hide details",
+      "Last run",
       "Only mine",
+      "Pipeline",
       "Refresh",
+      "Schedules",
       "Show schedules and details",
-      "Table"
+      "Status",
+      "Steps",
+      "Table",
+      "Updated by"
     ],
     "columns": [
       [
@@ -274,10 +282,18 @@ export const PINNED: Record<string, unknown> = {
     "buttons": [
       "Cards",
       "Columns",
+      "Created by",
+      "Data",
+      "Last run",
       "Only mine",
+      "Pipeline",
       "Refresh",
+      "Schedules",
       "Show schedules and details",
-      "Table"
+      "Status",
+      "Steps",
+      "Table",
+      "Updated by"
     ],
     "columns": [
       [
@@ -326,10 +342,18 @@ export const PINNED: Record<string, unknown> = {
       "Actions for UI-REVIEW Clean customers CSV check",
       "Cards",
       "Columns",
+      "Created by",
+      "Data",
+      "Last run",
       "Only mine",
+      "Pipeline",
       "Refresh",
+      "Schedules",
       "Show schedules and details",
-      "Table"
+      "Status",
+      "Steps",
+      "Table",
+      "Updated by"
     ],
     "columns": [
       [

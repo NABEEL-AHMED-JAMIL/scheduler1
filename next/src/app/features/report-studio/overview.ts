@@ -13,12 +13,15 @@ import { AuthService } from '../../core/auth/auth.service';
 import { WorkspaceDirectory } from '../../core/workspaces/workspace-directory';
 import { WorkspaceSelect } from '../../shared/ui/workspace-select';
 import { ReportStudioApi, studioError } from './report-studio.api';
-import { JobRow, StudioOverview, chipWord, isRunning, stageWord } from './report-studio.model';
+import { JobRow, ReportRow, StudioOverview, chipWord, isRunning, stageWord } from './report-studio.model';
 import { GeneratedService, pipelineOf } from '../documents/generated/generated.service';
 import { RunRow } from '../tasks/steps/steps.model';
 import { RsTabCounts } from './rs-tab-counts';
 import { formatDuration } from '../../shared/ui/time-format';
 import { PageLimitActions } from './page-limit-actions';
+import { AppLoading } from '../../shared/ui/loading';
+import { createTableSort } from '../../shared/ui/sort';
+import { SortHeader } from '../../shared/ui/sort-header';
 
 /** A pipeline whose runs fed reports lately (the Overview's "Connected pipelines"), as the person may see it. */
 export interface ConnectedPipeline {
@@ -41,7 +44,7 @@ const FAIL_WORDS: Record<string, string> = {
  */
 @Component({
   selector: 'app-report-overview',
-  imports: [PageHeader, WorkspaceSelect, RefreshButton, Icon, StatStrip, StatusPill, RsTimePipe, LoadError, RouterLink, PageLimitActions],
+  imports: [PageHeader, WorkspaceSelect, RefreshButton, Icon, StatStrip, StatusPill, RsTimePipe, LoadError, RouterLink, PageLimitActions, AppLoading, SortHeader],
   templateUrl: './overview.html',
 })
 export class ReportOverview implements OnInit {
@@ -60,6 +63,39 @@ export class ReportOverview implements OnInit {
   readonly loading = signal(true);
   readonly error = signal('');
   readonly pipelines = signal<ConnectedPipeline[]>([]);
+  /**
+   * Owner 2026-10-27: the Connected pipelines card's reads (the schedules, then each one's newest runs): it says it is
+   * looking while they come, and that they could not be read when they fail -- not "their schedules are not ones you can
+   * open". A refresh keeps the card's list until the new one is complete.
+   */
+  readonly pipelinesLoading = signal(false);
+  readonly pipelinesError = signal('');
+  private connectSeq = 0;
+  /** Owner 2026-10-27: the two recent lists sort by their columns; the service's order (recent first) until one is picked. */
+  readonly reportSort = createTableSort<ReportRow>({
+    id: 'report-overview-reports',
+    note: 'Sorts the recent reports shown here',
+    columns: {
+      report: r => r.name,
+      version: { value: r => r.currentVersion, kind: 'number' },
+      status: { value: r => (r.lastJob && isRunning(r.lastJob.status) ? 'Running' : chipWord(r.status)), kind: 'status' },
+      signed: r => (r.current?.approval?.signed ? 'Signed' : r.current?.approval ? 'Approved' : null),
+      updated: { value: r => r.updatedAt, kind: 'date' },
+    },
+  });
+  readonly sortedReports = computed(() => this.reportSort.apply(this.data()?.recentReports ?? []));
+  readonly jobSort = createTableSort<JobRow>({
+    id: 'report-overview-jobs',
+    note: 'Sorts the recent jobs shown here',
+    columns: {
+      job: j => j.label,
+      startedBy: j => this.startedBy(j),
+      progress: { value: j => (isRunning(j.status) ? 'Running' : j.status === 'SUCCEEDED' ? 'Completed' : j.status === 'FAILED' ? 'Failed' : chipWord(j.status)), kind: 'status' },
+      started: { value: j => j.createdAt, kind: 'date' },
+    },
+  });
+  /** A sorted copy: the blocked-job banner reads the service's own order. */
+  readonly sortedJobs = computed(() => this.jobSort.apply(this.data()?.recentJobs ?? []));
   readonly chipWord = chipWord;
   readonly stageWord = stageWord;
   readonly isRunning = isRunning;
@@ -140,30 +176,52 @@ export class ReportOverview implements OnInit {
    * The pipelines behind the runs reports were made from: the reader's schedules, the newest runs of the most recently run
    * ones, matched to the runs Report Studio used. A schedule the reader may not see is not listed.
    */
-  private connect(d: StudioOverview): void {
+  connect(d: StudioOverview): void {
     const used = d.pipelineRuns ?? [];
-    this.pipelines.set([]);
+    const seq = ++this.connectSeq;
+    this.pipelinesError.set('');
     // ZT-R9: the schedules are the Schedules page's (key 'jobs'); a reviewer without it is not asked (it was a 403 in the console).
-    if (!used.length || this.auth.isPlatformAdmin() || !this.auth.canOpen('jobs')) return;
+    if (!used.length || this.auth.isPlatformAdmin() || !this.auth.canOpen('jobs')) {
+      this.pipelines.set([]);
+      this.pipelinesLoading.set(false);
+      return;
+    }
+    this.pipelinesLoading.set(true);
     this.generated.schedules().subscribe({
       next: all => {
+        if (seq !== this.connectSeq) return;
         const recent = [...all].sort((a, b) => String(b.lastJobRun ?? '').localeCompare(String(a.lastJobRun ?? ''))).slice(0, 10);
+        const found: ConnectedPipeline[] = [];
+        let left = recent.length;
+        let failed = 0;
+        const settle = () => {
+          if (seq !== this.connectSeq || --left > 0) return;
+          this.pipelines.set(found.slice(0, 4));
+          this.pipelinesLoading.set(false);
+          if (recent.length && failed === recent.length) this.pipelinesError.set('The pipelines\' runs could not be read.');
+        };
+        if (!recent.length) { this.pipelines.set([]); this.pipelinesLoading.set(false); return; }
         for (const job of recent) {
           this.generated.runs(job.jobId, 15).subscribe({
             next: runs => {
               const hits = used.filter(u => runs.some(r => r.jobQueueId === u.pipelineRunId));
-              if (!hits.length) return;
-              const templates = new Set(hits.flatMap(h => h.templateIds)).size;
-              this.pipelines.update(list => [...list.filter(p => p.jobId !== job.jobId), {
-                jobId: job.jobId, name: job.jobName ?? `Schedule ${job.jobId}`, pipeline: pipelineOf(job), lastRun: runs[0] ?? null, templates,
-                usedRun: hits[0].pipelineRunId,
-              }].slice(0, 4));
+              if (hits.length) {
+                const templates = new Set(hits.flatMap(h => h.templateIds)).size;
+                found.push({ jobId: job.jobId, name: job.jobName ?? `Schedule ${job.jobId}`, pipeline: pipelineOf(job), lastRun: runs[0] ?? null, templates,
+                  usedRun: hits[0].pipelineRunId });
+              }
+              settle();
             },
-            error: () => { /* a schedule whose runs the reader cannot read is left out */ },
+            // A schedule whose runs the reader cannot read is left out; only all of them failing is said.
+            error: () => { failed++; settle(); },
           });
         }
       },
-      error: () => this.pipelines.set([]),
+      error: e => {
+        if (seq !== this.connectSeq) return;
+        this.pipelinesLoading.set(false);
+        this.pipelinesError.set(studioError(e, 'The schedules could not be read.').message);
+      },
     });
   }
 

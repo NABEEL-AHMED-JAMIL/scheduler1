@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { Dialog } from '@angular/cdk/dialog';
-import { of, throwError } from 'rxjs';
-import { HttpClient } from '@angular/common/http';
+import { NEVER, of, throwError } from 'rxjs';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { AuthService } from '../../../core/auth/auth.service';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -220,8 +220,46 @@ describe('AccessProfiles -- audit fixes', () => {
         { provide: HttpClient, useValue: { get: () => throwError(() => ({ error: {} })) } },
       ],
     });
-    TestBed.runInInjectionContext(() => new AccessProfiles()).ngOnInit();
-    expect(toast.error).toHaveBeenCalledWith('The page catalogue could not be loaded.');
+    const screen = TestBed.runInInjectionContext(() => new AccessProfiles());
+    screen.ngOnInit();
+    // Owner 2026-10-27: on the Pages tile ("Not available right now"), not a toast only.
+    expect(screen.pagesState.error()).toBe('The page catalogue could not be loaded.');
+    expect(screen.pagesState.pending()).toBe(false);
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+});
+
+describe('AccessProfiles -- loading, empty, error (owner 2026-10-27)', () => {
+  it('shows placeholders on the tiles, not "0 / none yet", until the profiles answer', () => {
+    const { screen } = screenWith([], { list: () => NEVER, pages: () => NEVER });
+    expect(screen.loading()).toBe(true);
+    expect(screen.tilesLoading()).toBe(true);
+    expect(screen.pagesState.pending()).toBe(true);
+    expect(screen.tilesFailed()).toBe(false);
+  });
+
+  it('is empty once no profile answers', () => {
+    const { screen } = screenWith([]);
+    expect(screen.loading()).toBe(false);
+    expect(screen.tilesLoading()).toBe(false);
+    expect(screen.profiles()).toEqual([]);
+    expect(screen.error()).toBe('');
+  });
+
+  it('says the profiles could not be read, in plain words, and marks the tiles as not available', () => {
+    const { screen } = screenWith([], { list: () => throwError(() => new HttpErrorResponse({ status: 500, error: 'Internal Server Error' })) });
+    expect(screen.loading()).toBe(false);
+    expect(screen.error()).toBe('Access profiles could not be loaded.');
+    expect(screen.tilesFailed()).toBe(true);
+    expect(screen.tilesLoading()).toBe(false);
+  });
+
+  it('knows nobody is in the workspace only after the people answered', () => {
+    const { screen } = screenWith([profile(1, 'Operator', ['jobs'], true)], { people: () => of({ status: 'SUCCESS', message: '', data: [] }) });
+    expect(screen.peopleLoaded()).toBe(false);
+    screen.openPreview();
+    expect(screen.peopleLoaded()).toBe(true);
+    expect(screen.people()).toEqual([]);
   });
 });
 

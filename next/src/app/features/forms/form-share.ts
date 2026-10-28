@@ -6,6 +6,10 @@ import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { ToastService } from '../../shared/ui/toast.service';
 import { ShareLink, ShareLinks, shareUrl } from './forms.model';
 import { FormsApi } from './forms.service';
+import { AppLoading, InlineStatus, loadErrorText } from '../../shared/ui/loading';
+import { LoadError } from '../../shared/ui/load-error';
+import { createTableSort } from '../../shared/ui/sort';
+import { SortHeader } from '../../shared/ui/sort-header';
 
 /** How long a new link lasts, in days. */
 const DAY_CHOICES = [1, 7, 14, 30, 90];
@@ -17,7 +21,7 @@ const DAY_CHOICES = [1, 7, 14, 30, 90];
  */
 @Component({
   selector: 'app-form-share',
-  imports: [Icon, ServerTimePipe],
+  imports: [Icon, ServerTimePipe, AppLoading, InlineStatus, LoadError, SortHeader],
   template: `
     <section class="card p-4 flex flex-col gap-4 max-w-4xl" data-share aria-labelledby="share-heading">
       <div class="flex flex-wrap items-start gap-3">
@@ -36,12 +40,16 @@ const DAY_CHOICES = [1, 7, 14, 30, 90];
         }
       </div>
 
-      @if (loading()) {
-        <p class="text-sm text-[color:var(--text-muted)]" role="status">Loading links…</p>
-      } @else if (error()) {
-        <p class="text-sm text-crit-500" role="alert">{{ error() }}
-          <button type="button" class="btn btn-default btn-xs" (click)="load()">Try again</button></p>
+      <!--
+        Owner 2026-10-27: only the first read shows the loader; a read again (after the policy, a new link or a revoke)
+        keeps the card -- the just-made link box included -- with a small line while it reads.
+      -->
+      @if (loading() && !state()) {
+        <app-loading shape="panel" label="Loading links…" [count]="3" />
+      } @else if (error() && !state()) {
+        <app-load-error role="alert" [message]="error()" (retry)="load()" />
       } @else if (state(); as s) {
+        <app-inline-status [loading]="loading()" [error]="error()" label="Reading the links again…" (retry)="load()" />
         @if (!s.enabled) {
           <p class="text-sm text-[color:var(--text-muted)]" role="note">
             Off: no link of this workspace opens anything. Turn it on to make links; turning it off again stops them all at once.
@@ -99,10 +107,17 @@ const DAY_CHOICES = [1, 7, 14, 30, 90];
           <div class="overflow-x-auto">
             <table class="table-modern" data-share-links>
               <thead>
-                <tr><th>Link</th><th>Status</th><th class="text-right">Used</th><th>Expires</th><th class="hidden lg:table-cell">Last used</th><th></th></tr>
+                <tr>
+                  <th appSort="link" [sortBy]="sort">Link</th>
+                  <th appSort="status" [sortBy]="sort">Status</th>
+                  <th class="text-right" appSort="used" [sortBy]="sort">Used</th>
+                  <th appSort="expires" [sortBy]="sort">Expires</th>
+                  <th class="hidden lg:table-cell" appSort="lastUsed" [sortBy]="sort">Last used</th>
+                  <th></th>
+                </tr>
               </thead>
               <tbody>
-                @for (l of s.links; track l.linkId) {
+                @for (l of links(); track l.linkId) {
                   <tr>
                     <td class="min-w-0">
                       <span class="font-medium">{{ l.label || 'Link #' + l.linkId }}</span>
@@ -150,6 +165,18 @@ export class FormShare implements OnInit {
   readonly made = signal('');
   readonly copied = signal(false);
   readonly activeCount = computed(() => (this.state()?.links ?? []).filter(l => l.status === 'Active').length);
+  /** Owner 2026-10-27: every column with a value sorts; the service's order until one is picked. */
+  readonly sort = createTableSort<ShareLink>({
+    id: 'form-share-links',
+    columns: {
+      link: l => l.label || `Link #${l.linkId}`,
+      status: { value: l => l.status, kind: 'status' },
+      used: { value: l => l.usedCount, kind: 'number' },
+      expires: { value: l => l.expiresAt, kind: 'date' },
+      lastUsed: { value: l => l.lastUsedAt, kind: 'date' },
+    },
+  });
+  readonly links = computed(() => this.sort.apply(this.state()?.links ?? []));
 
   ngOnInit(): void {
     this.load();
@@ -161,10 +188,10 @@ export class FormShare implements OnInit {
     this.api.shareLinks(this.formId()).subscribe({
       next: r => {
         this.loading.set(false);
-        if (r.status !== API_SUCCESS || !r.data) { this.error.set(r.message || 'The links could not be read.'); return; }
+        if (r.status !== API_SUCCESS || !r.data) { this.error.set(loadErrorText(r, 'The links could not be read.')); return; }
         this.state.set(r.data);
       },
-      error: err => { this.loading.set(false); this.error.set(err?.error?.message || 'The links could not be read.'); },
+      error: err => { this.loading.set(false); this.error.set(loadErrorText(err, 'The links could not be read.')); },
     });
   }
 

@@ -56,6 +56,9 @@ export interface SignInPage {
   total: number;
   limit: number;
   offset: number;
+  /** The sort the server applied, when one was asked for. */
+  sort?: string;
+  dir?: 'asc' | 'desc';
 }
 
 export interface SignInFilter {
@@ -68,6 +71,9 @@ export interface SignInFilter {
   to?: string | null;
   limit?: number;
   offset?: number;
+  /** Owner 2026-10-27: the column the server sorts by (at, username, outcome, method, ip) and which way; none is newest first. */
+  sort?: string | null;
+  dir?: 'asc' | 'desc' | null;
 }
 
 export interface SessionRow {

@@ -9,6 +9,10 @@
           @else { Not available here now }
         } @else { Checking the workspace's model… }
       </p>
+      @if (statusError()) {
+        <p class="text-xs text-[color:var(--crit-text)] flex flex-wrap items-center gap-2" role="alert">{{ statusError() }}
+          <button type="button" class="btn btn-default btn-xs" (click)="loadStatus()"><app-icon name="refresh" />Try again</button></p>
+      }
     </div>
   </div>
 
@@ -65,9 +69,10 @@
 
       @if (p.mappings?.length) {
         <table class="rsa-table" aria-label="Suggested mappings">
-          <thead><tr><th>Template field</th><th>Reads</th><th class="text-right">Sure</th></tr></thead>
+          <thead><tr><th appSort="field" [sortBy]="mappingSort">Template field</th><th appSort="source" [sortBy]="mappingSort">Reads</th>
+            <th class="text-right" appSort="sure" [sortBy]="mappingSort">Sure</th></tr></thead>
           <tbody>
-            @for (m of p.mappings!; track m.field) {
+            @for (m of sortedMappings(); track m.field) {
               <tr [title]="m.reason || ''"><td class="mono">{{ m.field }}</td><td class="mono">{{ m.source }}</td>
                 <td class="text-right" [class.rsa-low]="m.confidence < 0.6">{{ percent(m.confidence) }}</td></tr>
             }
@@ -127,6 +132,10 @@
     </article>
   }
 
+  @if (historyError()) {
+    <p class="text-xs text-[color:var(--crit-text)] flex flex-wrap items-center gap-2" role="alert">{{ historyError() }}
+      <button type="button" class="btn btn-default btn-xs" (click)="loadHistory()"><app-icon name="refresh" />Try again</button></p>
+  }
   @if (history().length) {
     <details class="rsa-history">
       <summary class="text-xs text-[color:var(--text-secondary)]">Earlier proposals · {{ history().length }}</summary>

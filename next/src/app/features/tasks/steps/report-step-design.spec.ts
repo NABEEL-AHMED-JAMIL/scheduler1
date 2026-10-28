@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { of } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { ReportStudioApi } from '../../report-studio/report-studio.api';
 import { ReportDesignSettings, ReportStepDesign } from './report-step-design';
@@ -119,5 +120,43 @@ describe('withoutProperties', () => {
     const out = withoutProperties(schema, ['design', 'templateId', 'templateVersion']) as unknown as { properties: object; required: string[] };
     expect(Object.keys(out.properties)).toEqual(['reportName']);
     expect(out.required).toEqual(['reportName']);
+  });
+});
+
+describe('ReportStepDesign -- loading and errors (owner 2026-10-27)', () => {
+  it('does not offer "Design the report" while the step\'s design is still being read', () => {
+    const { c, api, fixture, el } = render({ config: { design: 'STEP', templateId: 'D1' } });
+    // The first read answered at once; read again and hold the answer back.
+    api.template.mockImplementation(() => NEVER as never);
+    c.design.set(null);
+    c.retryDesign();
+    fixture.detectChanges();
+    expect(c.designState.loading()).toBe(true);
+    expect(el.querySelector('[data-design-report]')).toBeNull();
+  });
+
+  it('says the step\'s design could not be read, with Try again, and still no second "Design the report"', () => {
+    const r = render({ config: { design: 'STEP', templateId: 'D1' } });
+    r.api.template.mockImplementation(() => throwError(() => new HttpErrorResponse({ status: 500, error: {} })) as never);
+    r.c.design.set(null);
+    r.c.retryDesign();
+    r.fixture.detectChanges();
+    expect(r.c.designState.error()).toBe('The step\'s design could not be read.');
+    expect(r.el.querySelector('[data-design-report]')).toBeNull();
+    expect(r.el.querySelector('app-inline-status [role="alert"]')).not.toBeNull();
+  });
+
+  it('the template list is loading, then says when there is none, or that it could not be read', () => {
+    const r = render({ config: { design: 'TEMPLATE' } });
+    r.api.list.mockImplementation(() => NEVER as never);
+    r.c.loadTemplates();
+    expect(r.c.templatesState.loading()).toBe(true);
+    r.api.list.mockImplementation(() => of({ templates: [] }) as never);
+    r.c.loadTemplates();
+    r.fixture.detectChanges();
+    expect(r.el.textContent).toContain('No published template yet.');
+    r.api.list.mockImplementation(() => throwError(() => new HttpErrorResponse({ status: 500, error: {} })) as never);
+    r.c.loadTemplates();
+    expect(r.c.templatesState.error()).toBe('The templates could not be read.');
   });
 });

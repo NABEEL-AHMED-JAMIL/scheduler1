@@ -31,6 +31,9 @@ import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { ManagedBanner } from '../../shared/ui/managed-banner';
 import { PageHeader } from '../../shared/ui/page-header';
 import { RefreshButton } from '../../shared/ui/refresh-button';
+import { createTableSort } from '../../shared/ui/sort';
+import { SortHeader } from '../../shared/ui/sort-header';
+import { loadErrorText } from '../../shared/ui/loading';
 
 interface QueueRow {
   jobQueueId: number;
@@ -66,7 +69,7 @@ const FAILED = new Set(['Failed', 'Interrupt']);
 
 @Component({
   selector: 'app-queue',
-  imports: [RefreshButton, PageHeader, Icon, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, StatusFilterChip, Donut, RankedBar, BarChart, SplitBar, Pagination, ManagedBanner, DateRangePicker],
+  imports: [RefreshButton, PageHeader, SortHeader, Icon, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, StatusFilterChip, Donut, RankedBar, BarChart, SplitBar, Pagination, ManagedBanner, DateRangePicker],
   templateUrl: './queue.html',
 })
 export class Queue implements OnInit {
@@ -164,7 +167,25 @@ export class Queue implements OnInit {
   // [title]="row.jobStatusMessage" is optional on QueueRow, so narrowing this widens the diff
   // into the table markup for no gain here.
   readonly pager = createPager<any>();
-  readonly paged = computed(() => this.pager.slice(this.data()));
+  /**
+   * Owner 2026-10-27: every column sorts, over the window the read brought (the range's newest QUEUE_WINDOW runs, which
+   * the headers say); the list keeps the server's newest-first order until one is picked.
+   */
+  readonly sort = createTableSort<QueueRow>({
+    id: 'runs-by-date',
+    columns: {
+      run: { value: row => row.jobQueueId, kind: 'number' },
+      schedule: row => this.jobName(row),
+      created: { value: row => row.dateCreated, kind: 'date' },
+      duration: { value: row => this.seconds(row), kind: 'number' },
+      status: { value: row => row.jobStatus, kind: 'status' },
+      message: row => row.jobStatusMessage,
+    },
+    note: `Sorts the newest ${QUEUE_WINDOW.toLocaleString('en-GB')} runs shown`,
+  });
+  /** Sorted before paging, so a sort covers every run read and not only the page in view. */
+  readonly sorted = computed(() => this.sort.apply(this.data()));
+  readonly paged = computed(() => this.pager.slice(this.sorted()));
 
   goToPage(next: number): void { this.pager.goTo(next, this.data().length); }
   setPageSize(size: number): void { this.pager.setSize(size); }
@@ -380,8 +401,10 @@ export class Queue implements OnInit {
     // A range that makes no sense is not sent; the reason shows under the toolbar, and the rows
     // of the last range read stay until the boxes are put right.
     if (this.rangeError()) return;
-    if (!options.silent || !this.rows().length) this.loading.set(true);
-    this.error.set('');
+    // Owner 2026-10-27: a silent re-read (a push, a reconnect) keeps the rows and any reason already shown; one that fails
+    // used to swap the rows on screen for the error block until the next push.
+    const silent = !!options.silent && this.rows().length > 0;
+    if (!silent) { this.loading.set(true); this.error.set(''); }
     // Only the latest read may land: a push arriving mid-read, or a date changed twice, must not
     // let an older answer overwrite a newer one.
     this.request?.unsubscribe();
@@ -391,7 +414,8 @@ export class Queue implements OnInit {
       `${API_BASE}/message.json/fetchLogs`, body).subscribe({
       next: response => {
         this.loading.set(false);
-        if (response.status !== API_SUCCESS) { this.error.set(response.message); return; }
+        if (response.status !== API_SUCCESS) { if (!silent) this.error.set(loadErrorText(response, 'The runs could not be read.')); return; }
+        this.error.set('');
         // Named payload rather than data: `data()` is the filtered collection this screen
         // renders from, and the two are emphatically not the same population.
         const payload = response.data as any;
@@ -403,7 +427,7 @@ export class Queue implements OnInit {
       },
       error: err => {
         this.loading.set(false);
-        this.error.set(err?.error?.message || 'Could not load the queue.');
+        if (!silent) this.error.set(loadErrorText(err, 'The runs could not be read.'));
       },
     });
   }
@@ -475,6 +499,13 @@ export class Queue implements OnInit {
     const ms = new Date(row.endTime).getTime() - new Date(row.startTime).getTime();
     if (!isFinite(ms) || ms < 0) return null;
     return formatDuration(ms / 1000);
+  }
+
+  /** How long a run took in seconds, for the Duration sort; null while there is no end to measure to. */
+  seconds(row: QueueRow): number | null {
+    if (!row.startTime || !row.endTime) return null;
+    const ms = (instantOf(row.endTime)?.getTime() ?? NaN) - (instantOf(row.startTime)?.getTime() ?? NaN);
+    return Number.isFinite(ms) && ms >= 0 ? ms / 1000 : null;
   }
 
   /** A run with no end time is still occupying the queue. */

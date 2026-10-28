@@ -6,6 +6,8 @@ import { Icon } from '../../shared/ui/icon';
 import { PdfViewer } from '../objects/preview/pdf-viewer';
 import { ReportStudioApi, studioError } from './report-studio.api';
 import { saveBlob } from './report-files';
+import { AppLoading } from '../../shared/ui/loading';
+import { LoadError } from '../../shared/ui/load-error';
 
 /** The dialog's heading id, for the opener's ariaLabelledBy. */
 export const REPORT_FILE_TITLE_ID = 'report-file-title';
@@ -25,7 +27,7 @@ export interface ReportFileView {
  */
 @Component({
   selector: 'app-report-file-dialog',
-  imports: [Icon, PdfViewer],
+  imports: [Icon, PdfViewer, AppLoading, LoadError],
   template: `
     <div class="card shadow-2xl w-[64rem] max-w-[calc(100vw-2rem)] max-h-[90vh] flex flex-col overflow-hidden">
       <div class="flex items-center gap-3 px-4 py-2.5 border-b shrink-0 border-subtle">
@@ -40,11 +42,10 @@ export interface ReportFileView {
       <!-- A fixed height, not flex-1: in a column sized by its content, flex-1 collapsed the frame to a thin strip. -->
       <div class="h-[76vh] max-h-[calc(90vh-3.5rem)] min-h-0 flex flex-col">
         @if (error()) {
-          <div class="flex-1 flex flex-col items-center justify-center gap-2 text-center p-8">
-            <app-icon name="alert" size="1.6rem" class="icon-crit" /><p class="text-sm text-crit-500">{{ error() }}</p>
-          </div>
+          <!-- Owner 2026-10-27: a file that could not be read can be asked for again here. -->
+          <div class="flex-1 flex flex-col items-center justify-center"><app-load-error [message]="error()" (retry)="read()" /></div>
         } @else if (!url()) {
-          <div class="flex-1 flex flex-col items-center justify-center gap-3"><div class="spinner"></div><p class="text-sm text-[color:var(--text-muted)]">Reading {{ data.fileName }}…</p></div>
+          <div class="flex-1 flex flex-col items-center justify-center"><app-loading shape="spinner" [label]="'Reading ' + data.fileName + '…'" /></div>
         } @else if (data.format === 'PDF') {
           <app-pdf-viewer [src]="url()" />
         } @else {
@@ -68,6 +69,11 @@ export class ReportFileDialog implements OnInit, OnDestroy {
   readonly error = signal('');
 
   ngOnInit(): void {
+    this.read();
+  }
+
+  read(): void {
+    this.error.set('');
     this.api.download(this.data.reportId, this.data.version, this.data.format).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: res => {
         if (!res.body) { this.error.set('The file is empty.'); return; }

@@ -28,7 +28,9 @@
     </div>
   } @else {
   @if (error()) {
-    <p class="flex items-center gap-2 rounded-md px-3 py-2 text-sm bg-sunken text-warn-500" role="alert"><app-icon name="alert" size="0.95em" />{{ error() }}</p>
+    <!-- Owner 2026-10-27: Try again beside the reason (there was no way to read the list again). -->
+    <p class="flex items-center gap-2 rounded-md px-3 py-2 text-sm bg-sunken text-warn-500" role="alert" data-test="workflows-error"><app-icon name="alert" size="0.95em" />{{ error() }}
+      <button type="button" class="btn btn-default btn-sm ml-auto" (click)="loadList()"><app-icon name="refresh" />Try again</button></p>
   }
 
   <div class="inbox-split designer-split" [attr.data-pane]="pane()">
@@ -74,7 +76,7 @@
           }
         } @empty {
           <div class="p-8 text-center text-sm text-[color:var(--text-muted)]">
-            @if (loading()) { <div class="spinner mx-auto mb-2"></div>Reading workflows… }
+            @if (loading()) { <app-loading shape="list" label="Reading workflows…" [count]="5" /> }
             @else if (hasFilters()) { Nothing matches. <button type="button" class="link-inline" (click)="clearFilters()">Clear filters</button> }
             @else { {{ emptyText() }} }
           </div>
@@ -84,6 +86,10 @@
 
     <!-- The workflow: its header and tabs, the view under them, the publish bar at the foot. -->
     <section class="card inbox-detail designer-detail" aria-label="Workflow" data-test="workflow-detail">
+      <!-- Another workflow picked while one is open: the open one stays until the new one arrives; a failure says so here. -->
+      @if (current() && view() !== 'new' && (opening() || openError())) {
+        <app-inline-status class="px-4 pt-2" [loading]="!!opening()" [error]="openError()" label="Opening the workflow…" (retry)="retryOpen()" />
+      }
       @if (view() === 'new') {
         <div class="designer-scroll">
           <div class="inbox-detail-head">
@@ -329,6 +335,10 @@
                         <label class="label" for="st-job">Schedule to run</label>
                         <app-combobox id="st-job" [numeric]="true" placeholder="Search schedules…" [allowClear]="false" [disabled]="!canEdit()"
                                       [options]="jobOptions()" [ngModel]="s.jobId == null ? null : s.jobId" (ngModelChange)="set('jobId', numberOrNull($event))" />
+                        <app-inline-status [loading]="jobsLoading()" [error]="jobsError()" [empty]="!jobsLoading() && !jobsError() && !jobOptions().length"
+                                           label="Loading schedules…" emptyText="No schedule yet." (retry)="loadJobs()">
+                          <a class="link-inline" routerLink="/pipelines/schedules">Add one</a>
+                        </app-inline-status>
                       </div>
                       <!-- MIG-424: the run's parameters, from the request and earlier steps' kept values; checked against what the
                            pipeline declares when the workflow is published and again when the run starts. -->
@@ -344,7 +354,8 @@
                                          [placeholder]="parameterPlaceholder(p.name, p.declared)"
                                          [attr.aria-label]="'Value of ' + p.name" [attr.data-test]="'wf-run-param-' + p.name"
                                          (change)="setParameter(p.name, $any($event.target).value)" />
-                                  @if (!p.declared) {
+                                  <!-- Not said while the pipeline is still being read: every parameter looked undeclared meanwhile. -->
+                                  @if (!p.declared && !pipelineLoading()) {
                                     <span class="pill pill-warn text-xs" title="The pipeline does not declare it: publishing refuses it">Not declared</span>
                                   }
                                 </div>
@@ -352,9 +363,14 @@
                             </div>
                             <p class="field-note text-[color:var(--text-muted)]">From the request by name (<span class="mono">{{ '{{' }}subject.mrn{{ '}}' }}</span>)
                               or an earlier step's kept value (<span class="mono">{{ '{{' }}registration.patient_id{{ '}}' }}</span>). Empty: the pipeline's default.</p>
+                          } @else if (pipelineLoading()) {
+                            <app-loading class="field-note" data-test="wf-run-parameters-note" shape="inline" label="Reading the pipeline…" />
                           } @else {
                             <p class="field-note text-[color:var(--text-muted)]" data-test="wf-run-parameters-note">{{ selectedPipeline() ? 'This pipeline declares no parameters.'
                               : pipelineMissing() ? 'This pipeline could not be read: its parameters are checked when you publish.' : 'Reading the pipeline…' }}</p>
+                          }
+                          @if (pipelineMissing()) {
+                            <button type="button" class="btn btn-default btn-xs mt-1" data-test="wf-run-parameters-retry" (click)="retryPipelineFields(s.jobId!)"><app-icon name="refresh" />Try again</button>
                           }
                         </div>
                       }
@@ -463,6 +479,11 @@
                         <app-combobox id="st-req" [numeric]="true" placeholder="Search saved requests…" [allowClear]="false" [disabled]="!canEdit()"
                                       [options]="requestOptions()" [ngModel]="s.requestId == null ? null : s.requestId"
                                       (ngModelChange)="set('requestId', numberOrNull($event)); set('environmentId', null)" data-test="wf-api-request" />
+                        <app-inline-status [loading]="apiRequestsLoading()" [error]="apiRequestsError()"
+                                           [empty]="!apiRequestsLoading() && !apiRequestsError() && !requestOptions().length"
+                                           label="Loading saved requests…" emptyText="No saved POST or PUT request yet." (retry)="retryApiRequests()">
+                          <a class="link-inline" routerLink="/connections/api-collections">Add one</a>
+                        </app-inline-status>
                         <p class="field-note text-[color:var(--text-muted)]">Saved in Connections › API collections; its secrets stay there.</p>
                       </div>
                       @if (requestOf(s)?.environments?.length) {
@@ -637,6 +658,10 @@
               <app-icon name="upload" />Publish version {{ (wf.currentVersion || 0) + 1 }}</button>
           </footer>
         }
+      } @else if (opening() || (loading() && !workflows().length)) {
+        <app-loading shape="panel" data-test="designer-opening" label="Opening the workflow…" [count]="6" />
+      } @else if (openError()) {
+        <app-load-error role="alert" data-test="designer-open-error" [message]="openError()" (retry)="retryOpen()" />
       } @else if (!loading()) {
         <div class="inbox-empty" data-test="designer-empty">
           <app-icon name="layers" size="1.6rem" class="icon-muted block mx-auto mb-2" />
@@ -695,6 +720,7 @@
     @if (who?.kind === 'user') {
       <app-combobox [numeric]="true" placeholder="Search people…" [allowClear]="false" [disabled]="!canEdit()" [ariaLabel]="label + ': person'"
                     [options]="field === 'to' ? colleagueOptions() : actorOptions()" [ngModel]="numberOrNull(who.value)" (ngModelChange)="setWho(field, 'user', $event == null ? null : '' + $event)" />
+      <app-inline-status [error]="colleaguesError()" (retry)="loadColleagues()" />
     }
     @if (who?.kind === 'role') {
       <select class="input" [ngModel]="who.value || ''" (ngModelChange)="setWho(field, 'role', $event)" [disabled]="!canEdit()" [attr.aria-label]="label + ': role'">
@@ -708,7 +734,9 @@
         <option value="" disabled>Pick a team</option>
         @for (g of teams(); track g.id) { <option [value]="'' + g.id">{{ g.name }}</option> }
       </select>
-      @if (!teams().length) {
+      @if (teamsLoading() || teamsError()) {
+        <app-inline-status [loading]="teamsLoading()" [error]="teamsError()" label="Loading teams…" (retry)="loadTeams()" />
+      } @else if (!teams().length) {
         <p class="field-note text-[color:var(--text-muted)]" data-test="no-teams">No teams yet: make one in Administration › Teams.</p>
       }
     }

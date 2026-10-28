@@ -20,6 +20,7 @@
   </app-page-header>
 
   <app-stat-strip label="Teams at a glance" [items]="cards()" [cols]="2" [smCols]="4" [lgCols]="4" align="start" size="md"
+                  [loading]="!loaded() && !error()" [failed]="!!error() && !loaded()"
                   (itemClick)="pickCard($event)" data-testid="team-stats" />
 
   <app-table-shell heading="Teams" [loading]="loading()" [error]="error()" [isEmpty]="!filtered().length"
@@ -68,11 +69,11 @@
     <table class="table-modern" data-testid="teams-table">
       <thead>
         <tr>
-          <th>Team</th>
-          <th>Lead</th>
-          <th>Members</th>
+          <th appSort="name" [sortBy]="sort">Team</th>
+          <th appSort="lead" [sortBy]="sort">Lead</th>
+          <th appSort="members" [sortBy]="sort">Members</th>
           <th class="hidden lg:table-cell">Used by</th>
-          <th class="hidden xl:table-cell">Created</th>
+          <th class="hidden xl:table-cell" appSort="created" [sortBy]="sort">Created</th>
           <th class="w-10"><span class="sr-only">Open</span></th>
         </tr>
       </thead>
@@ -118,7 +119,11 @@
                 @for (u of usageOf(t); track u.kind) {
                   <span class="pill pill-neutral"><app-icon [name]="useLabels[u.kind].icon" size="0.85em" />{{ u.text }}</span>
                 } @empty {
-                  @if (usageComplete()) {
+                  @if (usageLoading() && !usage()) {
+                    <app-loading shape="inline" label="Loading…" />
+                  } @else if (usageError()) {
+                    <span class="text-xs text-[color:var(--text-muted)]" [title]="usageError()">Not available</span>
+                  } @else if (usageComplete()) {
                     <span class="text-xs text-[color:var(--text-muted)]">Not used yet</span>
                   } @else if (usageKnown()) {
                     <span class="text-xs text-[color:var(--text-muted)]" title="Only what you can open is counted">Nothing you can open</span>
@@ -249,6 +254,9 @@
                   <option value="" [selected]="addPerson() === null">Choose someone</option>
                   @for (p of addable(); track p.userId) { <option [value]="p.userId" [selected]="addPerson() === p.userId">{{ p.fullName || p.username }}</option> }
                 </select>
+                <app-inline-status [loading]="peopleState.loading()" [error]="peopleState.error()"
+                                   [empty]="peopleState.loaded() && !addable().length" label="Loading people…"
+                                   emptyText="Everyone in the workspace is in this team already." (retry)="loadPeople()" />
               </div>
               @if (admin()) {
                 <div class="field">
@@ -275,7 +283,11 @@
           @if (usage()?.capped) {
             <p class="text-xs text-[color:var(--text-muted)]">The first {{ maxWorkflows }} workflows were read; one further down may also use it.</p>
           }
-          @if (usesOf(team); as uses) {
+          @if (usageError()) {
+            <app-inline-status [error]="usageError()" (retry)="loadUsage(true)" />
+          } @else if (usageLoading() && !usage()) {
+            <app-loading shape="inline" label="Loading where it is used…" />
+          } @else if (usesOf(team); as uses) {
             @if (uses.length) {
               <ul class="flex flex-col gap-1 text-sm">
                 @for (u of uses; track u.kind + u.label) {

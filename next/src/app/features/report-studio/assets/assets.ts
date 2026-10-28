@@ -19,6 +19,8 @@ import { NewProfilePanel, NewProfileData } from './new-profile-panel';
 import { RsTabCounts } from '../rs-tab-counts';
 import { Pagination } from '../../../shared/ui/pagination';
 import { PAGE_SIZES } from '../../../shared/ui/pager';
+import { AppLoading } from '../../../shared/ui/loading';
+import { BlurLoader } from '../../../shared/ui/blur-loader';
 
 type Tab = 'assets' | 'profiles' | 'restricted';
 
@@ -31,7 +33,7 @@ type Tab = 'assets' | 'profiles' | 'restricted';
  */
 @Component({
   selector: 'app-report-assets',
-  imports: [PageHeader, RefreshButton, Icon, LoadError, RsTimePipe, WorkspaceSelect, RouterLink, AssetPicture, Pagination],
+  imports: [PageHeader, RefreshButton, Icon, LoadError, RsTimePipe, WorkspaceSelect, RouterLink, AssetPicture, Pagination, AppLoading, BlurLoader],
   templateUrl: './assets.html',
   styleUrl: './assets.css',
 })
@@ -51,6 +53,12 @@ export class ReportAssets implements OnInit {
   readonly profiles = signal<BrandProfileRow[]>([]);
   readonly loading = signal(true);
   readonly error = signal('');
+  /**
+   * Owner 2026-10-27: whether this workspace's cards have answered once. Until then the grid, the brand profiles and the
+   * tab counts show a skeleton, not "No assets yet" and 0; after it a filter, a page or Refresh keeps the cards under a
+   * blur instead of swapping them for a spinner.
+   */
+  readonly loaded = signal(false);
   readonly search = signal('');
   readonly kind = signal('');
   readonly state = signal('');
@@ -108,6 +116,8 @@ export class ReportAssets implements OnInit {
   /** Another workspace picked (and the first read): the tab counts and the cards again, from the first page. */
   load(): void {
     this.page.set(1);
+    // Another workspace: what is on screen is not its, so the first-load skeleton again.
+    this.loaded.set(false);
     this.refresh();
   }
 
@@ -138,6 +148,7 @@ export class ReportAssets implements OnInit {
         this.counts.set(lib.counts ?? { all: lib.total, signaturesAndStamps: 0 });
         this.profiles.set(lib.profiles ?? []);
         this.loading.set(false);
+        this.loaded.set(true);
       },
       error: e => {
         if (asked !== this.asked) return;

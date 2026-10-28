@@ -49,10 +49,12 @@ describe('Tasks: refusals', () => {
    * drawer showed the heading over a blank. It now stores the empty list, which the template
    * reads as "Could not read the jobs for this task." -- as the HTTP-error branch already did.
    */
+  // Owner 2026-10-27: the refusal is said as such (with Try again), not stored as an empty list that reads as "none".
   it('settles the linked-jobs drawer when the read is refused', () => {
     const { component } = tasksRefusing();
     component.toggleRow({ ...TASK, totalLinksJobs: 2 });
     expect(component.linkedLoading()).toBeNull();
-    expect(component.linkedJobs()[7714]).toEqual([]);
+    expect(component.linkedJobs()[7714]).toBeUndefined();
+    expect(component.linkedErrors()[7714]).toBe('The schedules for this pipeline could not be read.');
   });
 });

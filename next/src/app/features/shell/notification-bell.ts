@@ -11,6 +11,7 @@ import { Icon } from '../../shared/ui/icon';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { openableTarget } from '../notifications/notification-links';
 import { AuthService } from '../../core/auth/auth.service';
+import { AppLoading } from '../../shared/ui/loading';
 
 interface Note {
   notificationId: number;
@@ -36,7 +37,7 @@ const FETCH_ROWS = 20;
  */
 @Component({
   selector: 'app-notification-bell',
-  imports: [Icon, RouterLink],
+  imports: [Icon, RouterLink, AppLoading],
   // Unread rows get the same tint the Notifications page gives them, not just the dot. Not
   // .notification-row itself: that brings its own padding and a left rule the panel has no room for.
   styles: [`
@@ -74,7 +75,11 @@ const FETCH_ROWS = 20;
             <div class="px-3 py-8 text-center">
               <app-icon name="alert" size="1.5rem" class="icon-warn block mx-auto mb-2" />
               <p class="text-sm text-[color:var(--text-muted)]">Notifications could not be loaded.</p>
+              <button type="button" class="btn btn-default btn-sm mt-3" (click)="reload()"><app-icon name="refresh" />Try again</button>
             </div>
+          } @else if (!recent().length && !loaded()) {
+            <!-- Owner 2026-10-27: a panel opened before the first answer is loading, not "all caught up". -->
+            <app-loading shape="list" label="Loading notifications…" [count]="3" />
           } @else if (!recent().length) {
             <div class="px-3 py-8 text-center">
               <app-icon name="bell" size="1.5rem" class="icon-muted block mx-auto mb-2" />
@@ -143,6 +148,8 @@ export class NotificationBell implements OnInit, OnDestroy {
 
   /** The last list load failed, so an empty panel means "could not look", not "nothing new". */
   readonly failed = signal(false);
+  /** Whether a list has come back at all: until then an empty panel is loading, not an empty mailbox. */
+  readonly loaded = signal(false);
 
   /**
    * The badge, as the server counts it.
@@ -233,6 +240,11 @@ export class NotificationBell implements OnInit, OnDestroy {
     }
   }
 
+  /** The panel's Try again after a failed list. */
+  reload(): void {
+    this.load();
+  }
+
   private load(): void {
     // The count comes from the server rather than from the rows below, because the rows below are
     // one small window onto the mailbox and the badge is a statement about all of it.
@@ -242,6 +254,7 @@ export class NotificationBell implements OnInit, OnDestroy {
       next: response => {
         if (response.status !== API_SUCCESS) { this.failed.set(true); return; }
         this.failed.set(false);
+        this.loaded.set(true);
         const data = response.data as any;
         this.items.set(Array.isArray(data) ? data : (data?.content ?? []));
       },

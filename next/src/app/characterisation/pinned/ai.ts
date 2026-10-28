@@ -256,9 +256,16 @@ export const PINNED: Record<string, unknown> = {
     "buttons": [
       "Cards",
       "Columns",
+      "Connection · model",
+      "Last run",
       "Only mine",
+      "Output",
+      "Prompt",
       "Refresh",
-      "Table"
+      "Runs",
+      "State",
+      "Table",
+      "Used by"
     ],
     "columns": [
       [
@@ -320,9 +327,16 @@ export const PINNED: Record<string, unknown> = {
       "Actions for UI-REVIEW Zürich – 東京 ✓ draft prompt (never activated) with a deliberately long name for truncation checks in the prompt list",
       "Cards",
       "Columns",
+      "Connection · model",
+      "Last run",
       "Only mine",
+      "Output",
+      "Prompt",
       "Refresh",
-      "Table"
+      "Runs",
+      "State",
+      "Table",
+      "Used by"
     ],
     "columns": [
       [

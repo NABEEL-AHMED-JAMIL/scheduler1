@@ -14,7 +14,9 @@ import { ViewToggle } from '../../shared/ui/view-toggle';
 import { ToastService } from '../../shared/ui/toast.service';
 import { copyText } from '../../shared/ui/clipboard.util';
 import { confirmWith } from '../../shared/ui/confirm';
-import { createSort } from '../../shared/ui/sort';
+import { createTableSort } from '../../shared/ui/sort';
+import { SortHeader } from '../../shared/ui/sort-header';
+import { createLoadState } from '../../shared/ui/loading';
 import { Pagination } from '../../shared/ui/pagination';
 import { createPager } from '../../shared/ui/pager';
 import { RejectDialog } from './reject-dialog';
@@ -45,7 +47,7 @@ interface TenantRequest {
  */
 @Component({
   selector: 'app-tenant-requests',
-  imports: [RefreshButton, PageHeader, TableShell, StatTile, StatusPill, Icon, CopyButton, ViewToggle, ServerTimePipe, Pagination],
+  imports: [RefreshButton, PageHeader, TableShell, StatTile, StatusPill, Icon, CopyButton, ViewToggle, ServerTimePipe, Pagination, SortHeader],
   templateUrl: './tenant-requests.html',
   styles: [`
     /* An open row and its panel are one thing, so the border between them is dropped and the
@@ -62,8 +64,10 @@ export class TenantRequests implements OnInit {
   private readonly toast = inject(ToastService);
 
   readonly requests = signal<TenantRequest[]>([]);
-  readonly loading = signal(true);
-  readonly error = signal('');
+  /** Owner 2026-10-27: the list's read -- the tiles show placeholders, not 0, until it answers. */
+  readonly state = createLoadState();
+  readonly loading = this.state.loading;
+  readonly error = this.state.error;
   readonly busy = signal<number | null>(null);
 
   /**
@@ -81,13 +85,26 @@ export class TenantRequests implements OnInit {
   /** Free text across the four things a reviewer would recognise a request by. */
   readonly search = signal('');
   readonly statusFilter = signal('');
-  readonly sort = createSort<TenantRequest>('dateCreated', 'desc');
+  /**
+   * Owner 2026-10-27: the shared column sort, newest first as before. Status sorts by urgency (Waiting first), not by
+   * the word; "Asked for" stays unsortable -- free prose would order requests by whichever word they open with.
+   */
+  readonly sort = createTableSort<TenantRequest>({
+    id: 'tenant-requests',
+    columns: {
+      organisationName: r => r.organisationName,
+      contactName: r => r.contactName,
+      dateCreated: { value: r => r.dateCreated, kind: 'date' },
+      status: { value: r => r.status, kind: 'status', order: STATUS_ORDER },
+    },
+    initial: { key: 'dateCreated', direction: 'desc' },
+  });
   readonly pager = createPager<TenantRequest>();
 
   readonly filtered = computed(() => {
     const term = this.search().trim().toLowerCase();
     const status = this.statusFilter();
-    const rows = this.requests().filter(request => {
+    return this.requests().filter(request => {
       if (status && request.status !== status) return false;
       if (!term) return true;
       // Purpose is included on purpose: it is often the only thing a reviewer remembers about a
@@ -95,14 +112,14 @@ export class TenantRequests implements OnInit {
       return `${request.organisationName} ${request.contactName} ${request.contactEmail} ${request.purpose ?? ''}`
         .toLowerCase().includes(term);
     });
-    return this.sort.apply(rows, (row, key) =>
-      key === 'status' ? (STATUS_ORDER[row.status] ?? 9) : (row as any)[key]);
   });
+  /** The filtered requests in the chosen order; the cards follow it too. */
+  readonly sorted = computed(() => this.sort.apply(this.filtered()));
 
   readonly hasFilters = computed(() => !!this.search().trim() || !!this.statusFilter());
 
   /** The page on screen. createPager clamps, so filtering down cannot strand you on page 4. */
-  readonly paged = computed(() => this.pager.slice(this.filtered()));
+  readonly paged = computed(() => this.pager.slice(this.sorted()));
 
   goToPage(next: number): void { this.pager.goTo(next, this.filtered().length); }
   setPageSize(size: number): void { this.pager.setSize(size); }
@@ -185,19 +202,15 @@ export class TenantRequests implements OnInit {
   ngOnInit(): void { this.load(); }
 
   load(): void {
-    this.loading.set(true);
-    this.error.set('');
+    this.state.start();
     this.http.get<ApiResponse<TenantRequest[]>>(
       `${API_BASE}/tenantRequest.json/listRequests`).subscribe({
       next: response => {
-        this.loading.set(false);
-        if (response.status !== API_SUCCESS) { this.error.set(response.message); return; }
+        if (response.status !== API_SUCCESS) { this.state.fail(response, 'The workspace requests could not be read.'); return; }
         this.requests.set(response.data ?? []);
+        this.state.done();
       },
-      error: err => {
-        this.loading.set(false);
-        this.error.set(err?.error?.message || 'Could not load the requests.');
-      },
+      error: err => this.state.fail(err, 'The workspace requests could not be read.'),
     });
   }
 
@@ -283,4 +296,4 @@ export class TenantRequests implements OnInit {
  * screen whose only job is finding the requests nobody has answered yet. Sorting by urgency
  * means one click brings the outstanding work to the top.
  */
-const STATUS_ORDER: Record<string, number> = { Pending: 0, Approved: 1, Rejected: 2 };
+const STATUS_ORDER: readonly string[] = ['Pending', 'Approved', 'Rejected'];

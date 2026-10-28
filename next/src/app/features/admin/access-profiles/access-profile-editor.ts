@@ -11,6 +11,8 @@ import { Icon } from '../../../shared/ui/icon';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { Section } from '../../../shared/ui/section';
 import { ToastService } from '../../../shared/ui/toast.service';
+import { AppLoading, loadErrorText } from '../../../shared/ui/loading';
+import { LoadError } from '../../../shared/ui/load-error';
 import { AccessProfile, AccessProfilesService } from './access-profiles.service';
 import { PageGroup, PageRow, groupPages, keysOf, menuPreview, previewSize } from './page-groups';
 
@@ -29,7 +31,7 @@ export type PageFilter = 'all' | 'on' | 'off';
  */
 @Component({
   selector: 'app-access-profile-editor',
-  imports: [PageHeader, Section, Field, FormRow, Icon, ReactiveFormsModule],
+  imports: [PageHeader, Section, Field, FormRow, Icon, ReactiveFormsModule, AppLoading, LoadError],
   templateUrl: './access-profile-editor.html',
   styles: `
     .ap-editor { display: grid; gap: 1rem; }
@@ -72,6 +74,8 @@ export class AccessProfileEditor implements OnInit {
   readonly first = signal(false);
   readonly loading = signal(true);
   readonly error = signal('');
+  /** Owner 2026-10-27: a read that failed can be tried again; a profile that is gone, or no workspace chosen, cannot. */
+  readonly retryable = signal(true);
   readonly saving = signal(false);
   readonly submitted = signal(false);
   /** A platform administrator names the workspace (?tenantId=); a tenant administrator's is its own. */
@@ -121,21 +125,29 @@ export class AccessProfileEditor implements OnInit {
   readonly previewPlaces = computed(() => previewSize(this.preview()));
 
   ngOnInit(): void {
-    const params = this.route.snapshot.paramMap;
     const query = this.route.snapshot.queryParamMap;
     const asked = Number(query.get('tenantId'));
     this.tenantId.set(this.auth.isPlatformAdmin() && Number.isFinite(asked) && asked > 0 ? asked : null);
-    const id = Number(params.get('pageAccessProfileId'));
     if (this.auth.isPlatformAdmin() && !this.tenantId()) {
       this.loading.set(false);
+      this.retryable.set(false);
       this.error.set('Choose the workspace first, on Page access.');
       return;
     }
+    this.load();
+  }
+
+  /** The catalogue and the workspace's profiles; Try again calls it after a failed read. */
+  load(): void {
+    const id = Number(this.route.snapshot.paramMap.get('pageAccessProfileId'));
+    this.loading.set(true);
+    this.error.set('');
+    this.retryable.set(true);
     forkJoin({ pages: this.api.pages(), profiles: this.api.list(this.tenantId()) }).subscribe({
       next: ({ pages, profiles }) => {
         this.loading.set(false);
         if (pages.status !== API_SUCCESS || profiles.status !== API_SUCCESS) {
-          this.error.set((pages.status !== API_SUCCESS ? pages.message : profiles.message) || 'The page catalogue could not be loaded.');
+          this.error.set(loadErrorText(pages.status !== API_SUCCESS ? pages : profiles, 'The page catalogue could not be loaded.'));
           return;
         }
         this.pages.set(pages.data ?? []);
@@ -144,6 +156,7 @@ export class AccessProfileEditor implements OnInit {
         if (Number.isFinite(id) && id > 0) {
           const found = list.find(p => p.pageAccessProfileId === id);
           if (!found) {
+            this.retryable.set(false);
             this.error.set('That access profile is not in this workspace any more.');
             return;
           }
@@ -155,7 +168,7 @@ export class AccessProfileEditor implements OnInit {
       },
       error: err => {
         this.loading.set(false);
-        this.error.set(err?.error?.message || 'The page catalogue could not be loaded.');
+        this.error.set(loadErrorText(err, 'The page catalogue could not be loaded.'));
       },
     });
   }

@@ -5,9 +5,9 @@
         <h1 class="page-title">{{ showWorkspace() ? 'Staff activity' : "Our team's activity" }}</h1>
         <p class="page-subtitle">
           @if (showWorkspace()) {
-            Every change and every data read our staff made in a managed session, newest first.
+            Every change and every data read our staff made in a managed session, newest first unless you sort by a column.
           } @else {
-            Every change our team made here and every data they opened, exported or downloaded, newest first.
+            Every change our team made here and every data they opened, exported or downloaded, newest first unless you sort by a column.
           }
         </p>
       </div>
@@ -23,9 +23,10 @@
     <ng-container toolbar>
       <select class="input max-w-48 min-w-0" aria-label="Filter by staff member" [value]="staffFilter() ?? ''"
               (change)="setStaff($any($event.target).value)">
-        <option value="">Every staff member</option>
+        <option value="">{{ staffState.loading() ? 'Loading staff…' : 'Every staff member' }}</option>
         @for (s of staff(); track s.appUserId) { <option [value]="s.appUserId">{{ name(s) }}</option> }
       </select>
+      @if (staffState.error()) { <app-inline-status [error]="staffState.error()" (retry)="loadStaff()" /> }
       <select class="input max-w-48 min-w-0" aria-label="Changes or data reads" data-test="activity-kind" [value]="kindFilter()"
               (change)="setKind($any($event.target).value)">
         @for (k of kinds; track k.value) { <option [value]="k.value" [selected]="k.value === kindFilter()">{{ k.label }}</option> }
@@ -38,11 +39,11 @@
     <table class="table-modern">
       <thead>
         <tr>
-          <th>When</th>
-          <th>Staff member</th>
-          @if (showWorkspace()) { <th>Workspace</th> }
+          <th appSort="createdAt" [sortBy]="sort">When</th>
+          <th appSort="staff" [sortBy]="sort">Staff member</th>
+          @if (showWorkspace()) { <th appSort="workspace" [sortBy]="sort">Workspace</th> }
           <th>Change or read</th>
-          <th>Service</th>
+          <th appSort="service" [sortBy]="sort">Service</th>
         </tr>
       </thead>
       <tbody>
@@ -80,10 +81,12 @@
     <!-- The @if inside the slot: content inside an @if is not projected by its selector (see TableShell). -->
     <div pager>
       @if (hasMore()) {
-        <div class="flex justify-center p-4 border-t border-subtle">
+        <div class="flex flex-col items-center p-4 border-t border-subtle">
           <button type="button" class="btn btn-default btn-sm" (click)="loadOlder()" [disabled]="loadingMore()">
-            <app-icon name="history" [busy]="loadingMore()" />Load older
+            <app-icon name="history" [busy]="loadingMore()" />{{ sortParams() ? 'Load more' : 'Load older' }}
           </button>
+          <!-- Owner 2026-10-27: an older page that failed says so here; the rows above stay. -->
+          @if (olderError()) { <app-inline-status [error]="olderError()" (retry)="loadOlder()" /> }
         </div>
       }
     </div>

@@ -1,7 +1,8 @@
-import { describe, it, expect, vi } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
-import { of, throwError } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { ObjectPicker } from './object-picker';
 import { StorageService } from '../../features/objects/storage.service';
 import { API_SUCCESS } from '../../core/api/api.config';
@@ -26,6 +27,9 @@ function picker(data: object) {
 }
 
 describe('ObjectPicker', () => {
+  // The sort is remembered per viewer: every case starts from the picker's own order (Name A to Z).
+  beforeEach(() => { try { localStorage.clear(); } catch { /* none */ } });
+
   it('lists folders first, then files, filtered, and answers with the pick', () => {
     const { component, close } = picker({ heading: 'Pick' });
     expect(component.bucketOptions()).toEqual([{ value: 'b1', label: 'Bucket one', hint: 'S3' }]);
@@ -77,13 +81,66 @@ describe('ObjectPicker', () => {
   });
 
   it('sorts by size and by date, folders always first', () => {
+    try { localStorage.clear(); } catch { /* none */ }
     const { component } = picker({ bucket: 'b1' });
-    component.sortOn('size');
+    component.sort.toggle('size');
     expect(component.rows().map(r => r.name)).toEqual(['archive', 'docs', 'alpha.pdf', 'zeta.csv']);
-    expect(component.ariaSort('size')).toBe('descending');
-    component.sortOn('size');
+    expect(component.sort.ariaSort('size')).toBe('descending');
+    component.sort.toggle('size');
     expect(component.rows().map(r => r.name)).toEqual(['archive', 'docs', 'zeta.csv', 'alpha.pdf']);
-    expect(component.ariaSort('name')).toBeNull();
+    expect(component.sort.ariaSort('name')).toBeNull();
+  });
+
+  /** Owner 2026-10-27: the shared sort, Name A to Z by default, both ways, and Type sorts too. */
+  it('sorts by name both ways and by type, folders still first', () => {
+    try { localStorage.clear(); } catch { /* none */ }
+    const { component } = picker({ bucket: 'b1' });
+    expect(component.sort.ariaSort('name')).toBe('ascending');
+    component.sort.toggle('name');
+    expect(component.rows().map(r => r.name)).toEqual(['docs', 'archive', 'zeta.csv', 'alpha.pdf']);
+    component.sort.toggle('type');
+    expect(component.rows().map(r => r.name)).toEqual(['archive', 'docs', 'zeta.csv', 'alpha.pdf']);
+  });
+
+  /** Owner 2026-10-27: loading until the buckets answer, a line when there are none, and a failed next batch keeps the rows. */
+  it('is loading the buckets until they answer, then says when there are none', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [
+      { provide: StorageService, useValue: { buckets: () => NEVER, listObjects: vi.fn() } },
+      { provide: DialogRef, useValue: { close: vi.fn() } },
+      { provide: DIALOG_DATA, useValue: {} },
+    ] });
+    const waiting = TestBed.runInInjectionContext(() => new ObjectPicker());
+    expect(waiting.bucketsLoading()).toBe(true);
+
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [
+      { provide: StorageService, useValue: { buckets: () => of({ status: API_SUCCESS, data: [] }), listObjects: vi.fn() } },
+      { provide: DialogRef, useValue: { close: vi.fn() } },
+      { provide: DIALOG_DATA, useValue: {} },
+    ] });
+    const none = TestBed.runInInjectionContext(() => new ObjectPicker());
+    expect(none.bucketsLoading()).toBe(false);
+    expect(none.buckets()).toEqual([]);
+    expect(none.error()).toBe('');
+  });
+
+  it('keeps the rows when the next batch fails, and says why by the button', () => {
+    const listObjects = vi.fn((_b: string, _p: string, token?: string) => token
+      ? throwError(() => new HttpErrorResponse({ status: 500 }))
+      : of({ status: API_SUCCESS, data: { objects: [{ name: 'a.txt', key: 'a.txt', folder: false }], nextContinuationToken: 'a.txt' } }));
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [
+      { provide: StorageService, useValue: { buckets: () => of({ status: API_SUCCESS, data: [] }), listObjects } },
+      { provide: DialogRef, useValue: { close: vi.fn() } },
+      { provide: DIALOG_DATA, useValue: { bucket: 'b1' } },
+    ] });
+    const component = TestBed.runInInjectionContext(() => new ObjectPicker());
+    component.browse('', true);
+    expect(component.loadingMore()).toBe(false);
+    expect(component.error()).toBe('');
+    expect(component.moreError()).toBe('This folder could not be read.');
+    expect(component.rows().map(r => r.key)).toEqual(['a.txt']);
   });
 
   it('keeps the selection while the folder, filter and type change, and answers it with Use this file', () => {

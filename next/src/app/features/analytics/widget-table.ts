@@ -7,6 +7,8 @@ import { WrapToggle } from '../../shared/ui/wrap-toggle';
 import { readWrap, writeWrap } from './data-grid';
 import { readsAsYears } from './charts/chart-table';
 import { columnLabel } from '../../shared/ui/column-label';
+import { createTableSort } from '../../shared/ui/sort';
+import { SortHeader } from '../../shared/ui/sort-header';
 
 /**
  * How many lines of a value a result table shows with "Wrap text" on. Not all of it, as the Data
@@ -51,7 +53,7 @@ export const WIDGET_TABLE_WRAP_KEY = 'result:widget-table';
 @Component({
   selector: 'app-widget-table',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DataText],
+  imports: [DataText, SortHeader],
   template: `
     @if (windowed()) {
       <!-- Every row of a long result, drawn a screen at a time: the header stays put, the columns keep
@@ -62,7 +64,7 @@ export const WIDGET_TABLE_WRAP_KEY = 'result:widget-table';
           <colgroup>@for (width of widths(); track $index) { <col [style.width.rem]="width" /> }</colgroup>
           <thead>
             <tr aria-rowindex="1">
-              @for (column of columns(); track column) { <th class="vt-head" [class.num]="numberColumn()[$index]" [title]="column">{{ label(column) }}</th> }
+              @for (column of columns(); track $index) { <th class="vt-head" [class.num]="numberColumn()[$index]" [title]="column" [appSort]="column" [sortBy]="sort">{{ label(column) }}</th> }
             </tr>
           </thead>
           <tbody>
@@ -88,13 +90,13 @@ export const WIDGET_TABLE_WRAP_KEY = 'result:widget-table';
       <table class="table-modern">
         <thead>
           <tr>
-            @for (column of columns(); track column) {
-              <th class="whitespace-nowrap" [class.num]="numberColumn()[$index]" [title]="column">{{ label(column) }}</th>
+            @for (column of columns(); track $index) {
+              <th class="whitespace-nowrap" [class.num]="numberColumn()[$index]" [title]="column" [appSort]="column" [sortBy]="sort">{{ label(column) }}</th>
             }
           </tr>
         </thead>
         <tbody>
-          @for (row of rows(); track $index) {
+          @for (row of sortedRows(); track $index) {
             <tr>
               @for (cell of row; track $index) {
                 <td class="tabular align-top" [class.num]="numberColumn()[$index]">
@@ -186,6 +188,24 @@ export class WidgetTable {
   /** The average drawn row height, measured as rows are drawn: a wrapped row is taller. */
   private readonly rowPx = signal(ROW_PX);
 
+  /**
+   * Owner 2026-10-27, "add a sort on each table": any column sorts, typed from its values (numbers, dates, text). The
+   * columns come from the result, so they are read by name; the result's own order stays until a heading is picked.
+   * Not remembered: one table per tile, each its own result. A tile shows its first few rows, so there the headings
+   * sort those; the expanded view sorts every row it holds, before it windows them.
+   */
+  readonly sort = createTableSort<(string | null)[]>({
+    id: 'analytics-widget-table',
+    columns: {},
+    remember: false,
+    note: 'Sorts the rows shown here',
+    dynamic: key => {
+      const at = this.columns().indexOf(key);
+      return at < 0 ? null : { value: row => row[at], kind: 'auto' };
+    },
+  });
+  readonly sortedRows = computed(() => this.sort.apply(this.rows()));
+
   protected readonly windowed = computed(() => this.virtual() && this.rows().length > VIRTUAL_FROM);
   /** In rem: a character of the table's 12px type is about half a rem wide. */
   protected readonly widths = computed(() => columnWidths(this.columns(), this.rows(), this.wrap()).map(ch => ch / 2));
@@ -193,7 +213,7 @@ export class WidgetTable {
   protected readonly first = computed(() => Math.max(0, Math.floor(this.top() / this.rowPx()) - OVERSCAN));
   protected readonly last = computed(() =>
     Math.min(this.rows().length, Math.ceil((this.top() + this.viewport()) / this.rowPx()) + OVERSCAN));
-  protected readonly shown = computed(() => this.rows().slice(this.first(), this.last()));
+  protected readonly shown = computed(() => this.sortedRows().slice(this.first(), this.last()));
   protected readonly padTop = computed(() => this.first() * this.rowPx());
   protected readonly padBottom = computed(() => (this.rows().length - this.last()) * this.rowPx());
 

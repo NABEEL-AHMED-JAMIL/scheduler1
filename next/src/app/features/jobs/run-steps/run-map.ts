@@ -4,6 +4,8 @@ import { FlowEdge, FlowNode } from '../../../shared/flow-graph/flow-graph.model'
 import { MapBasis, countText, durationText, runGraph } from '../../../shared/flow-graph/flow-adapters';
 import { Segmented, SegmentOption } from '../../../shared/ui/segmented';
 import { StepExecution, StepTimeline } from './run-steps.model';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
 
 export type { MapBasis } from '../../../shared/flow-graph/flow-adapters';
 export { durationText, stepKind } from '../../../shared/flow-graph/flow-adapters';
@@ -16,8 +18,11 @@ export function runMap(t: StepTimeline, basis: MapBasis): { nodes: FlowNode[]; e
   return runGraph(t.steps, basis);
 }
 
+/** One task in the Overview: how many steps ran it and what they cost together. */
+export interface TaskCost { task: string; count: number; value: number; share: number }
+
 /** The tasks ranked by what they cost the run (the reference's "Overview": node type, count, total). */
-export function byTask(t: StepTimeline, basis: MapBasis): { task: string; count: number; value: number; share: number }[] {
+export function byTask(t: StepTimeline, basis: MapBasis): TaskCost[] {
   const totals = new Map<string, { count: number; value: number }>();
   for (const s of t.steps) {
     const v = basis === 'time' ? s.durationMs ?? 0 : s.recordsOut ?? 0;
@@ -36,7 +41,7 @@ export function byTask(t: StepTimeline, basis: MapBasis): { task: string; count:
 @Component({
   selector: 'app-run-map',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FlowGraph, Segmented],
+  imports: [FlowGraph, Segmented, SortHeader],
   styles: [`
     .rm-grid { display: grid; gap: 0.75rem; }
     @media (min-width: 1280px) { .rm-grid { grid-template-columns: minmax(0, 1fr) 17rem; } }
@@ -65,10 +70,11 @@ export function byTask(t: StepTimeline, basis: MapBasis): { task: string; count:
         <section class="rounded-lg border border-subtle px-3 py-2.5 flex flex-col gap-2 min-w-0" aria-label="Overview">
           <h3 class="text-sm font-semibold">Overview</h3>
           <table class="w-full text-xs">
-            <thead><tr class="text-left text-[color:var(--text-muted)]"><th class="font-medium py-1">Task</th><th class="font-medium">Steps</th>
-              <th class="font-medium text-right">{{ basis() === 'time' ? 'Time' : 'Rows out' }}</th></tr></thead>
+            <thead><tr class="text-left text-[color:var(--text-muted)]"><th class="font-medium py-1" appSort="task" [sortBy]="sort">Task</th>
+              <th class="font-medium" appSort="count" [sortBy]="sort">Steps</th>
+              <th class="font-medium text-right" appSort="value" [sortBy]="sort">{{ basis() === 'time' ? 'Time' : 'Rows out' }}</th></tr></thead>
             <tbody>
-              @for (r of overview(); track r.task) {
+              @for (r of sortedOverview(); track r.task) {
                 <tr class="border-t border-subtle" [attr.data-task]="r.task">
                   <td class="rm-task mono py-1.5 pr-2 truncate" [title]="r.task">{{ r.task }}</td>
                   <td class="tabular-nums">{{ r.count }}</td>
@@ -94,6 +100,20 @@ export class RunMap {
 
   readonly map = computed(() => runMap(this.timeline(), this.basis()));
   readonly overview = computed(() => byTask(this.timeline(), this.basis()));
+  /**
+   * Owner 2026-10-27: the Overview's columns sort; it starts ranked by cost (time or rows out, by the basis), as it
+   * always was.
+   */
+  readonly sort = createTableSort<TaskCost>({
+    id: 'run-map-overview',
+    columns: {
+      task: r => r.task,
+      count: { value: r => r.count, kind: 'number' },
+      value: { value: r => r.value, kind: 'number' },
+    },
+    initial: { key: 'value', direction: 'desc' },
+  });
+  readonly sortedOverview = computed(() => this.sort.apply(this.overview()));
 
   time(ms: number | null | undefined): string { return durationText(ms); }
   rows(n: number): string { return countText(n); }

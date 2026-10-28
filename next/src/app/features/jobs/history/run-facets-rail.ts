@@ -92,6 +92,10 @@ const PIPELINES_SHOWN = 8;
     @if (unavailable()) {
       <p class="text-xs text-[color:var(--text-muted)] flex gap-1.5"><app-icon name="info" size="0.9em" class="shrink-0 mt-0.5" />
         The counts could not be read; the list below still narrows.</p>
+      <!-- Owner 2026-10-27: Try again where it can help (a failed read, not a reader without Runs by date). -->
+      @if (retryable()) {
+        <button type="button" class="btn btn-default btn-xs self-start" data-test="facets-retry" (click)="retry.emit()"><app-icon name="refresh" />Try again</button>
+      }
     }
   `,
 })
@@ -101,12 +105,16 @@ export class RunFacetsRail {
   /** The counts could not be read (an older Core, a refusal). */
   readonly unavailable = input(false);
   readonly loading = input(false);
+  /** Whether Try again can help when the counts are unavailable. */
+  readonly retryable = input(false);
+  readonly retry = output<void>();
   readonly filterChange = output<ExplorerFilter>();
 
   readonly windows = RUN_WINDOWS;
   readonly allPipelines = signal(false);
 
-  readonly emptyWord = computed(() => (this.loading() ? 'Counting…' : 'None in this window'));
+  /** Owner 2026-10-27: counts that could not be read are "not counted", never "none". */
+  readonly emptyWord = computed(() => (this.loading() ? 'Counting…' : this.unavailable() ? 'Not counted' : 'None in this window'));
 
   /** The server's rows, plus any picked value it no longer counts (shown with 0, so it can be taken back). */
   private keep<T>(rows: T[], picked: (string | number)[], id: (row: T) => string | number, make: (value: string | number) => T): T[] {

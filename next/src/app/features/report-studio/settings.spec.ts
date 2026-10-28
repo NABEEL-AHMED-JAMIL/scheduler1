@@ -2,7 +2,8 @@ import { describe, it, expect, vi } from 'vitest';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { of } from 'rxjs';
+import { NEVER, Observable, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { ToastService } from '../../shared/ui/toast.service';
 import { TeamsApi } from '../../core/teams/teams.api';
 import { ReportStudioApi } from './report-studio.api';
@@ -86,5 +87,61 @@ describe('Report settings (Report Studio phase 7)', () => {
     expect(api.settings).not.toHaveBeenCalled();
     expect(el.querySelector('app-empty-state')?.textContent).toContain("The workspace's own settings");
     expect(el.querySelector('app-load-error')).toBeNull();
+  });
+});
+
+/** Owner 2026-10-27: the settings say they are loading, the teams say why they could not be read, the retention tables sort. */
+describe('Report settings -- loading, empty, error, sorting (owner 2026-10-27)', () => {
+  const failed = () => throwError(() => new HttpErrorResponse({ status: 500, error: 'Internal Server Error' }));
+  const preview = { cutoff: '', days: 30, count: 3, bytes: 4096, total: 9, snapshots: [
+    { snapshotId: 'S1', label: 'Run #12', takenAt: '2026-10-02T10:00:00Z', bytes: 50, why: 'No kept version uses it' },
+    { snapshotId: 'S2', label: 'Upload', takenAt: '2026-10-01T10:00:00Z', bytes: 900, why: 'No kept version uses it' }],
+    versions: [
+      { reportId: 'R', reportLabel: 'RPT-0010', name: 'Wound assessment', version: 2, createdAt: '2026-10-02T10:00:00Z', bytes: 1024 },
+      { reportId: 'R', reportLabel: 'RPT-0009', name: 'Wound assessment', version: 1, createdAt: '2026-10-01T10:00:00Z', bytes: 4096 }],
+    kept: { approved: 1, current: 4, waiting: 1, heldRuns: 0 } };
+
+  function screen(settings: () => Observable<unknown>, teams: () => Observable<unknown> = () => of({ status: 'SUCCESS', data: [] })) {
+    try { localStorage.clear(); } catch { /* none */ }
+    const api = { settings: vi.fn(settings), retentionPreview: vi.fn(() => of(preview)), pageLimit: vi.fn(() => NEVER) };
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [provideZonelessChangeDetection(), provideRouter([]), { provide: ReportStudioApi, useValue: api },
+      { provide: TeamsApi, useValue: { list: vi.fn(teams) } }, { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn() } },
+      { provide: AuthService, useValue: { isPlatformAdmin: () => false, canOpen: () => true } }] });
+    TestBed.overrideComponent(ReportSettings, { set: { template: '', imports: [] } });
+    const fixture = TestBed.createComponent(ReportSettings);
+    fixture.detectChanges();
+    return fixture.componentInstance;
+  }
+
+  it('is loading until the settings answer, and the teams too', () => {
+    const s = screen(() => NEVER, () => NEVER);
+    expect(s.loading()).toBe(true);
+    expect(s.settings()).toBeNull();
+    expect(s.teamsState.loading()).toBe(true);
+  });
+
+  it('says plainly when the settings or the teams could not be read', () => {
+    const s = screen(failed, failed);
+    expect(s.loading()).toBe(false);
+    expect(s.error()).toBe('The settings could not be read.');
+    expect(s.teamsState.error()).toBe('The teams could not be read.');
+  });
+
+  it('a saved team before the teams answer is "a team", not "#1063"', () => {
+    const s = screen(() => of(saved), () => NEVER);
+    expect(s.whoWords(saved.resolved!.reviewers)).toContain('Now: a team.');
+  });
+
+  it('sorts the retention preview\'s versions and frozen data by their columns, both ways', () => {
+    const s = screen(() => of(saved));
+    s.runPreview();
+    expect(s.sortedRetentionVersions().map(v => v.version)).toEqual([2, 1]);
+    s.retentionVersionSort.toggle('report');
+    expect(s.sortedRetentionVersions().map(v => v.reportLabel)).toEqual(['RPT-0009', 'RPT-0010']);
+    s.retentionVersionSort.toggle('report');
+    expect(s.sortedRetentionVersions().map(v => v.reportLabel)).toEqual(['RPT-0010', 'RPT-0009']);
+    s.retentionSnapshotSort.toggle('size');
+    expect(s.sortedRetentionSnapshots().map(d => d.snapshotId)).toEqual(['S2', 'S1']);
   });
 });

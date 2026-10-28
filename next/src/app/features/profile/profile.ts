@@ -34,6 +34,7 @@ import { ThemeChooser } from '../../shared/ui/theme-chooser';
 import { ThemeChoice, ThemeService } from '../../core/theme.service';
 import { themeLabel } from '../../core/theme-options';
 import { ThemePreference } from '../../core/theme-preference';
+import { AppLoading, InlineStatus } from '../../shared/ui/loading';
 
 /** One run of one of the caller's jobs, as /sourceJob.json/myActivity reports it. */
 export interface ActivityRun {
@@ -80,7 +81,7 @@ interface UserProfile {
 
 @Component({
   selector: 'app-profile',
-  imports: [Section, PageHeader, PhoneInput, Icon, Avatar, CopyButton, ServerTimePipe, RouterLink, StatusPill, Donut, BillingBrief, Field, StatTile, PasswordRulesHint, ThemeChooser],
+  imports: [Section, PageHeader, PhoneInput, Icon, Avatar, CopyButton, ServerTimePipe, RouterLink, StatusPill, Donut, BillingBrief, Field, StatTile, PasswordRulesHint, ThemeChooser, AppLoading, InlineStatus],
   templateUrl: './profile.html',
 })
 export class Profile implements OnInit {
@@ -243,6 +244,17 @@ export class Profile implements OnInit {
       });
     }
     if (this.ownSignIn()) { this.activityLoading.set(false); this.notifications.refresh(); return; }
+    this.loadActivity();
+    this.notifications.refresh();
+  }
+
+  /**
+   * Owner 2026-10-27: the activity tiles draw placeholders while this is read and "—" when it failed (they showed 0
+   * as if real), and the card's failure line has Try again.
+   */
+  loadActivity(): void {
+    this.activityLoading.set(true);
+    this.activityFailed.set(false);
     this.http.get<ApiResponse<UserActivity>>(`${API_BASE}/sourceJob.json/myActivity`).subscribe({
       next: r => {
         this.activityLoading.set(false);
@@ -253,7 +265,6 @@ export class Profile implements OnInit {
       // worse page than one whose activity card says it could not be read.
       error: () => { this.activityLoading.set(false); this.activityFailed.set(true); },
     });
-    this.notifications.refresh();
   }
 
   load(): void {

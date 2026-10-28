@@ -45,6 +45,16 @@ describe('ApiCollectionsApi: the workspace a platform administrator picked', () 
     asked.forEach(r => r.flush({ status: 'SUCCESS', message: '' }));
   });
 
+  it('sends the state and the sort only when they are set (owner 2026-10-27)', () => {
+    const { api, http } = setup();
+    api.list('', 1, 50, null, { status: 'Inactive', sort: 'updated', dir: 'desc' }).subscribe();
+    api.list('', 1, 50, null, { status: null }).subscribe();
+    const asked = http.match(() => true);
+    expect(asked.map(r => r.request.urlWithParams.replace(BASE, ''))).toEqual(['/list?page=1&limit=50&status=Inactive&sort=updated&dir=desc',
+      '/list?page=1&limit=50']);
+    asked.forEach(r => r.flush({ status: 'SUCCESS', message: '' }));
+  });
+
   it('names none for a workspace\'s people', () => {
     const { api, http } = setup();
     api.list('clinic', 1, 50).subscribe();

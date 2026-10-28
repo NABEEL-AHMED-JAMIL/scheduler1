@@ -29,7 +29,11 @@
     <div class="rs-banner rs-banner-info mb-4" role="note"><app-icon name="info" class="shrink-0" />
       <span class="text-sm min-w-0 flex-1">Reports are made by a workspace's members. You can read the steps here; to make one, work in the workspace.</span></div>
   }
-  @if (error()) { <div class="rs-banner rs-banner-crit mb-4" role="alert"><app-icon name="alert" class="icon-crit shrink-0" /><span class="text-sm">{{ error() }}</span></div> }
+  @if (error()) {
+    <div class="rs-banner rs-banner-crit mb-4" role="alert"><app-icon name="alert" class="icon-crit shrink-0" /><span class="text-sm min-w-0 flex-1">{{ error() }}</span>
+      @if (canRetry()) { <button type="button" class="btn btn-default btn-sm shrink-0" (click)="retryError()"><app-icon name="refresh" />Try again</button> }</div>
+  }
+  @if (picking()) { <div class="mb-4"><app-loading shape="inline" label="Opening the template…" /></div> }
 
   @switch (step()) {
     @case (1) {
@@ -39,8 +43,11 @@
           <input class="input max-w-72" type="search" [ngModel]="search()" (ngModelChange)="searchTemplates($event)" placeholder="Search templates" aria-label="Search templates" />
         </div>
         <div class="p-4">
-          @if (loadingTemplates()) { <div class="flex justify-center py-12"><span class="spinner" role="status" aria-label="Loading"></span></div> }
-          @else if (!shown().length) {
+          @if (templatesError()) { <app-load-error [message]="templatesError()" (retry)="readTemplates()" /> }
+          @else if (!templatesLoaded()) { <app-loading shape="cards" label="Loading templates…" [count]="6" /> }
+          @else {
+          <app-blur-loader [active]="loadingTemplates()" label="Refreshing…">
+          @if (!shown().length) {
             <p class="text-sm text-[color:var(--text-muted)] py-6">@if (search().trim()) { No published template matches the search. } @else { No published template yet. Publish one in Templates, or start from a starter there. }</p>
           } @else {
             <div class="rsw-cards">
@@ -55,6 +62,8 @@
                 </button>
               }
             </div>
+          }
+          </app-blur-loader>
           }
         </div>
         <app-pagination [total]="templateTotal()" [page]="templatePage()" [size]="templateSize()" (goTo)="templatesGoTo($event)" (setSize)="templatesSize($event)" />
@@ -95,8 +104,8 @@
                   <span class="label">Report data starts at</span>
                   <input class="input mono max-w-80" [ngModel]="rootPath()" (change)="rootPath.set($any($event.target).value.trim() || '$')" aria-label="Root path" />
                 </label>
-                @if (inspecting()) { <span class="spinner" role="status" aria-label="Reading the data"></span> }
-                @if (inspectError()) { <p class="field-note text-[color:var(--crit-text)]" role="alert">{{ inspectError() }}</p> }
+                @if (inspecting()) { <app-loading shape="inline" label="Reading the data…" /> }
+                @if (inspectError()) { <app-inline-status [error]="inspectError()" (retry)="retryRead()" /> }
                 @if (inspect(); as i) {
                   <dl class="rs-kv"><dt>Read</dt><dd>@if (i.connector === 'BUNDLE' ? bundleParts(i) : null; as ps) {
                     <ul class="rs-parts">@for (p of ps; track p.name) { <li><span class="mono">$.{{ p.name }}</span>@if (p.label) { <span class="text-[color:var(--text-muted)]"> · {{ p.label }}</span> }</li> }</ul>
@@ -124,15 +133,15 @@
                     }
                     @if (sampleTable(); as tbl) {
                       <div class="overflow-x-auto"><table class="table-modern rsw-sample">
-                        <thead><tr><th class="mono">{{ tbl.path }}[]</th>@for (c of tbl.cols.slice(1); track c) { <th>{{ c }}</th> }</tr></thead>
-                        <tbody>@for (r of tbl.rows; track $index) { <tr>@for (v of r; track $index) { <td class="text-sm" [class.tabular]="isNumber(v)">{{ v }}</td> }</tr> }</tbody>
+                        <thead><tr><th class="mono" [appSort]="tbl.cols[0] ?? ''" [sortBy]="sampleSort">{{ tbl.path }}[]</th>@for (c of tbl.cols.slice(1); track c) { <th [appSort]="c" [sortBy]="sampleSort">{{ c }}</th> }</tr></thead>
+                        <tbody>@for (r of sortedSample(); track $index) { <tr>@for (v of r.cells; track $index) { <td class="text-sm" [class.tabular]="isNumber(v)">{{ v }}</td> }</tr> }</tbody>
                       </table></div>
                     }
                   }
                   @case ('schema') {
                     <table class="table-modern">
-                      <thead><tr><th>Field</th><th>Type</th><th>Can be empty</th></tr></thead>
-                      <tbody>@for (f of i.schema; track f.path) { <tr><td class="mono text-xs">{{ f.path }}</td><td class="text-xs">{{ f.type }}</td><td class="text-xs">{{ f.nullable ? 'Yes' : 'No' }}</td></tr> }</tbody>
+                      <thead><tr><th appSort="field" [sortBy]="schemaSort">Field</th><th appSort="type" [sortBy]="schemaSort">Type</th><th appSort="nullable" [sortBy]="schemaSort">Can be empty</th></tr></thead>
+                      <tbody>@for (f of sortedSchema(); track f.path) { <tr><td class="mono text-xs">{{ f.path }}</td><td class="text-xs">{{ f.type }}</td><td class="text-xs">{{ f.nullable ? 'Yes' : 'No' }}</td></tr> }</tbody>
                     </table>
                   }
                   @case ('json') { <pre class="rs-code m-4">{{ sampleText() }}</pre> }
@@ -217,8 +226,10 @@
             <p class="text-xs text-[color:var(--text-muted)] px-4 py-2"><app-icon name="info" /> {{ inspect()?.label }} · "—" marks a missing value · a preview prints at most 200 rows a table</p>
           } @else if (checkError()) {
             <p class="p-4 text-sm text-[color:var(--crit-text)]" role="alert">{{ checkError() }}</p>
+          } @else if (checking()) {
+            <app-loading shape="spinner" label="Drawing the preview…" />
           } @else {
-            <div class="flex justify-center py-24"><span class="spinner" role="status" aria-label="Drawing the preview"></span></div>
+            <p class="p-4 text-sm text-[color:var(--text-muted)]">No preview yet: pick the data in Data and mapping, then check again.</p>
           }
         </section>
 
@@ -254,7 +265,8 @@
                 <select class="input" aria-label="Brand profile" [ngModel]="brandProfileId()" (ngModelChange)="brandProfileId.set($event); check()">
                   <option value="">@if (!brandProfileId() && brand(); as b) { {{ b.name }} } @else { {{ templateProfileId() ? "The template's profile" : 'The workspace default' }} }</option>
                   @for (p of profiles(); track p.profileId) { <option [value]="p.profileId">{{ p.name }} · v{{ p.version }}{{ p.isDefault ? ' (workspace default)' : '' }}</option> }
-                </select></label>
+                </select>
+                <app-inline-status [loading]="profilesState.loading()" [error]="profilesState.error()" label="Loading brand profiles…" (retry)="loadProfiles()" /></label>
               @if (brand(); as b) {
                 <div class="flex items-center gap-2 text-sm min-w-0">
                   @if (b.logoAssetId) { <app-rs-asset-picture class="rsw-logo" [assetId]="b.logoAssetId" [alt]="b.logoName || 'Logo'" maxHeight="1.25rem" />
@@ -263,7 +275,7 @@
                   @if (canBrand()) { <a class="link-inline ml-auto" [routerLink]="['/reports/assets/branding', b.profileId]">Replace</a> }
                 </div>
                 <p class="text-xs text-[color:var(--text-muted)]">@if (b.signOnApproval !== false) { Its approval signs the PDF in the approver's name. } @else { Approving does not sign the PDF. }</p>
-              } @else {
+              } @else if (profilesState.loaded()) {
                 <p class="text-xs text-[color:var(--text-muted)]">No published brand profile yet: the report prints in the platform's look.</p>
               }
             }
@@ -301,6 +313,10 @@
           <div class="rsw-progress" role="progressbar" [attr.aria-valuenow]="j.progressPct" aria-valuemin="0" aria-valuemax="100" [attr.aria-label]="stageWord(j.status)">
             <i [style.width.%]="j.progressPct"></i></div>
           <p class="text-sm">{{ stageWord(j.status) }} · {{ j.progressPct }}%</p>
+          @if (pollError()) {
+            <p class="text-sm text-[color:var(--crit-text)] flex flex-wrap items-center gap-2" role="alert">{{ pollError() }}
+              <button type="button" class="btn btn-default btn-sm" (click)="checkJobAgain()"><app-icon name="refresh" />Check again</button></p>
+          }
           @if (j.status === 'FAILED') {
             <p class="text-sm text-[color:var(--crit-text)]" role="alert">{{ j.error }} No report version was made.</p>
             <app-report-problems [problems]="j.diagnostics || []" />

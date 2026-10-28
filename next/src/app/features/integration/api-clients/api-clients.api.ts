@@ -334,9 +334,20 @@ export class ApiClientsApi {
   }
 
   /** Newest first; `before` is the last id of the page shown. */
-  deliveries(webhookId: string, before?: string | null, limit = 50, tenantId?: number | null): Observable<ApiResponse<DeliveryRow[]>> {
+  /**
+   * Owner 2026-10-27: `order` is the server's sort (when, event, state, attempts; asc or desc). A sorted log pages by
+   * `offset` (the rows already shown): `before` is the newest-first order's cursor and is not sent with it.
+   */
+  deliveries(webhookId: string, before?: string | null, limit = 50, tenantId?: number | null,
+             order: { sort: string; dir: string; offset: number } | null = null): Observable<ApiResponse<DeliveryRow[]>> {
     const params: Record<string, string> = { webhookId, limit: String(limit) };
-    if (before) params['before'] = before;
+    if (order) {
+      params['sort'] = order.sort;
+      params['dir'] = order.dir;
+      params['offset'] = String(order.offset);
+    } else if (before) {
+      params['before'] = before;
+    }
     return this.http.get<ApiResponse<DeliveryRow[]>>(`${this.webhooks}/deliveries`, { params: scoped(params, tenantId) });
   }
 

@@ -9,6 +9,8 @@ import { PageHeader } from '../../../shared/ui/page-header';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
 import { EmptyState } from '../../../shared/ui/empty-state';
 import { LoadError } from '../../../shared/ui/load-error';
+import { AppLoading, InlineStatus, loadErrorText } from '../../../shared/ui/loading';
+import { BlurLoader } from '../../../shared/ui/blur-loader';
 import { SegmentOption, Segmented } from '../../../shared/ui/segmented';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { sidePanelConfig } from '../../../shared/ui/side-panel';
@@ -33,7 +35,7 @@ const LIMIT = 25;
  */
 @Component({
   selector: 'app-backfills',
-  imports: [PageHeader, RefreshButton, EmptyState, LoadError, Segmented, ServerTimePipe, Icon, RouterLink],
+  imports: [PageHeader, RefreshButton, EmptyState, LoadError, AppLoading, InlineStatus, BlurLoader, Segmented, ServerTimePipe, Icon, RouterLink],
   styles: `
     .bf-list { display: flex; flex-direction: column; }
     .bf-row { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(0, 2fr) minmax(9rem, 0.9fr) auto; gap: 1rem; align-items: center;
@@ -61,9 +63,13 @@ const LIMIT = 25;
         </div>
       </app-page-header>
 
-      @if (error()) {
+      <!-- Owner 2026-10-27: the first read is a skeleton (it drew an empty card); a reload keeps the list, dimmed, and one
+           that fails says so above it instead of replacing it. -->
+      @if (error() && !rows().length) {
         <app-load-error [message]="error()" (retry)="load()" />
-      } @else if (!rows().length && !loading()) {
+      } @else if (loading() && !rows().length) {
+        <div class="card"><app-loading shape="list" label="Loading backfills…" /></div>
+      } @else if (!rows().length) {
         <div class="card p-10">
           <app-empty-state icon="history" [title]="show() === 'open' ? 'No backfill is running' : 'No backfills'"
                            message="Build › Pipelines › Schedules & triggers: a schedule's ⋮ menu › Backfill… runs it for each day of a past range.">
@@ -71,6 +77,8 @@ const LIMIT = 25;
           </app-empty-state>
         </div>
       } @else {
+        @if (error()) { <app-inline-status [error]="error()" (retry)="load()" data-test="backfills-reload-error" /> }
+        <app-blur-loader [active]="loading()" label="Refreshing…">
         <div class="card bf-list" data-test="backfills-list">
           @for (b of rows(); track b.backfillId) {
             <div class="bf-row" role="button" tabindex="0" (click)="open(b)" (keydown.enter)="open(b)" [attr.data-backfill]="b.backfillId">
@@ -132,6 +140,7 @@ const LIMIT = 25;
             </div>
           }
         </div>
+        </app-blur-loader>
         @if (total() > rows().length || page() > 1) {
           <div class="flex items-center gap-2 text-sm">
             <button type="button" class="btn btn-default btn-sm" [disabled]="page() === 1" (click)="go(page() - 1)">Newer</button>
@@ -209,13 +218,14 @@ export class Backfills implements OnInit {
           this.error.set('');
           this.rows.set(r.data.rows ?? []);
           this.total.set(r.data.total ?? 0);
-        } else {
-          this.error.set(r.message || 'The backfills could not be read.');
+        } else if (!quiet || !this.rows().length) {
+          this.error.set(loadErrorText(r, 'The backfills could not be read.'));
         }
       },
+      // A quiet poll that fails keeps the list as it is; the next poll tries again.
       error: err => {
         this.loading.set(false);
-        this.error.set(refusalOf(err, 'The backfills could not be read.'));
+        if (!quiet || !this.rows().length) this.error.set(refusalOf(err, 'The backfills could not be read.'));
       },
     });
   }

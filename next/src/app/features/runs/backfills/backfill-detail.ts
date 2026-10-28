@@ -8,6 +8,12 @@ import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { SegmentOption, Segmented } from '../../../shared/ui/segmented';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { valuesText } from '../../jobs/run-parameters/run-parameters';
+import { Subscription } from 'rxjs';
+import { AppLoading, InlineStatus, loadErrorText } from '../../../shared/ui/loading';
+import { LoadError } from '../../../shared/ui/load-error';
+import { BlurLoader } from '../../../shared/ui/blur-loader';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
 import {
   Backfill, BackfillPeriod, BackfillsApi, STEP_WORDS, doneOf, durationText, isOpen, lookOf, money, periodLabel, progressParts, refusalOf, statusWord,
 } from './backfills.api';
@@ -28,7 +34,7 @@ type PeriodFilter = '' | 'FAILED' | 'QUEUED' | 'PENDING' | 'COMPLETED' | 'SKIPPE
  */
 @Component({
   selector: 'app-backfill-detail',
-  imports: [SidePanel, Icon, RouterLink, ServerTimePipe, Segmented],
+  imports: [SidePanel, Icon, RouterLink, ServerTimePipe, Segmented, AppLoading, InlineStatus, LoadError, BlurLoader, SortHeader],
   styles: `
     .bf-bar { display: flex; height: 0.5rem; border-radius: 999px; overflow: hidden; background: var(--surface-sunken); }
     .bf-bar > span { display: block; height: 100%; }
@@ -43,10 +49,13 @@ type PeriodFilter = '' | 'FAILED' | 'QUEUED' | 'PENDING' | 'COMPLETED' | 'SKIPPE
   `,
   template: `
     <app-side-panel [heading]="'Backfill #' + data.backfillId" [subtitle]="subtitle()" data-test="backfill-detail">
-      @if (error()) {
-        <p class="text-sm text-crit-500 m-0" role="alert">{{ error() }}</p>
+      <!-- Owner 2026-10-27: a failed read says why with Try again; a period filter or page that fails keeps the backfill
+           on screen and says so above it. -->
+      @if (error() && !backfill()) {
+        <app-load-error [message]="error()" (retry)="load()" />
       } @else if (backfill(); as b) {
         <div class="flex flex-col gap-4">
+          @if (error()) { <app-inline-status [error]="error()" (retry)="load()" /> }
           <div class="flex items-center gap-2 flex-wrap">
             @if (lookOf(b.status); as l) {
               <span class="pill pill-{{ l.tone }}" data-test="backfill-status"><app-icon [name]="l.icon" size="0.85em" />{{ l.word }}</span>
@@ -122,8 +131,11 @@ type PeriodFilter = '' | 'FAILED' | 'QUEUED' | 'PENDING' | 'COMPLETED' | 'SKIPPE
               <h3 class="text-sm font-semibold m-0">Periods</h3>
               <app-segmented class="ml-auto" [options]="filters" [value]="filter()" (valueChange)="pick($event)" ariaLabel="Show periods" />
             </div>
+            <app-blur-loader [active]="loading()" label="Reading the periods…">
             <table class="bf-periods" data-test="backfill-periods">
-              <thead><tr><th>{{ stepUnit() === 'hour' ? 'Hour' : 'Date' }}</th><th>State</th><th>Run</th><th>Tries</th><th>Note</th></tr></thead>
+              <!-- Owner 2026-10-27: Date, State, Run and Tries sort on the server (Core's backfills/detail); Note stays plain. -->
+              <thead><tr><th appSort="date" [sortBy]="sort">{{ stepUnit() === 'hour' ? 'Hour' : 'Date' }}</th><th appSort="state" [sortBy]="sort">State</th>
+                <th appSort="run" [sortBy]="sort">Run</th><th appSort="tries" [sortBy]="sort">Tries</th><th>Note</th></tr></thead>
               <tbody>
                 @for (p of b.periods || []; track p.start) {
                   <tr>
@@ -140,16 +152,18 @@ type PeriodFilter = '' | 'FAILED' | 'QUEUED' | 'PENDING' | 'COMPLETED' | 'SKIPPE
                 }
               </tbody>
             </table>
+            </app-blur-loader>
             @if ((b.periods?.length ?? 0) === 100) {
               <div class="flex gap-2 mt-2">
-                @if (page() > 1) { <button type="button" class="btn btn-default btn-sm" (click)="go(page() - 1)">Earlier</button> }
-                <button type="button" class="btn btn-default btn-sm" (click)="go(page() + 1)">Later</button>
+                <!-- In a column's order the pages are the order's, not the calendar's. -->
+                @if (page() > 1) { <button type="button" class="btn btn-default btn-sm" (click)="go(page() - 1)">{{ order() ? 'Previous 100' : 'Earlier' }}</button> }
+                <button type="button" class="btn btn-default btn-sm" (click)="go(page() + 1)">{{ order() ? 'Next 100' : 'Later' }}</button>
               </div>
             }
           </section>
         </div>
       } @else {
-        <p class="text-sm text-[color:var(--text-muted)] m-0">Reading the backfill…</p>
+        <app-loading shape="panel" [count]="6" label="Reading the backfill…" />
       }
       <div foot class="flex items-center gap-2 w-full">
         <a class="btn btn-default btn-sm" [routerLink]="['/pipelines/schedules', backfill()?.jobId ?? 0, 'executions']" (click)="ref.close(changed)"
@@ -167,10 +181,42 @@ export class BackfillDetail implements OnInit {
 
   readonly backfill = signal<Backfill | null>(null);
   readonly error = signal('');
+  /** Owner 2026-10-27: a read is out (the first, or a filter or page of the periods). */
+  readonly loading = signal(false);
+  private request?: Subscription;
   readonly busy = signal(false);
   readonly filter = signal<PeriodFilter>('');
   readonly page = signal(1);
   changed = false;
+
+  /**
+   * Owner 2026-10-27 ("add a sort on each table"): the periods sort on the server, a page of 100 at a time -- Date, State
+   * (problems first, as Core ranks them), Run (a period not run yet last) and Tries. The periods' own order is the calendar,
+   * oldest first (Core's default), and sends no sort; a new order goes back to the first page. Not remembered: the panel
+   * opens fresh for each backfill.
+   */
+  readonly sort = createTableSort<BackfillPeriod>({
+    id: 'backfill-periods',
+    server: true,
+    remember: false,
+    initial: { key: 'date', direction: 'asc' },
+    columns: {
+      date: { value: p => p.start, kind: 'date', first: 'asc' },
+      state: { value: p => p.state, kind: 'status', order: ['FAILED', 'CANCELLED', 'QUEUED', 'PENDING', 'SKIPPED', 'COMPLETED'] },
+      run: { value: p => p.jobQueueId, kind: 'number' },
+      tries: { value: p => p.tries, kind: 'number' },
+    },
+    onChange: () => {
+      this.page.set(1);
+      this.load();
+    },
+  });
+
+  /** What a read carries: the column and direction, or null for the calendar order. */
+  order(): { sort: string; dir: 'asc' | 'desc' } | null {
+    const picked = this.sort.param();
+    return picked && !(picked.sort === 'date' && picked.dir === 'asc') ? picked : null;
+  }
 
   readonly filters: SegmentOption<PeriodFilter>[] = [
     { id: '', label: 'All' }, { id: 'FAILED', label: 'Failed' }, { id: 'QUEUED', label: 'Running' }, { id: 'PENDING', label: 'Waiting' },
@@ -200,16 +246,20 @@ export class BackfillDetail implements OnInit {
   }
 
   load(): void {
-    this.api.detail(this.data.backfillId, this.filter() || null, this.page()).subscribe({
+    // Only the newest read may land: a filter picked twice must not let the older answer win.
+    this.request?.unsubscribe();
+    this.loading.set(true);
+    this.request = this.api.detail(this.data.backfillId, this.filter() || null, this.page(), this.order()).subscribe({
       next: r => {
+        this.loading.set(false);
         if (r.status === API_SUCCESS && r.data) {
           this.error.set('');
           this.backfill.set(r.data);
         } else {
-          this.error.set(r.message || 'The backfill could not be read.');
+          this.error.set(loadErrorText(r, 'The backfill could not be read.'));
         }
       },
-      error: err => this.error.set(refusalOf(err, 'The backfill could not be read.')),
+      error: err => { this.loading.set(false); this.error.set(refusalOf(err, 'The backfill could not be read.')); },
     });
   }
 

@@ -1,10 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Dialog } from '@angular/cdk/dialog';
 import { ActivatedRoute, Router } from '@angular/router';
-import { of } from 'rxjs';
+import { NEVER, Observable, of, throwError } from 'rxjs';
 import { AuthService } from '../../../core/auth/auth.service';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { ConnectionActivity, Connections } from './connections';
@@ -187,5 +187,68 @@ describe('Model connections -- Active / Inactive and the chips (owner items #12,
     expect(screen.providerChip({ ...ROWS[1], provider: 'Something new' })).toBe('pill pill-prov-compat');
     expect(screen.statusChip(ROWS[0])).toEqual({ cls: 'pill pill-ok', label: 'Active', icon: 'check' });
     expect(screen.statusChip({ ...ROWS[0], status: 'Inactive' })).toEqual({ cls: 'pill pill-warn', label: 'Inactive', icon: 'pause' });
+  });
+});
+
+/** Owner 2026-10-27: the recent runs sort, and the list's loading / empty / error states. */
+function screenWith(list: () => Observable<unknown>, activity: ConnectionActivity = ACTIVITY) {
+  TestBed.resetTestingModule();
+  try { localStorage.clear(); } catch { /* none */ }
+  TestBed.configureTestingModule({
+    providers: [
+      { provide: HttpClient, useValue: { get: (url: string) => url.endsWith('/activity') ? of({ status: 'SUCCESS', message: '', data: activity })
+        : url.endsWith('/history') ? of({ status: 'SUCCESS', message: '', data: [] }) : list() } },
+      { provide: Dialog, useValue: {} },
+      { provide: ToastService, useValue: { success: () => {}, error: () => {} } },
+      { provide: AuthService, useValue: { isPlatformAdmin: () => false, user: signal({ appUserId: 1 }) } },
+      { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: { get: () => null } } } },
+      { provide: Router, useValue: { navigate: vi.fn() } },
+    ],
+  });
+  const screen = TestBed.runInInjectionContext(() => new Connections());
+  screen.ngOnInit();
+  TestBed.tick();
+  return screen;
+}
+
+describe('Model connections -- sorting the recent runs (owner 2026-10-27)', () => {
+  const runs: ConnectionActivity = { ...ACTIVITY, recent: [
+    { runId: 1, at: '2026-09-30T10:00:00', kind: 'run', promptName: 'Beta', status: 'ok', latencyMs: 900, tokensIn: 1, tokensOut: 1 },
+    { runId: 2, at: '2026-09-30T09:00:00', kind: 'run', promptName: 'Alpha', status: 'failed', latencyMs: 3000, tokensIn: 50, tokensOut: 5 },
+  ] };
+
+  it('keeps the newest-first order, then sorts by prompt both ways', () => {
+    const screen = screenWith(() => of({ status: 'SUCCESS', message: '', data: ROWS }), runs);
+    expect(screen.sortedRecent().map(r => r.runId)).toEqual([1, 2]);
+    screen.recentSort.toggle('prompt');
+    expect(screen.sortedRecent().map(r => r.runId)).toEqual([2, 1]);
+    screen.recentSort.toggle('prompt');
+    expect(screen.sortedRecent().map(r => r.runId)).toEqual([1, 2]);
+  });
+
+  it('sorts the time as a number, the slowest first', () => {
+    const screen = screenWith(() => of({ status: 'SUCCESS', message: '', data: ROWS }), runs);
+    screen.recentSort.toggle('time');
+    expect(screen.sortedRecent().map(r => r.latencyMs)).toEqual([3000, 900]);
+  });
+});
+
+describe('Model connections -- loading, empty, error (owner 2026-10-27)', () => {
+  it('is loading, and the tiles wait, until the list answers', () => {
+    const screen = screenWith(() => NEVER);
+    expect(screen.loading()).toBe(true);
+    expect(screen.state.pending()).toBe(true);
+  });
+
+  it('is empty once an empty list answers', () => {
+    const screen = screenWith(() => of({ status: 'SUCCESS', message: '', data: [] }));
+    expect(screen.state.pending()).toBe(false);
+    expect(screen.filtered()).toEqual([]);
+  });
+
+  it('says the list could not be read, in plain words', () => {
+    const screen = screenWith(() => throwError(() => new HttpErrorResponse({ status: 500 })));
+    expect(screen.loading()).toBe(false);
+    expect(screen.error()).toBe('The connections could not be read.');
   });
 });

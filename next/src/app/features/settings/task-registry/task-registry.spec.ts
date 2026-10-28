@@ -2,13 +2,15 @@ import { describe, it, expect, vi } from 'vitest';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
-import { Dialog } from '@angular/cdk/dialog';
+import { DIALOG_DATA, Dialog, DialogRef } from '@angular/cdk/dialog';
 import { ActivatedRoute, Router } from '@angular/router';
-import { Observable, of } from 'rxjs';
+import { NEVER, Observable, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { AuthService } from '../../../core/auth/auth.service';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { StepTaskEntry } from '../../tasks/steps/steps.model';
 import { TaskUsagePanel } from './task-usage-panel';
+import { StepsApi } from '../../tasks/steps/steps.service';
 import { WorkspaceDirectory } from '../../../core/workspaces/workspace-directory';
 import { TaskPanel } from './task-panel';
 import { TaskRegistry } from './task-registry';
@@ -57,6 +59,7 @@ function screenWith(setup: Setup = {}) {
   const role = setup.role ?? 'TENANT_ADMIN';
   const navigate = vi.fn();
   TestBed.resetTestingModule();
+  try { localStorage.clear(); } catch { /* none: the sort remembers its choice there */ }
   TestBed.configureTestingModule({
     providers: [
       provideZonelessChangeDetection(),
@@ -119,7 +122,7 @@ describe('Task Registry -- the list', () => {
 
   it('says the pipelines could not be loaded', () => {
     const { screen } = screenWith({ list: () => new Observable(sub => sub.error({ error: {} })) });
-    expect(screen.error()).toBe('Could not load pipelines.');
+    expect(screen.error()).toBe('The pipelines could not be read.');
   });
 });
 
@@ -271,5 +274,78 @@ describe('Task Registry -- the workspace\'s task switches', () => {
     screen.switchTask(screen.rows().find(r => r.code === 'filter')!.task, false);
     expect(toast.error).toHaveBeenCalledWith('Only a workspace administrator switches tasks.');
     expect(screen.rows().find(r => r.code === 'filter')!.state).toBe('On');
+  });
+});
+
+describe('Task Registry -- sorting, loading, empty, error (owner 2026-10-27)', () => {
+  it('keeps the kind order until a heading is picked, then sorts before paging, both ways', () => {
+    const { screen } = screenWith();
+    expect(screen.shown()[0].code).toBe('sample');
+    screen.sort.toggle('task');
+    expect(screen.sorted().map(r => r.name)[0]).toBe('Filter');
+    screen.sort.toggle('task');
+    expect(screen.sorted().map(r => r.name)[0]).toBe('Write Database');
+    screen.sort.toggle('runs');
+    expect(screen.sorted()[0].code).toBe('filter');
+  });
+
+  it('is loading, with the step-task tiles waiting, until the registry answers', () => {
+    const { screen } = screenWith({ tasks: () => NEVER, usage: () => NEVER });
+    expect(screen.tasksLoading()).toBe(true);
+    expect(screen.tasksLoaded()).toBe(false);
+    expect(screen.countsKnown()).toBe(false);
+  });
+
+  it('is empty, not loading, once both lists answer empty', () => {
+    const { screen } = screenWith({ tasks: () => of({ status: 'SUCCESS', data: [] }),
+      list: () => of({ status: 'SUCCESS', data: { rows: [], summary: { total: 0, active: 0, fields: 0, topics: 0, untopped: 0 } } }) });
+    expect(screen.tasksLoading()).toBe(false);
+    expect(screen.loading()).toBe(false);
+    expect(screen.tasksLoaded()).toBe(true);
+    expect(screen.pipelinesLoaded()).toBe(true);
+    expect(screen.filtered()).toEqual([]);
+  });
+
+  it('says the registry could not be read, in plain words, when the read fails', () => {
+    const { screen } = screenWith({ tasks: () => throwError(() => new HttpErrorResponse({ status: 500, error: 'Internal Server Error' })) });
+    expect(screen.tasksLoading()).toBe(false);
+    expect(screen.tasksError()).toBe('The Task Registry could not be read.');
+  });
+});
+
+describe('Task usage drawer -- loading, empty, error (owner 2026-10-27)', () => {
+  function drawer(answer: () => Observable<any>) {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: DialogRef, useValue: { close: vi.fn() } },
+        { provide: DIALOG_DATA, useValue: { list: 'pipelines', of: { code: 'filter' }, name: 'Filter', count: 3, tenantId: null } },
+        { provide: StepsApi, useValue: { taskPipelines: vi.fn(answer), taskRuns: vi.fn(answer) } },
+        { provide: WorkspaceDirectory, useValue: { names: () => new Map() } },
+      ],
+    });
+    const panel = TestBed.runInInjectionContext(() => new TaskUsagePanel());
+    panel.ngOnInit();
+    return panel;
+  }
+
+  it('is loading until the list answers', () => {
+    expect(drawer(() => NEVER).loading()).toBe(true);
+  });
+
+  it('is empty once an empty list answers', () => {
+    const panel = drawer(() => of({ status: 'SUCCESS', data: [] }));
+    expect(panel.loading()).toBe(false);
+    expect(panel.pipelines()).toEqual([]);
+  });
+
+  it('says the list could not be read and reads again on Try again', () => {
+    let answer: () => Observable<any> = () => throwError(() => new HttpErrorResponse({ status: 500 }));
+    const panel = drawer(() => answer());
+    expect(panel.loading()).toBe(false);
+    expect(panel.error()).toBe('The list could not be read.');
+    answer = () => of({ status: 'SUCCESS', data: [] });
+    panel.load();
+    expect(panel.error()).toBe('');
   });
 });

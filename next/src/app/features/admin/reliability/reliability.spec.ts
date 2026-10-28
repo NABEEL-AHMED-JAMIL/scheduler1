@@ -46,6 +46,7 @@ const burn = (sli: string, rule: string, firing: boolean, rate: number | null): 
 
 function screen() {
   TestBed.resetTestingModule();
+  try { localStorage.clear(); } catch { /* none */ }
   TestBed.configureTestingModule({ imports: [Reliability], providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()] });
   const fixture = TestBed.createComponent(Reliability);
   fixture.detectChanges();
@@ -150,5 +151,58 @@ describe('Reliability helpers', () => {
     const bars = dayBars([{ day: '2026-09-28', good: 7, bad: 1 }], '2026-09-27', '2026-09-29');
     expect(bars.map(b => [b.meta, b.value])).toEqual([['2026-09-27', 0], ['2026-09-28', 8], ['2026-09-29', 0]]);
     expect(bars[1].segments!.map(x => [x.label, x.value])).toEqual([['Good', 7], ['Bad', 1]]);
+  });
+});
+
+describe('Reliability -- sorting (owner 2026-10-27)', () => {
+  it('keeps "Why runs ended" bad first until a heading is picked, then sorts by runs both ways', () => {
+    const s = screen();
+    answerAll(s);
+    const c = s.component;
+    expect(c.sortedRunGroups().map(g => g.reason)).toEqual(['STALLED', 'DECLINED', 'SKIPPED', 'AI_STEP', 'WORKER']);
+    c.runGroupSort.toggle('runs');
+    expect(c.sortedRunGroups().map(g => g.runs)).toEqual([19_997, 40, 4, 2, 1]);
+    c.runGroupSort.toggle('runs');
+    expect(c.sortedRunGroups().map(g => g.runs)).toEqual([1, 2, 4, 40, 19_997]);
+  });
+
+  it('sorts both meter tables by one choice', () => {
+    const s = screen();
+    answerAll(s);
+    s.component.meterSort.toggle('meter');
+    expect(s.component.sortedMeters().map(m => m.meter)).toEqual(['pipeline.runs']);
+    expect(s.component.meterSort.key()).toBe('meter');
+  });
+});
+
+describe('Reliability -- loading, error (owner 2026-10-27)', () => {
+  it('is loading (no error, no figures) until the objectives answer', () => {
+    const s = screen();
+    expect(s.component.runsLoading()).toBe(true);
+    expect(s.component.billingLoading()).toBe(true);
+    expect(s.component.runsError()).toBe('');
+    expect(s.el.querySelector('[data-testid="status-runs"] app-loading')).not.toBeNull();
+  });
+
+  it('says the figures could not be read, in plain words, with Try again', () => {
+    const s = screen();
+    s.http.expectOne(r => r.url === RUNS_URL).flush('boom', { status: 500, statusText: 'Server Error' });
+    s.http.expectOne(r => r.url === BILLING_URL).flush({ status: API_SUCCESS, message: '', data: null });
+    s.http.expectOne(r => r.url === BURN_URL).flush({ status: API_SUCCESS, message: '', data: [] });
+    s.fixture.detectChanges();
+    expect(s.component.runsLoading()).toBe(false);
+    expect(s.component.runsError()).toBe('Could not read the pipeline execution figures.');
+    // An answer with no figures is not a blank card.
+    expect(s.component.billingError()).toBe('Could not read the billing figures.');
+    expect(s.el.querySelector('[data-testid="status-runs"]')!.textContent).toContain('Try again');
+  });
+
+  it('keeps the figures under a blur while a new range is read', () => {
+    const s = screen();
+    answerAll(s);
+    s.component.setRange('7');
+    s.fixture.detectChanges();
+    expect(s.component.runsLoading()).toBe(true);
+    expect(s.el.querySelector('[data-testid="status-runs"]')!.textContent).toContain('99.985%');
   });
 });

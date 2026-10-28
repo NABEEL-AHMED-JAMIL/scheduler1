@@ -25,6 +25,9 @@ import { naturalHeight, optionFor, pickerOf } from './charts/chart-options';
 import { markFor } from './charts/mark-pick';
 import { tableOf } from './charts/chart-table';
 import type { Mark, WidgetView } from './widget-view';
+import type { PivotRow } from './analytics.service';
+import { createTableSort } from '../../shared/ui/sort';
+import { SortHeader } from '../../shared/ui/sort-header';
 
 /** How many rows a tile's table shows; the rest are one click away. */
 export const WIDGET_ROWS = 8;
@@ -45,7 +48,7 @@ export const WIDGET_HEIGHT_MAX = 600;
  */
 @Component({
   selector: 'app-widget-chart',
-  imports: [BarChart, Donut, KpiCard, KpiTrend, LineChart, ScatterPlot, Comparison, Histogram, ResultSummary, RankedBar, GroupedBar, WidgetTable, DataText, EChart, ChartPalette],
+  imports: [BarChart, Donut, KpiCard, KpiTrend, LineChart, ScatterPlot, Comparison, Histogram, ResultSummary, RankedBar, GroupedBar, WidgetTable, DataText, EChart, ChartPalette, SortHeader],
   template: `
     @if (view(); as v) {
       <!-- In a row layout a compact kind (a figure, a ring, ranked bars, a summary) is capped and
@@ -83,9 +86,10 @@ export const WIDGET_HEIGHT_MAX = 600;
               <table class="table-modern">
                 <thead>
                   <tr>
-                    <th class="whitespace-nowrap">{{ grid.rowDimension }}</th>
-                    @for (column of grid.columnValues; track column) {
-                      <th class="text-right"><app-data-text class="min-w-16 max-w-48 ml-auto" [value]="column" [label]="grid.columnDimension" /></th>
+                    <!-- Owner 2026-10-27: the row header and every column sort; the server's order stays until one is picked. -->
+                    <th class="whitespace-nowrap" appSort="row" [sortBy]="pivotSort">{{ grid.rowDimension }}</th>
+                    @for (column of grid.columnValues; track $index) {
+                      <th class="text-right" [appSort]="'c:' + $index" [sortBy]="pivotSort"><app-data-text class="min-w-16 max-w-48 ml-auto" [value]="column" [label]="grid.columnDimension" /></th>
                     }
                   </tr>
                 </thead>
@@ -276,7 +280,21 @@ export class WidgetChart {
   dimensionName(view: WidgetView): string { return (view.columns[0] ?? '').replace(/_/g, ' '); }
   readable(cell: string): string { return readableCell(cell); }
   tileRows(view: WidgetView): (string | null)[][] { return view.rows.slice(0, this.maxRows()); }
-  pivotRows(grid: PivotGrid): NonNullable<PivotGrid['rows']> { return (grid.rows ?? []).slice(0, this.maxRows()); }
+  /**
+   * Owner 2026-10-27, "add a sort on each table": the cross-tab sorts by its row values or by any column's figures
+   * (columns keyed by position, 'c:0', 'c:1'...). Sorted before the tile's cut, so a tile shows the top rows of the
+   * chosen order. Not remembered: each tile is its own grid.
+   */
+  readonly pivotSort = createTableSort<PivotRow>({
+    id: 'analytics-pivot',
+    columns: { row: { value: row => row.key, kind: 'auto' } },
+    remember: false,
+    dynamic: key => {
+      const at = /^c:(\d+)$/.exec(key);
+      return at ? { value: row => row.cells[Number(at[1])], kind: 'auto' } : null;
+    },
+  });
+  pivotRows(grid: PivotGrid): NonNullable<PivotGrid['rows']> { return this.pivotSort.apply(grid.rows ?? []).slice(0, this.maxRows()); }
 
   points(view: WidgetView): Point[] { return view.marks.map(mark => ({ label: mark.name, value: mark.value })); }
   /** The same series accumulated; the kind is refused over a rank-ordered result, so the order is the dimension's own. */

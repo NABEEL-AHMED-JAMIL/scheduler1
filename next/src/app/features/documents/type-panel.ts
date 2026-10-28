@@ -8,11 +8,15 @@ import { Field } from '../../shared/ui/field';
 import { StatusPill } from '../../shared/ui/status-pill';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import {
-  DocumentType, ListSource, RULE_KINDS, RULE_LABELS, RuleKind, TypeDefinition, TypeField, TypeRule, TypeTable, blankDefinition, blankRule, blankTable,
+  DocumentType, ListSource, TypeVersionRow, RULE_KINDS, RULE_LABELS, RuleKind, TypeDefinition, TypeField, TypeRule, TypeTable, blankDefinition, blankRule, blankTable,
   autoApproveVerdict, definitionProblems, definitionToSave, editableDefinition, listText, refusalText, statusOf, textList,
 } from './documents.model';
 import { DocumentsApi, TypeSave } from './documents.service';
 import { FieldListEditor } from './field-list-editor';
+import { AppLoading, InlineStatus } from '../../shared/ui/loading';
+import { LoadError } from '../../shared/ui/load-error';
+import { createTableSort } from '../../shared/ui/sort';
+import { SortHeader } from '../../shared/ui/sort-header';
 
 export interface TypePanelData {
   /** null: a new type. */
@@ -37,14 +41,26 @@ type Mode = 'view' | 'edit' | 'copy' | 'new' | 'version';
  */
 @Component({
   selector: 'app-type-panel',
-  imports: [SidePanel, Icon, Field, StatusPill, ServerTimePipe, FieldListEditor],
+  imports: [SidePanel, Icon, Field, StatusPill, ServerTimePipe, FieldListEditor, AppLoading, InlineStatus, LoadError, SortHeader],
   template: `
     <app-side-panel [heading]="heading()" [subtitle]="subtitle()">
       <div class="flex flex-col gap-4 min-w-0" data-test="type-panel">
-        @if (loadError()) { <p class="text-sm text-crit-500" role="alert">{{ loadError() }}</p> }
-        @if (loading()) { <p class="text-sm text-[color:var(--text-muted)]">Loading…</p> }
+        <!--
+          Owner 2026-10-27: the first read shows the shared loader; a failed one says why with Try again and draws no empty
+          form under it (it drew a blank name, key and definition). A read again (after a save) keeps the form on screen.
+        -->
+        @if (loadError() && !type()) {
+          <app-load-error role="alert" [message]="loadError()" (retry)="reopen()" />
+        } @else if (loadError()) {
+          <app-inline-status [error]="loadError()" (retry)="reopen()" />
+        }
+        @if (loading() && !type()) {
+          <app-loading shape="panel" label="Loading the document type…" [count]="8" />
+        } @else if (loading()) {
+          <app-loading shape="inline" label="Reading it again…" />
+        }
 
-        @if (!loading()) {
+        @if (showForm()) {
           @switch (mode()) {
             @case ('view') {
               @if (type()?.builtIn) {
@@ -242,10 +258,17 @@ type Mode = 'view' | 'edit' | 'copy' | 'new' | 'version';
           @if (type()?.versions?.length) {
             <section class="flex flex-col gap-2" aria-label="Versions">
               <h3 class="text-sm font-semibold">Versions</h3>
+              <!-- Owner 2026-10-27: an older version that could not be read is said here with Try again (it was a toast). -->
+              <app-inline-status [loading]="versionLoading() !== null" [error]="versionError()"
+                                 [label]="'Reading version ' + (versionLoading() ?? '') + '…'" (retry)="retryVersion()" />
               <table class="table-modern">
-                <thead><tr><th>Version</th><th>Name</th><th>Saved</th></tr></thead>
+                <thead><tr>
+                  <th appSort="version" [sortBy]="versionSort">Version</th>
+                  <th appSort="name" [sortBy]="versionSort">Name</th>
+                  <th appSort="saved" [sortBy]="versionSort">Saved</th>
+                </tr></thead>
                 <tbody>
-                  @for (v of type()!.versions; track v.version) {
+                  @for (v of versionsSorted(); track v.version) {
                     <tr>
                       <td>
                         <button type="button" class="link-inline mono" [attr.aria-pressed]="shownVersion() === v.version" (click)="showVersion(v.version)">v{{ v.version }}</button>
@@ -298,6 +321,23 @@ export class TypePanel implements OnInit {
   readonly loading = signal(false);
   readonly loadError = signal('');
   readonly type = signal<DocumentType | null>(null);
+  /** The form is drawn for a new type, and for an existing one once it has been read (never blank under an error). */
+  readonly showForm = computed(() => this.data.documentTypeId == null || !!this.type());
+  /** The older version being read, and why the last one could not be. */
+  readonly versionLoading = signal<number | null>(null);
+  readonly versionError = signal('');
+  private versionAsked: number | null = null;
+  /** Owner 2026-10-27: the versions sort by any column; newest first as the service lists them until one is picked. */
+  readonly versionSort = createTableSort<TypeVersionRow>({
+    id: 'document-type-versions',
+    columns: {
+      version: { value: v => v.version, kind: 'number' },
+      name: v => v.name,
+      saved: { value: v => v.dateCreated, kind: 'date' },
+    },
+    remember: false,
+  });
+  readonly versionsSorted = computed(() => this.versionSort.apply(this.type()?.versions ?? []));
   readonly mode = signal<Mode>(this.data.documentTypeId == null ? 'new' : 'view');
   readonly viewing = signal<number | null>(null);
   readonly name = signal('');
@@ -374,20 +414,34 @@ export class TypePanel implements OnInit {
     const t = this.type();
     if (!t) return;
     if (version === t.currentVersion) { this.backToCurrent(); return; }
+    this.versionAsked = version;
+    this.versionLoading.set(version);
+    this.versionError.set('');
     this.api.typeVersion(t.documentTypeId, version).subscribe({
       next: r => {
-        if (r.status !== API_SUCCESS || !r.data) { this.toast.error(r.message); return; }
+        if (this.versionAsked !== version) return;
+        this.versionLoading.set(null);
+        if (r.status !== API_SUCCESS || !r.data) { this.versionError.set(r.message || 'That version could not be read.'); return; }
         this.viewing.set(version);
         this.mode.set('version');
         this.fill(r.data.name, r.data.typeKey, r.data.definition);
       },
-      error: err => this.toast.error(refusalText(err, 'That version could not be read.')),
+      error: err => {
+        if (this.versionAsked !== version) return;
+        this.versionLoading.set(null);
+        this.versionError.set(refusalText(err, 'That version could not be read.'));
+      },
     });
   }
+
+  retryVersion(): void { if (this.versionAsked !== null) this.showVersion(this.versionAsked); }
 
   backToCurrent(): void {
     const t = this.type();
     if (!t) return;
+    this.versionAsked = null;
+    this.versionLoading.set(null);
+    this.versionError.set('');
     this.viewing.set(null);
     this.mode.set('view');
     this.fill(t.name, t.typeKey, t.definition);

@@ -18,10 +18,10 @@
           </span>
         }
       }
-      <button type="button" class="btn btn-default btn-icon btn-sm" aria-label="Read the limits and queue again" title="Read the limits and queue again" (click)="loadLimits()"><app-icon name="refresh" /></button>
+      <button type="button" class="btn btn-default btn-icon btn-sm" aria-label="Read the limits and queue again" title="Read the limits and queue again" (click)="loadLimits()"><app-icon name="refresh" [busy]="limitsState.loading()" /></button>
       <button type="button" class="btn btn-default btn-sm" data-test="converter-formats-toggle"
               [attr.aria-expanded]="showFormats()" aria-controls="conv-formats" (click)="showFormats.set(!showFormats())">
-        <app-icon name="list" />Supported formats <span class="text-[color:var(--text-muted)]">{{ families().length }}</span>
+        <app-icon name="list" />Supported formats <span class="text-[color:var(--text-muted)]">{{ formatsState.pending() ? '…' : families().length }}</span>
         <app-icon [name]="showFormats() ? 'chevronDown' : 'chevronRight'" size="0.9em" />
       </button>
     </div>
@@ -35,12 +35,20 @@
         <span><b>Time</b> {{ l.timeoutSeconds }} sec a file</span>
         <span><b>Queue</b> {{ l.slots }} at once, {{ l.maxWaiting }} more waiting</span>
         <span class="limits-note">If it's busy you're told so; nothing is lost, try again in about 30 seconds.</span>
+      } @else if (limitsState.error()) {
+        <!-- The refresh button above reads them again. -->
+        <span class="limits-note" role="status">The limits could not be read; the converter still checks every file.</span>
       } @else {
-        <span class="limits-note">The limits could not be read; the converter still checks every file.</span>
+        <app-loading shape="inline" label="Loading the limits…" />
       }
     </div>
 
     @if (showFormats()) {
+      @if (formatsState.pending()) {
+        <app-loading shape="cards" label="Loading the supported formats…" [count]="3" />
+      } @else if (formatsError() && !families().length) {
+        <app-inline-status [error]="formatsError()" (retry)="loadFormats()" />
+      }
       <div id="conv-formats" class="formats-grid" data-test="converter-formats">
         @for (family of families(); track family.key) {
           <div class="format-family">
@@ -98,6 +106,9 @@
         <app-icon name="alert" class="shrink-0" />{{ formatsError() }}
         <button type="button" class="btn btn-default btn-xs" (click)="loadFormats()"><app-icon name="refresh" />Try again</button>
       </p>
+    } @else if (sourceName() && formatsState.pending()) {
+      <!-- Owner 2026-10-27: not "isn't a format this can convert" while the formats are still being read. -->
+      <app-loading shape="inline" label="Checking the format…" />
     } @else if (sourceName() && !family()) {
       <p class="text-sm text-warn-500">".{{ extension() }}" isn't a format this can convert.</p>
     } @else if (family()) {
@@ -134,7 +145,10 @@
           <div class="field">
             <label class="label" for="savebucket">Save to bucket</label>
             <app-combobox id="savebucket" [selected]="saveBucket()" (selectedChange)="saveBucket.set($event)"
-                          placeholder="Choose a bucket" clearLabel="None" [options]="bucketOptions()" />
+                          [placeholder]="bucketsState.pending() ? 'Loading buckets…' : 'Choose a bucket'" clearLabel="None" [options]="bucketOptions()" />
+            <app-inline-status [loading]="bucketsState.loading()" [error]="bucketsState.error()" label="Loading buckets…"
+                               [empty]="bucketsState.loaded() && !buckets().length" emptyText="No bucket yet."
+                               (retry)="loadBuckets()" />
           </div>
 
           <div class="field">
@@ -229,11 +243,11 @@
         <table class="table-modern">
           <thead>
             <tr>
-              <th>Name</th>
-              <th>Conversion</th>
-              <th>Size</th>
-              <th>Location</th>
-              <th>Created</th>
+              <th appSort="name" [sortBy]="taskSort">Name</th>
+              <th appSort="conversion" [sortBy]="taskSort">Conversion</th>
+              <th appSort="size" [sortBy]="taskSort">Size</th>
+              <th appSort="location" [sortBy]="taskSort">Location</th>
+              <th appSort="created" [sortBy]="taskSort">Created</th>
               <th class="w-28 th-actions">Actions</th>
             </tr>
           </thead>

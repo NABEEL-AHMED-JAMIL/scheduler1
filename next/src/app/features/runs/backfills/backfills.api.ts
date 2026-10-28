@@ -140,9 +140,17 @@ export class BackfillsApi {
     return this.http.get<ApiResponse<BackfillPage>>(this.base, { params });
   }
 
-  detail(backfillId: number, state?: string | null, page = 1): Observable<ApiResponse<Backfill>> {
+  /**
+   * One backfill and a page of its periods; owner 2026-10-27: in a column's order when one is given (Core's date, state,
+   * run, tries), else oldest first.
+   */
+  detail(backfillId: number, state?: string | null, page = 1, order?: { sort: string; dir: 'asc' | 'desc' } | null): Observable<ApiResponse<Backfill>> {
     const params: Record<string, string> = { backfillId: String(backfillId), page: String(page) };
     if (state) params['state'] = state;
+    if (order) {
+      params['sort'] = order.sort;
+      params['dir'] = order.dir;
+    }
     return this.http.get<ApiResponse<Backfill>>(`${this.base}/detail`, { params });
   }
 

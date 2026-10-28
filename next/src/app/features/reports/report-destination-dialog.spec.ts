@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { Observable, of, throwError } from 'rxjs';
+import { NEVER, Observable, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { StorageService } from '../objects/storage.service';
 import { TestBed } from '@angular/core/testing';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
@@ -86,5 +87,31 @@ describe('ReportDestinationDialog bucket choice', () => {
     expect(dialog.bucketsError()).toBe('Storage is unavailable.');
     dialog.bucket.set('reports-archive');
     expect(dialog.valid()).toBe(false);
+  });
+});
+
+describe('ReportDestinationDialog -- the connections list (owner 2026-10-27)', () => {
+  it('is loading, and says nothing about none, until the connections answer', () => {
+    const dialog = dialogFor('bucket', () => NEVER);
+    expect(dialog.loadingBuckets()).toBe(true);
+    expect(dialog.bucketsRead()).toBe(false);
+  });
+
+  it('knows there is none once an empty list answers', () => {
+    const dialog = dialogFor('bucket', () => of({ status: 'SUCCESS', data: [] }));
+    expect(dialog.loadingBuckets()).toBe(false);
+    expect(dialog.bucketsRead()).toBe(true);
+    expect(dialog.bucketOptions()).toEqual([]);
+  });
+
+  it('says why they could not be read, and reads them again on Try again', () => {
+    let calls = 0;
+    const dialog = dialogFor('bucket', () => (calls++ === 0
+      ? throwError(() => new HttpErrorResponse({ status: 500 })) : of({ status: 'SUCCESS', data: CONNECTIONS })));
+    expect(dialog.loadingBuckets()).toBe(false);
+    expect(dialog.bucketsError()).toBe('The connections could not be read.');
+    dialog.loadBuckets();
+    expect(dialog.bucketsError()).toBe('');
+    expect(dialog.bucketOptions().length).toBe(2);
   });
 });

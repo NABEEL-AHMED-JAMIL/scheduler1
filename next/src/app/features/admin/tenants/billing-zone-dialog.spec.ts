@@ -2,7 +2,8 @@ import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
-import { of } from 'rxjs';
+import { NEVER, Observable, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { BillingZoneDialog, monthDay } from './billing-zone-dialog';
 import { BillingApi } from '../../billing/billing.service';
 import { ToastService } from '../../../shared/ui/toast.service';
@@ -64,5 +65,52 @@ describe('H9: a workspace\'s billing time zone (Administration › Tenants)', ()
     expect(ref.close).toHaveBeenCalledWith(true);
     expect(monthDay('2026-11')).toBe('2026-11-01');
     expect(monthDay('garbage')).toBe('');
+  });
+});
+
+function dialogWith(timeZone: () => Observable<unknown>, timeZones: () => Observable<unknown> = () => of({ status: 'SUCCESS', message: '', data: ['UTC'] })) {
+  TestBed.resetTestingModule();
+  TestBed.configureTestingModule({ providers: [
+    provideZonelessChangeDetection(),
+    { provide: DIALOG_DATA, useValue: { tenantId: 2961, tenantName: 'Meridian' } },
+    { provide: DialogRef, useValue: { close: vi.fn() } },
+    { provide: BillingApi, useValue: { timeZone, timeZones, setTimeZone: vi.fn() } },
+    { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn() } },
+  ] });
+  const fixture = TestBed.createComponent(BillingZoneDialog);
+  fixture.detectChanges();
+  return { fixture, d: fixture.componentInstance, el: fixture.nativeElement as HTMLElement };
+}
+
+describe('Billing time zone dialog -- sorting the changes (owner 2026-10-27)', () => {
+  it('keeps the server order, then sorts by the month a change starts, both ways', () => {
+    const { d } = dialog();
+    expect(d.sortedHistory().map(h => h.id)).toEqual([2, 1]);
+    d.historySort.toggle('from');
+    expect(d.sortedHistory().map(h => h.id)).toEqual([2, 1]);
+    d.historySort.toggle('from');
+    expect(d.sortedHistory().map(h => h.id)).toEqual([1, 2]);
+  });
+});
+
+describe('Billing time zone dialog -- loading, error (owner 2026-10-27)', () => {
+  it('is loading, with no error, until the zone answers', () => {
+    const { d, el } = dialogWith(() => NEVER, () => NEVER);
+    expect(d.loaded()).toBeNull();
+    expect(d.loadError()).toBe('');
+    expect(d.zonesState.loading()).toBe(true);
+    expect(el.querySelector('app-loading')).not.toBeNull();
+  });
+
+  it('says a failed read in plain words, with Try again', () => {
+    const { d, el, fixture } = dialogWith(() => throwError(() => new HttpErrorResponse({ status: 500, error: 'Internal Server Error' })));
+    fixture.detectChanges();
+    expect(d.loadError()).toBe('The billing time zone could not be read.');
+    expect(el.textContent).toContain('Try again');
+  });
+
+  it('says the time zone list could not be read, instead of an empty list', () => {
+    const { d } = dialogWith(() => of({ status: 'SUCCESS', message: '', data: ZONE }), () => throwError(() => new HttpErrorResponse({ status: 500 })));
+    expect(d.zonesState.error()).toBe('The time zones could not be read.');
   });
 });

@@ -66,13 +66,15 @@
     @if (error()) {
       <div class="rounded-lg px-3 py-2 text-xs bg-crit-500/12 text-crit-500 flex items-start gap-2 mx-1 my-1" role="alert">
         <app-icon name="alert" class="icon-crit mt-0.5 shrink-0" size="0.9em" /><span class="flex-1">{{ error() }}</span>
-        <button type="button" class="link-inline" (click)="load()">Retry</button>
+        <button type="button" class="btn btn-default btn-xs" (click)="load()"><app-icon name="refresh" />Try again</button>
       </div>
     }
-    @if (!shown().length && !error()) {
+    @if (!shown().length && !error() && loading()) {
+      <!-- Owner 2026-10-27: list-shaped loading (with a status line) rather than a bare "Loading…". -->
+      <app-loading shape="list" label="Loading conversations…" [count]="5" />
+    } @else if (!shown().length && !error()) {
       <p class="text-xs text-[color:var(--text-muted)] px-2 py-3" data-empty>
-        @if (loading()) { Loading… }
-        @else if (query()) { Nothing matches “{{ query() }}”. }
+        @if (query()) { Nothing matches “{{ query() }}”. }
         @else if (chip() !== 'all') { No {{ chip() === 'pipeline' ? 'pipeline designs' : chip() === 'run' ? 'runs' : 'questions' }} yet. }
         @else { None yet. A question starts one. }
       </p>
@@ -139,11 +141,12 @@
         <button type="button" class="btn btn-default btn-sm w-full justify-center" [disabled]="loadingMore()" (click)="loadMore()">
           {{ loadingMore() ? 'Loading…' : 'Load ' + (total() - rows().length > 50 ? 50 : total() - rows().length) + ' more' }}
         </button>
+        @if (moreError()) { <app-inline-status [error]="moreError()" (retry)="loadMore()" /> }
       </div>
     }
   </div>
   <div class="flex items-center justify-between gap-2 px-3 py-2 border-t border-subtle text-xs text-[color:var(--text-muted)]">
-    <span>{{ total() }} conversation{{ total() === 1 ? '' : 's' }}</span>
+    <span>@if (loaded()) { {{ total() }} conversation{{ total() === 1 ? '' : 's' }} }</span>
     <a class="link-inline font-medium" routerLink="/ai/assistant/conversations" data-see-all>See all<app-icon name="external" size="0.85em" /></a>
   </div>
 }

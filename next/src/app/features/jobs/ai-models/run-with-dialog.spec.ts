@@ -138,3 +138,25 @@ describe('ai model choice', () => {
     expect(optionLabel({ modelOptionId: 1, model: 'm', effectiveModel: 'm-2026' })).toBe('m-2026');
   });
 });
+
+describe('Run with… -- loading and a failed read (owner 2026-10-27)', () => {
+  it('is loading until the steps answer', () => {
+    const { fixture, ask } = openDialog();
+    expect(fixture.componentInstance.loading()).toBe(true);
+    expect(fixture.componentInstance.problem()).toBe('');
+    ask.flush({ status: API_SUCCESS, data: { steps: [] } });
+  });
+
+  it('says the read failed in plain words and reads again on Try again', () => {
+    const { fixture, http, ask, el } = openDialog();
+    ask.flush('boom', { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+    expect(fixture.componentInstance.loading()).toBe(false);
+    expect(fixture.componentInstance.problem()).toBe('This schedule\'s AI steps could not be read.');
+    button(el, 'Try again')!.click();
+    expect(fixture.componentInstance.loading()).toBe(true);
+    http.expectOne(r => r.url.endsWith('/sourceJob.json/aiModelChoice')).flush({ status: API_SUCCESS, data: CHOICES });
+    expect(fixture.componentInstance.problem()).toBe('');
+    expect(fixture.componentInstance.steps().length).toBe(2);
+  });
+});

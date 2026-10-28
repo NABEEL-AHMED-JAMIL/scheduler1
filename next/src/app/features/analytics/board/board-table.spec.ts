@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { useMemoryStorage } from '../../../shared/testing/memory-storage';
 import { BoardApi, TablePage, TableRequest } from './board-api';
 import { BoardTable } from './board-table';
@@ -213,5 +214,35 @@ describe('a KPI tile over a saved statement', () => {
     const many = queryView({ columns: ['month', 'n'], rows: [['Jan', '1'], ['Feb', '2']], rowCount: 2, truncated: false });
     expect(many.issues.kpi).toContain('needs one row');
     expect(many.issues.kpiTrend).toBe('');
+  });
+});
+
+describe('a board table that could not be read (owner 2026-10-27)', () => {
+  useMemoryStorage();
+
+  it('says so inside the table with Try again, keeping the pager, and reads again when asked', () => {
+    let calls = 0;
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [provideZonelessChangeDetection(),
+        { provide: BoardApi, useValue: { rows: () => (++calls === 1
+          ? throwError(() => new HttpErrorResponse({ status: 500 }))
+          : of({ status: 'SUCCESS', message: '', data: { columns: ['a'], columnMeta: [{ name: 'a', type: 'VARCHAR' }], page: 0, pageSize: 25,
+            totalRows: 0, unfilteredRows: 0, filtered: false, rows: [] } })) } }],
+    });
+    const fixture = TestBed.createComponent(BoardTable);
+    fixture.componentRef.setInput('source', { connection: 'c', path: 'p', sql: 'SELECT * FROM dataset' });
+    fixture.detectChanges();
+    const table = fixture.componentInstance;
+    const el = fixture.nativeElement as HTMLElement;
+    expect(table.error()).toBe('This table could not be read.');
+    expect(table.loading()).toBe(false);
+    expect(el.querySelector('tbody')!.textContent).toContain('Try again');
+    expect(el.querySelector('[aria-label="Rows per page"]')).not.toBeNull();
+    table.retry();
+    fixture.detectChanges();
+    expect(calls).toBe(2);
+    expect(table.error()).toBe('');
+    expect(el.textContent).toContain('No row matches these filters.');
   });
 });

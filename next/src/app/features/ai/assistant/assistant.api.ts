@@ -109,9 +109,11 @@ export class AssistantApi {
     return this.http.get<ApiResponse<ToolRun[]>>(`${BASE()}/tools/runs`, { params: withTenant({ limit }, tenantId) });
   }
 
-  dataset(datasetRef: string, offset = 0, limit = 50): Observable<ApiResponse<{ rows: Record<string, unknown>[]; offset: number; rowsKept: number }>> {
+  /** Owner 2026-10-27: `order` sorts the whole kept dataset on the server by one of its own columns (asc or desc) before the page. */
+  dataset(datasetRef: string, offset = 0, limit = 50, order: { sort: string; dir: string } | null = null):
+    Observable<ApiResponse<{ rows: Record<string, unknown>[]; offset: number; rowsKept: number }>> {
     return this.http.get<ApiResponse<{ rows: Record<string, unknown>[]; offset: number; rowsKept: number }>>(
-      `${BASE()}/tools/dataset`, { params: { datasetRef, offset, limit } });
+      `${BASE()}/tools/dataset`, { params: { datasetRef, offset, limit, ...(order ?? {}) } });
   }
 
   /** A refusal's body is still the answer: 4xx with an envelope comes back as a value, not an error. */

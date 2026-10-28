@@ -3,7 +3,8 @@ import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { provideRouter } from '@angular/router';
-import { of } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { StepsApi } from './steps.service';
 import { FOLLOW_MS, RunDrawer } from './run-drawer';
 import { SampleDialog } from './sample-dialog';
@@ -107,5 +108,49 @@ describe('SampleDialog', () => {
     d.use();
     expect(d.error()).toContain('a value is text');
     expect(ref.close).not.toHaveBeenCalled();
+  });
+});
+
+describe('RunDrawer -- loading and errors (owner 2026-10-27)', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it('says it is reading the run instead of assuming "Queue" before the first answer', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [RunDrawer],
+      providers: [provideZonelessChangeDetection(), provideRouter([]),
+        { provide: StepsApi, useValue: { timeline: vi.fn(() => NEVER), stepLog: vi.fn() } },
+        { provide: DialogRef, useValue: { close: vi.fn() } },
+        { provide: DIALOG_DATA, useValue: { jobQueueId: 7401, jobId: 2848, jobName: 'x' } }],
+    });
+    const fixture = TestBed.createComponent(RunDrawer);
+    fixture.detectChanges();
+    expect(fixture.componentInstance.timeline()).toBeNull();
+    expect((fixture.nativeElement as HTMLElement).querySelector('app-status')).toBeNull();
+  });
+
+  it('a run that cannot be read offers Try again, which follows it again', () => {
+    vi.useFakeTimers();
+    const refused = { status: 'ERROR', message: '' };
+    const { drawer: d, api } = drawer([refused, refused, refused, refused, refused, refused]);
+    for (let i = 0; i < 6; i++) vi.advanceTimersByTime(FOLLOW_MS);
+    expect(d.following()).toBe(false);
+    expect(d.error()).toBe('The run could not be read.');
+    api.timeline.mockReturnValue(of({ status: 'SUCCESS', message: '', data: { jobQueueId: 7401, jobId: 2848, runStatus: 'Completed', attempt: 1, attempts: [1], legacy: false, steps: [] } }));
+    d.retry();
+    expect(d.error()).toBe('');
+    expect(d.timeline()?.runStatus).toBe('Completed');
+  });
+
+  it('a step log that cannot be read says so, not "No lines."', () => {
+    const done = { status: 'SUCCESS', message: '', data: { jobQueueId: 7401, jobId: 2848, runStatus: 'Completed', attempt: 1, attempts: [1], legacy: false, steps: [step('read', 0, 'Completed')] } };
+    const { drawer: d, api } = drawer([done]);
+    api.stepLog.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 500 })) as never);
+    d.toggleLog(d.timeline()!.steps[0]);
+    expect(d.logLoading()).toBe(false);
+    expect(d.logError()).toBe('The log could not be read.');
+    api.stepLog.mockReturnValue(of({ status: 'SUCCESS', message: '', data: { stepExecutionId: 1000, stepKey: 'read', attempt: 1, lines: [] } }) as never);
+    d.readLog(1000);
+    expect(d.logError()).toBe('');
   });
 });

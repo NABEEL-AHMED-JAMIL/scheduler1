@@ -198,3 +198,32 @@ describe('Run items tab', () => {
     expect(lists(http).map(a => a.request.body)).toEqual([{ jobQueueId: 8814, status: 'all', page: 0, size: 50 }]);
   });
 });
+
+describe('Run items tab -- loading, empty, error (owner 2026-10-27)', () => {
+  it('is loading (a skeleton, not the empty state) until the first list answers', () => {
+    const { el, http, fixture } = mount(null);
+    expect(el.querySelector('app-loading')).not.toBeNull();
+    expect(el.textContent).not.toContain('No items yet');
+    lists(http).forEach(r => r.flush({ status: API_SUCCESS, data: PAGE({ items: [], total: 0 }) }));
+    fixture.detectChanges();
+    expect(el.textContent).toContain('No items yet');
+  });
+
+  it('says the items could not be read, with Try again, when the first read fails', () => {
+    const { el, http, fixture, component } = mount(null);
+    lists(http).forEach(r => r.flush('boom', { status: 500, statusText: 'Server Error' }));
+    fixture.detectChanges();
+    expect(component.error()).toBe('The run\'s items could not be read.');
+    [...el.querySelectorAll('button')].find(b => b.textContent!.trim() === 'Try again')!.click();
+    expect(lists(http)).toHaveLength(1);
+  });
+
+  it('keeps the rows when a filter change fails, and says so above them', () => {
+    const { el, http, fixture, component } = mount();
+    component.setStatus('failed');
+    lists(http).forEach(r => r.flush('boom', { status: 500, statusText: 'Server Error' }));
+    fixture.detectChanges();
+    expect(el.querySelector('[data-test="items-table"]')).not.toBeNull();
+    expect(el.querySelector('[data-test="items-reload-error"]')?.textContent).toContain('The run\'s items could not be read.');
+  });
+});

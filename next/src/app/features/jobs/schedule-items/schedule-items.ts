@@ -14,6 +14,11 @@ import { ToastService } from '../../../shared/ui/toast.service';
 import { DateRange, DateRangePicker, presetRange } from '../../../shared/ui/date-range';
 import { RunItemsApi, refusalText } from '../run-items/run-items.api';
 import { fieldText, stepDescription, stepShortName } from '../run-items/run-items.model';
+import { AppLoading, InlineStatus } from '../../../shared/ui/loading';
+import { LoadError } from '../../../shared/ui/load-error';
+import { BlurLoader } from '../../../shared/ui/blur-loader';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
 import {
   AcrossPage, AcrossRow, AcrossStatus, Comparison, acrossQuery, afterText, beforeText, carriedSteps, compareTitle, headline, reportText, rowLook,
   sameSteps, ticked, versionText,
@@ -35,7 +40,7 @@ function dayStart(day: string, plusDays = 0): string | null {
  */
 @Component({
   selector: 'app-schedule-items',
-  imports: [PageHeader, Icon, Pagination, EmptyState, ServerTimePipe, RouterLink, DateRangePicker, CdkMenu, CdkMenuItemCheckbox, CdkMenuTrigger],
+  imports: [PageHeader, Icon, Pagination, EmptyState, ServerTimePipe, RouterLink, DateRangePicker, CdkMenu, CdkMenuItemCheckbox, CdkMenuTrigger, AppLoading, InlineStatus, LoadError, BlurLoader, SortHeader],
   styles: `
     .si-tabs { display: flex; gap: 0.25rem; border-bottom: 1px solid var(--border-subtle); }
     .si-tab { padding: 0.625rem 0.875rem; font-size: 0.875rem; color: var(--text-secondary); border-bottom: 2px solid transparent; margin-bottom: -1px; }
@@ -125,25 +130,31 @@ function dayStart(day: string, plusDays = 0): string | null {
             </div>
           }
           @if (page()?.note) { <p class="px-4 py-2 text-xs text-[color:var(--text-secondary)] border-b border-subtle">{{ page()!.note }}</p> }
+          <!-- Owner 2026-10-27: a filter, date or page that fails keeps the rows and says so above them (the error was set and
+               never shown); the first load is a skeleton, its failure the shared error with Try again. -->
+          @if (error() && page()) {
+            <div class="px-4 py-2 border-b border-subtle" data-test="across-reload-error"><app-inline-status [error]="error()" (retry)="load()" /></div>
+          }
           @if (error() && !page()) {
-            <div class="p-8 flex flex-col items-start gap-3" role="alert">
-              <p class="text-sm text-crit-500">{{ error() }}</p>
-              <button type="button" class="btn btn-default btn-sm" (click)="load()">Try again</button>
-            </div>
+            <app-load-error [message]="error()" (retry)="load()" />
           } @else if (!page()) {
-            <p class="px-4 py-3 text-xs text-[color:var(--text-muted)]" aria-busy="true">Reading the schedule's items…</p>
+            <app-loading shape="rows" label="Reading the schedule's items…" />
           } @else if (!page()!.items.length) {
-            <app-empty-state class="p-8" icon="list" [title]="emptyTitle()" [message]="emptyMessage()" />
+            <app-blur-loader [active]="loading()" label="Reading the items…">
+              <app-empty-state class="p-8" icon="list" [title]="emptyTitle()" [message]="emptyMessage()" />
+            </app-blur-loader>
           } @else {
+            <app-blur-loader [active]="loading()" label="Reading the items…">
             <div class="overflow-x-auto" [attr.aria-busy]="loading()">
               <table class="si-table" data-test="across-table">
                 <thead>
                   <tr>
-                    <th scope="col">Run</th>
-                    @if (page()!.distinctKeys > 1) { <th scope="col">Item</th> }
-                    <th scope="col">When</th>
+                    <!-- Owner 2026-10-27: Run, Item, When and Status sort on the server (Core's itemRuns); the rest stay plain. -->
+                    <th scope="col" appSort="run" [sortBy]="sort">Run</th>
+                    @if (page()!.distinctKeys > 1) { <th scope="col" appSort="label" [sortBy]="sort">Item</th> }
+                    <th scope="col" appSort="startedAt" [sortBy]="sort">When</th>
                     <th scope="col">Pipeline version</th>
-                    <th scope="col">Status</th>
+                    <th scope="col" appSort="status" [sortBy]="sort">Status</th>
                     @for (f of fields(); track f) {
                       <th scope="col" [attr.data-field-col]="f"><span class="inline-flex items-center gap-1">{{ short(f) }}@if (masked(f)) { <app-icon name="lock" size="0.85em" label="Masked" /> }</span></th>
                     }
@@ -182,6 +193,7 @@ function dayStart(day: string, plusDays = 0): string | null {
                 </tbody>
               </table>
             </div>
+            </app-blur-loader>
             <app-pagination [total]="page()!.total" [page]="pageNo() + 1" [size]="size()" (goTo)="goTo($event - 1)" (setSize)="setSize($event)" />
           }
         </div>
@@ -228,9 +240,9 @@ function dayStart(day: string, plusDays = 0): string | null {
                   @if (same(c).length) { {{ sameLine(c) }} }</p>
               </div>
             } @else if (compareError()) {
-              <p class="p-4 text-sm text-crit-500" role="alert">{{ compareError() }}</p>
+              <app-load-error [message]="compareError()" (retry)="retryCompare()" />
             } @else {
-              <p class="p-4 text-xs text-[color:var(--text-muted)]" aria-busy="true">Comparing the two runs…</p>
+              <app-loading shape="panel" label="Comparing the two runs…" />
             }
           </section>
         }
@@ -260,6 +272,23 @@ export class ScheduleItems implements OnInit {
   readonly size = signal(25);
   readonly fields = signal<string[]>([]);
   readonly page = signal<AcrossPage | null>(null);
+  /**
+   * Owner 2026-10-27 ("add a sort on each table"): Run, Item, When and Status sort on the server -- Core orders the item
+   * records in SQL before its newest-2,000 cut, then pages them. A new order goes back to the first page. No choice is the
+   * list's own order, latest first, and sends no sort.
+   */
+  readonly sort = createTableSort<AcrossRow>({
+    id: 'schedule-items',
+    server: true,
+    initial: null,
+    columns: {
+      run: { value: r => r.jobQueueId, kind: 'number' },
+      label: { value: r => r.label, kind: 'text' },
+      startedAt: { value: r => r.startedAt, kind: 'date' },
+      status: { value: r => rowLook(r).label, kind: 'status' },
+    },
+    onChange: () => { this.pageNo.set(0); this.load(); },
+  });
   readonly loading = signal(false);
   readonly error = signal('');
   readonly compareRuns = signal<number[]>([]);
@@ -271,7 +300,13 @@ export class ScheduleItems implements OnInit {
   // As the run page's: the schedules, then this schedule's runs; the header adds this page's own title.
   readonly trail = computed(() => [...crumbsFor(`/pipelines/schedules/${this.jobId()}`, 'here').slice(0, -1),
     { label: this.jobName() ? `${this.jobName()} · runs` : 'Schedule runs', link: `/pipelines/schedules/${this.jobId()}/executions` }]);
-  readonly headline = computed(() => headline(this.page()));
+  /** Owner 2026-10-27: in a column's order the line says so, rather than "latest first". */
+  readonly headline = computed(() => {
+    const h = headline(this.page());
+    if (!h || !this.sort.param()) return h;
+    return { ...h, sub: h.sub.replace(/ · latest( result)? first/, ' · in the order picked')
+      .replace('the newest 2,000 looked at', 'the first 2,000 in this order looked at') };
+  });
   readonly keyLabel = computed(() => this.page()?.keys?.find(k => k.key === this.key())?.label ?? this.key().split('/').pop() ?? this.key());
   readonly emptyTitle = computed(() => this.searchApplied() || this.key() ? 'No run processed it' : 'No items yet');
   readonly emptyMessage = computed(() => this.searchApplied() || this.key()
@@ -339,10 +374,10 @@ export class ScheduleItems implements OnInit {
     this.error.set('');
     this.request?.unsubscribe();
     const r = this.range();
-    this.request = this.api.acrossRuns(acrossQuery(job, {
+    this.request = this.api.acrossRuns({ ...acrossQuery(job, {
       key: this.key(), search: this.searchApplied(), status: this.status(), page: this.pageNo(), size: this.size(), fields: this.fields(),
       from: r.from ? dayStart(r.from) : null, to: r.to ? dayStart(r.to, 1) : null,
-    })).subscribe({
+    }), ...(untracked(() => this.sort.param()) ?? {}) }).subscribe({
       next: page => {
         this.loading.set(false);
         this.page.set(page);
@@ -433,6 +468,13 @@ export class ScheduleItems implements OnInit {
     this.comparison.set(null);
     this.compareError.set('');
     if (this.compareRuns().length === 2) this.compare();
+  }
+
+  /** Try again on a comparison that failed. */
+  retryCompare(): void {
+    if (this.compareRows().length !== 2) return;
+    this.compareError.set('');
+    this.compare();
   }
 
   private compare(): void {

@@ -7,6 +7,8 @@ import { ToastService } from '../../shared/ui/toast.service';
 import { AccountSecurityApi, MfaEnrolment, MfaStatus } from './account-security.api';
 import { MfaEnrolmentPanel } from './mfa-enrolment';
 import { RecoveryCodes } from './recovery-codes';
+import { AppLoading, InlineStatus, createLoadState } from '../../shared/ui/loading';
+import { LoadError } from '../../shared/ui/load-error';
 
 /**
  * MIG-353 part 4: My account › Security › Two-factor login: whether it is on, setting it up with an authenticator app,
@@ -14,7 +16,7 @@ import { RecoveryCodes } from './recovery-codes';
  */
 @Component({
   selector: 'app-two-factor-card',
-  imports: [Icon, ServerTimePipe, MfaEnrolmentPanel, RecoveryCodes],
+  imports: [Icon, ServerTimePipe, MfaEnrolmentPanel, RecoveryCodes, AppLoading, InlineStatus, LoadError],
   template: `
     <section class="card p-4" aria-labelledby="mfa-heading" data-test="mfa-card">
       <div class="flex items-start gap-2">
@@ -33,9 +35,11 @@ import { RecoveryCodes } from './recovery-codes';
         </div>
       </div>
 
-      @if (error()) {
-        <p class="field-note text-crit-500 mt-3" role="alert">{{ error() }}</p>
+      <!-- Owner 2026-10-27: a failed first read says why with Try again; a failed re-read (after a change) keeps the card. -->
+      @if (error() && !status()) {
+        <app-load-error [message]="error()" (retry)="load()" />
       } @else if (status(); as s) {
+        @if (error()) { <app-inline-status [error]="error()" (retry)="load()" /> }
         @if (codes().length) {
           <div class="mt-4"><app-recovery-codes [codes]="codes()" [account]="auth.user()?.username ?? ''" /></div>
         }
@@ -100,7 +104,7 @@ import { RecoveryCodes } from './recovery-codes';
           }
         }
       } @else {
-        <p class="text-sm text-[color:var(--text-muted)] mt-4">Loading…</p>
+        <app-loading shape="panel" label="Loading two-factor login…" [count]="2" />
       }
     </section>
   `,
@@ -114,7 +118,9 @@ export class TwoFactorCard implements OnInit {
   readonly enrolment = signal<MfaEnrolment | null>(null);
   readonly codes = signal<string[]>([]);
   readonly busy = signal(false);
-  readonly error = signal('');
+  /** Owner 2026-10-27: the status read's three states; start() clears an old failure so a later success shows. */
+  readonly state = createLoadState();
+  readonly error = this.state.error;
   readonly actionError = signal('');
   readonly mode = signal<'idle' | 'codes' | 'off'>('idle');
   readonly password = signal('');
@@ -125,12 +131,13 @@ export class TwoFactorCard implements OnInit {
   }
 
   load(): void {
+    this.state.start();
     this.api.mfa().subscribe({
       next: r => {
-        if (r.status === API_SUCCESS && r.data) this.status.set(r.data);
-        else this.error.set(r.message || 'Two-factor login could not be read.');
+        if (r.status === API_SUCCESS && r.data) { this.status.set(r.data); this.state.done(); }
+        else this.state.fail(r, 'Two-factor login could not be read.');
       },
-      error: err => this.error.set(err?.error?.message || 'Two-factor login could not be read.'),
+      error: err => this.state.fail(err, 'Two-factor login could not be read.'),
     });
   }
 

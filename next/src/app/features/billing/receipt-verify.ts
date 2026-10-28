@@ -6,6 +6,7 @@ import { Icon } from '../../shared/ui/icon';
 import { FileDropzone } from '../../shared/ui/file-dropzone';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { BillingApi, ReceiptVerdict } from './billing.service';
+import { AppLoading, loadErrorText } from '../../shared/ui/loading';
 
 /** The dialog's heading id, for the opener's ariaLabelledBy. */
 export const RECEIPT_VERIFY_TITLE_ID = 'receipt-verify-title';
@@ -71,7 +72,7 @@ export class ReceiptVerdictView {
  */
 @Component({
   selector: 'app-receipt-verify-dialog',
-  imports: [Icon, FileDropzone, ReceiptVerdictView],
+  imports: [Icon, FileDropzone, ReceiptVerdictView, AppLoading],
   template: `
     <div class="card shadow-2xl w-[34rem] max-w-[calc(100vw-2rem)] max-h-[88vh] flex flex-col overflow-hidden">
       <div class="flex items-center gap-3 px-4 py-2.5 border-b shrink-0 border-subtle">
@@ -84,10 +85,12 @@ export class ReceiptVerdictView {
           <p class="text-xs text-[color:var(--text-secondary)]">Choose the receipt's PDF as it was sent or downloaded. It is checked here and not kept.</p>
           <app-file-dropzone [file]="file()" (fileChange)="pick($event)" accept="application/pdf,.pdf" prompt="Drop the receipt PDF here" hint="PDF · up to 10 MB" />
         }
+        <!-- Owner 2026-10-27: the shared loader; a check of a stored receipt that failed offers Try again (a file is picked again). -->
         @if (busy()) {
-          <div class="flex items-center gap-2 text-sm text-[color:var(--text-muted)]"><span class="spinner"></span>Checking the signature…</div>
+          <app-loading shape="inline" label="Checking the signature…" />
         } @else if (error()) {
-          <div class="step-notice step-notice-crit" role="alert"><app-icon name="alert" class="icon-crit shrink-0 mt-0.5" /><div>{{ error() }}</div></div>
+          <div class="step-notice step-notice-crit" role="alert"><app-icon name="alert" class="icon-crit shrink-0 mt-0.5" />
+            <div>{{ error() }}@if (data.number && !verdict()) { <button type="button" class="btn btn-default btn-xs ml-1" (click)="retry()"><app-icon name="refresh" />Try again</button> }</div></div>
         }
         <app-receipt-verdict [verdict]="verdict()" />
       </div>
@@ -111,8 +114,13 @@ export class ReceiptVerifyDialog implements OnInit {
   readonly verdict = signal<ReceiptVerdict | null>(null);
   readonly signed = computed(() => !!this.verdict()?.signature.signed);
 
-  ngOnInit(): void {
-    if (this.data.number) this.run(this.api.verifyReceipt(this.data.number));
+  ngOnInit(): void { this.retry(); }
+
+  /** The stored receipt's check (by its number), again after a failure. */
+  retry(): void {
+    if (!this.data.number) return;
+    this.error.set('');
+    this.run(this.api.verifyReceipt(this.data.number));
   }
 
   pick(file: File | null): void {
@@ -125,8 +133,8 @@ export class ReceiptVerifyDialog implements OnInit {
   private run(call: ReturnType<BillingApi['verifyReceipt']>): void {
     this.busy.set(true);
     call.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: r => { this.busy.set(false); if (r.status === API_SUCCESS && r.data) this.verdict.set(r.data); else this.error.set(r.message || 'The receipt could not be checked.'); },
-      error: e => { this.busy.set(false); this.error.set(e?.error?.message || 'The receipt could not be checked.'); },
+      next: r => { this.busy.set(false); if (r.status === API_SUCCESS && r.data) this.verdict.set(r.data); else this.error.set(loadErrorText(r, 'The receipt could not be checked.')); },
+      error: e => { this.busy.set(false); this.error.set(loadErrorText(e, 'The receipt could not be checked.')); },
     });
   }
 

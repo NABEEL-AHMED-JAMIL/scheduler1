@@ -32,6 +32,8 @@ import { RUN_TABS, RunTab, runFacts, runStatusLook, runTabFromUrl, runTabUrl, st
 import { RunItems } from '../run-items/run-items';
 import { RunItemsApi } from '../run-items/run-items.api';
 import { ItemFilter, ItemsPage, filterOf, itemsQuery, refsOf } from '../run-items/run-items.model';
+import { AppLoading, loadErrorText } from '../../../shared/ui/loading';
+import { LoadError } from '../../../shared/ui/load-error';
 
 export type { RunTab } from '../run-steps/run-page.model';
 /** The tab a `?tab=` value names on the bare run address (kept for the callers that read it). */
@@ -79,7 +81,7 @@ export function runHasAi(timeline: { steps?: { task: string }[]; aiSteps?: unkno
 @Component({
   selector: 'app-job-logs',
   imports: [PageHeader, RefreshButton, Icon, RouterLink, RankedBar, RunDecision, RunAiAnswers, RunStepsTable, RunMap,
-    RunOutputs, RunAiTrace, RunLog, RunApproval, RunItems],
+    RunOutputs, RunAiTrace, RunLog, RunApproval, RunItems, AppLoading, LoadError],
   templateUrl: './job-logs.html',
   // One read of the run's steps and outputs for the whole page: the summary, every tab, the step log panel.
   providers: [RunTimelineStore, RunApprovalStore],
@@ -317,7 +319,7 @@ export class JobLogs implements OnInit, OnDestroy {
     ...(this.hasAi() || (!this.aiKnown() && this.tab() === 'ai')
       ? [{ id: 'ai' as RunTab, label: this.aiSteps().length ? `AI answers (${this.aiSteps().length})` : 'AI answers', icon: 'sparkle' }] : []),
     // MIG-420: only a run of a pipeline that works item by item has Items; until Core has said, kept when the address asks.
-    ...(this.items()?.itemRun || (!this.itemsRead() && this.tab() === 'items')
+    ...(this.items()?.itemRun || ((!this.itemsRead() || !!this.itemsError()) && this.tab() === 'items')
       ? [{ id: 'items' as RunTab, label: this.items()?.itemRun ? `Items (${this.items()!.summary.items.toLocaleString('en-GB')})` : 'Items', icon: 'table' }] : []),
     { id: 'outputs' as RunTab, label: this.store.outputList().length ? `Outputs (${this.store.outputList().length})` : 'Outputs', icon: 'file' },
     { id: 'log' as RunTab, label: this.logs().length ? `Log (${this.logs().length.toLocaleString('en-GB')})` : 'Log', icon: 'terminal' },
@@ -345,6 +347,12 @@ export class JobLogs implements OnInit, OnDestroy {
   private readonly itemsApi = inject(RunItemsApi);
   readonly items = signal<ItemsPage | null>(null);
   readonly itemsRead = signal(false);
+  /**
+   * Owner 2026-10-27: why the items could not be read. A failure used to move the tab to Steps without a word, as if
+   * the run had no items; it now says so on the tab with Try again. A refusal (403/404: items not for this reader, or
+   * an older Core) still means no tab.
+   */
+  readonly itemsError = signal('');
   /** The Items tab's filter, kept in the address (?tab=items&status=failed opens it filtered). */
   readonly itemStatus = signal<ItemFilter>(filterOf(this.activated.snapshot?.queryParamMap?.get('status')));
   /** MIG-421: a Task inbox task's link names its items (?tab=items&items=2,6,9): the tab shows only them. */
@@ -359,10 +367,26 @@ export class JobLogs implements OnInit, OnDestroy {
     this.itemsAsking = true;
     const status = this.itemStatus();
     this.itemsApi.list(itemsQuery(id, { status, page: 0, size: 50 })).subscribe({
-      next: page => { this.itemsAsking = false; this.itemsAskedFor.set(status); this.items.set(page); this.itemsRead.set(true); },
-      // A reader the items are not for (a platform administrator's own sign-in), or an older Core: no tab.
-      error: () => { this.itemsAsking = false; this.items.set(null); this.itemsRead.set(true); },
+      next: page => { this.itemsAsking = false; this.itemsAskedFor.set(status); this.items.set(page); this.itemsError.set(''); this.itemsRead.set(true); },
+      // A reader the items are not for (a platform administrator's own sign-in), or an older Core: no tab. Anything else
+      // is a read that failed, and the tab says so.
+      error: err => {
+        this.itemsAsking = false;
+        // Core's own refusal (its envelope said ERROR: the items are not for this reader, or it has none to give) and a
+        // 403/404 are "no tab"; a request that failed on the way is the error the tab shows.
+        const refused = !!(err as { refused?: unknown })?.refused || [403, 404].includes(Number((err as { status?: unknown })?.status));
+        if (!this.items()?.itemRun) this.items.set(null);
+        this.itemsError.set(refused ? '' : loadErrorText(err, "The run's items could not be read."));
+        this.itemsRead.set(true);
+      },
     });
+  }
+
+  /** Try again on the Items tab. */
+  retryItems(): void {
+    this.itemsError.set('');
+    this.itemsRead.set(false);
+    this.readItems();
   }
 
   itemStatusChanged(status: ItemFilter): void {
@@ -416,7 +440,7 @@ export class JobLogs implements OnInit, OnDestroy {
       if (shown !== null && shown !== key) untracked(() => {
         this.logs.set([]); this.job.set(null); this.run.set(null); this.review.set(null); this.aiSteps.set([]);
         this.aiStepsLoadedFor = null; this.aiStepsRead.set(false); this.costFor = null; this.cost.set(null); this.missing.set(false);
-        this.items.set(null); this.itemsRead.set(false);
+        this.items.set(null); this.itemsRead.set(false); this.itemsError.set('');
         this.load();
       });
       shown = key;
@@ -427,7 +451,7 @@ export class JobLogs implements OnInit, OnDestroy {
     });
     // ?tab=items on a run with no items opens the Steps, as ?tab=ai does on a run with no AI steps.
     effect(() => {
-      if (this.tab() === 'items' && this.itemsRead() && !this.items()?.itemRun) untracked(() => this.setTab('steps'));
+      if (this.tab() === 'items' && this.itemsRead() && !this.items()?.itemRun && !this.itemsError()) untracked(() => this.setTab('steps'));
     });
     // ?tab=ai on a run with no AI steps opens the Steps, quietly, once the page knows (the address follows).
     effect(() => {
@@ -741,7 +765,9 @@ export class JobLogs implements OnInit, OnDestroy {
     }
 
     if (!quiet) this.loading.set(true);
-    this.error.set('');
+    // Owner 2026-10-27: a quiet poll keeps the reason for an earlier failure until it has an answer, so the log does
+    // not flicker between its lines and the error every five seconds.
+    if (!quiet) this.error.set('');
     this.http.get<ApiResponse<AuditLog[]>>(`${API_BASE}/sourceJob.json/findSourceJobAuditLog`, {
       params: { jobId: this.jobId(), jobQueueId: this.jobQueueId() },
     }).subscribe({
@@ -749,6 +775,7 @@ export class JobLogs implements OnInit, OnDestroy {
         this.loading.set(false);
         this.refreshing.set(false);
         if (response.status === API_SUCCESS) {
+          this.error.set('');
           const data = response.data as any;
           // The payload is { auditLogs, sourceJob, sourceJobQueue }. This read "jobAuditLogs",
           // which never matched, so the screen reported no logs for every run.
@@ -766,7 +793,7 @@ export class JobLogs implements OnInit, OnDestroy {
           this.goneMissing();
           return;
         } else {
-          this.error.set(response.message);
+          this.error.set(loadErrorText(response, 'The run could not be read.'));
         }
         // The next poll is scheduled from here, when this one has actually come back.
         this.arm();
@@ -778,7 +805,7 @@ export class JobLogs implements OnInit, OnDestroy {
           this.goneMissing();
           return;
         }
-        this.error.set(err?.error?.message || 'Could not load the logs.');
+        this.error.set(loadErrorText(err, 'The run could not be read.'));
         // A failed poll still re-arms: a run does not stop producing lines because one request
         // was refused, and giving up here is how a screen goes quiet without saying so.
         this.arm();

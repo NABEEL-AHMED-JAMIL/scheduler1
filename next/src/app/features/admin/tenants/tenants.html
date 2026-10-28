@@ -8,16 +8,22 @@
 
   <!-- Owner #19 (2026-10-19): the platform at a glance, from the server's counts -- Identity's, Core's and billing's. -->
   <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 stat-strip stat-row is-md is-start" role="list" data-test="workspace-tiles">
+    <!-- Owner 2026-10-27: placeholders until the list answers (and, for the cost, until billing does), never 0 or $0.00. -->
     <app-stat-tile label="Workspaces" [value]="stats().tenants" icon="building" tone="info"
-                   [foot]="stats().active + ' active · ' + stats().suspended + ' suspended · ' + stats().managed + ' managed'" />
-    <app-stat-tile label="Users" [value]="stats().users" icon="users" tone="info" foot="across every workspace" />
-    <app-stat-tile label="Pipelines" [value]="stats().tasks" icon="list" tone="info" [foot]="stats().jobs + ' schedules'" />
+                   [foot]="stats().active + ' active · ' + stats().suspended + ' suspended · ' + stats().managed + ' managed'"
+                   [loading]="tilesLoading()" [failed]="tilesFailed()" />
+    <app-stat-tile label="Users" [value]="stats().users" icon="users" tone="info" foot="across every workspace"
+                   [loading]="tilesLoading()" [failed]="tilesFailed()" />
+    <app-stat-tile label="Pipelines" [value]="stats().tasks" icon="list" tone="info" [foot]="stats().jobs + ' schedules'"
+                   [loading]="tilesLoading()" [failed]="tilesFailed()" />
     <app-stat-tile label="Runs this month" [value]="stats().runs" icon="play" [tone]="stats().failed ? 'warn' : 'ok'"
-                   [foot]="stats().failed + ' failed'" />
+                   [foot]="stats().failed + ' failed'" [loading]="tilesLoading()" [failed]="tilesFailed()" />
     <app-stat-tile label="Cost this month" [value]="money(stats().cost)" icon="chart" tone="info"
-                   [foot]="figuresError() ? 'billing did not answer' : 'so far, as billed'" />
+                   [foot]="figuresError() ? 'billing did not answer' : 'so far, as billed'"
+                   [loading]="tilesLoading() || figuresLoading()" [failed]="tilesFailed() || (!!figuresError() && !figures().size)" />
     <app-stat-tile label="Alerts open" [value]="stats().alerts" icon="bell" [tone]="stats().alerts ? 'crit' : 'ok'"
-                   [foot]="stats().alerting ? 'in ' + stats().alerting + ' workspaces' : 'none open'" />
+                   [foot]="stats().alerting ? 'in ' + stats().alerting + ' workspaces' : 'none open'"
+                   [loading]="tilesLoading()" [failed]="tilesFailed()" />
   </div>
 
   <app-table-shell heading="Workspaces" [loading]="loading()" [error]="error()"
@@ -51,7 +57,7 @@
         <button type="button" class="btn btn-ghost btn-icon btn-sm"
                 [title]="sort.direction() === 'asc' ? 'Sorted ascending — click for descending' : 'Sorted descending — click for ascending'"
                 [attr.aria-label]="sort.direction() === 'asc' ? 'Sorted ascending; sort descending' : 'Sorted descending; sort ascending'"
-                (click)="sort.toggle(sort.key())">
+                (click)="flipSort()">
           <app-icon [name]="sort.direction() === 'asc' ? 'arrowUp' : 'arrowDown'" size="0.95em" />
         </button>
       }
@@ -74,23 +80,14 @@
       <table class="table-modern" data-test="workspaces-table">
         <thead>
           <tr>
-            <th>
-              <button type="button" class="th-sort" [class.th-sort-active]="sort.key() === 'tenantName'" (click)="sort.toggle('tenantName')">
-                Workspace
-                <app-icon [name]="sort.iconFor('tenantName')" size="0.875rem" [class]="sort.key() === 'tenantName' ? 'icon-info' : 'icon-muted'" />
-              </button>
-            </th>
-            <th>State</th>
-            <th>Plan</th>
+            <!-- Owner 2026-10-27: the shared sortable heading on every column that holds a value. -->
+            <th appSort="tenantName" [sortBy]="sort">Workspace</th>
+            <th appSort="state" [sortBy]="sort">State</th>
+            <th appSort="plan" [sortBy]="sort">Plan</th>
             @for (col of figureColumns; track col.key) {
-              <th class="text-right">
-                <button type="button" class="th-sort" [class.th-sort-active]="sort.key() === col.key" (click)="sort.toggle(col.key)" [title]="col.title">
-                  {{ col.label }}
-                  <app-icon [name]="sort.iconFor(col.key)" size="0.875rem" [class]="sort.key() === col.key ? 'icon-info' : 'icon-muted'" />
-                </button>
-              </th>
+              <th class="text-right" [appSort]="col.key" [sortBy]="sort" [title]="col.title">{{ col.label }}</th>
             }
-            <th>Admin</th>
+            <th appSort="admin" [sortBy]="sort">Admin</th>
             <th class="w-12 th-actions">Actions</th>
           </tr>
         </thead>

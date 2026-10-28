@@ -8,6 +8,11 @@ import { compactNumber } from '../../shared/charts/number-format';
 import { API_SUCCESS } from '../../core/api/api.config';
 import { AnalyticsService, ColumnDistribution } from './analytics.service';
 import type { ColumnView, QualityFinding } from './analytics';
+import { createTableSort } from '../../shared/ui/sort';
+import { SortHeader } from '../../shared/ui/sort-header';
+
+/** One bar of a column's values: a value or a bin, with its row count. */
+export interface ValueBar { label: string; rows: number; percent: number; title: string; }
 
 /** How a measured column may be drawn. */
 export type DistributionKind = 'bars' | 'share' | 'curve' | 'area' | 'table';
@@ -41,7 +46,7 @@ const SHARE_SLICE_CEILING = 8;
  */
 @Component({
   selector: 'app-column-card',
-  imports: [Icon, Donut, LineChart, DataText],
+  imports: [Icon, Donut, LineChart, DataText, SortHeader],
   templateUrl: './column-card.html',
 })
 export class ColumnCard {
@@ -101,7 +106,7 @@ export class ColumnCard {
    * bins are contiguous, so printing both edges on every bar repeats each number twice down the
    * column. Both are in the tooltip.
    */
-  readonly bars = computed(() => {
+  readonly bars = computed<ValueBar[]>(() => {
     const measured = this.distribution();
     if (!measured || !measured.bins?.length) return [];
     const tallest = Math.max(...measured.bins.map(bin => bin.rows), 0);
@@ -117,6 +122,19 @@ export class ColumnCard {
         : `${bin.from} to ${bin.to}: ${bin.rows} row(s)`,
     }));
   });
+
+  /**
+   * Owner 2026-10-27: the Table drawing sorts by value or by row count. Until a heading is picked it keeps the server's
+   * order -- commonest first for values, range order for bins -- and the other drawings always keep that order.
+   */
+  readonly barSort = createTableSort<ValueBar>({
+    id: 'analytics-column-values',
+    columns: {
+      value: { value: bar => bar.label, kind: 'auto' },
+      rows: { value: bar => bar.rows, kind: 'number' },
+    },
+  });
+  readonly sortedBars = computed(() => this.barSort.apply(this.bars()));
 
   readonly slices = computed(() => this.bars().map(bar => ({ name: bar.label, value: bar.rows })));
   readonly points = computed(() => this.bars().map(bar => ({ label: bar.label, value: bar.rows })));

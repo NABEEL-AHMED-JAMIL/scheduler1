@@ -8,6 +8,12 @@ import {
 } from './run-items.model';
 import { AcrossPage, AcrossQuery, Comparison } from '../schedule-items/schedule-items.model';
 
+/**
+ * Owner 2026-10-27 ("add a sort on each table"): a list's column order as Core's allow-list names it -- runItems: position,
+ * label, status, time; itemRuns: run, label, startedAt, status. Sent only when a column is picked.
+ */
+export type ListOrder = { sort?: string; dir?: 'asc' | 'desc' };
+
 /** A bulk selection as the bulk endpoints take it. */
 export type SelectionBody = { jobQueueId: number; refs?: string[]; all?: boolean; status?: ItemFilter; search?: string; except?: string[] };
 
@@ -28,7 +34,7 @@ function dataOf<T>(r: ApiResponse<T>): T {
 export class RunItemsApi {
   private readonly http = inject(HttpClient);
 
-  list(query: ItemsQuery): Observable<ItemsPage> {
+  list(query: ItemsQuery & ListOrder): Observable<ItemsPage> {
     return this.http.post<ApiResponse<ItemsPage>>(`${BASE}/runItems`, query).pipe(map(dataOf));
   }
 
@@ -110,7 +116,7 @@ export class RunItemsApi {
   }
 
   /** MIG-421: a schedule's items across its runs, newest first (the item records only). */
-  acrossRuns(query: AcrossQuery): Observable<AcrossPage> {
+  acrossRuns(query: AcrossQuery & ListOrder): Observable<AcrossPage> {
     return this.http.post<ApiResponse<AcrossPage>>(`${BASE}/itemRuns`, query).pipe(map(dataOf));
   }
 

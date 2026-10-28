@@ -58,4 +58,21 @@ describe('Administration › Appearance (owner #4)', () => {
     fixture.detectChanges();
     expect(el.querySelector('[data-test="workspace-theme-card"]')).not.toBeNull();
   });
+
+  it('is loading, not "Now: no default", until the value answers; a failed read says so with Try again (owner 2026-10-27)', () => {
+    const { el, http, fixture, page } = render(false);
+    expect(page.loading()).toBe(true);
+    expect(page.loaded()).toBe(false);
+    expect(el.querySelector('[data-test="workspace-theme-card"]')).toBeNull();
+    http.expectOne(r => r.url.endsWith('/tenant.json/appearance')).flush('boom', { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+    expect(page.loading()).toBe(false);
+    expect(page.error()).toBe('Could not read the workspace’s appearance.');
+    expect(el.textContent).toContain('Try again');
+    page.load();
+    http.expectOne(r => r.url.endsWith('/tenant.json/appearance')).flush({ status: API_SUCCESS, data: { tenantId: 2960, defaultTheme: null } });
+    fixture.detectChanges();
+    expect(page.error()).toBe('');
+    expect(el.querySelector('[data-test="workspace-theme-card"]')).not.toBeNull();
+  });
 });

@@ -2,7 +2,8 @@ import { describe, it, expect, vi } from 'vitest';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { of } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { AuthService } from '../../../core/auth/auth.service';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { DataPolicyApi } from './data-policy.api';
@@ -189,5 +190,38 @@ describe('Administration › Data policies -- as a platform administrator\'s own
   it('keeps the platform\'s retention minimums, for every workspace', () => {
     const { el } = render('PLATFORM_ADMIN');
     expect(el.querySelector('[data-retention-platform]')?.textContent).toContain('Platform minimums');
+  });
+});
+
+describe('Administration › Data policies -- the model list loading, empty, error (owner 2026-10-27)', () => {
+  it('says the model connections are loading, not that there are none, until they answer', () => {
+    const { api, page, el, refresh } = render('TENANT_ADMIN');
+    api.connections.mockImplementation(() => NEVER as never);
+    page.connections.set([]);
+    page.loadConnections();
+    refresh();
+    expect(page.connectionsLoading()).toBe(true);
+    expect(el.textContent).not.toContain('No model connections in this workspace yet.');
+  });
+
+  it('says there are none once an empty list answers', () => {
+    const { api, page, el, refresh } = render('TENANT_ADMIN');
+    api.connections.mockImplementation(() => of({ status: 'SUCCESS', message: '', data: [] }) as never);
+    page.connections.set([]);
+    page.loadConnections();
+    refresh();
+    expect(page.connectionsLoading()).toBe(false);
+    expect(el.textContent).toContain('No model connections in this workspace yet.');
+  });
+
+  it('says the list could not be read, in plain words, with Try again', () => {
+    const { api, page, el, refresh } = render('TENANT_ADMIN');
+    api.connections.mockImplementation(() => throwError(() => new HttpErrorResponse({ status: 500, error: 'Internal Server Error' })) as never);
+    page.connections.set([]);
+    page.loadConnections();
+    refresh();
+    expect(page.connectionsLoading()).toBe(false);
+    expect(page.connectionsError()).toBe('The model connections could not be read.');
+    expect(el.textContent).toContain('Try again');
   });
 });

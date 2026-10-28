@@ -9,6 +9,7 @@ import { Icon } from '../../../shared/ui/icon';
 import { CreatedFlow, FlowDefinition, FlowTrigger, PipelineFlowArtifact, pipelineIdOf, triggerWhen } from './flow.model';
 import { ConversationApi } from './conversation.api';
 import { AuthService } from '../../../core/auth/auth.service';
+import { InlineStatus, createLoadState } from '../../../shared/ui/loading';
 
 export interface CreatePipelineData {
   flow: PipelineFlowArtifact;
@@ -78,7 +79,7 @@ export function jobPayload(name: string, taskDetailId: number, trigger: FlowTrig
 @Component({
   selector: 'app-create-pipeline',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Icon],
+  imports: [Icon, InlineStatus],
   styles: [`.cp-dialog { width: min(36rem, 94vw); max-height: 88vh; }`],
   template: `
     <div class="cp-dialog card shadow-xl flex flex-col" role="dialog" aria-labelledby="create-pipeline-title">
@@ -105,11 +106,18 @@ export function jobPayload(name: string, taskDetailId: number, trigger: FlowTrig
         <label class="flex flex-col gap-1 text-sm">
           <span class="font-medium">Topic</span>
           <select class="input" [disabled]="busy() || !!created() || !topics().length" (change)="topicId.set(+$any($event.target).value)">
+            @if (topicsState.loading()) { <option value="">Loading topics…</option> }
             @for (t of topics(); track t.sourceTaskTypeId) {
               <option [value]="t.sourceTaskTypeId" [selected]="t.sourceTaskTypeId === topicId()">{{ t.serviceName }}</option>
             }
           </select>
-          @if (topicsError()) { <span class="text-xs text-crit-500">{{ topicsError() }}</span> }
+          <!-- Owner 2026-10-27: the field says it is loading, that there is no topic, or why the topics could not be read. -->
+          @if (topicsNote()) {
+            <span class="text-xs text-crit-500">{{ topicsNote() }}</span>
+          } @else {
+            <app-inline-status [loading]="topicsState.loading()" [error]="topicsState.error()" [empty]="topicsState.loaded() && !topics().length"
+                               label="Loading topics…" emptyText="This workspace has no active topic to put a pipeline under." (retry)="loadTopics()" />
+          }
         </label>
         <div class="text-sm flex flex-col gap-1">
           <span class="font-medium">Starts</span>
@@ -177,7 +185,9 @@ export class CreatePipeline implements OnInit {
   readonly name = signal(this.data.flow.name || 'AI pipeline');
   readonly pipelineId = signal(pipelineIdOf(this.data.flow.name));
   readonly topics = signal<Topic[]>([]);
-  readonly topicsError = signal('');
+  /** Why no topic can be offered at all (no workspace): not a read that Try again could help. */
+  readonly topicsNote = signal('');
+  readonly topicsState = createLoadState(false);
   readonly topicId = signal<number | null>(null);
   readonly busy = signal(false);
   readonly created = signal<CreatedPipeline | null>(null);
@@ -208,17 +218,23 @@ export class CreatePipeline implements OnInit {
     // A platform administrator's own sign-in has no workspace: the topics are then every workspace's, and a pipeline made
     // on one of them is refused ("That topic belongs to another workspace", owner 2026-10-20). They open the workspace first.
     if (!this.auth.user()?.tenantId) {
-      this.topicsError.set('Pipelines belong to a workspace: open it with "Work in this workspace" on Platform › Workspaces first.');
+      this.topicsNote.set('Pipelines belong to a workspace: open it with "Work in this workspace" on Platform › Workspaces first.');
       return;
     }
+    this.loadTopics();
+  }
+
+  loadTopics(): void {
+    this.topicsState.start();
     this.http.get<ApiResponse<Topic[]>>(`${API_BASE}/setting.json/topics`, { params: { q: '', limit: 50 } }).subscribe({
       next: r => {
-        const list = (r.status === API_SUCCESS ? r.data ?? [] : []).filter(t => (t.status ?? 'Active') === 'Active');
+        if (r.status !== API_SUCCESS) { this.topicsState.fail(r, 'The topics could not be read.'); return; }
+        const list = (r.data ?? []).filter(t => (t.status ?? 'Active') === 'Active');
         this.topics.set(list);
         this.topicId.set(list[0]?.sourceTaskTypeId ?? null);
-        if (!list.length) this.topicsError.set(r.message && r.status !== API_SUCCESS ? r.message : 'This workspace has no active topic to put a pipeline under.');
+        this.topicsState.done();
       },
-      error: err => this.topicsError.set(err?.error?.message || 'The topics could not be read.'),
+      error: err => this.topicsState.fail(err, 'The topics could not be read.'),
     });
   }
 

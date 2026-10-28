@@ -27,6 +27,10 @@
           @if (modelStatus().model) { <span class="pill pill-neutral mono shrink-0">{{ modelStatus().model }}</span> }
           @if (modelStatus().facts) { <span class="ai-facts text-xs text-[color:var(--text-muted)] truncate">{{ modelStatus().facts }}</span> }
         </div>
+        @if (connectionsError()) {
+          <!-- Owner 2026-10-27: the picker's read failed; say so, rather than offering only the default as if it were all. -->
+          <app-inline-status class="!mt-0" [error]="connectionsError()" (retry)="loadConnections()" />
+        }
         <button type="button" class="btn btn-default btn-sm xl:hidden" [attr.aria-expanded]="historyOpen()" (click)="historyOpen.set(!historyOpen())">
           <app-icon name="history" />History
         </button>
@@ -76,7 +80,7 @@
       </header>
       <div class="flex-1 min-h-0 overflow-y-auto px-4 py-4 flex flex-col gap-3" [appStickToBottom]="messages().length + (working() ? 1 : 0) + liveCalls().length">
         @if (threadLoading()) {
-          <p class="text-sm text-[color:var(--text-muted)]">Opening the conversation…</p>
+          <app-loading shape="panel" label="Opening the conversation…" [count]="5" />
         } @else if (threadMissing()) {
           <div class="m-auto flex flex-col items-center text-center gap-2 py-6" data-thread-missing>
             <span class="stat-glyph"><app-icon name="search" /></span>
@@ -84,9 +88,7 @@
             <p class="text-sm text-[color:var(--text-secondary)] max-w-sm">It may have been deleted, or the link belongs to another workspace. Start a new chat, or open one of yours.</p>
           </div>
         } @else if (threadError()) {
-          <div class="rounded-lg px-3 py-2 text-sm bg-crit-500/12 text-crit-500 flex items-start gap-2">
-            <app-icon name="alert" class="icon-crit mt-0.5 shrink-0" size="0.9em" />{{ threadError() }}
-          </div>
+          <app-load-error [message]="threadError()" (retry)="retryOpen()" />
         } @else if (!messages().length && !working()) {
           <div class="m-auto flex flex-col gap-4 py-4" data-suggestions>
             <div class="flex items-center gap-3">
@@ -318,7 +320,10 @@
         @if (error()) {
           <div class="flex items-start gap-2 rounded-lg px-3 py-2 text-sm bg-crit-500/12" role="alert">
             <app-icon name="alert" class="icon-crit mt-0.5 shrink-0" size="0.9em" />
-            <span class="text-crit-500 min-w-0 break-words">{{ error() }}</span>
+            <span class="text-crit-500 min-w-0 break-words flex-1">{{ error() }}</span>
+            @if (answerUnread()) {
+              <button type="button" class="btn btn-default btn-sm" (click)="checkAgain()"><app-icon name="refresh" />Check again</button>
+            }
           </div>
         }
       </div>
@@ -379,8 +384,15 @@
                   </select>
                 </label>
               }
-              @if (traceRunId() != null && traceOf(traceRunId()!)?.error; as e) { <p class="text-xs text-crit-500">{{ e }}</p> }
-              <app-trace-panel [run]="traceView().run" [calls]="traceView().calls" [live]="traceView().live" />
+              <!-- Owner 2026-10-27: a run's calls being read show as loading, not as "Ask something"; a failed read offers Try again. -->
+              @if (traceRunId() != null && traceOf(traceRunId()!)?.error; as e) {
+                <app-inline-status [error]="e" (retry)="retryTrace(traceRunId()!)" />
+              }
+              @if (!traceView().live && traceRunId() != null && traceOf(traceRunId()!)?.loading) {
+                <app-loading shape="list" label="Loading the tool calls…" [count]="3" />
+              } @else {
+                <app-trace-panel [run]="traceView().run" [calls]="traceView().calls" [live]="traceView().live" />
+              }
             </div>
           }
           @case ('context') {
@@ -390,12 +402,12 @@
                 <p class="text-xs text-[color:var(--text-muted)]">What the assistant can use here</p>
               </div>
               <dl class="text-sm grid gap-2" data-context>
-                <div class="flex items-baseline justify-between gap-3"><dt class="text-[color:var(--text-muted)] shrink-0">Workspace</dt><dd class="text-right truncate min-w-0" [title]="tip(workspace())">{{ workspace() || '—' }}</dd></div>
+                <div class="flex items-baseline justify-between gap-3"><dt class="text-[color:var(--text-muted)] shrink-0">Workspace</dt><dd class="text-right truncate min-w-0" [title]="tip(workspace())">@if (workspaceLoading()) { <app-loading shape="inline" label="Loading…" /> } @else { {{ workspace() || '—' }} }</dd></div>
                 <div class="flex items-baseline justify-between gap-3"><dt class="text-[color:var(--text-muted)] shrink-0">Acting as</dt><dd class="text-right min-w-0"><span class="block truncate">{{ actingAs() || '—' }}</span><span class="block text-xs text-[color:var(--text-muted)]">{{ roleText() }}</span></dd></div>
                 <div class="flex items-baseline justify-between gap-3"><dt class="text-[color:var(--text-muted)] shrink-0">Model</dt><dd class="text-right truncate min-w-0" [title]="tip(modelLabel())">{{ modelLabel() }}</dd></div>
-                <div class="flex items-baseline justify-between gap-3"><dt class="text-[color:var(--text-muted)] shrink-0">Data policy</dt><dd class="text-right min-w-0"><a class="link-inline" routerLink="/administration/data-policies" [title]="policyError() || 'The workspace\'s data policy'">{{ policyHeadline() }}</a></dd></div>
+                <div class="flex items-baseline justify-between gap-3"><dt class="text-[color:var(--text-muted)] shrink-0">Data policy</dt><dd class="text-right min-w-0"><a class="link-inline" routerLink="/administration/data-policies" [title]="policyError() || 'The workspace\'s data policy'">@if (policyLoading()) { <app-loading shape="inline" label="Loading…" /> } @else { {{ policyHeadline() }} }</a></dd></div>
                 <div class="flex items-baseline justify-between gap-3"><dt class="text-[color:var(--text-muted)] shrink-0">Tools allowed</dt>
-                  <dd class="text-right"><a class="link-inline" routerLink="/settings/tools">{{ allowed().length }} of {{ tools().length }}</a></dd></div>
+                  <dd class="text-right">@if (toolsLoading()) { <app-loading shape="inline" label="Loading…" /> } @else if (toolsError()) { <span class="text-[color:var(--text-muted)]">Not available</span> } @else { <a class="link-inline" routerLink="/settings/tools">{{ allowed().length }} of {{ tools().length }}</a> }</dd></div>
                 <div class="flex items-baseline justify-between gap-3"><dt class="text-[color:var(--text-muted)] shrink-0">Asks first for</dt>
                   <dd class="text-right mono text-xs break-words min-w-0">{{ askFirst().length ? askFirst().join(', ') : '—' }}</dd></div>
               </dl>
@@ -409,8 +421,11 @@
                   }
                 </ul>
               }
+              @if (policyError()) {
+                <app-inline-status [error]="policyError()" (retry)="loadPolicy()" />
+              }
               @if (toolsError()) {
-                <p class="text-xs text-crit-500">{{ toolsError() }}</p>
+                <app-inline-status [error]="toolsError()" (retry)="loadTools()" />
               } @else if (tools().length) {
                 <div class="flex flex-col gap-1.5">
                   <p class="text-xs font-medium text-[color:var(--text-secondary)]">Allowed tools</p>

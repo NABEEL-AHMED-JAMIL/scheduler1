@@ -212,10 +212,17 @@ export const PINNED: Record<string, unknown> = {
     "buttons": [
       "Actions for Reference: CSV check and summarise",
       "Columns",
+      "In this workspace",
+      "Input → output",
+      "Kind",
       "New registry task",
       "Only mine",
       "Open Reference: CSV check and summarise",
-      "Refresh"
+      "Pipelines",
+      "Refresh",
+      "Runs this month",
+      "Service",
+      "Task"
     ],
     "columns": [
       [
@@ -269,10 +276,17 @@ export const PINNED: Record<string, unknown> = {
     "buttons": [
       "Actions for Reference: CSV check and summarise",
       "Columns",
+      "In this workspace",
+      "Input → output",
+      "Kind",
       "New registry task",
       "Only mine",
       "Open Reference: CSV check and summarise",
-      "Refresh"
+      "Pipelines",
+      "Refresh",
+      "Runs this month",
+      "Service",
+      "Task"
     ],
     "columns": [
       [

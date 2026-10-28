@@ -41,7 +41,8 @@
     }
 
     @if (loading() && !dashboards().length) {
-      <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]"><app-icon name="refresh" class="spin icon-muted" /> Reading the dashboards…</div>
+      <!-- Owner 2026-10-27: card-shaped loading with a status line, rather than a bare spinner. -->
+      <div class="card"><app-loading shape="cards" label="Loading the dashboards…" [count]="6" /></div>
     } @else if (refused()) {
       <div class="card p-8 flex flex-col items-center text-center gap-2" data-test="list-refused">
         <span class="stat-glyph"><app-icon name="lock" /></span>
@@ -260,9 +261,10 @@
               <button type="button" class="btn btn-default btn-sm ms-auto" (click)="filterOpen.set(false)">Hide</button>
             </div>
             @if (boardColumnsLoading()) {
-              <p class="field-note text-[color:var(--text-muted)]">Reading that dataset's columns — one of the four queries this server runs at a time, which is why it is only read when you open this.</p>
+              <app-loading shape="inline" label="Loading that dataset's columns…" />
+              <p class="field-note text-[color:var(--text-muted)]">One of the four queries this server runs at a time, which is why it is only read when you open this.</p>
             } @else if (boardColumnsError()) {
-              <p class="text-xs text-crit-500">{{ boardColumnsError() }}</p>
+              <app-inline-status [error]="boardColumnsError()" (retry)="retryFilterColumns()" />
             } @else if (boardFilterOn()) {
               <app-filter-builder [model]="boardFilter()" [columns]="boardColumns()" (changed)="boardFilter.set($event)" />
               <div class="flex flex-wrap items-center gap-2">
@@ -289,13 +291,16 @@
                 </select></app-field>
               <app-field label="Which one" for="w-source" [required]="true">
                 <select id="w-source" class="input w-full" [value]="addSourceId()" (change)="chooseAddSource($any($event.target).value)">
-                  <option value="" [selected]="!addSourceId()">Pick one…</option>
+                  <option value="" [selected]="!addSourceId()">{{ sourcesReady() ? 'Pick one…' : 'Loading saved work…' }}</option>
                   @if (addKindOfSource() === 'analysis') {
                     @for (item of analyses(); track item.analyticsAnalysisId) { <option [value]="item.analyticsAnalysisId">{{ item.analysisName }}</option> }
                   } @else {
                     @for (item of queries(); track item.analyticsQueryId) { <option [value]="item.analyticsQueryId">{{ item.queryName }}</option> }
                   }
-                </select></app-field>
+                </select>
+                <!-- Owner 2026-10-27: the field says it is loading, or why the saved work could not be read. -->
+                <app-inline-status [loading]="!sourcesReady()" [error]="sourcesError()" label="Loading saved analyses and queries…" (retry)="retrySources()" />
+              </app-field>
               <app-field label="Height" for="w-height">
                 <input id="w-height" class="input" type="number" placeholder="180" [class.input-invalid]="!!heightError()"
                        [attr.aria-invalid]="heightError() ? 'true' : null" [attr.aria-describedby]="heightError() ? 'w-height-error' : null"
@@ -317,7 +322,7 @@
                   } @else if (preview.error) {
                     <p class="text-xs text-crit-500">{{ preview.error }}</p>
                   } @else {
-                    <p class="text-xs text-[color:var(--text-muted)]"><app-icon name="refresh" size="0.9em" class="spin" /> Running it once to preview…</p>
+                    <app-loading shape="inline" label="Running it once to preview…" />
                   }
                 } @else {
                   <p class="text-xs text-[color:var(--text-muted)]">Pick what it shows, above, and its result is drawn here in the chart under the pointer.</p>
@@ -329,8 +334,7 @@
               <button type="button" class="btn btn-primary btn-sm" [disabled]="!canAdd()" (click)="addWidget()">Add</button>
             </div>
             <p class="field-note text-[color:var(--text-muted)]">A widget points at saved work; it never keeps a copy of the result. Adding one runs that widget alone, not the whole board.</p>
-            @if (sourcesError()) { <p class="text-xs text-crit-500">{{ sourcesError() }}</p> }
-            @else if (!analyses().length && !queries().length && sourcesReady()) { <p class="text-xs text-[color:var(--text-muted)]">This workspace has saved neither an analysis nor a query yet, so there is nothing a widget could point at.</p> }
+            @if (!sourcesError() && !analyses().length && !queries().length && sourcesReady()) { <p class="text-xs text-[color:var(--text-muted)]">This workspace has saved neither an analysis nor a query yet, so there is nothing a widget could point at.</p> }
             @if (addError()) { <p class="text-xs text-crit-500">{{ addError() }}</p> }
           </div>
         }
@@ -525,7 +529,7 @@
           </div>
         }
       } @else {
-        <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]"><app-icon name="refresh" class="spin icon-muted" /> Reading the board…</div>
+        <div class="card"><app-loading shape="panel" label="Loading the board…" [count]="6" /></div>
       }
     </div>
   }

@@ -17,6 +17,7 @@ import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import type { PinnedChart } from '../analytics/analytics.service';
 import { AskHistory, EXAMPLE_QUESTIONS, clearHistory, historyKey, readHistory, saveHistory, withPin, withQuestion } from './ask-history';
 import { formatDuration, elapsedDuration } from '../../shared/ui/time-format';
+import { AppLoading } from '../../shared/ui/loading';
 
 /**
  * Ask your data (Wave 5, Data > Ask your data, page key ask-data): a question in plain language, answered by the
@@ -29,7 +30,7 @@ import { formatDuration, elapsedDuration } from '../../shared/ui/time-format';
  */
 @Component({
   selector: 'app-ask-data',
-  imports: [PageHeader, RouterLink, Icon, ChartAnswerSlot, AskIndex, ModelSetupBanner, NeedsWorkspace, Section, ServerTimePipe],
+  imports: [PageHeader, RouterLink, Icon, ChartAnswerSlot, AskIndex, ModelSetupBanner, NeedsWorkspace, Section, ServerTimePipe, AppLoading],
   templateUrl: './ask-data.html',
 })
 export class AskData implements OnInit {

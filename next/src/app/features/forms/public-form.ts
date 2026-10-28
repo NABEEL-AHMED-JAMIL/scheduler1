@@ -10,9 +10,10 @@ import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { AnswerChange, FormRenderer, UploadWanted } from './form-renderer';
 import { Answers, PublicFormView, UploadRef, answerProblems, answersForSubmit } from './forms.model';
 import { PublicFormsApi } from './forms.service';
+import { AppLoading } from '../../shared/ui/loading';
 
 /** Why a link opened nothing, as the visitor reads it. */
-type Refusal = { title: string; text: string; signIn: boolean };
+type Refusal = { title: string; text: string; signIn: boolean; retry?: boolean };
 
 /**
  * A form shared by link (MIG-278), at /f/:token: outside the signed-in shell, open to whoever holds the link. The page
@@ -22,7 +23,7 @@ type Refusal = { title: string; text: string; signIn: boolean };
  */
 @Component({
   selector: 'app-public-form',
-  imports: [BrandMark, FormRenderer, Icon, RouterLink, ServerTimePipe],
+  imports: [BrandMark, FormRenderer, Icon, RouterLink, ServerTimePipe, AppLoading],
   template: `
     <div class="min-h-screen flex flex-col bg-page">
       <header class="border-b border-subtle">
@@ -40,7 +41,7 @@ type Refusal = { title: string; text: string; signIn: boolean };
 
       <main class="mx-auto w-full px-5 py-10 flex-1" [class.max-w-3xl]="!sectioned()" [class.max-w-6xl]="sectioned()">
         @if (loading()) {
-          <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]" role="status">Opening the form…</div>
+          <div class="card"><app-loading shape="panel" label="Opening the form…" [count]="6" /></div>
         } @else if (refusal(); as r) {
           <section class="card p-8 flex flex-col items-center gap-3 text-center" data-refused>
             <span class="stat-glyph"><app-icon [name]="r.signIn ? 'lock' : 'alert'" class="icon-warn" /></span>
@@ -48,6 +49,10 @@ type Refusal = { title: string; text: string; signIn: boolean };
             <p class="text-sm text-[color:var(--text-secondary)] max-w-md">{{ r.text }}</p>
             @if (r.signIn && !signedIn()) {
               <a class="btn btn-primary btn-sm mt-1" routerLink="/login" [queryParams]="{ returnUrl: here() }">Sign in</a>
+            }
+            <!-- Owner 2026-10-27: a refusal that may pass (no connection, busy, a server error) offers Try again. -->
+            @if (r.retry) {
+              <button type="button" class="btn btn-default btn-sm mt-1" data-retry (click)="load()"><app-icon name="refresh" />Try again</button>
             }
           </section>
         } @else if (sent()) {
@@ -125,6 +130,7 @@ export class PublicForm implements OnInit {
     const token = this.token();
     if (!token) { this.loading.set(false); this.refusal.set(refusalOf(404, '')); return; }
     this.loading.set(true);
+    this.refusal.set(null);
     this.api.open(token).subscribe({
       next: r => {
         this.loading.set(false);
@@ -245,9 +251,9 @@ export function refusalOf(status: number, said: string | null | undefined): Refu
     case 410: return { title: 'This link no longer works', text: text || 'This link has expired. Ask whoever sent it for a new one.', signIn: false };
     case 401: return { title: 'Sign in to fill this in', text: text || 'Sign in to the workspace that shared this form to fill it in.', signIn: true };
     case 403: return { title: 'This form is for another workspace', text: text || 'Sign in to the workspace that shared this form to fill it in.', signIn: true };
-    case 429: return { title: 'Too many tries', text: text || 'Too many tries from here. Wait a minute and try again.', signIn: false };
-    case 0: return { title: 'Could not reach the server', text: text || 'Check your connection and reload the page.', signIn: false };
+    case 429: return { title: 'Too many tries', text: text || 'Too many tries from here. Wait a minute and try again.', signIn: false, retry: true };
+    case 0: return { title: 'Could not reach the server', text: text || 'Check your connection, then try again.', signIn: false, retry: true };
     case 404: return { title: 'This link is not valid', text: text || 'This link is not valid. Ask whoever sent it for a new one.', signIn: false };
-    default: return { title: 'This form cannot be opened right now', text: text || 'Try again in a minute.', signIn: false };
+    default: return { title: 'This form cannot be opened right now', text: text || 'Try again in a minute.', signIn: false, retry: true };
   }
 }

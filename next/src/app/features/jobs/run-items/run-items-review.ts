@@ -4,6 +4,7 @@ import { API_SUCCESS } from '../../../core/api/api.config';
 import { Team, TeamsApi } from '../../../core/teams/teams.api';
 import { plural } from '../run-steps/run-page.model';
 import { Reviewers } from './run-items.model';
+import { InlineStatus, loadErrorText } from '../../../shared/ui/loading';
 
 /** What the dialog asks about: how many items are going, and their first names. */
 export interface ReviewDialogData { count: number; labels: string[]; }
@@ -23,6 +24,7 @@ export const ROLES: { value: string; label: string }[] = [
  */
 @Component({
   selector: 'app-run-items-review',
+  imports: [InlineStatus],
   template: `
     <div class="card shadow-2xl w-[30rem] max-w-[calc(100vw-2rem)] overflow-hidden" role="dialog" aria-labelledby="rir-title" data-test="items-review-dialog">
       <div class="px-5 pt-4 pb-3 flex flex-col gap-3">
@@ -39,9 +41,12 @@ export const ROLES: { value: string; label: string }[] = [
         @if (kind() === 'team') {
           <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Team</span>
             <select class="select" [value]="team()" (change)="team.set($any($event.target).value)" data-test="review-team">
-              <option value="">{{ teamsLoading() ? 'Reading the teams…' : teams().length ? 'Pick a team' : 'This workspace has no team' }}</option>
+              <option value="">{{ teamsLoading() ? 'Loading teams…' : teamsError() ? 'The teams could not be read' : teams().length ? 'Pick a team' : 'This workspace has no team' }}</option>
               @for (t of teams(); track t.teamId) { <option [value]="t.teamId">{{ t.name }} ({{ t.memberCount }})</option> }
             </select>
+            <!-- Owner 2026-10-27: loading, why the teams could not be read (Try again), or that there is none. -->
+            <app-inline-status [loading]="teamsLoading()" [error]="teamsError()" [empty]="!teamsLoading() && !teamsError() && !teams().length"
+                               label="Loading teams…" emptyText="This workspace has no team yet: send it to a role instead." (retry)="loadTeams()" />
           </label>
         } @else {
           <label class="flex flex-col gap-1.5 text-sm"><span class="font-medium">Role</span>
@@ -74,6 +79,8 @@ export class RunItemsReview implements OnInit {
   readonly note = signal('');
   readonly teams = signal<Team[]>([]);
   readonly teamsLoading = signal(true);
+  /** Why the teams could not be read: a failure is not "This workspace has no team" (owner 2026-10-27). */
+  readonly teamsError = signal('');
 
   readonly countText = computed(() => plural(this.data.count, 'item'));
   readonly labelsText = computed(() => {
@@ -82,15 +89,21 @@ export class RunItemsReview implements OnInit {
   });
   readonly ready = computed(() => this.kind() === 'role' ? !!this.role() : !!this.team());
 
-  ngOnInit(): void {
+  ngOnInit(): void { this.loadTeams(); }
+
+  loadTeams(): void {
+    this.teamsLoading.set(true);
+    this.teamsError.set('');
     this.teamsApi.list().subscribe({
       next: r => {
         this.teamsLoading.set(false);
-        const teams = r?.status === API_SUCCESS && Array.isArray(r.data) ? r.data.filter(t => t.status === 'ACTIVE') : [];
+        if (r?.status !== API_SUCCESS || !Array.isArray(r.data)) { this.teamsError.set(loadErrorText(r, 'The teams could not be read.')); return; }
+        const teams = r.data.filter(t => t.status === 'ACTIVE');
         this.teams.set(teams);
         if (!teams.length) this.kind.set('role');
       },
-      error: () => { this.teamsLoading.set(false); this.kind.set('role'); },
+      // The team choice stays, saying why it is empty; a role can still be picked.
+      error: err => { this.teamsLoading.set(false); this.teamsError.set(loadErrorText(err, 'The teams could not be read.')); },
     });
   }
 

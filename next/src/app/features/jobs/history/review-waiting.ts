@@ -10,6 +10,8 @@ import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { BulkBar } from '../../../shared/ui/bulk/bulk-bar';
 import { BulkReviewApi } from '../../../shared/ui/bulk/bulk-review.api';
 import { BulkSelection } from '../../../shared/ui/bulk/bulk.model';
+import { AppLoading, InlineStatus, loadErrorText } from '../../../shared/ui/loading';
+import { LoadError } from '../../../shared/ui/load-error';
 
 /** A run whose results wait for a review (sourceJob.json/review/waiting). */
 export interface WaitingRun {
@@ -35,8 +37,19 @@ interface WaitingAnswer {
  */
 @Component({
   selector: 'app-review-waiting',
-  imports: [RouterLink, Icon, ServerTimePipe, BulkBar],
+  imports: [RouterLink, Icon, ServerTimePipe, BulkBar, AppLoading, InlineStatus, LoadError],
   template: `
+    <!-- Owner 2026-10-27: a failed read is said, with Try again, rather than looking exactly like "nothing waits". Where
+         the list is the page (Review > Runs) its first load shows a skeleton; on Runs the explorer's own card waits. -->
+    @if (error()) {
+      @if (all() && !runs().length) {
+        <div class="card" data-review-waiting-error><app-load-error [message]="error()" (retry)="load()" /></div>
+      } @else {
+        <div class="card px-4 py-2.5" data-review-waiting-error><app-inline-status [error]="error()" (retry)="load()" /></div>
+      }
+    } @else if (all() && !loaded()) {
+      <div class="card"><app-loading shape="list" label="Loading runs to review…" /></div>
+    }
     @if (runs().length) {
       <section class="card p-4 space-y-3" data-review-waiting aria-labelledby="review-waiting-heading">
         <div class="flex items-center gap-2">
@@ -102,8 +115,10 @@ export class ReviewWaiting implements OnInit {
 
   readonly runs = signal<WaitingRun[]>([]);
   readonly more = signal(false);
-  /** The list has answered once (Review › Runs says "nothing waits" only then). */
+  /** The list has answered once (Review › Runs says "nothing waits" only then). A failed read does not count. */
   readonly loaded = signal(false);
+  /** Why the list could not be read, or '' (owner 2026-10-27: a failure is not "nothing waits"). */
+  readonly error = signal('');
   /** Every run listed, not the newest five: Review › Runs, where the list is the page (UX review DR2). */
   readonly all = input(false);
   /** A bulk decision was made here (the page around it reads its counts again). */
@@ -148,15 +163,20 @@ export class ReviewWaiting implements OnInit {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: answer => {
+          if (answer?.status !== API_SUCCESS || !answer.data) {
+            this.error.set(loadErrorText(answer, 'The runs waiting for review could not be read.'));
+            this.settled.emit();
+            return;
+          }
           this.bulk.clear();
-          const ok = answer?.status === API_SUCCESS && answer.data;
-          this.runs.set(ok ? answer.data!.runs ?? [] : []);
-          this.more.set(ok ? !!answer.data!.more : false);
+          this.error.set('');
+          this.runs.set(answer.data.runs ?? []);
+          this.more.set(!!answer.data.more);
           this.loaded.set(true);
           this.settled.emit();
         },
-        // A list that cannot load is left out rather than shown as an error: Executions is still the page.
-        error: () => { this.runs.set([]); this.more.set(false); this.loaded.set(true); this.settled.emit(); },
+        // Executions is still the page, so the runs on screen stay; the failure is said in one line with Try again.
+        error: err => { this.error.set(loadErrorText(err, 'The runs waiting for review could not be read.')); this.settled.emit(); },
       });
   }
 

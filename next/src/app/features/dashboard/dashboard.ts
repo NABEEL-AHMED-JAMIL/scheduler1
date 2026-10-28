@@ -55,15 +55,33 @@ type BreakdownKey = typeof BREAKDOWN_COLUMNS[number];
 import { GetStarted } from './get-started';
 import { PageHeader } from '../../shared/ui/page-header';
 import { RefreshButton } from '../../shared/ui/refresh-button';
+import { createTableSort } from '../../shared/ui/sort';
+import { SortHeader } from '../../shared/ui/sort-header';
+import { AppLoading, loadErrorText } from '../../shared/ui/loading';
 @Component({
   selector: 'app-dashboard',
-  imports: [RefreshButton, PageHeader, ServerTimePipe, Pagination, Icon, DateRangePicker, Donut, BarChart, Heatmap, BillingBrief, StatTile, TableShell, BlurLoader, LoadError, GetStarted, WaitingForReview, NeedsAttention, QuickLinks],
+  imports: [RefreshButton, PageHeader, ServerTimePipe, Pagination, Icon, DateRangePicker, Donut, BarChart, Heatmap, BillingBrief, StatTile, TableShell, BlurLoader, LoadError, GetStarted, WaitingForReview, NeedsAttention, QuickLinks, SortHeader, AppLoading],
   templateUrl: './dashboard.html',
 })
 export class Dashboard implements OnInit {
   /** A busy hour can return every job that ran in it, so the drill-down pages like any list. */
   readonly breakdownPager = createPager<JobBreakdown>(50);
-  readonly pagedBreakdown = computed(() => this.breakdownPager.slice(this.filteredBreakdown()));
+  /**
+   * Owner 2026-10-27: the hour's table sorts by any column -- the schedule, its workspace, each status count and the
+   * total -- before the pager cuts a page; it keeps the endpoint's order until a heading is picked.
+   */
+  readonly breakdownSort = createTableSort<JobBreakdown>({
+    id: 'dashboard-hour',
+    columns: {
+      schedule: row => row.jobName,
+      workspace: row => workspaceName(row),
+      total: { value: row => row.total, kind: 'number' },
+      ...Object.fromEntries(BREAKDOWN_COLUMNS.map(key =>
+        [key, { value: (row: JobBreakdown) => this.countFor(row, key), kind: 'number' as const }])),
+    },
+  });
+  readonly sortedBreakdown = computed(() => this.breakdownSort.apply(this.filteredBreakdown()));
+  readonly pagedBreakdown = computed(() => this.breakdownPager.slice(this.sortedBreakdown()));
 
   goToBreakdownPage(page: number): void {
     this.breakdownPager.goTo(page, this.filteredBreakdown().length);
@@ -117,6 +135,12 @@ export class Dashboard implements OnInit {
   private readonly unreadCount = inject(UnreadCountService);
 
   readonly loading = signal(true);
+  /**
+   * Owner 2026-10-27: whether the figures have answered at least once. Until then the tiles draw placeholders and each
+   * chart its own loader -- the bar chart's "No runs in this range." used to show through the blur on the first load.
+   */
+  readonly loadedOnce = signal(false);
+  readonly firstLoad = computed(() => this.loading() && !this.loadedOnce());
   /**
    * Why each read failed, by source. A failed chart used to be silently empty -- indistinguishable
    * from "no activity" -- and then one failure replaced every tile and chart with a single error,
@@ -424,6 +448,7 @@ export class Dashboard implements OnInit {
     const settle = () => {
       if (--pending > 0) return;
       this.loading.set(false);
+      this.loadedOnce.set(true);
       if (!failed && sources.length === SOURCES.length) this.updatedAt.set(new Date());
     };
     const clear = (source: DashboardSource) => {
@@ -514,11 +539,11 @@ export class Dashboard implements OnInit {
       next: r => {
         this.breakdownLoading.set(false);
         if (r.status === API_SUCCESS) this.breakdown.set(r.data ?? []);
-        else this.breakdownError.set(r.message || 'Could not load that hour.');
+        else this.breakdownError.set(loadErrorText(r, 'The schedules of that hour could not be read.'));
       },
       error: err => {
         this.breakdownLoading.set(false);
-        this.breakdownError.set(err?.error?.message || 'Could not load that hour.');
+        this.breakdownError.set(loadErrorText(err, 'The schedules of that hour could not be read.'));
       },
     });
   }

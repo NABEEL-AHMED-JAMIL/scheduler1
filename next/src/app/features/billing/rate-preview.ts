@@ -1,7 +1,12 @@
 import { Component, computed, input, signal } from '@angular/core';
 import { Icon } from '../../shared/ui/icon';
+import { createTableSort } from '../../shared/ui/sort';
+import { SortHeader } from '../../shared/ui/sort-header';
 import { RatePreview } from './billing.service';
 import { formatMoneyExact, formatQuantity, formatUnitPrice, monthShort, yearMonth } from './billing-format';
+
+type PreviewWorkspace = RatePreview['workspaces'][number];
+type PreviewChange = PreviewWorkspace['changes'][number];
 
 /**
  * The months a preview may price: last month (the plan's "what last month would have cost") and, for a platform whose
@@ -21,7 +26,7 @@ export function previewPeriods(now = new Date()): { value: string; label: string
  */
 @Component({
   selector: 'app-rate-preview',
-  imports: [Icon],
+  imports: [Icon, SortHeader],
   template: `
     @if (preview(); as p) {
       <div class="grid grid-cols-3 gap-2 mb-3" data-test="preview-totals">
@@ -40,9 +45,9 @@ export function previewPeriods(now = new Date()): { value: string; label: string
         <p class="text-sm text-[color:var(--text-secondary)]">No usage in {{ month() }} that this card would price.</p>
       } @else {
         <table class="table-modern" data-test="preview-workspaces">
-          <thead><tr><th>Workspace</th><th class="text-right">Now</th><th class="text-right">With this card</th><th class="text-right">Difference</th><th class="w-8"></th></tr></thead>
+          <thead><tr><th appSort="workspace" [sortBy]="sort">Workspace</th><th class="text-right" appSort="now" [sortBy]="sort">Now</th><th class="text-right" appSort="draft" [sortBy]="sort">With this card</th><th class="text-right" appSort="difference" [sortBy]="sort">Difference</th><th class="w-8"></th></tr></thead>
           <tbody>
-            @for (w of p.workspaces; track w.tenantId) {
+            @for (w of workspaces(); track w.tenantId) {
               <tr class="cursor-pointer hover-brand" (click)="toggle(w.tenantId)" [class.is-open]="open() === w.tenantId">
                 <td><div class="font-medium">{{ w.tenantName || 'Workspace ' + w.tenantId }}</div>
                   <div class="text-[11px] text-[color:var(--text-muted)]">now v{{ w.currentVersion }}{{ w.currentName ? ' ' + w.currentName : '' }}@if (w.invoice) { · {{ w.invoice.number }} {{ w.invoice.status }} (kept) }</div></td>
@@ -58,9 +63,9 @@ export function previewPeriods(now = new Date()): { value: string; label: string
                   @if (!w.changes.length) { <span class="text-xs text-[color:var(--text-muted)]">No line changes.</span> }
                   @else {
                     <table class="table-modern" data-test="preview-changes">
-                      <thead><tr><th>Line</th><th class="text-right">Quantity</th><th class="text-right">Now</th><th class="text-right">With this card</th></tr></thead>
+                      <thead><tr><th appSort="line" [sortBy]="changeSort">Line</th><th class="text-right" appSort="quantity" [sortBy]="changeSort">Quantity</th><th class="text-right" appSort="now" [sortBy]="changeSort">Now</th><th class="text-right" appSort="draft" [sortBy]="changeSort">With this card</th></tr></thead>
                       <tbody>
-                        @for (c of w.changes; track c.meter) {
+                        @for (c of changeSort.apply(w.changes); track c.meter) {
                           <tr><td>{{ c.label }}<div class="text-[11px] mono text-[color:var(--text-muted)]">{{ c.meter }}</div></td>
                             <td class="text-right tabular">{{ qty(c.quantity, c.meter) }}</td>
                             <td class="text-right tabular">{{ money(c.current) }}</td>
@@ -89,6 +94,26 @@ export class RatePreviewView {
   readonly currency = input('USD');
   readonly open = signal<number | null>(null);
   readonly month = computed(() => { const p = this.preview(); return p ? monthShort(p.period) : ''; });
+  /** Owner 2026-10-27: the workspaces and the lines that change sort; the meter's order stays until a heading is picked. */
+  readonly sort = createTableSort<PreviewWorkspace>({
+    id: 'billing-rate-preview',
+    columns: {
+      workspace: w => w.tenantName || `Workspace ${w.tenantId}`,
+      now: { value: w => Number(w.current), kind: 'number' },
+      draft: { value: w => Number(w.draft), kind: 'number' },
+      difference: { value: w => Number(w.difference), kind: 'number' },
+    },
+  });
+  readonly workspaces = computed(() => this.sort.apply(this.preview()?.workspaces ?? []));
+  readonly changeSort = createTableSort<PreviewChange>({
+    id: 'billing-rate-preview-changes',
+    columns: {
+      line: c => c.label || c.meter,
+      quantity: { value: c => Number(c.quantity), kind: 'number' },
+      now: { value: c => Number(c.current), kind: 'number' },
+      draft: { value: c => Number(c.draft), kind: 'number' },
+    },
+  });
 
   toggle(tenantId: number): void { this.open.set(this.open() === tenantId ? null : tenantId); }
   money(v: number): string { return formatMoneyExact(Number(v) || 0, this.currency()); }

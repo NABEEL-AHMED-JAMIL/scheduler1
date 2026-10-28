@@ -238,3 +238,87 @@ describe('ZT-A12 follow-up: Settings › Alerts on the platform administrator\'s
     expect(fixture.componentInstance.scope()).toBe('platform');
   });
 });
+
+describe('Alerts -- loading, empty, error (owner 2026-10-27)', () => {
+  it('is loading, not "No rule yet" or "0 alerts open", until both lists answer', () => {
+    const s = screen();
+    const page = s.fixture.componentInstance;
+    expect(page.rulesState.pending()).toBe(true);
+    expect(page.alertsState.pending()).toBe(true);
+    expect(s.el.textContent).not.toContain('No rule yet');
+    expect(s.el.textContent).not.toContain('No alert has fired.');
+    expect(s.el.querySelector('[data-test="rules-count"]')).toBeNull();
+    expect(s.el.querySelector('[data-test="alerts-recommended"]')).toBeNull();
+  });
+
+  it('says each list is empty once it answers empty', () => {
+    const s = screen();
+    answer(s, [], []);
+    expect(s.el.querySelector('[data-test="alerts-empty"]')!.textContent).toContain('No alert has fired.');
+    expect(s.el.textContent).toContain('No rule yet');
+  });
+
+  it('a failed rules read says so with Try again, keeps the alerts, and does not offer the recommended rules', () => {
+    const s = screen();
+    s.http.expectOne(r => r.url === RULES).flush('Internal Server Error', { status: 500, statusText: 'Server Error' });
+    s.http.expectOne(r => r.url === ALERTS).flush({ status: API_SUCCESS, message: '', data: [alert()] });
+    s.fixture.detectChanges();
+    const page = s.fixture.componentInstance;
+    expect(page.rulesState.loading()).toBe(false);
+    expect(page.rulesState.error()).toBe('The alert rules could not be read.');
+    expect(s.el.querySelector('[data-test="alert-rules"] app-load-error')).not.toBeNull();
+    expect(s.el.textContent).not.toContain('No rule yet');
+    expect(s.el.querySelector('[data-test="alerts-recommended"]')).toBeNull();
+    expect(s.el.querySelector('[data-alert="5"]')).not.toBeNull();
+  });
+
+  it('a refused alerts read is an error, not "No alert has fired"', () => {
+    const s = screen();
+    s.http.expectOne(r => r.url === RULES).flush({ status: API_SUCCESS, message: '', data: { scope: 'workspace', rules: [rule()], maxRules: 50,
+      kinds: [{ kind: 'RUN_FAILED', label: 'Runs failed', threshold: 1, windowMinutes: 60, whatToDo: 'x', runbook: 'y' }] } });
+    s.http.expectOne(r => r.url === ALERTS).flush({ status: 'ERROR', message: '' });
+    s.fixture.detectChanges();
+    expect(s.fixture.componentInstance.alertsState.error()).toBe('The alerts could not be read.');
+    expect(s.el.querySelector('[data-test="alerts-empty"]')).toBeNull();
+    expect(s.el.querySelector('[data-test="alerts-list"] app-load-error')).not.toBeNull();
+  });
+});
+
+describe('Alert rule panel -- schedules and teams that could not be read (owner 2026-10-27)', () => {
+  function panelFor(rule: AlertRule | null) {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [AlertRulePanel],
+      providers: [
+        provideRouter([]), provideHttpClient(), provideHttpClientTesting(),
+        { provide: AuthService, useValue: { isPlatformAdmin: () => false, user: () => ({ tenantId: 2924 }) } },
+        { provide: DialogRef, useValue: { close: () => {} } },
+        { provide: DIALOG_DATA, useValue: { scope: 'workspace', rule,
+          kinds: [{ kind: 'RUN_FAILED', label: 'Runs failed', threshold: 1, windowMinutes: 60, whatToDo: 'x', runbook: 'y' }] } },
+      ],
+    });
+    const fixture = TestBed.createComponent(AlertRulePanel);
+    fixture.detectChanges();
+    return { fixture, page: fixture.componentInstance, http: TestBed.inject(HttpTestingController), el: fixture.nativeElement as HTMLElement };
+  }
+
+  it('is loading the schedules until they answer, then picks the rule\'s own', () => {
+    const p = panelFor(rule({ jobId: 42 }));
+    expect(p.page.schedulesState.loading()).toBe(true);
+    p.http.expectOne(r => r.url.includes('/sourceJob.json/listSourceJob'))
+      .flush({ status: API_SUCCESS, message: '', data: [{ jobId: 41, jobName: 'A' }, { jobId: 42, jobName: 'B' }] });
+    p.fixture.detectChanges();
+    expect(p.page.schedulesState.loading()).toBe(false);
+    expect((p.el.querySelector('[data-test="rule-job"]') as HTMLSelectElement).value).toBe('42');
+  });
+
+  it('says the schedules and the teams could not be read, with Try again', () => {
+    const p = panelFor(null);
+    p.http.expectOne(r => r.url.includes('/sourceJob.json/listSourceJob')).flush('no', { status: 500, statusText: 'Server Error' });
+    p.http.expectOne(r => r.url.includes('/appUser.json/teams/list')).flush('no', { status: 500, statusText: 'Server Error' });
+    p.fixture.detectChanges();
+    expect(p.page.schedulesState.error()).toBe('The schedules could not be read.');
+    expect(p.page.teamsState.error()).toBe('The teams could not be read.');
+    expect(p.el.querySelectorAll('app-inline-status [role="alert"]').length).toBe(2);
+  });
+});

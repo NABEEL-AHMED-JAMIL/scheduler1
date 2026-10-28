@@ -28,6 +28,9 @@ import { instantOf } from '../../../core/instant';
 import { AuthService } from '../../../core/auth/auth.service';
 import { ConversionAction, ConversionPanel, ConversionPanelData } from './conversion-panel';
 import { isOwnPlatformSignIn } from '../../../core/auth/workspace-data';
+import { AppLoading, InlineStatus, createLoadState } from '../../../shared/ui/loading';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
 
 interface FormatFamily {
   key: string;
@@ -115,7 +118,7 @@ export function createdIn(task: Pick<ConverterTask, 'dateCreated'>, range: Pick<
 @Component({
   selector: 'app-converter',
   imports: [PageHeader, Icon, RouterLink, ServerTimePipe, Segmented, FileDropzone, Combobox, TableShell, Pagination, RenderPanel,
-    Section, DateRangePicker],
+    Section, DateRangePicker, AppLoading, InlineStatus, SortHeader],
   templateUrl: './converter.html',
   styles: `
     /* Owner #26: the limits as one wrapping line of facts at the top of the card, not a column beside it. */
@@ -144,6 +147,14 @@ export class Converter implements OnInit {
   readonly result = signal<ConvertResult | null>(null);
   /** The supported-formats read failed: said as such, not as "this file can't be converted". */
   readonly formatsError = signal('');
+  /**
+   * Owner 2026-10-27: the reads behind the card each say they are loading -- the formats ("0" and "isn't a format this
+   * can convert" while they were on their way), the limits (which said "could not be read" while loading) and the
+   * buckets a result can be saved to (which read as "No matches").
+   */
+  readonly formatsState = createLoadState();
+  readonly limitsState = createLoadState();
+  readonly bucketsState = createLoadState();
   readonly showFormats = signal(false);
   /** ADR-027: the converter's limits, read once; null until read (the screen works without them). */
   readonly limits = signal<ConverterLimits | null>(null);
@@ -199,7 +210,8 @@ export class Converter implements OnInit {
   readonly taskName = signal('');
 
   readonly tasks = signal<ConverterTask[]>([]);
-  readonly tasksLoading = signal(false);
+  /** Loading from the start: the list is read on arrival, and "Nothing converted yet" must not show before it answers. */
+  readonly tasksLoading = signal(true);
   readonly tasksError = signal('');
   readonly taskPager = createPager<ConverterTask>();
 
@@ -214,7 +226,19 @@ export class Converter implements OnInit {
       && (!q || [t.taskName, t.inputFileName, t.outputFileName, t.inputFormat, t.outputFormat, t.bucketName]
         .some(v => (v ?? '').toLowerCase().includes(q))));
   });
-  readonly pagedTasks = computed(() => this.taskPager.slice(this.shownTasks()));
+  /** Owner 2026-10-27: every column that holds a value sorts, before the paging; the API's order until one is picked. */
+  readonly taskSort = createTableSort<ConverterTask>({
+    id: 'converter-tasks',
+    columns: {
+      name: t => t.taskName,
+      conversion: t => `${t.inputFormat} → ${t.outputFormat}`,
+      size: { value: t => t.inputFileSize, kind: 'number' },
+      location: t => t.bucketName,
+      created: { value: t => t.dateCreated, kind: 'date' },
+    },
+  });
+  readonly sortedTasks = computed(() => this.taskSort.apply(this.shownTasks()));
+  readonly pagedTasks = computed(() => this.taskPager.slice(this.sortedTasks()));
   /** The picked bucket file, with its size and date for the card (the picker's answer). */
   readonly picked = signal<PickedObject | null>(null);
 
@@ -295,9 +319,14 @@ export class Converter implements OnInit {
 
   /** Reads the limits again: the queue's "now" numbers change while the page is open. */
   loadLimits(): void {
+    this.limitsState.start();
     this.http.get<ApiResponse<ConverterLimits>>(`${API_BASE}/documentConverter.json/limits`).subscribe({
-      next: r => { if (r?.status === API_SUCCESS && typeof r.data?.maxFileSizeMb === 'number') this.limits.set(r.data); },
-      error: () => { /* the limits are a hint; the server still checks */ },
+      next: r => {
+        if (r?.status === API_SUCCESS && typeof r.data?.maxFileSizeMb === 'number') { this.limits.set(r.data); this.limitsState.done(); }
+        else this.limitsState.fail(r, 'The limits could not be read.');
+      },
+      // The limits are a hint; the server still checks every file. The strip says they are missing.
+      error: err => this.limitsState.fail(err, 'The limits could not be read.'),
     });
   }
 
@@ -339,23 +368,34 @@ export class Converter implements OnInit {
     const asked = this.route?.snapshot?.queryParamMap?.get('mode');
     if (asked && this.modeOptions.some(o => o.id === asked)) this.mode.set(asked as ConverterMode);
     this.loadTasks();
-    this.storage.buckets().subscribe({
-      next: r => { if (r.status === API_SUCCESS) this.buckets.set(r.data ?? []); },
-      error: () => { /* upload mode still works with no bucket list */ },
-    });
+    this.loadBuckets();
     this.loadFormats();
     this.loadLimits();
   }
 
+  /** The buckets a result can be saved to (upload mode works without them; the Save to bucket box says why it is empty). */
+  loadBuckets(): void {
+    this.bucketsState.start();
+    this.storage.buckets().subscribe({
+      next: r => {
+        if (r.status !== API_SUCCESS) { this.bucketsState.fail(r, 'The buckets could not be read.'); return; }
+        this.buckets.set(r.data ?? []);
+        this.bucketsState.done();
+      },
+      error: err => this.bucketsState.fail(err, 'The buckets could not be read.'),
+    });
+  }
+
   loadFormats(): void {
     this.formatsError.set('');
+    this.formatsState.start();
     this.http.get<ApiResponse<FormatFamily[]>>(`${API_BASE}/documentConverter.json/supportedFormats`)
       .subscribe({
         next: response => {
-          if (response.status === API_SUCCESS) this.families.set(response.data ?? []);
-          else this.formatsError.set('Could not load the supported formats.');
+          if (response.status === API_SUCCESS) { this.families.set(response.data ?? []); this.formatsState.done(); }
+          else { this.formatsError.set('Could not load the supported formats.'); this.formatsState.fail(response, 'Could not load the supported formats.'); }
         },
-        error: () => this.formatsError.set('Could not load the supported formats.'),
+        error: err => { this.formatsError.set('Could not load the supported formats.'); this.formatsState.fail(err, 'Could not load the supported formats.'); },
       });
   }
 

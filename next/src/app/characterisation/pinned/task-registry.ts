@@ -170,6 +170,8 @@ export const PINNED: Record<string, unknown> = {
     ],
     "buttons": [
       "Columns",
+      "Input → output",
+      "Kind",
       "Only mine",
       "Open Aggregate",
       "Open Enrich",
@@ -187,10 +189,15 @@ export const PINNED: Record<string, unknown> = {
       "Open Upload to bucket",
       "Open Validate",
       "Open Write Database",
+      "Pipelines",
       "Refresh",
+      "Runs this month",
+      "Service",
       "Show all 124 characters of Why it is unavailable",
       "Show all 127 characters of Why it is unavailable",
-      "Show all 136 characters of Why it is unavailable"
+      "Show all 136 characters of Why it is unavailable",
+      "State",
+      "Task"
     ],
     "columns": [
       [
@@ -279,6 +286,9 @@ export const PINNED: Record<string, unknown> = {
     "buttons": [
       "Actions for Reference: CSV check and summarise",
       "Columns",
+      "In this workspace",
+      "Input → output",
+      "Kind",
       "New registry task",
       "Only mine",
       "Open Aggregate",
@@ -298,7 +308,11 @@ export const PINNED: Record<string, unknown> = {
       "Open Upload to bucket",
       "Open Validate",
       "Open Write Database",
-      "Refresh"
+      "Pipelines",
+      "Refresh",
+      "Runs this month",
+      "Service",
+      "Task"
     ],
     "columns": [
       [

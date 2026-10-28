@@ -12,13 +12,18 @@
         <app-workspace-select [value]="tenantId()" (valueChange)="pickWorkspace($event)" />
         @if (!needsWorkspace()) {
           <app-refresh-button [loading]="loading()" (refresh)="loadAll()" />
-          <button type="button" class="btn btn-primary btn-sm" (click)="openNew()" [disabled]="!scopes().length">
+          <button type="button" class="btn btn-primary btn-sm" (click)="openNew()" [disabled]="!scopes().length"
+                  [attr.title]="newClientBlocked() || null">
             <app-icon name="plus" />New API client
           </button>
         }
       </div>
     </div>
   </app-page-header>
+  @if (scopesState.error()) {
+    <!-- Owner 2026-10-27: why New API client is disabled, instead of a button that just does nothing. -->
+    <app-inline-status class="mb-3" [error]="scopesState.error()" (retry)="loadScopes()" data-scopes-status />
+  }
 
   @if (needsWorkspace()) {
     <!-- A platform administrator has no workspace of his own: nothing is read until he picks one. -->
@@ -57,6 +62,11 @@
           }
         </p>
       </div>
+    } @else if (limitsState.error()) {
+      <!-- Owner 2026-10-27: an unread quota is not "no quota": say so, with Try again. -->
+      <app-inline-status class="mb-3" [error]="limitsState.error()" (retry)="loadLimits()" data-api-limits-status />
+    } @else if (limitsState.pending()) {
+      <app-inline-status class="mb-3" [loading]="true" label="Loading the API limits…" />
     }
 
     <app-table-shell heading="API clients" [loading]="loading()" [error]="error()"
@@ -74,19 +84,19 @@
       <table class="table-modern" data-api-clients>
         <thead>
           <tr>
-            <th>Client</th>
+            <th appSort="name" [sortBy]="clientSort">Client</th>
             <th>Scopes</th>
-            <th>Allowed from</th>
-            <th>Limit</th>
-            <th class="text-right">Calls this month</th>
-            <th>Last used</th>
-            <th>Expires</th>
-            <th class="text-right">State</th>
+            <th appSort="allowed" [sortBy]="clientSort">Allowed from</th>
+            <th appSort="limit" [sortBy]="clientSort">Limit</th>
+            <th class="text-right" appSort="calls" [sortBy]="clientSort">Calls this month</th>
+            <th appSort="lastUsed" [sortBy]="clientSort">Last used</th>
+            <th appSort="expires" [sortBy]="clientSort">Expires</th>
+            <th class="text-right" appSort="state" [sortBy]="clientSort">State</th>
             <th class="w-12 th-actions">Actions</th>
           </tr>
         </thead>
         <tbody>
-          @for (c of shown(); track c.clientId) {
+          @for (c of sortedClients(); track c.clientId) {
             <tr [class.row-inactive]="c.status !== 'Active'">
               <td class="max-w-64">
                 <div class="font-medium truncate">{{ c.name }}</div>
@@ -158,15 +168,15 @@
       <table class="table-modern" data-event-routes>
         <thead>
           <tr>
-            <th>Event type</th>
-            <th>Starts</th>
-            <th>Contract</th>
-            <th class="text-right">State</th>
+            <th appSort="eventType" [sortBy]="routeSort">Event type</th>
+            <th appSort="target" [sortBy]="routeSort">Starts</th>
+            <th appSort="contract" [sortBy]="routeSort">Contract</th>
+            <th class="text-right" appSort="state" [sortBy]="routeSort">State</th>
             <th class="w-12 th-actions">Actions</th>
           </tr>
         </thead>
         <tbody>
-          @for (r of routes(); track r.routeId) {
+          @for (r of sortedRoutes(); track r.routeId) {
             <tr [class.row-inactive]="!r.active">
               <td class="mono">{{ r.eventType }}</td>
               <td>{{ targetOf(r) }}</td>
@@ -211,15 +221,15 @@
       <table class="table-modern" data-webhooks>
         <thead>
           <tr>
-            <th>URL</th>
+            <th appSort="url" [sortBy]="webhookSort">URL</th>
             <th>Events</th>
-            <th>Last delivered</th>
-            <th class="text-right">State</th>
+            <th appSort="lastDelivered" [sortBy]="webhookSort">Last delivered</th>
+            <th class="text-right" appSort="state" [sortBy]="webhookSort">State</th>
             <th class="w-12 th-actions">Actions</th>
           </tr>
         </thead>
         <tbody>
-          @for (w of webhooks(); track w.id) {
+          @for (w of sortedWebhooks(); track w.id) {
             <tr [class.row-inactive]="!w.active">
               <td class="max-w-96">
                 <div class="mono truncate" [title]="w.url">{{ w.url }}</div>

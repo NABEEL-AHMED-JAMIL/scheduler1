@@ -80,6 +80,30 @@ const LOOK: Record<string, StatusLook> = {
 
 const UNKNOWN: StatusLook = { tone: 'neutral', glyph: '' };
 
+/** A status column sorts by what the chip asks of the reader: what went wrong, what wants someone, what runs, what waits, what is done. */
+const TONE_RANK: Record<Tone, number> = { crit: 0, warn: 1, brand: 2, neutral: 3, ok: 4 };
+
+/**
+ * Where a status sorts in a table (owner 2026-10-27, "add a sort on each table"): by the chip's tone, so Failed and
+ * Rejected come before Pending, Running, Queued and Completed whatever the words are, and the same everywhere. A word
+ * this file does not know sorts after the known ones; ties are broken by the word itself (see shared/ui/sort.ts).
+ */
+export function statusRank(label: string | null | undefined): number {
+  const word = String(label ?? '').trim().toLowerCase();
+  const tone = LOOK[word]?.tone ?? RANK_ONLY[word];
+  return tone ? TONE_RANK[tone] : Object.keys(TONE_RANK).length;
+}
+
+/**
+ * Words some tables show that have no chip look of their own yet (webhooks, API clients, test results): where they sort,
+ * without changing how they are drawn.
+ */
+const RANK_ONLY: Record<string, Tone> = {
+  failing: 'crit', error: 'crit', revoked: 'crit', expired: 'warn', paused: 'warn', stalled: 'warn', warning: 'warn',
+  'in progress': 'brand', processing: 'brand', waiting: 'warn', ended: 'neutral', disabled: 'neutral', off: 'neutral',
+  succeeded: 'ok', passed: 'ok', done: 'ok', enabled: 'ok', on: 'ok', live: 'ok',
+};
+
 /**
  * The word a chip says where the stored value is not one (UI review U5, U14). A run's status is the
  * server's enum, and "Interrupt" on a chip read as a command beside Completed and Failed. Only the

@@ -2,7 +2,8 @@ import { describe, it, expect, vi } from 'vitest';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { DialogRef } from '@angular/cdk/dialog';
-import { of, throwError } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { DocumentsApi } from './documents.service';
 import { StarterMarket } from './documents.model';
 import { StartersDialog } from './starters-dialog';
@@ -92,5 +93,42 @@ describe('StartersDialog', () => {
     fixture.detectChanges();
     expect(el.querySelector('[role="alert"]')!.textContent).toContain('A workspace administrator adds document types.');
     expect(dialog.answer()).toBeNull();
+  });
+});
+
+describe('StartersDialog -- loading, empty, error (owner 2026-10-27)', () => {
+  it('is loading until the catalog answers', async () => {
+    const { fixture, dialog, api } = open();
+    api.starters.mockReturnValue(NEVER as never);
+    // As on opening: nothing read yet (a re-read keeps the list it has instead).
+    dialog.markets.set([]);
+    dialog.load();
+    fixture.detectChanges();
+    expect(dialog.loading()).toBe(true);
+    expect((fixture.nativeElement as HTMLElement).querySelector('app-loading')).not.toBeNull();
+  });
+
+  it('says so when the catalog holds no starter', async () => {
+    const { fixture, dialog, api, el } = open();
+    api.starters.mockReturnValue(of({ status: 'SUCCESS', message: '', data: [] }));
+    dialog.load();
+    fixture.detectChanges();
+    expect(dialog.loading()).toBe(false);
+    expect(el.textContent).toContain('No starter types are available yet.');
+  });
+
+  it('says why the catalog could not be read, and reads it again on Try again', async () => {
+    const { fixture, dialog, api, el } = open();
+    api.starters.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 500 })) as never);
+    dialog.load();
+    fixture.detectChanges();
+    expect(dialog.loading()).toBe(false);
+    expect(dialog.error()).toBe('Could not read the starters.');
+    api.starters.mockReturnValue(of({ status: 'SUCCESS', message: '', data: MARKETS }));
+    // The list read on opening stays; the failed re-read says so beside it, with Try again.
+    (el.querySelector('app-inline-status button') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(dialog.error()).toBe('');
+    expect(dialog.markets().length).toBe(2);
   });
 });

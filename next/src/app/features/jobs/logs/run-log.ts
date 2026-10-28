@@ -1,7 +1,9 @@
-import { Component, ElementRef, ViewEncapsulation, LOCALE_ID, computed, effect, inject, input, model, signal, untracked, viewChild } from '@angular/core';
+import { Component, ElementRef, ViewEncapsulation, LOCALE_ID, computed, effect, inject, input, model, output, signal, untracked, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { Icon } from '../../../shared/ui/icon';
+import { AppLoading } from '../../../shared/ui/loading';
+import { LoadError } from '../../../shared/ui/load-error';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { copyText } from '../../../shared/ui/clipboard.util';
@@ -30,7 +32,7 @@ const LEVEL_WORDS: Record<LogLevel, string> = { ERROR: 'Errors', WARN: 'Warnings
  */
 @Component({
   selector: 'app-run-log',
-  imports: [Icon, ServerTimePipe, RouterLink, NgTemplateOutlet],
+  imports: [Icon, ServerTimePipe, RouterLink, NgTemplateOutlet, AppLoading, LoadError],
   // The log's look is shared with the step log panel (RUN_LOG_STYLES); it is written for the console's dark ground.
   encapsulation: ViewEncapsulation.None,
   styles: RUN_LOG_STYLES,
@@ -72,10 +74,16 @@ const LEVEL_WORDS: Record<LogLevel, string> = { ERROR: 'Errors', WARN: 'Warnings
       </div>
       <ng-content select="[above]" />
 
-      @if (loading() && !entries().length) {
-        <p class="px-4 py-3 text-xs text-[color:var(--text-muted)]">Reading the log…</p>
-      } @else if (error()) {
-        <div class="px-4 py-3 text-sm text-crit-500" role="alert">{{ error() }} </div>
+      <!-- Owner 2026-10-27: a failed poll keeps the lines on screen and says so above them, instead of swapping them for
+           the error until the next good poll; only a log that never arrived shows the error in their place. -->
+      @if (error() && entries().length) {
+        <p class="px-4 py-2 text-xs text-crit-500 border-b border-subtle" role="alert" data-test="log-stale">
+          {{ error() }} The lines below are from the last read.</p>
+      }
+      @if (loading() && !entries().length && !error()) {
+        <app-loading shape="list" label="Reading the log…" />
+      } @else if (error() && !entries().length) {
+        <app-load-error [message]="error()" (retry)="retry.emit()" />
       } @else if (!shown().length) {
         <p class="px-4 py-3 text-xs text-[color:var(--text-muted)]" data-test="log-empty">
           {{ lines().length ? 'No lines match the filters.' : stepPending() ? 'Reading the step\\'s lines…' : 'This run reported no log entries.' }}</p>
@@ -129,6 +137,8 @@ export class RunLog {
   readonly entries = input<AuditEntry[]>([]);
   readonly loading = input(false);
   readonly error = input('');
+  /** Try again on a log that could not be read. */
+  readonly retry = output<void>();
   /** The bucket a path in an entry is relative to, so it links to its folder. */
   readonly bucket = input<string | null>(null);
   /** The run is still writing lines: the view follows the newest while the reader is at the bottom. */

@@ -12,7 +12,8 @@ export class CatalogApi {
   private readonly http = inject(HttpClient);
 
   /** One page of the assets (page from 0); paging.total is how many the filter matches in all. */
-  list(filter: { q?: string; kind?: string; flag?: string; withDeleted?: boolean; withSystem?: boolean; page?: number; size?: number }):
+  list(filter: { q?: string; kind?: string; flag?: string; withDeleted?: boolean; withSystem?: boolean; page?: number; size?: number;
+    sort?: string; dir?: string }):
     Observable<ApiResponse<CatalogAsset[]> & { paging?: CatalogPaging }> {
     let params = new HttpParams();
     if (filter.q) params = params.set('q', filter.q);
@@ -23,6 +24,8 @@ export class CatalogApi {
     // administrator asks for them; analytics-service ignores the flag for anyone else.
     if (filter.withSystem) params = params.set('withSystem', 'true');
     if (filter.size) params = params.set('page', filter.page ?? 0).set('size', filter.size);
+    // Owner 2026-10-27: the server's sort (name, kind, owner, freshness, sensitivity, quality), only once the viewer picked one.
+    if (filter.sort) params = params.set('sort', filter.sort).set('dir', filter.dir ?? 'asc');
     return this.http.get<ApiResponse<CatalogAsset[]> & { paging?: CatalogPaging }>(`${BASE()}/list`, { params });
   }
 

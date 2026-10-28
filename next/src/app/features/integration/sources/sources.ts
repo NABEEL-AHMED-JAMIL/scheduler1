@@ -35,6 +35,9 @@ import { WorkspaceDirectory } from '../../../core/workspaces/workspace-directory
 import { PageHeader } from '../../../shared/ui/page-header';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
 import { PipelineRead, PipelineReads, readsSentence } from './pipeline-reads';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
+import { createLoadState, loadErrorText } from '../../../shared/ui/loading';
 
 export type SourcesTab = 'sources' | 'connections' | 'contracts';
 const TABS: SourcesTab[] = ['sources', 'connections', 'contracts'];
@@ -56,7 +59,7 @@ export const SOURCES_VIEW_PATHS: Record<SourcesTab, string> = {
  */
 @Component({
   selector: 'app-sources',
-  imports: [WorkspaceSelect, RouterLink, RefreshButton, PipelineReads, PageHeader, SensitivityTag, Icon, TableShell, StatusPill, StatStrip, ViewToggle, Pagination, DataText, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, ManagedBanner],
+  imports: [WorkspaceSelect, RouterLink, RefreshButton, PipelineReads, PageHeader, SensitivityTag, Icon, TableShell, StatusPill, StatStrip, ViewToggle, Pagination, DataText, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, ManagedBanner, SortHeader],
   templateUrl: './sources.html',
 })
 export class Sources implements OnInit {
@@ -95,8 +98,13 @@ export class Sources implements OnInit {
   readonly view = signal<ListView>('table');
   readonly rows = signal<SourceRow[]>([]);
   readonly total = signal(0);
-  readonly loading = signal(true);
-  readonly error = signal('');
+  /**
+   * The sources' read. Owner 2026-10-27: the KPI strip showed 0 / 0 / 0 / 0 as if real while it loaded and under a
+   * failure; it now waits for the first answer (placeholders) and says "Not available right now" when it failed.
+   */
+  readonly sourcesState = createLoadState();
+  readonly loading = this.sourcesState.loading;
+  readonly error = this.sourcesState.error;
   readonly search = signal('');
   readonly kindFilter = signal('');
   readonly page = signal(1);
@@ -105,6 +113,24 @@ export class Sources implements OnInit {
   readonly filtered = computed(() => this.rows()
     .filter(r => !this.kindFilter() || r.kind === this.kindFilter())
     .map(r => this.named(r)));
+  /**
+   * Owner 2026-10-27 ("add a sort on each table"): the sources are paged, so they sort on the server (dataSource.json/list
+   * sort/dir) and a new order goes back to the first page; the table and the cards show that order. No order picked: the
+   * newest first, as before, and no sort is sent. Last test (a result and a time) does not sort. The kind filter still
+   * narrows the page read, as before.
+   */
+  readonly sourceSort = createTableSort<SourceRow>({
+    id: 'sources',
+    server: true,
+    columns: {
+      name: { value: r => r.name, param: 'name' },
+      kind: { value: r => kindLabel(r.kind), param: 'kind' },
+      format: { value: r => r.format, param: 'format' },
+      created: { value: r => r.dateCreated, kind: 'date', param: 'created' },
+      state: { value: r => r.status, kind: 'status', param: 'state' },
+    },
+    onChange: () => { this.page.set(1); this.load(); },
+  });
   readonly hasFilters = computed(() => !!this.search().trim() || !!this.kindFilter());
   readonly emptyMessage = computed(() => this.hasFilters() ? 'No source matches the current filters.'
     // UX review 2026-10-13 (I1): never "nothing" while the pipelines read data directly.
@@ -154,6 +180,35 @@ export class Sources implements OnInit {
     : this.tab() === 'contracts' ? this.contractsLoading() : this.loading());
   readonly namedConnections = computed(() => this.connections().map(c => this.named(c)));
   readonly namedContracts = computed(() => this.contracts().map(c => c.system ? c : this.named(c)));
+
+  /** Owner 2026-10-27: the database connections and the contracts sort by every column; the service's order until then. */
+  readonly connectionSort = createTableSort<ConnectionRow>({
+    id: 'source-connections',
+    columns: {
+      name: c => c.name,
+      host: c => `${c.host}:${c.port} / ${c.database}`,
+      user: c => c.username,
+      password: { value: c => c.passwordSet, kind: 'bool' },
+      tls: c => this.sslText(c.sslMode),
+      workspace: c => this.workspace(c),
+      state: { value: c => c.status || 'Active', kind: 'status' },
+    },
+  });
+  readonly sortedConnections = computed(() => this.connectionSort.apply(this.namedConnections()));
+  readonly contractSort = createTableSort<ContractRow>({
+    id: 'source-contracts',
+    columns: {
+      name: c => c.name,
+      direction: c => this.directionText(c.direction),
+      active: { value: c => c.activeVersion, kind: 'number' },
+      latest: { value: c => c.currentVersion ?? 0, kind: 'number' },
+      // The most guarded first.
+      sensitivity: { value: c => c.sensitivity, kind: 'status', order: ['sensitive', 'internal', 'public'] },
+      created: { value: c => c.dateCreated, kind: 'date' },
+      workspace: c => (c.system ? 'Every workspace' : this.workspace(c)),
+    },
+  });
+  readonly sortedContracts = computed(() => this.contractSort.apply(this.namedContracts()));
 
   private sourcesRead = false;
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
@@ -230,29 +285,28 @@ export class Sources implements OnInit {
     this.api.pipelineReads().subscribe({
       next: r => {
         this.pipelineReadsLoading.set(false);
-        if (r.status !== API_SUCCESS) { this.pipelineReadsError.set(r.message); return; }
+        if (r.status !== API_SUCCESS) { this.pipelineReadsError.set(loadErrorText(r, 'What the pipelines read could not be read.')); return; }
         this.pipelineReads.set(r.data ?? []);
       },
       error: err => {
         this.pipelineReadsLoading.set(false);
-        this.pipelineReadsError.set(err?.error?.message || 'Could not load what the pipelines read.');
+        this.pipelineReadsError.set(loadErrorText(err, 'What the pipelines read could not be read.'));
       },
     });
   }
 
   load(): void {
     this.sourcesRead = true;
-    this.loading.set(true);
-    this.error.set('');
-    this.api.list(this.search(), this.page(), this.size(), this.pickedWorkspace()).subscribe({
+    this.sourcesState.start();
+    this.api.list(this.search(), this.page(), this.size(), this.pickedWorkspace(), this.sourceSort.param()).subscribe({
       next: r => {
-        this.loading.set(false);
-        if (r.status !== API_SUCCESS) { this.error.set(r.message); return; }
+        if (r.status !== API_SUCCESS) { this.sourcesState.fail(r, 'The sources could not be read.'); return; }
         const rows = r.data ?? [];
         this.rows.set(rows);
         this.total.set(r.paging?.totalRecord ?? rows.length);
+        this.sourcesState.done();
       },
-      error: err => { this.loading.set(false); this.error.set(err?.error?.message || 'Could not load the sources.'); },
+      error: err => this.sourcesState.fail(err, 'The sources could not be read.'),
     });
   }
 
@@ -263,10 +317,10 @@ export class Sources implements OnInit {
     this.api.connections(this.pickedWorkspace()).subscribe({
       next: r => {
         this.connectionsLoading.set(false);
-        if (r.status !== API_SUCCESS) { this.connectionsError.set(r.message); return; }
+        if (r.status !== API_SUCCESS) { this.connectionsError.set(loadErrorText(r, 'The database connections could not be read.')); return; }
         this.connections.set(r.data ?? []);
       },
-      error: err => { this.connectionsLoading.set(false); this.connectionsError.set(err?.error?.message || 'Could not load the database connections.'); },
+      error: err => { this.connectionsLoading.set(false); this.connectionsError.set(loadErrorText(err, 'The database connections could not be read.')); },
     });
   }
 
@@ -277,10 +331,10 @@ export class Sources implements OnInit {
     this.api.contracts('', this.pickedWorkspace()).subscribe({
       next: r => {
         this.contractsLoading.set(false);
-        if (r.status !== API_SUCCESS) { this.contractsError.set(r.message); return; }
+        if (r.status !== API_SUCCESS) { this.contractsError.set(loadErrorText(r, 'The data contracts could not be read.')); return; }
         this.contracts.set(r.data ?? []);
       },
-      error: err => { this.contractsLoading.set(false); this.contractsError.set(err?.error?.message || 'Could not load the data contracts.'); },
+      error: err => { this.contractsLoading.set(false); this.contractsError.set(loadErrorText(err, 'The data contracts could not be read.')); },
     });
   }
 

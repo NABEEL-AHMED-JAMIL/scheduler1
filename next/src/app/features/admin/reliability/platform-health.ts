@@ -5,6 +5,10 @@ import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { refusal } from '../../../shared/ui/bulk/bulk.model';
 import { AlertsApi, PlatformHealth, Probe, ServiceHealth } from '../../settings/alerts/alerts.api';
 import { AlertRules } from '../../settings/alerts/alert-rules';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
+import { AppLoading, InlineStatus } from '../../../shared/ui/loading';
+import { LoadError } from '../../../shared/ui/load-error';
 
 /** A status as a person reads it, and the tone of its dot. */
 export function statusWord(status: string | undefined): { word: string; tone: 'ok' | 'warn' | 'crit' | 'muted' } {
@@ -99,7 +103,7 @@ export function errorRate(s: ServiceHealth): { text: string; bad: boolean } {
  */
 @Component({
   selector: 'app-platform-health',
-  imports: [StatTile, ServerTimePipe, AlertRules],
+  imports: [StatTile, ServerTimePipe, AlertRules, SortHeader, AppLoading, InlineStatus, LoadError],
   styles: `
     .dot { display: inline-block; width: 0.5rem; height: 0.5rem; border-radius: 999px; margin-right: 0.4rem; vertical-align: middle; }
     .dot-ok { background: var(--series-ok); }
@@ -114,35 +118,46 @@ export function errorRate(s: ServiceHealth): { text: string; bad: boolean } {
     <section class="flex flex-col gap-4" aria-labelledby="health-title" data-test="platform-health">
       <div class="grid grid-cols-2 md:grid-cols-4 stat-strip stat-row is-md is-start" role="list" data-test="health-tiles">
         <app-stat-tile label="Services up" [value]="upCount() + ' of ' + services().length" icon="activity"
-                       [tone]="upCount() === services().length ? 'ok' : 'crit'" [foot]="asOfFoot()" />
+                       [tone]="upCount() === services().length ? 'ok' : 'crit'" [foot]="asOfFoot()"
+                       [loading]="tilesLoading()" [failed]="tilesFailed()" />
         <app-stat-tile label="Unplanned restarts" [value]="'' + unplannedTotal()" icon="refresh"
-                       [tone]="unplannedTotal() ? 'warn' : 'ok'" foot="in 24 hours; deploys are not counted" />
+                       [tone]="unplannedTotal() ? 'warn' : 'ok'" foot="in 24 hours; deploys are not counted"
+                       [loading]="tilesLoading()" [failed]="tilesFailed()" />
         <app-stat-tile label="Errors" [value]="erroring().length ? erroring().length + ' services' : 'None'" icon="alert"
-                       [tone]="erroring().length ? 'crit' : 'ok'" foot="answering 5xx in the last minutes" />
+                       [tone]="erroring().length ? 'crit' : 'ok'" foot="answering 5xx in the last minutes"
+                       [loading]="tilesLoading()" [failed]="tilesFailed()" />
         <app-stat-tile label="Background checks" [value]="checksFailing() ? checksFailing() + ' failing' : 'All OK'" icon="shield"
-                       [tone]="checksFailing() ? 'crit' : 'ok'" foot="Kafka lag and billing reconciliation" />
+                       [tone]="checksFailing() ? 'crit' : 'ok'" foot="Kafka lag and billing reconciliation"
+                       [loading]="tilesLoading()" [failed]="tilesFailed()" />
       </div>
 
       <div class="flex flex-wrap items-center gap-2">
         <h2 class="text-lg font-semibold m-0" id="health-title">Services</h2>
         <span class="text-sm text-[color:var(--text-secondary)]">{{ summary() }}</span>
       </div>
-      @if (error()) { <p class="text-sm text-crit-500 m-0" role="alert">{{ error() }}</p> }
+      <!-- Owner 2026-10-27: skeleton rows until the first sample answers; a failed first read says why with Try again; a
+           failed minute's re-read keeps the rows and says so in a line above them. -->
+      @if (error() && health()) { <app-inline-status [error]="error()" (retry)="load()" /> }
 
       <div class="card rel-table-wrap">
+        @if (!health() && error()) {
+          <app-load-error [message]="error()" (retry)="load()" />
+        } @else if (!health()) {
+          <app-loading shape="rows" [count]="5" label="Loading the services…" />
+        } @else {
         <table class="table-modern" data-test="health-table">
           <thead>
             <tr>
-              <th>Service</th>
-              <th>Status</th>
-              <th>Version</th>
-              <th>Started</th>
-              <th class="text-right" title="Restarts in 24 hours. A planned deploy's restart (scripts/deploy.sh) raises no alert and is counted apart.">Restarts (24 h)</th>
-              <th class="text-right" title="Answers 5xx, as a share of the requests a minute, from the latest sample">Error rate</th>
+              <th appSort="service" [sortBy]="sort">Service</th>
+              <th appSort="status" [sortBy]="sort">Status</th>
+              <th appSort="version" [sortBy]="sort">Version</th>
+              <th appSort="started" [sortBy]="sort">Started</th>
+              <th class="text-right" appSort="restarts" [sortBy]="sort" title="Restarts in 24 hours. A planned deploy's restart (scripts/deploy.sh) raises no alert and is counted apart.">Restarts (24 h)</th>
+              <th class="text-right" appSort="errorRate" [sortBy]="sort" title="Answers 5xx, as a share of the requests a minute, from the latest sample">Error rate</th>
             </tr>
           </thead>
           <tbody>
-            @for (s of services(); track s.service) {
+            @for (s of sortedServices(); track s.service) {
               <tr [attr.data-service]="s.service" [attr.data-status]="s.status">
                 <td class="font-medium">{{ s.service }}</td>
                 <td class="whitespace-nowrap"><span class="dot" [class]="'dot dot-' + status(s).tone"></span>{{ status(s).word }}
@@ -163,10 +178,11 @@ export function errorRate(s: ServiceHealth): { text: string; bad: boolean } {
                 <td class="text-right tabular whitespace-nowrap" [class.text-crit-500]="rate(s).bad" data-test="error-rate">{{ rate(s).text }}</td>
               </tr>
             } @empty {
-              <tr><td colspan="6" class="text-center text-[color:var(--text-muted)] py-4">{{ loading() ? 'Reading the services…' : 'No sample yet: the first comes within a minute of Core starting.' }}</td></tr>
+              <tr><td colspan="6" class="text-center text-[color:var(--text-muted)] py-4">No sample yet: the first comes within a minute of Core starting.</td></tr>
             }
           </tbody>
         </table>
+        }
       </div>
 
       <div class="card rel-table-wrap" data-test="background-checks">
@@ -174,6 +190,12 @@ export function errorRate(s: ServiceHealth): { text: string; bad: boolean } {
           <h2 class="text-sm font-semibold m-0">Background checks</h2>
           <p class="text-xs text-[color:var(--text-muted)] m-0">Read on their own schedule; a failing check raises an alert through its rule below.</p>
         </div>
+        <!-- Owner 2026-10-27: before the first answer the checks are not "Not read yet" (that is a real result): loading. -->
+        @if (!health() && error()) {
+          <p class="px-4 py-3 text-sm text-[color:var(--text-muted)] m-0">Not available right now.</p>
+        } @else if (!health()) {
+          <app-loading shape="rows" [count]="2" label="Loading the background checks…" />
+        } @else {
         <table class="table-modern">
           <thead><tr><th>Check</th><th>Result</th><th>What it found</th><th class="text-right">Read</th></tr></thead>
           <tbody>
@@ -187,6 +209,7 @@ export function errorRate(s: ServiceHealth): { text: string; bad: boolean } {
             }
           </tbody>
         </table>
+        }
       </div>
 
       <h2 class="text-lg font-semibold m-0 mt-2">Platform alerts</h2>
@@ -203,6 +226,25 @@ export class PlatformHealthView implements OnInit, OnDestroy {
   readonly error = signal('');
 
   readonly services = computed(() => this.health()?.services ?? []);
+  /** Owner 2026-10-27: placeholders until the first sample, "Not available right now" when it could not be read. */
+  readonly tilesLoading = computed(() => !this.health() && !this.error());
+  readonly tilesFailed = computed(() => !this.health() && !!this.error());
+  /**
+   * Owner 2026-10-27: every column sorts; the rows keep the server's order until a heading is picked. The choice holds
+   * through the minute's re-read, since it is applied to whatever the read brings.
+   */
+  readonly sort = createTableSort<ServiceHealth>({
+    id: 'platform-services',
+    columns: {
+      service: s => s.service,
+      status: { value: s => statusWord(s.status).word, kind: 'status', order: ['Down', 'Not answering', 'Out of service', 'Not sampled yet', 'Up'] },
+      version: s => s.version,
+      started: { value: s => s.startedAt, kind: 'date' },
+      restarts: { value: s => s.restarts24h, kind: 'number' },
+      errorRate: { value: s => s.errorPct, kind: 'number' },
+    },
+  });
+  readonly sortedServices = computed(() => this.sort.apply(this.services()));
   readonly upCount = computed(() => this.services().filter(s => s.status === 'UP').length);
   readonly unplannedTotal = computed(() => this.services().reduce((n, s) => n + unplannedRestarts(s), 0));
   readonly erroring = computed(() => this.services().filter(s => errorRate(s).bad));

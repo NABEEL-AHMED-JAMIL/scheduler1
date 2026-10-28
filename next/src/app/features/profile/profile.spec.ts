@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
 import { Dialog } from '@angular/cdk/dialog';
-import { of } from 'rxjs';
+import { NEVER, Observable, of, throwError } from 'rxjs';
 import { Profile } from './profile';
 import { ToastService } from '../../shared/ui/toast.service';
 import { StorageService } from '../objects/storage.service';
@@ -83,5 +83,45 @@ describe('Profile run durations', () => {
       const { component } = profile();
       expect(component.runDuration({ startTime: '2026-09-24T17:00:00' } as any)).toBe('2 min');
     } finally { vi.useRealTimers(); }
+  });
+});
+
+/** Owner 2026-10-27: the activity tiles are placeholders while read and "—" on a failure, never a 0 that reads as real. */
+describe('Profile activity -- loading, empty, error', () => {
+  function withActivity(answer: () => Observable<unknown>) {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [
+      { provide: HttpClient, useValue: { get: vi.fn(answer), post: vi.fn(), put: vi.fn() } },
+      { provide: Dialog, useValue: {} },
+      { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn(), info: vi.fn() } },
+      { provide: StorageService, useValue: {} },
+      { provide: AuthService, useValue: { canOpen: () => true, role: () => 'TENANT_USER' } },
+    ] });
+    const component = TestBed.runInInjectionContext(() => new Profile());
+    component.loadActivity();
+    return component;
+  }
+
+  it('is loading until the activity answers', () => {
+    const component = withActivity(() => NEVER);
+    expect(component.activityLoading()).toBe(true);
+    expect(component.activityFailed()).toBe(false);
+  });
+
+  it('is empty, not failed, when the answer holds nothing', () => {
+    const component = withActivity(() => of({ status: 'SUCCESS', data: null }));
+    expect(component.activityLoading()).toBe(false);
+    expect(component.activityFailed()).toBe(false);
+    expect(component.runs()).toEqual([]);
+  });
+
+  it('says the read failed, and Try again reads it afresh', () => {
+    let fail = true;
+    const component = withActivity(() => (fail ? throwError(() => ({ status: 500 })) : of({ status: 'SUCCESS', data: null })));
+    expect(component.activityLoading()).toBe(false);
+    expect(component.activityFailed()).toBe(true);
+    fail = false;
+    component.loadActivity();
+    expect(component.activityFailed()).toBe(false);
   });
 });

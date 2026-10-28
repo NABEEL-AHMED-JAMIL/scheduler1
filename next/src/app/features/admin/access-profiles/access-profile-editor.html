@@ -10,14 +10,13 @@
   </app-page-header>
 
   @if (loading()) {
-    <div class="card p-12 text-center text-sm text-[color:var(--text-muted)]">
-      <div class="spinner mx-auto mb-3" role="status" aria-label="Loading"></div>Loading the page catalogue…
-    </div>
+    <div class="card"><app-loading shape="panel" [count]="6" label="Loading the page catalogue…" /></div>
   } @else if (error()) {
-    <div class="card p-10 text-center" role="alert">
-      <app-icon name="alert" size="1.5rem" class="icon-crit block mx-auto mb-2" />
-      <p class="text-sm text-crit-500">{{ error() }}</p>
-      <button type="button" class="btn btn-default btn-sm mt-3" (click)="back()">Back to Page access</button>
+    <!-- Owner 2026-10-27: Try again after a read that failed; only the way back when trying again cannot help. -->
+    <div class="card" role="alert">
+      <app-load-error [message]="error()" [retryable]="retryable()" (retry)="load()">
+        <button type="button" class="btn btn-default btn-sm mt-3 ml-2" (click)="back()">Back to Page access</button>
+      </app-load-error>
     </div>
   } @else {
     <form [formGroup]="form" class="card p-4" (ngSubmit)="save()">

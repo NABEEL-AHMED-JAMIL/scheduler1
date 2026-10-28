@@ -7,9 +7,13 @@ import { LoadError } from '../../shared/ui/load-error';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { SidePanel } from '../../shared/ui/side-panel';
 import { ToastService } from '../../shared/ui/toast.service';
+import { AppLoading, InlineStatus, createLoadState, loadErrorText } from '../../shared/ui/loading';
+import { BlurLoader } from '../../shared/ui/blur-loader';
+import { createTableSort } from '../../shared/ui/sort';
+import { SortHeader } from '../../shared/ui/sort-header';
 import { CatalogApi } from './catalog.api';
 import {
-  AssetDetail, Grant, LineageGraph, SENSITIVITIES, TAGS, freshnessText, grantTone, isSensitive, kindText, lineageSides, nodeIcon, phiHint,
+  AssetDetail, CatalogColumn, Grant, LineageGraph, SENSITIVITIES, TAGS, freshnessText, grantTone, isSensitive, kindText, lineageSides, nodeIcon, phiHint,
   sensitivityTone, sourceText, tagText, tagsLevel, whereText,
 } from './catalog.model';
 
@@ -27,15 +31,16 @@ export interface CatalogPanelData {
  */
 @Component({
   selector: 'app-catalog-panel',
-  imports: [SidePanel, Icon, LoadError, ServerTimePipe],
+  imports: [SidePanel, Icon, LoadError, ServerTimePipe, AppLoading, InlineStatus, BlurLoader, SortHeader],
   styles: `tr.is-sensitive > td { background: color-mix(in oklab, var(--color-warn-500) 7%, transparent); }`,
   template: `
     <app-side-panel [heading]="asset()?.name || data.name" [subtitle]="subtitle()">
-      @if (loading()) {
-        <p class="text-sm text-[color:var(--text-muted)]" role="status">Reading the asset…</p>
-      } @else if (error()) {
+      <!-- Owner 2026-10-27: a re-read (after asking for access) keeps the asset under a blur instead of blanking it. -->
+      @if (error() && !asset()) {
         <app-load-error [message]="error()" (retry)="load()" />
       } @else if (asset(); as a) {
+        @if (error()) { <app-inline-status [error]="error()" (retry)="load()" /> }
+        <app-blur-loader [active]="loading()" label="Refreshing…">
         <div class="flex flex-col gap-5" data-catalog-panel>
           <section class="flex flex-wrap items-center gap-2 text-sm">
             <span class="pill" [class]="'pill-' + tone(a.sensitivity)" data-sensitivity>{{ a.sensitivity }}</span>
@@ -122,9 +127,14 @@ export interface CatalogPanelData {
             @if (a.profileError) { <p class="text-xs text-[color:var(--text-muted)]">Last profile: {{ a.profileError }}</p> }
             @if (a.columns.length) {
               <table class="table-modern" data-columns>
-                <thead><tr><th>Column</th><th>Type</th><th class="text-right">Empty</th><th>Holds</th></tr></thead>
+                <thead><tr>
+                  <th appSort="name" [sortBy]="columnSort">Column</th>
+                  <th appSort="type" [sortBy]="columnSort">Type</th>
+                  <th class="text-right" appSort="empty" [sortBy]="columnSort">Empty</th>
+                  <th appSort="holds" [sortBy]="columnSort">Holds</th>
+                </tr></thead>
                 <tbody>
-                  @for (c of a.columns; track c.name) {
+                  @for (c of sortedColumns(); track c.name) {
                     <tr [attr.data-column]="c.name" [class.is-sensitive]="c.tags.length > 0">
                       <td class="mono">
                         <!-- UX review B5 (CT1): a sensitive column is marked where it is listed, not only in a select. -->
@@ -161,7 +171,10 @@ export interface CatalogPanelData {
 
           <section class="flex flex-col gap-2" data-lineage>
             <h3 class="text-sm font-semibold">Lineage</h3>
-            @if (!sides().upstream.length && !sides().downstream.length) {
+            <!-- Owner 2026-10-27: "nothing seen" only once the lineage answered; a failure says so with Try again. -->
+            @if (lineageState.pending() || lineageState.error()) {
+              <app-inline-status [loading]="lineageState.loading()" [error]="lineageState.error()" label="Reading the lineage…" (retry)="loadLineage()" />
+            } @else if (!sides().upstream.length && !sides().downstream.length) {
               <p class="text-sm text-[color:var(--text-muted)]">Nothing seen feeding it or reading it yet.</p>
             } @else {
               <div class="lineage-row">
@@ -179,9 +192,10 @@ export interface CatalogPanelData {
             }
           </section>
 
-          @if (a.canEdit && grants().length) {
+          @if (a.canEdit && (grants().length || grantsState.error())) {
             <section class="flex flex-col gap-2" data-grants>
               <h3 class="text-sm font-semibold">Access requests</h3>
+              @if (grantsState.error()) { <app-inline-status [error]="grantsState.error()" (retry)="loadGrants()" /> }
               @for (g of grants(); track g.grantId) {
                 <div class="flex flex-wrap items-center gap-2 text-sm" [attr.data-grant]="g.grantId">
                   <span class="pill" [class]="'pill-' + grantTone(g.status)">{{ g.status }}</span>
@@ -196,6 +210,9 @@ export interface CatalogPanelData {
             </section>
           }
         </div>
+        </app-blur-loader>
+      } @else {
+        <app-loading shape="panel" label="Reading the asset…" [count]="6" />
       }
     </app-side-panel>
   `,
@@ -209,6 +226,9 @@ export class CatalogPanel implements OnInit {
   readonly asset = signal<AssetDetail | null>(null);
   readonly graph = signal<LineageGraph | null>(null);
   readonly grants = signal<Grant[]>([]);
+  /** Owner 2026-10-27: the lineage and the access requests are reads of their own, each with its states. */
+  readonly lineageState = createLoadState();
+  readonly grantsState = createLoadState(false);
   readonly loading = signal(true);
   readonly error = signal('');
   readonly busy = signal(false);
@@ -236,6 +256,17 @@ export class CatalogPanel implements OnInit {
     return a ? `${kindText(a.kind)} · ${sourceText(a.source)} · owner ${a.ownerName || 'nobody'}` : '';
   });
   readonly sides = computed(() => lineageSides(this.graph()));
+  /** Owner 2026-10-27: the columns sort by any heading; they keep the dataset's own order until one is picked. */
+  readonly columnSort = createTableSort<CatalogColumn>({
+    id: 'catalog-asset-columns',
+    columns: {
+      name: c => c.name,
+      type: c => c.dataType,
+      empty: { value: c => c.nullPercent, kind: 'number' },
+      holds: c => c.tags.map(tagText).join(', '),
+    },
+  });
+  readonly sortedColumns = computed(() => this.columnSort.apply(this.asset()?.columns ?? []));
   readonly usedBy = computed(() => {
     const down = this.sides().downstream;
     const count = (kind: string) => down.filter(n => n.kind === kind).length;
@@ -259,18 +290,39 @@ export class CatalogPanel implements OnInit {
       next: res => {
         this.loading.set(false);
         if (res.status !== API_SUCCESS || !res.data) {
-          this.error.set(res.message || 'The asset could not be read.');
+          this.error.set(loadErrorText(res, 'The asset could not be read.'));
           return;
         }
         this.show(res.data);
-        this.api.lineage(this.data.assetId).subscribe({ next: g => this.graph.set(g.status === API_SUCCESS ? g.data ?? null : null) });
-        if (res.data.canEdit) {
-          this.api.accessRequests().subscribe({
-            next: r => this.grants.set(r.status === API_SUCCESS ? (r.data ?? []).filter(g => g.assetId === this.data.assetId) : []),
-          });
-        }
+        this.loadLineage();
+        if (res.data.canEdit) this.loadGrants();
       },
-      error: () => { this.loading.set(false); this.error.set('The catalog could not be reached.'); },
+      error: err => { this.loading.set(false); this.error.set(loadErrorText(err, 'The asset could not be read.')); },
+    });
+  }
+
+  loadLineage(): void {
+    this.lineageState.start();
+    this.api.lineage(this.data.assetId).subscribe({
+      next: g => {
+        if (g.status !== API_SUCCESS) { this.lineageState.fail(g, 'The lineage could not be read.'); return; }
+        this.graph.set(g.data ?? null);
+        this.lineageState.done();
+      },
+      error: err => this.lineageState.fail(err, 'The lineage could not be read.'),
+    });
+  }
+
+  /** The access requests on this asset (its owner or an admin): a failure is said, not shown as "no request". */
+  loadGrants(): void {
+    this.grantsState.start();
+    this.api.accessRequests().subscribe({
+      next: r => {
+        if (r.status !== API_SUCCESS) { this.grantsState.fail(r, 'The access requests could not be read.'); return; }
+        this.grants.set((r.data ?? []).filter(g => g.assetId === this.data.assetId));
+        this.grantsState.done();
+      },
+      error: err => this.grantsState.fail(err, 'The access requests could not be read.'),
     });
   }
 

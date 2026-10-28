@@ -5,7 +5,7 @@ import { By } from '@angular/platform-browser';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Dialog } from '@angular/cdk/dialog';
 import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { ToastService } from '../../shared/ui/toast.service';
 import { DocumentsApi } from './documents.service';
@@ -455,5 +455,14 @@ describe('DocumentReview -- read-only', () => {
     const { el } = await screenWith({ api: stubApi({ ...INVOICE, status: 'Failed', fields: [], checks: null,
       error: 'The model\'s answer was not an extraction.' }) });
     expect(el.querySelector('[data-test="view-only"]')?.textContent).toContain('The extraction failed: The model\'s answer was not an extraction.');
+  });
+});
+
+describe('DocumentReview -- loading (owner 2026-10-27)', () => {
+  it('shows the shared loader, announced, while the document is on the way', async () => {
+    const { el, screen } = await screenWith({ api: stubApi(INVOICE, { review: vi.fn(() => NEVER) }) });
+    expect(screen.loading()).toBe(true);
+    expect(el.querySelector('app-loading')?.getAttribute('aria-busy')).toBe('true');
+    expect(el.querySelector('[data-test="document-missing"]')).toBeNull();
   });
 });

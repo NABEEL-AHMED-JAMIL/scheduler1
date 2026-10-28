@@ -2,8 +2,10 @@
   <button type="button" class="flex items-center gap-2 text-left w-full" (click)="toggle()" [attr.aria-expanded]="open()" data-test="index-toggle">
     <app-icon name="database" class="shrink-0 text-[color:var(--text-muted)]" />
     <span class="font-semibold">Search index</span>
-    <span class="text-xs text-[color:var(--text-muted)] flex-1 min-w-0 truncate" data-test="index-summary">
-      @if (loadError()) { {{ loadError() }} } @else { {{ summary() }} }
+    <!-- Owner 2026-10-27: "Reading…" until the first answer, and a failure in red -- the card opens to Try again. -->
+    <span data-test="index-summary"
+          [class]="loadError() ? 'text-xs flex-1 min-w-0 truncate text-crit-500' : 'text-xs flex-1 min-w-0 truncate text-[color:var(--text-muted)]'">
+      @if (loadError()) { {{ loadError() }} } @else if (state.pending()) { <app-loading shape="inline" label="Reading the search index…" /> } @else { {{ summary() }} }
     </span>
     <span class="pill pill-neutral text-[11px]">Workspace admins</span>
     <app-icon [name]="open() ? 'minus' : 'plus'" size="0.9em" class="shrink-0" />
@@ -51,11 +53,14 @@
         @if (!folders().length) {
           <p class="text-xs text-[color:var(--text-muted)]">No folders: only documents and forms are indexed.</p>
         }
+        <app-inline-status [loading]="bucketsState.loading()" [error]="bucketsState.error()"
+                           [empty]="bucketsState.loaded() && !buckets().length" label="Loading connections…"
+                           emptyText="No storage connection you can open yet, so no folder can be added." (retry)="loadBuckets()" />
         @for (f of folders(); track $index; let i = $index) {
           <div class="grid grid-cols-1 md:grid-cols-[minmax(0,16rem)_minmax(0,1fr)_auto] gap-2 items-center" data-test="index-folder">
             <select class="input" [value]="f.connection" [disabled]="!enabled() || saving()" aria-label="Connection"
                     (change)="setFolder(i, { connection: $any($event.target).value })">
-              @if (!f.connection) { <option value="" selected>Choose a connection</option> }
+              @if (!f.connection) { <option value="" selected>{{ bucketsState.loading() ? 'Loading connections…' : 'Choose a connection' }}</option> }
               @for (b of buckets(); track b.bucket) {
                 <option [value]="b.bucket" [selected]="b.bucket === f.connection">{{ bucketLabel(b) }}</option>
               }
@@ -76,8 +81,9 @@
         <button type="button" class="btn btn-primary btn-sm" data-test="index-save" [disabled]="!canSave()" (click)="save()">
           <app-icon [name]="saving() ? 'refresh' : 'save'" [class.spin]="saving()" />Save</button>
         <button type="button" class="btn btn-default btn-sm" [disabled]="!dirty() || saving()" (click)="reset()">Undo changes</button>
-        <button type="button" class="btn btn-default btn-sm ml-auto" [disabled]="saving()" (click)="load()"><app-icon name="refresh" />Refresh</button>
+        <button type="button" class="btn btn-default btn-sm ml-auto" [disabled]="saving() || state.loading()" (click)="load()"><app-icon name="refresh" [class.spin]="state.loading()" />Refresh</button>
       </div>
+      @if (loadError()) { <app-inline-status [error]="loadError() ?? ''" (retry)="load()" /> }
 
       <dl class="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs border-t border-subtle pt-3" data-test="index-counts">
         <div><dt class="text-[color:var(--text-muted)]">Documents</dt><dd class="tabular-nums font-medium">{{ s.indexed.document }}</dd></div>
@@ -92,8 +98,10 @@
       @for (f of s.failures; track f.source) {
         <p class="text-xs text-[color:var(--text-secondary)] break-words"><app-icon name="alert" size="0.85em" class="icon-crit" /> {{ f.title || f.source }}: {{ f.error }}</p>
       }
-    } @else if (!loadError()) {
-      <p class="text-xs text-[color:var(--text-muted)] flex items-center gap-1.5"><app-icon name="refresh" class="spin" size="0.9em" />Reading the search index…</p>
+    } @else if (loadError()) {
+      <app-load-error [message]="loadError() ?? ''" (retry)="load()" />
+    } @else {
+      <app-loading shape="panel" label="Reading the search index…" [count]="3" />
     }
   }
 </section>

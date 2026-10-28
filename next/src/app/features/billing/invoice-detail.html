@@ -1,11 +1,7 @@
 @if (loading() && !invoice()) {
-  <div class="lookup-entries-empty lookup-detail-empty"><app-icon name="refresh" class="spin icon-muted" /> Loading {{ number() }}…</div>
+  <app-loading shape="panel" [label]="'Loading ' + number() + '…'" [count]="8" />
 } @else if (error() || !invoice()) {
-  <div class="lookup-entries-empty lookup-detail-empty">
-    <app-icon name="alert" size="1.5rem" class="icon-crit" />
-    <p class="text-crit-500">{{ error() }}</p>
-    <button type="button" class="btn btn-default btn-sm mt-2" (click)="load()">Try again</button>
-  </div>
+  <app-load-error [message]="error() || 'No such invoice.'" (retry)="load()" />
 } @else {
   @if (invoice(); as i) {
     <header class="lookup-detail-head">
@@ -131,9 +127,9 @@
         <!-- UX final BL2: every line, whole -- the page scrolls, not a box that cut "Webhook deliveries" in half. -->
         <div class="bill-lines" data-test="invoice-lines">
           <table class="table-modern lookup-entry-table">
-            <thead><tr><th>Description</th><th class="text-right">Qty</th><th class="text-right hidden md:table-cell">Rate</th><th class="text-right">Amount</th></tr></thead>
+            <thead><tr><th appSort="description" [sortBy]="lineSort">Description</th><th class="text-right" appSort="quantity" [sortBy]="lineSort">Qty</th><th class="text-right hidden md:table-cell" appSort="rate" [sortBy]="lineSort">Rate</th><th class="text-right" appSort="amount" [sortBy]="lineSort">Amount</th></tr></thead>
             <tbody>
-              @for (l of i.lines; track l.invoiceLineId) {
+              @for (l of sortedLines(); track l.invoiceLineId) {
                 <tr>
                   <td>{{ l.description }}@if (l.periodLabel) { <span class="pill pill-neutral ml-1">{{ l.periodLabel }}</span> }@if (l.manual) { <span class="pill pill-neutral ml-1">Manual</span> }
                     @if (l.meter) { <div class="text-[11px] mono text-[color:var(--text-muted)]">{{ l.meter }}</div> }
@@ -208,9 +204,9 @@
                chip the receipt -- and "By" folds away when the pane is narrow (a container query, not the window's width). -->
           <div class="bill-pay-wrap">
           <table class="table-modern lookup-entry-table bill-payments" data-test="invoice-payments">
-            <thead><tr><th class="w-[6.5rem]">Received</th><th>Payment</th><th class="bill-col-by w-[10rem]">Sent by</th><th class="text-right w-[5.5rem]">Amount</th><th class="w-[11.5rem]">State</th></tr></thead>
+            <thead><tr><th class="w-[6.5rem]" appSort="received" [sortBy]="paymentSort">Received</th><th appSort="payment" [sortBy]="paymentSort">Payment</th><th class="bill-col-by w-[10rem]" appSort="by" [sortBy]="paymentSort">Sent by</th><th class="text-right w-[5.5rem]" appSort="amount" [sortBy]="paymentSort">Amount</th><th class="w-[11.5rem]" appSort="state" [sortBy]="paymentSort">State</th></tr></thead>
             <tbody>
-              @for (p of i.payments; track p.paymentId) {
+              @for (p of sortedPayments(); track p.paymentId) {
                 <tr [attr.data-payment-state]="stateChip(p).kind">
                   <td class="tabular text-xs whitespace-nowrap" [title]="'Filed ' + (p.dateCreated | serverTime: 'recent')">{{ paymentDay(p) }}</td>
                   <td class="min-w-0">

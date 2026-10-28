@@ -24,6 +24,10 @@ import { PageHeader } from '../../../shared/ui/page-header';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
 import { readableRunError } from './run-error';
 import { formatDuration } from '../../../shared/ui/time-format';
+import { AppLoading, createLoadState, loadErrorText } from '../../../shared/ui/loading';
+import { LoadError } from '../../../shared/ui/load-error';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
 
 /**
  * Model connections: where prompts run. The same rail-and-pane the Kafka page has, because
@@ -33,7 +37,7 @@ import { formatDuration } from '../../../shared/ui/time-format';
 @Component({
   selector: 'app-connections',
   imports: [RefreshButton, PageHeader, Icon, StatTile, StatusPill, MineFilter, CdkMenu, CdkMenuItem, CdkMenuTrigger, RouterLink, BlurLoader, ServerTimePipe, DecimalPipe, ManagedBanner,
-    BarChart],
+    BarChart, AppLoading, LoadError, SortHeader],
   styles: [ONE_PANE_BELOW_1024],
   templateUrl: './connections.html',
 })
@@ -48,8 +52,10 @@ export class Connections implements OnInit {
   private readonly router = inject(Router);
 
   readonly connections = signal<ModelConnection[]>([]);
-  readonly loading = signal(true);
-  readonly error = signal('');
+  /** The list's read (owner 2026-10-27): the tiles and the panes wait for the first answer instead of showing 0. */
+  readonly state = createLoadState();
+  readonly loading = this.state.loading;
+  readonly error = this.state.error;
   readonly testing = signal<number | null>(null);
   readonly search = signal('');
   readonly providerFilter = signal('');
@@ -58,6 +64,8 @@ export class Connections implements OnInit {
   readonly providers = AI_PROVIDERS;
   readonly canSeeWorkspace = computed(() => this.auth.isPlatformAdmin());
   private readonly tenants = signal<{ tenantId: number; tenantName: string }[]>([]);
+  /** The workspaces a platform administrator's new connection picks from: New waits for them (see create()). */
+  readonly tenantsState = createLoadState(false);
 
   readonly selectedId = signal<number | null>(null);
   /**
@@ -105,6 +113,23 @@ export class Connections implements OnInit {
       { label: 'Failed', value: d.failed, color: statusColor('Failed') },
     ],
   })));
+  /**
+   * Owner 2026-10-27: the recent runs sort by any column; they arrive newest first and are the latest few the service
+   * keeps for the pane, so the headings say a sort covers only those.
+   */
+  readonly recentSort = createTableSort<ConnectionActivity['recent'][number]>({
+    id: 'ai-connection-recent-runs',
+    note: 'Sorts the latest runs shown',
+    columns: {
+      when: { value: r => r.at, kind: 'date' },
+      prompt: r => r.promptName || (r.promptId ? 'Prompt ' + r.promptId : this.kindLabel(r.kind)),
+      model: r => r.model,
+      status: { value: r => (r.status === 'ok' ? 'Completed' : 'Failed'), kind: 'status' },
+      time: { value: r => r.latencyMs, kind: 'number' },
+      tokens: { value: r => (r.tokensIn ?? 0) + (r.tokensOut ?? 0), kind: 'number' },
+    },
+  });
+  readonly sortedRecent = computed(() => this.recentSort.apply(this.activity()?.recent ?? []));
   readonly activityRuns = computed(() => (this.activity()?.days ?? []).reduce((n, d) => n + d.ok + d.failed, 0));
 
   constructor() {
@@ -137,12 +162,12 @@ export class Connections implements OnInit {
         this.activityLoading.set(false);
         // Each list defaults to empty: an older ai-service (or a partial answer) must not break the panel.
         if (r.status === API_SUCCESS && r.data) this.activity.set({ ...r.data, days: r.data.days ?? [], recent: r.data.recent ?? [], prompts: r.data.prompts ?? [] });
-        else this.activityError.set(r.message || 'Could not read what this connection has been doing.');
+        else this.activityError.set(loadErrorText(r, 'Could not read what this connection has been doing.'));
       },
-      error: () => {
+      error: err => {
         if (this.selectedId() !== id) return;
         this.activityLoading.set(false);
-        this.activityError.set('Could not read what this connection has been doing.');
+        this.activityError.set(loadErrorText(err, 'Could not read what this connection has been doing.'));
       },
     });
   }
@@ -161,24 +186,32 @@ export class Connections implements OnInit {
 
   ngOnInit(): void {
     this.load();
-    if (this.canSeeWorkspace()) {
-      this.http.get<ApiResponse<any[]>>(`${API_BASE}/tenant.json/listTenants`).subscribe({
-        next: r => { if (r.status === API_SUCCESS) this.tenants.set(r.data ?? []); },
-        error: () => {},
-      });
-    }
+    if (this.canSeeWorkspace()) this.loadTenants();
+  }
+
+  /** The workspaces for a new connection; `then` runs once they are in (New clicked before they arrived). */
+  private loadTenants(then?: () => void): void {
+    this.tenantsState.start();
+    this.http.get<ApiResponse<any[]>>(`${API_BASE}/tenant.json/listTenants`).subscribe({
+      next: r => {
+        if (r.status !== API_SUCCESS) { this.tenantsState.fail(r, 'The workspaces could not be read.'); if (then) this.toast.error(this.tenantsState.error()); return; }
+        this.tenants.set(r.data ?? []);
+        this.tenantsState.done();
+        then?.();
+      },
+      error: err => { this.tenantsState.fail(err, 'The workspaces could not be read.'); if (then) this.toast.error(this.tenantsState.error()); },
+    });
   }
 
   load(): void {
-    this.loading.set(true);
-    this.error.set('');
+    this.state.start();
     this.http.get<ApiResponse<ModelConnection[]>>(`${API_BASE}/aiConnection.json/list`).subscribe({
       next: r => {
-        this.loading.set(false);
-        if (r.status !== API_SUCCESS) { this.error.set(r.message); return; }
+        if (r.status !== API_SUCCESS) { this.state.fail(r, 'The connections could not be read.'); return; }
         this.connections.set(r.data ?? []);
+        this.state.done();
       },
-      error: err => { this.loading.set(false); this.error.set(err?.error?.message || 'Could not load the connections.'); },
+      error: err => this.state.fail(err, 'The connections could not be read.'),
     });
   }
 
@@ -204,9 +237,15 @@ export class Connections implements OnInit {
   }
   clearFilters(): void { this.search.set(''); this.providerFilter.set(''); this.statusFilter.set(''); this.onlyMine.set(false); }
 
+  /**
+   * Owner 2026-10-27: a platform administrator's dialog needs the workspaces -- opened before they arrived (or after the
+   * read failed) it got none, hid its Workspace field and saved without one. It now waits for them, or says why not.
+   */
   create(): void {
-    this.dialog.open<boolean>(ConnectionDialog, { data: { tenants: this.canSeeWorkspace() ? this.tenants() : undefined } })
+    const open = () => this.dialog.open<boolean>(ConnectionDialog, { data: { tenants: this.canSeeWorkspace() ? this.tenants() : undefined } })
       .closed.subscribe(saved => { if (saved) this.load(); });
+    if (this.canSeeWorkspace() && !this.tenantsState.loaded()) { this.loadTenants(open); return; }
+    open();
   }
   edit(c: ModelConnection): void {
     this.dialog.open<boolean>(ConnectionDialog, { data: { connection: c } }).closed.subscribe(saved => { if (saved) this.load(); });

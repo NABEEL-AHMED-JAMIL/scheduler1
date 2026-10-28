@@ -239,14 +239,14 @@
               <table class="table-modern">
                 <thead>
                   <tr>
-                    <th>
+                    <th appSort="value" [sortBy]="barSort">
                       {{ measured.exactValues ? 'Value' : 'From' }}
                     </th>
-                    <th class="text-right">Rows</th>
+                    <th class="text-right" appSort="rows" [sortBy]="barSort">Rows</th>
                   </tr>
                 </thead>
                 <tbody>
-                  @for (bar of bars(); track $index) {
+                  @for (bar of sortedBars(); track $index) {
                     <tr>
                       <td class="mono" [title]="bar.title">
                         <app-data-text class="max-w-64" [value]="bar.label"

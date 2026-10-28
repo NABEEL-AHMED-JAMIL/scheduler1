@@ -34,15 +34,15 @@
          rather than a zero that reads like a real count. -->
     <app-blur-loader [active]="loading()" label="Loading…">
       <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 stat-strip stat-row is-md is-start" role="list" data-test="home-kpis">
-        <app-stat-tile label="Schedules" [value]="errors().status ? '—' : totalJobs()" icon="calendar" tone="info"
+        <app-stat-tile label="Schedules" [loading]="firstLoad()" [value]="errors().status ? '—' : totalJobs()" icon="calendar" tone="info"
                        link="/pipelines/schedules" hint="Every schedule in this workspace" />
-        <app-stat-tile label="Active schedules" [value]="errors().status ? '—' : activeJobs()" icon="zap" tone="ok"
+        <app-stat-tile label="Active schedules" [loading]="firstLoad()" [value]="errors().status ? '—' : activeJobs()" icon="zap" tone="ok"
                        link="/pipelines/schedules" hint="Schedules that are turned on" />
-        <app-stat-tile label="Running now" [value]="errors().running ? '—' : runningNow()" icon="play" tone="info"
+        <app-stat-tile label="Running now" [loading]="firstLoad()" [value]="errors().running ? '—' : runningNow()" icon="play" tone="info"
                        link="/runs/latest" hint="Runs in flight now" />
-        <app-stat-tile label="Last run completed" [value]="errors().running ? '—' : completed()" icon="checkCircle" tone="ok"
+        <app-stat-tile label="Last run completed" [loading]="firstLoad()" [value]="errors().running ? '—' : completed()" icon="checkCircle" tone="ok"
                        link="/pipelines/schedules" hint="Schedules whose latest run completed" />
-        <app-stat-tile label="Last run failed" [value]="errors().running ? '—' : failed()" icon="xCircle" tone="crit"
+        <app-stat-tile label="Last run failed" [loading]="firstLoad()" [value]="errors().running ? '—' : failed()" icon="xCircle" tone="crit"
                        link="/pipelines/schedules" hint="Schedules whose latest run failed" />
       </div>
     </app-blur-loader>
@@ -62,7 +62,11 @@
             } @else {
               <!-- Status colours, so Inactive is amber like its pill rather than the next palette slot,
                    a pink that read as Failed. -->
-              <app-donut [data]="statusCategories()" totalLabel="schedules" [colorFor]="outcomeColor" />
+              @if (firstLoad()) {
+                <app-loading shape="spinner" label="Loading schedule status…" />
+              } @else {
+                <app-donut [data]="statusCategories()" totalLabel="schedules" [colorFor]="outcomeColor" />
+              }
             }
           </div>
 
@@ -74,7 +78,11 @@
             @if (errors().running; as reason) {
               <app-load-error [message]="reason" (retry)="retry('running')" />
             } @else {
-              <app-donut [data]="jobRunning()" totalLabel="schedules" [colorFor]="outcomeColor" />
+              @if (firstLoad()) {
+                <app-loading shape="spinner" label="Loading last outcomes…" />
+              } @else {
+                <app-donut [data]="jobRunning()" totalLabel="schedules" [colorFor]="outcomeColor" />
+              }
             }
           </div>
 
@@ -83,7 +91,12 @@
             @if (errors().hourly; as reason) {
               <app-load-error [message]="reason" (retry)="retry('hourly')" />
             } @else {
-              <app-bar-chart [data]="dayBars()" [height]="104" emptyMessage="No runs in this range." />
+              <!-- Owner 2026-10-27: "No runs in this range." only once the runs have answered. -->
+              @if (firstLoad()) {
+                <app-loading shape="spinner" label="Loading runs by day…" />
+              } @else {
+                <app-bar-chart [data]="dayBars()" [height]="104" emptyMessage="No runs in this range." />
+              }
             }
           </div>
         </div>
@@ -103,7 +116,11 @@
           @if (errors().hourly; as reason) {
             <app-load-error [message]="reason" (retry)="retry('hourly')" />
           } @else {
-            <app-heatmap [data]="heatCells()" [selected]="selectedHeat()" [interactive]="!ownSignIn()" (cellClicked)="onHeatCell($event)" />
+            @if (firstLoad()) {
+              <app-loading shape="panel" label="Loading runs by hour…" [count]="5" />
+            } @else {
+              <app-heatmap [data]="heatCells()" [selected]="selectedHeat()" [interactive]="!ownSignIn()" (cellClicked)="onHeatCell($event)" />
+            }
           }
         </div>
       </div>
@@ -151,17 +168,17 @@
             <table class="table-modern">
               <thead>
                 <tr>
-                  <th>Schedule</th>
+                  <th appSort="schedule" [sortBy]="breakdownSort">Schedule</th>
                   <!-- Whose job it is, for the one role whose hour mixes workspaces. -->
                   @if (seesWorkspaces()) {
-                    <th>Workspace</th>
+                    <th appSort="workspace" [sortBy]="breakdownSort">Workspace</th>
                   }
                   @for (column of visibleColumns(); track column) {
-                    <th class="text-right">{{ column }}</th>
+                    <th class="text-right" [appSort]="column" [sortBy]="breakdownSort">{{ column }}</th>
                   }
                   <!-- Total is pinned so the key figure stays on screen however far the row
                        runs; below md the Breakdown bar is dropped so Total is the last column. -->
-                  <th class="text-right col-pin-right">Total</th>
+                  <th class="text-right col-pin-right" appSort="total" [sortBy]="breakdownSort">Total</th>
                   <th class="w-28 hidden md:table-cell">Breakdown</th>
                 </tr>
               </thead>

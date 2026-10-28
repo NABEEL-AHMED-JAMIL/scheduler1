@@ -3,7 +3,8 @@ import { TestBed } from '@angular/core/testing';
 import { Component, ViewChild, signal } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { Dialog } from '@angular/cdk/dialog';
-import { NEVER, of } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { InvoicePane } from './invoice-detail';
 import { PaymentPanel } from './payment-panel';
 import { BillingApi } from './billing.service';
@@ -31,11 +32,12 @@ const DETAIL = {
 @Component({ imports: [InvoicePane], template: `<app-invoice-pane [number]="number" (changed)="changes = changes + 1" />` })
 class Host { number = 'INV-2026-08-0006'; changes = 0; @ViewChild(InvoicePane) pane!: InvoicePane; }
 
-function page(platformAdmin: boolean, detail: object = DETAIL, clients = { listOf: vi.fn(() => of({ status: API_SUCCESS, data: [] })) }) {
+function page(platformAdmin: boolean, detail: object = DETAIL, clients = { listOf: vi.fn(() => of({ status: API_SUCCESS, data: [] })) }, answer?: () => unknown) {
+  try { localStorage.clear(); } catch { /* none */ }
   // jsdom has no object URLs; the QR code and the documents are blobs shown through one.
   vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: () => 'blob:qr', revokeObjectURL: () => {} }));
   const opened: { component: any; config: any }[] = [];
-  const api = { invoice: vi.fn(() => of({ status: API_SUCCESS, data: detail })), submitPayment: vi.fn(() => of({ status: API_SUCCESS, message: 'recorded' })), verifyPayment: vi.fn(() => of({ status: API_SUCCESS, message: 'verified' })), documentBlob: vi.fn(() => of(new Blob(['%PDF']))), qrBlob: vi.fn(() => of(new Blob(['png']))),
+  const api = { invoice: vi.fn(answer ?? (() => of({ status: API_SUCCESS, data: detail }))), submitPayment: vi.fn(() => of({ status: API_SUCCESS, message: 'recorded' })), verifyPayment: vi.fn(() => of({ status: API_SUCCESS, message: 'verified' })), documentBlob: vi.fn(() => of(new Blob(['%PDF']))), qrBlob: vi.fn(() => of(new Blob(['png']))),
     payLink: vi.fn(() => of({ status: API_SUCCESS, data: { invoiceId: 7, number: 'INV-2026-08-0006', url: 'https://checkout.stripe.com/c/pay/cs_test_1', sessionId: 'cs_test_1', amount: 202.75, currency: 'USD', provider: 'stripe', testMode: true } })) };
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({ imports: [Host], providers: [provideRouter([]),
@@ -220,7 +222,8 @@ describe('InvoicePane, switching and adding', () => {
     fixture.detectChanges();
     expect(pane.loading()).toBe(true);
     expect(pane.invoice()).toBeNull();
-    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Loading INV-2026-09-0007');
+    // Owner 2026-10-27: the pane's skeleton (its words appear after a moment, so a fast answer does not flicker).
+    expect((fixture.nativeElement as HTMLElement).querySelector('app-loading')).not.toBeNull();
   });
 
   it('confirms a manual line the way it confirms every other change', () => {
@@ -328,5 +331,41 @@ describe('InvoicePane header and lines (UX final BL2)', () => {
     expect(lines.querySelector('.lookup-entries-scroll')).toBeNull();
     expect(lines.querySelectorAll('tbody tr').length).toBe(15);
     expect(lines.textContent).toContain('Webhook deliveries');
+  });
+});
+
+describe('InvoicePane -- sorting (owner 2026-10-27)', () => {
+  it('keeps the bill\'s own line order until a heading is picked, then sorts by amount both ways', () => {
+    const { component } = page(false);
+    expect(component.sortedLines().map(l => l.invoiceLineId)).toEqual([1, 2]);
+    component.lineSort.toggle('amount');
+    expect(component.sortedLines().map(l => l.invoiceLineId)).toEqual([1, 2]);
+    component.lineSort.toggle('amount');
+    expect(component.sortedLines().map(l => l.invoiceLineId)).toEqual([2, 1]);
+  });
+
+  it('sorts the payments by amount', () => {
+    const { component } = page(false);
+    component.paymentSort.toggle('amount');
+    expect(component.sortedPayments().map(p => p.paymentId)).toEqual([1, 2]);
+    component.paymentSort.toggle('amount');
+    expect(component.sortedPayments().map(p => p.paymentId)).toEqual([2, 1]);
+  });
+});
+
+describe('InvoicePane -- loading, error (owner 2026-10-27)', () => {
+  it('is loading until the invoice answers', () => {
+    const { component, fixture } = page(false, DETAIL, undefined, () => NEVER);
+    expect(component.loading()).toBe(true);
+    expect(component.error()).toBe('');
+    expect((fixture.nativeElement as HTMLElement).querySelector('app-loading')).not.toBeNull();
+  });
+
+  it('says the invoice could not be read, in plain words, with Try again', () => {
+    const { component, fixture } = page(false, DETAIL, undefined, () => throwError(() => new HttpErrorResponse({ status: 500, error: 'Internal Server Error' })));
+    fixture.detectChanges();
+    expect(component.loading()).toBe(false);
+    expect(component.error()).toBe('The invoice could not be read.');
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Try again');
   });
 });

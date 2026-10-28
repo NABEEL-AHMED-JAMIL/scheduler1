@@ -8,6 +8,7 @@ import { AnalyticsService, Dashboard, PinnedChart } from '../analytics.service';
 import { kindInfo } from '../widget-kinds';
 import { ChartAnswer, pinRequest } from './chart-answer';
 import type { ChartSettings } from './chart-settings';
+import { AppLoading, InlineStatus, loadErrorText } from '../../../shared/ui/loading';
 
 export interface PinChartData {
   answer: ChartAnswer;
@@ -25,7 +26,7 @@ export interface PinChartData {
  */
 @Component({
   selector: 'app-pin-chart-panel',
-  imports: [SidePanel, Icon, RouterLink],
+  imports: [SidePanel, Icon, RouterLink, AppLoading, InlineStatus],
   template: `
     <app-side-panel heading="Pin to dashboard" [subtitle]="data.title + ' · ' + kindLabel">
       <div class="flex flex-col gap-4 min-w-0" data-test="pin-panel">
@@ -47,8 +48,12 @@ export interface PinChartData {
           <div class="flex flex-col gap-2 text-sm min-w-0" role="radiogroup" aria-labelledby="pin-where-label">
             <p class="font-medium" id="pin-where-label">Dashboard</p>
             @if (loading()) {
-              <p class="text-xs text-[color:var(--text-muted)] flex items-center gap-1.5"><app-icon name="refresh" class="spin" size="0.9em" />Reading your dashboards…</p>
+              <app-loading shape="inline" label="Loading your dashboards…" />
             } @else {
+              <!-- Owner 2026-10-27: a failed read said nothing and offered only a new dashboard, as if there were none. -->
+              @if (boardsError()) {
+                <app-inline-status [error]="boardsError()" (retry)="loadBoards()" />
+              }
               @if (boards().length) {
                 <label class="flex items-center gap-2"><input type="radio" name="pin-where" [checked]="mode() === 'existing'" (change)="mode.set('existing')" />An existing dashboard</label>
                 <select class="input" data-test="pin-board" [disabled]="mode() !== 'existing'" (change)="boardId.set(+$any($event.target).value)">
@@ -90,6 +95,7 @@ export class PinChartPanel implements OnInit {
   readonly title = signal(this.data.title);
   readonly boards = signal<Dashboard[]>([]);
   readonly loading = signal(true);
+  readonly boardsError = signal('');
   readonly mode = signal<'existing' | 'new'>('new');
   readonly boardId = signal<number | null>(null);
   readonly newName = signal('');
@@ -100,10 +106,15 @@ export class PinChartPanel implements OnInit {
   readonly canPin = computed(() => !this.busy() && !!this.title().trim()
     && (this.mode() === 'existing' ? this.boardId() !== null : !!this.newName().trim()));
 
-  ngOnInit(): void {
+  ngOnInit(): void { this.loadBoards(); }
+
+  loadBoards(): void {
+    this.loading.set(true);
+    this.boardsError.set('');
     this.analytics.fetchAllDashboards().subscribe({
       next: res => {
         this.loading.set(false);
+        if (res.status !== API_SUCCESS) this.boardsError.set(loadErrorText(res, 'Your dashboards could not be read; you can still pin to a new one.'));
         const boards = res.status === API_SUCCESS && res.data ? res.data.filter(b => b.analyticsDashboardId != null) : [];
         this.boards.set(boards);
         if (boards.length) {
@@ -111,7 +122,7 @@ export class PinChartPanel implements OnInit {
           this.boardId.set(boards[0].analyticsDashboardId!);
         }
       },
-      error: () => this.loading.set(false),
+      error: err => { this.loading.set(false); this.boardsError.set(loadErrorText(err, 'Your dashboards could not be read; you can still pin to a new one.')); },
     });
   }
 

@@ -277,20 +277,20 @@
             @if (canOpenJobs()) {
               <a routerLink="/pipelines/schedules" class="group block rounded-card">
                 <app-stat-tile label="Schedules" [value]="jobsAssigned()" icon="briefcase" tone="info"
-                               [foot]="activeJobs() + ' active'"
+                               [foot]="activeJobs() + ' active'" [loading]="activityLoading()" [failed]="activityFailed()"
                                class="h-full transition-colors group-hover:border-[color:var(--accent-mark)]" />
               </a>
             } @else {
               <app-stat-tile label="Schedules" [value]="jobsAssigned()" icon="briefcase" tone="info"
-                             [foot]="activeJobs() + ' active'" class="h-full" />
+                             [foot]="activeJobs() + ' active'" [loading]="activityLoading()" [failed]="activityFailed()" class="h-full" />
             }
             <app-stat-tile label="Runs" [value]="recentRuns()" icon="play" tone="info"
-                           [foot]="'in ' + windowDays() + ' days'" />
+                           [foot]="'in ' + windowDays() + ' days'" [loading]="activityLoading()" [failed]="activityFailed()" />
             <!-- The only tile that ever needs acting on, so it is the only one that changes
                  colour -- a red zero would cry wolf every time somebody opened their profile. -->
             <app-stat-tile label="Failed" [value]="recentFailures()" icon="xCircle"
                            [tone]="recentFailures() > 0 ? 'crit' : 'muted'"
-                           [foot]="'in ' + windowDays() + ' days'"
+                           [foot]="'in ' + windowDays() + ' days'" [loading]="activityLoading()" [failed]="activityFailed()"
                            [class.border-crit-500]="recentFailures() > 0" />
             <a routerLink="/notifications" class="group block rounded-card">
               <app-stat-tile label="Unread" [value]="unread()" icon="bell" tone="info" foot="notifications"
@@ -303,7 +303,7 @@
           </h4>
 
           @if (activityLoading()) {
-            <p class="text-sm text-[color:var(--text-muted)]">Loading&hellip;</p>
+            <app-loading shape="list" label="Loading your recent runs…" [count]="3" />
           } @else if (runs().length) {
             <ul class="divide-y divide-[color:var(--border-subtle)]">
               @for (run of runs(); track run.jobQueueId) {
@@ -346,9 +346,8 @@
             <!-- Said before the empty state below it: a failed call and an empty answer both
                  leave this card with nothing to list, and "no jobs are assigned to you" is a
                  claim about the account rather than about the request. -->
-            <p class="text-sm text-[color:var(--text-muted)]">
-              Your activity could not be read just now. The rest of this page is unaffected.
-            </p>
+            <app-inline-status error="Your activity could not be read just now. The rest of this page is unaffected."
+                               (retry)="loadActivity()" />
           } @else if (jobsAssigned()) {
             <p class="text-sm text-[color:var(--text-muted)]">
               None of your {{ jobsAssigned() }} schedules has run yet.

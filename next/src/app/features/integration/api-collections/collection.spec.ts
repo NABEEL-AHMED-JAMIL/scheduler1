@@ -3,7 +3,8 @@ import { provideZonelessChangeDetection, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Dialog } from '@angular/cdk/dialog';
 import { provideRouter } from '@angular/router';
-import { of } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { AuthService } from '../../../core/auth/auth.service';
 import { WorkspaceDirectory } from '../../../core/workspaces/workspace-directory';
 import { ToastService } from '../../../shared/ui/toast.service';
@@ -37,6 +38,7 @@ const DETAIL = {
 };
 
 function setup(opts: { admin?: boolean; api?: Partial<Record<string, unknown>>; confirm?: boolean; platform?: { remembered: number | null } } = {}) {
+  try { localStorage.clear(); } catch { /* none */ }
   const api = {
     get: vi.fn(() => of({ status: 'SUCCESS', message: '', data: structuredClone(DETAIL) })),
     version: vi.fn(),
@@ -59,7 +61,8 @@ function setup(opts: { admin?: boolean; api?: Partial<Record<string, unknown>>; 
       { provide: AuthService, useValue: { isTenantAdmin: () => opts.admin ?? true, canBuild: () => opts.admin ?? true, builderLocked: () => false,
         isPlatformAdmin: () => !!opts.platform, isManagedSession: () => false, user: signal({ appUserId: 4537 }) } },
       ...(opts.platform ? [{ provide: WorkspaceDirectory, useValue: { picks: () => true, remembered: () => opts.platform!.remembered,
-        workspaces: () => [], recent: () => [], names: () => new Map(), load: () => of([]), choose: vi.fn(), nameOf: (id: number) => `Workspace ${id}` } }] : []),
+        workspaces: () => [], recent: () => [], names: () => new Map(), load: () => of([]), choose: vi.fn(), nameOf: (id: number) => `Workspace ${id}`,
+        loaded: () => true, error: () => '' } }] : []),
     ],
   });
   const fixture = TestBed.createComponent(Collection);
@@ -221,5 +224,71 @@ describe('Collection -- a platform administrator', () => {
     expect(data.every(d => d.tenantId === 2960)).toBe(true);
     screen.pickWorkspace(2945);
     expect(api.get).toHaveBeenLastCalledWith(1000, 2945);
+  });
+});
+
+describe('Collection -- sorting (owner 2026-10-27)', () => {
+  it('keeps the saved order of the APIs, then sorts them by name both ways', () => {
+    const { screen } = setup();
+    expect(screen.sortedRequests().map(r => r.name)).toEqual(['Get status', 'Metadata probe', 'Post echo']);
+    screen.requestSort.toggle('name');
+    screen.requestSort.toggle('name');
+    expect(screen.sortedRequests().map(r => r.name)).toEqual(['Post echo', 'Metadata probe', 'Get status']);
+    screen.requestSort.toggle('timeout');
+    expect(screen.sortedRequests().map(r => r.timeoutMs)).toEqual([30000, 30000, 15000]);
+  });
+
+  it('sorts the versions oldest first when asked, newest first as they came', () => {
+    const { screen } = setup();
+    expect(screen.sortedVersions().map(v => v.version)).toEqual([3, 2]);
+    screen.versionSort.toggle('version');
+    expect(screen.sortedVersions().map(v => v.version)).toEqual([3, 2]);
+    screen.versionSort.toggle('version');
+    expect(screen.sortedVersions().map(v => v.version)).toEqual([2, 3]);
+  });
+
+  it('sorts who uses the APIs by name, the unpinned ("Latest") after the pinned ones', () => {
+    const usage = [
+      { userType: 'PIPELINE', userRef: '9', userName: 'Zeta', requestName: 'Get status', pinnedVersion: null },
+      { userType: 'SOURCE', userRef: '4', userName: 'Alpha', requestName: 'Get status', pinnedVersion: 2 },
+    ];
+    const { screen } = setup({ api: { usage: vi.fn(() => of({ status: 'SUCCESS', message: '', data: usage })) } });
+    screen.usageSort.toggle('name');
+    expect(screen.sortedUsage().map(u => u.userName)).toEqual(['Alpha', 'Zeta']);
+    screen.usageSort.toggle('pinned');
+    expect(screen.sortedUsage().map(u => u.userName)).toEqual(['Alpha', 'Zeta']);
+  });
+});
+
+describe('Collection -- loading, empty, error (owner 2026-10-27)', () => {
+  it('"Used by" is loading, not "no one uses it", until its own read answers', () => {
+    const { screen, el } = setup({ api: { usage: vi.fn(() => NEVER) } });
+    expect(screen.usageState.loading()).toBe(true);
+    expect(screen.usageState.pending()).toBe(true);
+    expect(el.querySelector('[data-test="usage"]')!.textContent).not.toContain('No pipeline, source or AI tool uses these APIs yet.');
+  });
+
+  it('"Used by" is empty once an empty answer comes', () => {
+    const { screen } = setup();
+    expect(screen.usageState.pending()).toBe(false);
+    expect(screen.sortedUsage()).toEqual([]);
+  });
+
+  it('"Used by" says it could not be read instead of claiming no one uses the APIs', () => {
+    const { screen } = setup({ api: { usage: vi.fn(() => throwError(() => new HttpErrorResponse({ status: 500 }))) } });
+    expect(screen.usageState.loading()).toBe(false);
+    expect(screen.usageState.error()).toBe('Who uses these APIs could not be read.');
+  });
+
+  it('the figures are placeholders while the collection is on its way', () => {
+    const { screen } = setup({ api: { get: vi.fn(() => NEVER) } });
+    expect(screen.detail()).toBeNull();
+    expect(screen.loading()).toBe(true);
+  });
+
+  it('a failed read of the collection says so in plain words', () => {
+    const { screen } = setup({ api: { get: vi.fn(() => throwError(() => new HttpErrorResponse({ status: 500 }))) } });
+    expect(screen.loading()).toBe(false);
+    expect(screen.error()).toBe('The collection could not be read.');
   });
 });

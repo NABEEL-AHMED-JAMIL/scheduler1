@@ -7,6 +7,7 @@ import { API_SUCCESS } from '../../../core/api/api.config';
 import { Icon } from '../../../shared/ui/icon';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { ToastService } from '../../../shared/ui/toast.service';
+import { AppLoading, InlineStatus, loadErrorText } from '../../../shared/ui/loading';
 import { AssistantApi } from './assistant.api';
 import { Conversation } from './assistant.model';
 import { ConversationApi } from './conversation.api';
@@ -37,7 +38,7 @@ export const RAIL_ITEMS = 12;
  */
 @Component({
   selector: 'app-conversation-list',
-  imports: [Icon, RouterLink, NgTemplateOutlet, CdkMenu, CdkMenuItem, CdkMenuTrigger, ServerTimePipe],
+  imports: [Icon, RouterLink, NgTemplateOutlet, CdkMenu, CdkMenuItem, CdkMenuTrigger, ServerTimePipe, AppLoading, InlineStatus],
   templateUrl: './conversation-list.html',
   encapsulation: ViewEncapsulation.None,
   host: { class: 'cl-host', '[class.cl-rail]': 'rail()' },
@@ -125,6 +126,10 @@ export class ConversationList {
   readonly loading = signal(true);
   readonly loadingMore = signal(false);
   readonly error = signal('');
+  /** Owner 2026-10-27: whether the list has answered once, so the count does not read "0 conversations" before it. */
+  readonly loaded = signal(false);
+  /** Why the next page could not be read: Load more used to just stop. */
+  readonly moreError = signal('');
   readonly query = signal('');
   readonly chip = signal<Chip>('all');
   readonly rail = signal(readRail(browserStorage()));
@@ -190,13 +195,14 @@ export class ConversationList {
     this.request = this.api.list({ q: this.query(), kind: chip === 'all' ? [] : [chip], limit: Math.max(PAGE, this.rows().length) }).subscribe({
       next: r => {
         this.loading.set(false);
-        if (r.status !== API_SUCCESS || !r.data) { this.error.set(r.message || 'The conversations could not be read.'); return; }
+        if (r.status !== API_SUCCESS || !r.data) { this.error.set(loadErrorText(r, 'The conversations could not be read.')); return; }
         this.rows.set(r.data.rows ?? []);
         this.total.set(r.data.total ?? 0);
+        this.loaded.set(true);
       },
       error: err => {
         this.loading.set(false);
-        this.error.set(err?.error?.message || 'The conversations could not be read.');
+        this.error.set(loadErrorText(err, 'The conversations could not be read.'));
       },
     });
   }
@@ -204,16 +210,17 @@ export class ConversationList {
   loadMore(): void {
     if (this.loadingMore() || !this.more()) return;
     this.loadingMore.set(true);
+    this.moreError.set('');
     const chip = this.chip();
     this.api.list({ q: this.query(), kind: chip === 'all' ? [] : [chip], offset: this.rows().length, limit: PAGE }).subscribe({
       next: r => {
         this.loadingMore.set(false);
-        if (r.status !== API_SUCCESS || !r.data) return;
+        if (r.status !== API_SUCCESS || !r.data) { this.moreError.set(loadErrorText(r, 'The next conversations could not be read.')); return; }
         const have = new Set(this.rows().map(x => x.conversationId));
         this.rows.update(list => [...list, ...(r.data!.rows ?? []).filter(x => !have.has(x.conversationId))]);
         this.total.set(r.data.total ?? this.total());
       },
-      error: () => this.loadingMore.set(false),
+      error: err => { this.loadingMore.set(false); this.moreError.set(loadErrorText(err, 'The next conversations could not be read.')); },
     });
   }
 

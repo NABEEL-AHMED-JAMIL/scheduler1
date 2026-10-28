@@ -9,6 +9,12 @@ import { Problem } from '../report-studio.model';
 import { RsTimePipe } from '../rs-time.pipe';
 import { typeWord } from './designer-model';
 import { elapsedDuration } from '../../../shared/ui/time-format';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
+import { loadErrorText } from '../../../shared/ui/loading';
+
+/** One suggested mapping of a proposal (Suggest mappings). */
+type Mapping = NonNullable<Proposal['mappings']>[number];
 
 /** One action the AI assistant offers, in the designer's words. */
 interface AiAction { kind: ProposalKind; label: string; hint: string; needsWords: boolean; needsData: boolean; placeholder: string; }
@@ -39,7 +45,7 @@ const ACTIONS: AiAction[] = [
  */
 @Component({
   selector: 'app-rs-ai-panel',
-  imports: [FormsModule, Icon, RsTimePipe],
+  imports: [FormsModule, Icon, RsTimePipe, SortHeader],
   templateUrl: './ai-panel.html',
   styleUrl: './ai-panel.css',
 })
@@ -81,6 +87,19 @@ export class AiPanel {
   readonly proposal = signal<Proposal | null>(null);
   readonly previewing = signal(false);
   readonly history = signal<Proposal[]>([]);
+  /** Owner 2026-10-27: the model check and the earlier proposals say when they could not be read, with Try again. */
+  readonly statusError = signal('');
+  readonly historyError = signal('');
+  /** Owner 2026-10-27: the suggested mappings sort by field, source or how sure; the AI's order until one is picked. */
+  readonly mappingSort = createTableSort<Mapping>({
+    id: 'report-ai-mappings',
+    columns: {
+      field: m => m.field,
+      source: m => m.source,
+      sure: { value: m => m.confidence, kind: 'number' },
+    },
+  });
+  readonly sortedMappings = computed(() => this.mappingSort.apply(this.proposal()?.mappings ?? []));
   readonly elapsed = signal(0);
   /** The counter while the model drafts: "45 sec", "2 min 05 sec". */
   elapsedText(): string { return elapsedDuration(this.elapsed()); }
@@ -115,15 +134,36 @@ export class AiPanel {
 
   constructor() {
     inject(DestroyRef).onDestroy(() => { this.stopTimer(); this.call?.unsubscribe(); });
-    this.api.status().subscribe({ next: s => this.status.set(s), error: e => this.status.set({ available: false, reason: studioError(e).message }) });
+    this.loadStatus();
     effect(() => {
       const id = this.templateId();
-      untracked(() => this.api.proposals(id, 8).subscribe({ next: list => this.history.set(list), error: () => this.history.set([]) }));
+      untracked(() => this.loadHistory(id));
     });
     // A draft saved since the proposal: its preview is no longer the draft's, so it goes.
     effect(() => { if (this.stale() && this.previewing()) untracked(() => this.togglePreview(false)); });
     // An edit on the page put the draft back: the button says so too.
     effect(() => { if (!this.shown() && untracked(() => this.previewing())) this.previewing.set(false); });
+  }
+
+  /** Whether a model can answer here: read once, and again on Try again. */
+  loadStatus(): void {
+    this.statusError.set('');
+    this.status.set(null);
+    this.api.status().subscribe({
+      next: s => this.status.set(s),
+      error: e => {
+        this.statusError.set(loadErrorText(e, 'Whether a model can answer could not be checked.'));
+        this.status.set({ available: false, reason: studioError(e).message });
+      },
+    });
+  }
+
+  loadHistory(id = this.templateId()): void {
+    this.historyError.set('');
+    this.api.proposals(id, 8).subscribe({
+      next: list => { if (id === this.templateId()) this.history.set(list); },
+      error: e => { if (id === this.templateId()) this.historyError.set(loadErrorText(e, 'The earlier proposals could not be read.')); },
+    });
   }
 
   choose(kind: ProposalKind): void {

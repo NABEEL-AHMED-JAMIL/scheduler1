@@ -149,23 +149,23 @@
       <thead>
         <tr>
           <th class="w-8"></th>
-          <th>Pipeline</th>
+          <th appSort="pipeline" [sortBy]="sort">Pipeline</th>
           <!-- Whose task it is, beside its name, for the one role whose list mixes workspaces. It waits
                for xl like Type; the cards and the Workspace filter carry it on a narrower screen. -->
           @if (seesWorkspaces()) {
-            <th class="hidden xl:table-cell">Workspace</th>
+            <th class="hidden xl:table-cell" appSort="workspace" [sortBy]="sort">Workspace</th>
           }
           <!-- UX review 2026-10-12 (B2, P1): what a user needs -- its steps, schedules, last run and the data's
                sensitivity. The topic, registry task and storage are infrastructure: under the row's Advanced. -->
-          <th class="num">Steps</th>
-          <th class="num">Schedules</th>
-          <th>Last run</th>
-          <th class="hidden xl:table-cell">Data</th>
+          <th class="num" appSort="steps" [sortBy]="sort">Steps</th>
+          <th class="num" appSort="schedules" [sortBy]="sort">Schedules</th>
+          <th appSort="lastRun" [sortBy]="sort">Last run</th>
+          <th class="hidden xl:table-cell" appSort="data" [sortBy]="sort">Data</th>
           <!-- Metadata, not identity: hidden until there is width for it, so Status and the
                row menu stay on screen instead of behind a horizontal scrollbar. -->
-          <th class="hidden 2xl:table-cell">Created by</th>
-          <th class="hidden 2xl:table-cell">Updated by</th>
-          <th class="text-right">Status</th>
+          <th class="hidden 2xl:table-cell" appSort="createdBy" [sortBy]="sort">Created by</th>
+          <th class="hidden 2xl:table-cell" appSort="updatedBy" [sortBy]="sort">Updated by</th>
+          <th class="text-right" appSort="status" [sortBy]="sort">Status</th>
           <!-- Pinned, so a long topic or bucket name can never push the menu off-screen again. -->
           <th class="w-16 col-pin-right th-actions">Actions</th>
         </tr>
@@ -263,12 +263,14 @@
                   <div class="flex items-center gap-2 mb-1.5">
                     <app-icon name="briefcase" size="0.9em" class="icon-muted" />
                     <span class="text-xs font-semibold">Schedules that run this pipeline</span>
-                    @if (linkedLoading() === task.taskDetailId) {
-                      <app-icon name="refresh" size="0.85em" class="spin icon-muted" />
-                    }
                   </div>
 
-                  @if (linkedJobs()[task.taskDetailId]; as jobs) {
+                  <!-- Owner 2026-10-27: loading says so (for a screen reader too), and a failed read is not "none". -->
+                  @if (linkedLoading() === task.taskDetailId) {
+                    <app-loading shape="inline" label="Loading schedules…" />
+                  } @else if (linkedErrors()[task.taskDetailId]; as why) {
+                    <app-inline-status [error]="why" (retry)="loadLinkedJobs(task)" />
+                  } @else if (linkedJobs()[task.taskDetailId]; as jobs) {
                     @if (jobs.length) {
                       <!-- A raised surface inside the drawer, not a transparent one: the
                            table's sticky header is painted --surface-raised, so leaving the
@@ -279,15 +281,15 @@
                           <table class="table-modern">
                             <thead>
                               <tr>
-                                <th>Schedule</th>
-                                <th>Execution</th>
-                                <th>Last run</th>
-                                <th>Run status</th>
-                                <th class="text-right">State</th>
+                                <th appSort="schedule" [sortBy]="linkedSort">Schedule</th>
+                                <th appSort="execution" [sortBy]="linkedSort">Execution</th>
+                                <th appSort="lastRun" [sortBy]="linkedSort">Last run</th>
+                                <th appSort="runStatus" [sortBy]="linkedSort">Run status</th>
+                                <th class="text-right" appSort="state" [sortBy]="linkedSort">State</th>
                               </tr>
                             </thead>
                             <tbody>
-                              @for (job of jobs; track job.jobId) {
+                              @for (job of sortedLinked(jobs); track job.jobId) {
                                 <tr>
                                   <td class="max-w-64">
                                     <a class="link-inline truncate" [routerLink]="['/pipelines/schedules', job.jobId, 'edit']"
@@ -309,9 +311,8 @@
                         </div>
                       </div>
                     } @else {
-                      <p class="text-xs text-[color:var(--text-muted)]">
-                        Could not read the schedules for this pipeline.
-                      </p>
+                      <!-- The row said it had schedules, but the answer names none (they went since the list was read). -->
+                      <p class="text-xs text-[color:var(--text-muted)]">No schedule runs this pipeline now. Refresh the list to update its count.</p>
                     }
                   }
                 }

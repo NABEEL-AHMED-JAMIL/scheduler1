@@ -21,12 +21,19 @@ export const PINNED: Record<string, unknown> = {
       "Connect Files in storage",
       "Connect REST API",
       "Connected (1)",
+      "Connection",
+      "Connector",
       "Databases (2)",
       "Files (1)",
+      "Lag",
+      "Last sync",
+      "Mode",
       "New connection",
       "Refresh",
+      "Rows",
       "SaaS apps (1)",
-      "Shop DB (demo)"
+      "Shop DB (demo)",
+      "Status"
     ],
     "columns": [
       [
@@ -63,11 +70,21 @@ export const PINNED: Record<string, unknown> = {
         "Add tables",
         "Close",
         "Delete",
+        "Lag",
+        "Last sync",
         "Make a source",
+        "Mode",
+        "Rows",
+        "Schedule",
+        "Started",
+        "Status",
         "Stop syncing public.customers",
+        "Stream",
         "Sync now",
         "Sync public.customers now",
-        "Test"
+        "Test",
+        "Took",
+        "Why"
       ],
       "columns": [
         [
@@ -111,11 +128,18 @@ export const PINNED: Record<string, unknown> = {
       "All (5)",
       "Columns",
       "Connected (1)",
+      "Connection",
+      "Connector",
       "Databases (2)",
       "Files (1)",
+      "Lag",
+      "Last sync",
+      "Mode",
       "Refresh",
+      "Rows",
       "SaaS apps (1)",
-      "Shop DB (demo)"
+      "Shop DB (demo)",
+      "Status"
     ],
     "columns": [
       [
@@ -162,12 +186,19 @@ export const PINNED: Record<string, unknown> = {
       "Connect Files in storage",
       "Connect REST API",
       "Connected (1)",
+      "Connection",
+      "Connector",
       "Databases (2)",
       "Files (1)",
+      "Lag",
+      "Last sync",
+      "Mode",
       "New connection",
       "Refresh",
+      "Rows",
       "SaaS apps (1)",
-      "Shop DB (demo)"
+      "Shop DB (demo)",
+      "Status"
     ],
     "columns": [
       [

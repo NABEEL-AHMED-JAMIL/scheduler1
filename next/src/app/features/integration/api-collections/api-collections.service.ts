@@ -38,9 +38,17 @@ function scoped(params: Params, tenantId?: number | null): Params {
 export class ApiCollectionsApi {
   private readonly http = inject(HttpClient);
 
-  list(search: string, page: number, limit: number, tenantId?: number | null): Observable<PagedResponse<CollectionRow[]>> {
+  /**
+   * Owner 2026-10-27: `narrow.status` (Active, Inactive) filters on the server, so the count and the pages are that
+   * state's; `narrow.sort`/`dir` is the server's order (name, source, sensitivity, apis, folders, version, updated, state).
+   * Each is sent only when set: without them, the list as before.
+   */
+  list(search: string, page: number, limit: number, tenantId?: number | null,
+       narrow: { status?: string | null; sort?: string; dir?: string } | null = null): Observable<PagedResponse<CollectionRow[]>> {
     const params: Params = { page, limit };
     if (search.trim()) params['search'] = search.trim();
+    if (narrow?.status) params['status'] = narrow.status;
+    if (narrow?.sort) { params['sort'] = narrow.sort; params['dir'] = narrow.dir ?? 'asc'; }
     return this.http.get<PagedResponse<CollectionRow[]>>(`${BASE}/list`, { params: scoped(params, tenantId) });
   }
 

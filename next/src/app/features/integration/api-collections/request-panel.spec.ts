@@ -2,7 +2,8 @@ import { describe, it, expect, vi } from 'vitest';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
-import { of } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { ApiCollectionsApi } from './api-collections.service';
 import { RequestPanel, RequestPanelData } from './request-panel';
@@ -231,5 +232,28 @@ describe('RequestPanel -- paging modes', () => {
     screen.patch({ pagingAllowedHosts: 'api2.example.org' });
     fixture.detectChanges();
     expect(el.querySelector('[data-test="paging-problem"]')).toBeNull();
+  });
+});
+
+describe('RequestPanel -- loading and error (owner 2026-10-27)', () => {
+  it('is loading until the API answers', () => {
+    panelWith({}, { getRequest: vi.fn(() => NEVER) });
+    const panel = TestBed.runInInjectionContext(() => new RequestPanel());
+    expect(panel.loading()).toBe(true);
+    expect(panel.edit()).toBeFalsy();
+  });
+
+  it('says the API could not be read in plain words, and Try again reads it again', () => {
+    let calls = 0;
+    const getRequest = vi.fn(() => (calls++ === 0
+      ? throwError(() => new HttpErrorResponse({ status: 500 }))
+      : of({ status: 'SUCCESS', message: '', data: DETAIL })));
+    panelWith({}, { getRequest });
+    const panel = TestBed.runInInjectionContext(() => new RequestPanel());
+    expect(panel.loading()).toBe(false);
+    expect(panel.loadError()).toBe('The API could not be read.');
+    panel.readRequest();
+    expect(panel.loadError()).toBe('');
+    expect(panel.edit()?.urlTemplate).toBe('https://example.com/');
   });
 });

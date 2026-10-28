@@ -15,6 +15,9 @@ import { GrantDialog, GrantDialogData, GrantWorkspace } from './grant-dialog';
 import { ManagedGrant, ManagedServiceApi, StaffCandidate, personName, staffOf } from './managed-service.api';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
+import { InlineStatus, createLoadState, loadErrorText } from '../../../shared/ui/loading';
 
 interface TenantRow { tenantId: number; tenantName: string; status?: string; managementMode?: ManagementMode | null }
 
@@ -25,7 +28,7 @@ interface TenantRow { tenantId: number; tenantName: string; status?: string; man
  */
 @Component({
   selector: 'app-managed-service',
-  imports: [WorkspaceSelect, RefreshButton, PageHeader, TableShell, Icon, ServerTimePipe, RouterLink],
+  imports: [WorkspaceSelect, RefreshButton, PageHeader, TableShell, Icon, ServerTimePipe, RouterLink, SortHeader, InlineStatus],
   templateUrl: './managed-service.html',
 })
 export class ManagedService implements OnInit {
@@ -47,35 +50,79 @@ export class ManagedService implements OnInit {
   readonly hasFilters = computed(() => !!this.tenantFilter() || !!this.staffFilter() || this.includeRevoked());
   readonly liveCount = computed(() => this.grants().filter(g => this.isLive(g)).length);
   readonly name = personName;
+  /**
+   * Owner 2026-10-27: the staff and workspace lists feed the filter and the Grant dialog; their state is said (the filter
+   * reads "Loading staff…", a failure shows with Try again, and Grant waits for both) instead of empty lists that look
+   * like "no staff member to grant".
+   */
+  readonly staffState = createLoadState();
+  readonly tenantsState = createLoadState();
+  readonly listsLoading = computed(() => this.staffState.loading() || this.tenantsState.loading());
+  private seq = 0;
+
+  /** Owner 2026-10-27: every column sorts; the grants keep the server's order until a heading is picked. */
+  readonly sort = createTableSort<ManagedGrant>({
+    id: 'managed-grants',
+    columns: {
+      staff: g => personName(g),
+      workspace: g => this.workspaceName(g),
+      granted: { value: g => g.grantedAt, kind: 'date' },
+      revoked: { value: g => g.revokedAt, kind: 'date' },
+      state: { value: g => (this.isLive(g) ? 'Live' : 'Revoked'), kind: 'status', order: ['Live', 'Revoked'] },
+    },
+  });
+  readonly sorted = computed(() => this.sort.apply(this.grants()));
 
   ngOnInit(): void {
     this.load();
+    this.loadTenants();
+    this.loadStaff();
+  }
+
+  loadTenants(): void {
+    this.tenantsState.start();
     this.http.get<ApiResponse<TenantRow[]>>(`${API_BASE}/tenant.json/listTenants`).subscribe({
-      next: r => this.tenants.set((r.status === API_SUCCESS ? r.data ?? [] : [])
-        .filter(t => t.status !== 'Delete')
-        .map(t => ({ tenantId: t.tenantId, tenantName: t.tenantName, managementMode: t.managementMode ?? null }))
-        .sort((a, b) => a.tenantName.localeCompare(b.tenantName))),
-      error: () => this.tenants.set([]),
+      next: r => {
+        if (r.status !== API_SUCCESS) { this.tenantsState.fail(r, 'The workspaces could not be read.'); return; }
+        this.tenants.set((r.data ?? [])
+          .filter(t => t.status !== 'Delete')
+          .map(t => ({ tenantId: t.tenantId, tenantName: t.tenantName, managementMode: t.managementMode ?? null }))
+          .sort((a, b) => a.tenantName.localeCompare(b.tenantName)));
+        this.tenantsState.done();
+      },
+      error: err => this.tenantsState.fail(err, 'The workspaces could not be read.'),
     });
+  }
+
+  loadStaff(): void {
+    this.staffState.start();
     this.api.users().subscribe({
-      next: r => this.staff.set(r.status === API_SUCCESS ? staffOf(r.data ?? []) : []),
-      error: () => this.staff.set([]),
+      next: r => {
+        if (r.status !== API_SUCCESS) { this.staffState.fail(r, 'The staff could not be read.'); return; }
+        this.staff.set(staffOf(r.data ?? []));
+        this.staffState.done();
+      },
+      error: err => this.staffState.fail(err, 'The staff could not be read.'),
     });
   }
 
   load(): void {
+    const seq = ++this.seq;
     this.loading.set(true);
     this.error.set('');
     this.api.listGrants({ tenantId: this.tenantFilter(), appUserId: this.staffFilter(), includeRevoked: this.includeRevoked() })
       .subscribe({
         next: r => {
+          // A filter changed meanwhile: the newer read answers for it.
+          if (seq !== this.seq) return;
           this.loading.set(false);
           if (r.status === API_SUCCESS) this.grants.set(r.data ?? []);
-          else this.error.set(r.message || 'The grants could not be read.');
+          else this.error.set(loadErrorText(r, 'The grants could not be read.'));
         },
         error: err => {
+          if (seq !== this.seq) return;
           this.loading.set(false);
-          this.error.set(err?.error?.message || 'The grants could not be read.');
+          this.error.set(loadErrorText(err, 'The grants could not be read.'));
         },
       });
   }
@@ -101,7 +148,7 @@ export class ManagedService implements OnInit {
 
   openGrant(): void {
     const data: GrantDialogData = { staff: this.staff(), tenants: this.tenants(), tenantId: this.tenantFilter(),
-      appUserId: this.staffFilter() };
+      appUserId: this.staffFilter(), staffError: this.staffState.error(), tenantsError: this.tenantsState.error() };
     this.dialog.open<boolean>(GrantDialog, { data, hasBackdrop: true }).closed.subscribe(granted => {
       if (granted) this.load();
     });

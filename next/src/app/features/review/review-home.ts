@@ -18,6 +18,8 @@ import { BulkReviewApi } from '../../shared/ui/bulk/bulk-review.api';
 import { BULK_CAP, BulkAction, BulkAnswer, BulkSelection } from '../../shared/ui/bulk/bulk.model';
 import { TaskCountService } from '../workflows/task-count.service';
 import { NeedsWorkspace } from '../../shared/ui/needs-workspace';
+import { createTableSort } from '../../shared/ui/sort';
+import { SortHeader } from '../../shared/ui/sort-header';
 import { REVIEW_PAGE, ReviewItem, ReviewKind, ReviewLoad, ReviewViewer, ageOf, dueIn, loadReview } from './review-sources';
 import { KIND_ICON, KIND_LABEL, linkOf, sendMixed } from './review-home.model';
 import { ReviewItemPanel, ReviewItemPanelData, ReviewItemPanelResult } from './review-item-panel';
@@ -38,7 +40,7 @@ type WaitsFilter = '' | 'me' | 'teams' | 'open';
  */
 @Component({
   selector: 'app-review-home',
-  imports: [PageHeader, RefreshButton, EmptyState, Icon, RouterLink, ServerTimePipe, BulkBar, NeedsWorkspace],
+  imports: [PageHeader, RefreshButton, SortHeader, EmptyState, Icon, RouterLink, ServerTimePipe, BulkBar, NeedsWorkspace],
   styles: `
     .review-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; padding: 0.75rem 1rem;
       border-bottom: 1px solid var(--border-subtle); }
@@ -112,16 +114,16 @@ type WaitsFilter = '' | 'me' | 'teams' | 'open';
                            [checked]="pageState() === 'all'" [indeterminate]="pageState() === 'some'" [disabled]="!pagePicks().length"
                            (change)="bulk.setPage(pagePicks(), $any($event.target).checked)" />
                   </th>
-                  <th>Type</th>
-                  <th>What</th>
-                  <th>From</th>
-                  <th class="whitespace-nowrap">Waiting since</th>
-                  <th class="whitespace-nowrap">Waits on</th>
-                  <th class="whitespace-nowrap text-right">Due / age</th>
+                  <th appSort="type" [sortBy]="sort">Type</th>
+                  <th appSort="what" [sortBy]="sort">What</th>
+                  <th appSort="from" [sortBy]="sort">From</th>
+                  <th class="whitespace-nowrap" appSort="since" [sortBy]="sort">Waiting since</th>
+                  <th class="whitespace-nowrap" appSort="waitsOn" [sortBy]="sort">Waits on</th>
+                  <th class="whitespace-nowrap text-right" appSort="due" [sortBy]="sort">Due / age</th>
                 </tr>
               </thead>
               <tbody>
-                @for (item of shown(); track item.uid) {
+                @for (item of sorted(); track item.uid) {
                   <tr class="review-row" [class.row-selected]="bulk.has(item)" tabindex="0" [attr.data-item]="item.kind + ':' + item.id"
                       (click)="open(item)" (keydown.enter)="open(item)">
                     <td (click)="$event.stopPropagation()">
@@ -210,6 +212,25 @@ export class ReviewHome implements OnInit {
         : !i.waitsOn.startsWith('Claimed by')))
       && (!q || [this.nameOf(i), i.title, i.from, i.waitsOn, this.subOf(i)].join(' ').toLowerCase().includes(q)));
   });
+
+  /**
+   * Owner 2026-10-27: every column sorts, over what this page holds (the first REVIEW_PAGE of each source; the tabs list
+   * the rest). Until one is picked the rows keep their own order: overdue first, then soonest due, then longest waiting.
+   * Due / age sorts by the due time, soonest (overdue) first; an item with no due date goes last.
+   */
+  readonly sort = createTableSort<ReviewItem>({
+    id: 'review-all-waiting',
+    columns: {
+      type: i => this.label[i.kind],
+      what: i => this.nameOf(i),
+      from: i => i.from,
+      since: { value: i => i.since, kind: 'date' },
+      waitsOn: i => i.waitsOn,
+      due: { value: i => i.due, kind: 'date', first: 'asc' },
+    },
+    note: `Sorts what is listed here: the first ${REVIEW_PAGE} of each list`,
+  });
+  readonly sorted = computed(() => this.sort.apply(this.shown()));
 
   readonly bulk = new BulkSelection<ReviewItem>({
     idOf: i => i.uid,

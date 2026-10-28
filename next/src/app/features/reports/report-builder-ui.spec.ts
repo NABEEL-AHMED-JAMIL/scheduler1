@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { Component, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { provideRouter } from '@angular/router';
 import { Dialog, DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { NEVER, Observable, of } from 'rxjs';
 import { ToastService } from '../../shared/ui/toast.service';
@@ -165,6 +166,8 @@ describe('ReportDestinationDialog, sending', () => {
     const close = vi.fn();
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({ providers: [
+      // The empty connection list links to Connections (owner 2026-10-27), so the dialog needs a router.
+      provideRouter([]),
       { provide: DIALOG_DATA, useValue: { kind: 'bucket', send } },
       { provide: DialogRef, useValue: { close } },
       { provide: StorageService, useValue: { buckets: () => of({ status: 'SUCCESS', data: [

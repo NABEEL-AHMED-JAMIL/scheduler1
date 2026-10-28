@@ -32,6 +32,9 @@ import { ManagedBanner } from '../../../shared/ui/managed-banner';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { StatusPill } from '../../../shared/ui/status-pill';
 import { ActionsBar } from '../../../shared/ui/actions-bar';
+import { AppLoading, InlineStatus, createLoadState, loadErrorText } from '../../../shared/ui/loading';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
 
 /**
  * The page's tabs (MIG-249; UX review 2026-10-12, B2): Details is the pipeline's own form; Steps, Settings, History,
@@ -59,7 +62,7 @@ export function yesNoAsCheckbox(field: PipelineField): PipelineField {
 @Component({
   selector: 'app-task-edit',
   imports: [ActionsBar, PageHeader, StatusPill, Icon, ReactiveFormsModule, RouterLink, Field, Combobox, LoadError, StepBuilder, ManagedBanner,
-    CdkMenu, CdkMenuItem, CdkMenuTrigger, Section, EmptyState, ServerTimePipe],
+    CdkMenu, CdkMenuItem, CdkMenuTrigger, Section, EmptyState, ServerTimePipe, AppLoading, InlineStatus, SortHeader],
   templateUrl: './task-edit.html',
   // UX review 2026-10-12 (B2/B3): this screen's own rules, in its lazy chunk rather than the console's first download.
   styles: `
@@ -135,6 +138,8 @@ export class TaskEdit implements OnInit {
    */
   readonly pipelineDef = signal<Pipeline | null>(null);
   readonly formLoading = signal(false);
+  /** Owner 2026-10-27: the form's read failed -- not the same as "this pipeline has no form". */
+  readonly formError = signal('');
 
   /** The fields in the order their author put them in; `position` is not guaranteed sorted. */
   readonly formFields = computed(() =>
@@ -193,6 +198,14 @@ export class TaskEdit implements OnInit {
   readonly profiles = signal<{ kafkaConnectionProfileId: number; profileName: string; environmentLabel?: string; isDefault?: boolean; tenantId?: number | null; tenantName?: string; status?: string }[]>([]);
   /** Whether fetchAllProfiles has answered: an empty answer is still an answer. */
   private profilesLoaded = false;
+  /**
+   * Owner 2026-10-27: the choice lists' reads, each with loading and a reason under its field instead of a toast (or
+   * nothing) and "No matches": the connections, the picked connection's topics, the task groups and the home pages.
+   */
+  readonly profilesState = createLoadState();
+  readonly topicsError = signal('');
+  readonly groupsState = createLoadState(false);
+  readonly homePagesState = createLoadState(false);
   readonly selectedProfileId = signal<number | null>(null);
   readonly topicsLoading = signal(false);
   /** The connection whose topics last arrived (null until one has): an empty list is only "none" once it is an answer. */
@@ -207,6 +220,7 @@ export class TaskEdit implements OnInit {
   });
   readonly topicHint = computed(() => this.topicsLoading()
     ? 'Loading this connection’s topics…'
+    : this.topicsError() ? 'The topics could not be read.'
     : this.noTopicsHere()
       ? 'No topic publishes through this connection yet. Add one under Configuration › Kafka & Topics, then pick it here.'
       : 'Where this pipeline publishes. The registry tasks on it come next.');
@@ -239,8 +253,12 @@ export class TaskEdit implements OnInit {
   }
 
   private topicsTicket = 0;
+  /** Try again under the Topic field. */
+  retryTopics(): void { this.loadTopicsFor(this.selectedProfileId()); }
+
   private loadTopicsFor(profileId: number | null): void {
     const ticket = ++this.topicsTicket;
+    this.topicsError.set('');
     if (profileId == null) { this.taskTypes.set([]); this.topicsLoading.set(false); return; }
     this.topicsLoading.set(true);
     this.http.get<ApiResponse<any[]>>(`${API_BASE}/setting.json/topics`,
@@ -249,9 +267,13 @@ export class TaskEdit implements OnInit {
         if (ticket !== this.topicsTicket) return;
         this.topicsLoading.set(false);
         if (response.status === API_SUCCESS) { this.taskTypes.set(response.data ?? []); this.topicsAnsweredFor.set(profileId); }
-        else this.toast.error(response.message || 'Could not load the topics.');
+        else this.topicsError.set(loadErrorText(response, 'The topics could not be read.'));
       },
-      error: () => { if (ticket === this.topicsTicket) { this.topicsLoading.set(false); this.toast.error('Could not load the topics.'); } },
+      error: err => {
+        if (ticket !== this.topicsTicket) return;
+        this.topicsLoading.set(false);
+        this.topicsError.set(loadErrorText(err, 'The topics could not be read.'));
+      },
     });
   }
 
@@ -301,24 +323,7 @@ export class TaskEdit implements OnInit {
         this.form.get(name)!.updateValueAndValidity({ emitEvent: false });
       }
     }
-    this.http.get<ApiResponse<any[]>>(`${API_BASE}/kafkaConnectionProfile.json/fetchAllProfiles`).subscribe({
-      next: response => {
-        this.profilesLoaded = true;
-        if (response.status !== API_SUCCESS) { this.flushPendingTopicSeed(); return; }
-        const rows = (response.data ?? []).filter((p: any) => p.status !== 'Delete');
-        this.profiles.set(rows);
-        // A new task starts on the workspace's default connection when there is exactly one
-        // to start on; a platform administrator, who sees every workspace's, picks.
-        if (!this.isEdit() && this.selectedProfileId() == null) {
-          const defaults = rows.filter((p: any) => p.isDefault);
-          if (defaults.length === 1) { this.selectedProfileId.set(defaults[0].kafkaConnectionProfileId); this.loadTopicsFor(defaults[0].kafkaConnectionProfileId); }
-        }
-        // An edited task's topic may have arrived before the profiles did.
-        this.flushPendingTopicSeed();
-      },
-      // The topic is still named without the list; only the connection box stays empty.
-      error: () => { this.profilesLoaded = true; this.flushPendingTopicSeed(); this.toast.error('Could not load the Kafka connections.'); },
-    });
+    this.loadProfiles();
 
     // A new task has no workspace yet to ask for; an edited one asks once loadTask knows its tenant.
     if (!this.isEdit()) this.loadReferences(null);
@@ -341,6 +346,38 @@ export class TaskEdit implements OnInit {
     });
 
     if (this.isEdit()) this.loadTask();
+  }
+
+  /** The Kafka connections (the first of the topic pick's two boxes); Try again under the field reads them again. */
+  loadProfiles(): void {
+    this.profilesState.start();
+    this.http.get<ApiResponse<any[]>>(`${API_BASE}/kafkaConnectionProfile.json/fetchAllProfiles`).subscribe({
+      next: response => {
+        this.profilesLoaded = true;
+        if (response.status !== API_SUCCESS) {
+          this.profilesState.fail(response, 'The Kafka connections could not be read.');
+          this.flushPendingTopicSeed();
+          return;
+        }
+        this.profilesState.done();
+        const rows = (response.data ?? []).filter((p: any) => p.status !== 'Delete');
+        this.profiles.set(rows);
+        // A new task starts on the workspace's default connection when there is exactly one
+        // to start on; a platform administrator, who sees every workspace's, picks.
+        if (!this.isEdit() && this.selectedProfileId() == null) {
+          const defaults = rows.filter((p: any) => p.isDefault);
+          if (defaults.length === 1) { this.selectedProfileId.set(defaults[0].kafkaConnectionProfileId); this.loadTopicsFor(defaults[0].kafkaConnectionProfileId); }
+        }
+        // An edited task's topic may have arrived before the profiles did.
+        this.flushPendingTopicSeed();
+      },
+      // The topic is still named without the list; only the connection box stays empty, and says why.
+      error: err => {
+        this.profilesLoaded = true;
+        this.profilesState.fail(err, 'The Kafka connections could not be read.');
+        this.flushPendingTopicSeed();
+      },
+    });
   }
 
   private flushPendingTopicSeed(): void {
@@ -435,17 +472,29 @@ export class TaskEdit implements OnInit {
    * own. A tenant administrator's request carries it too, and the server ignores it -- theirs
    * is the only workspace it will answer for.
    */
+  private referencesTenant: number | null = null;
   private loadReferences(tenantId: number | null): void {
-    const fetch = (kind: TaskReferenceKind, into: (rows: TaskReference[]) => void) => {
-      const params: Record<string, string> = { kind };
-      if (tenantId != null) params['tenantId'] = String(tenantId);
-      this.http.get<ApiResponse<TaskReference[]>>(`${API_BASE}/setting.json/taskReferences`, { params }).subscribe({
-        next: response => { if (response.status === API_SUCCESS) into(response.data ?? []); },
-        error: () => this.toast.error(kind === 'HOME_PAGE' ? 'Could not load the home pages.' : 'Could not load the task groups.'),
-      });
-    };
-    fetch('TASK_GROUP', rows => this.groups.set(rows));
-    fetch('HOME_PAGE', rows => this.homePages.set(rows));
+    this.referencesTenant = tenantId;
+    this.loadReference('TASK_GROUP');
+    this.loadReference('HOME_PAGE');
+  }
+
+  /** One of the two reference lists; also Try again under its field. */
+  loadReference(kind: TaskReferenceKind): void {
+    const state = kind === 'HOME_PAGE' ? this.homePagesState : this.groupsState;
+    const into = kind === 'HOME_PAGE' ? this.homePages : this.groups;
+    const fallback = kind === 'HOME_PAGE' ? 'The home pages could not be read.' : 'The task groups could not be read.';
+    const params: Record<string, string> = { kind };
+    if (this.referencesTenant != null) params['tenantId'] = String(this.referencesTenant);
+    state.start();
+    this.http.get<ApiResponse<TaskReference[]>>(`${API_BASE}/setting.json/taskReferences`, { params }).subscribe({
+      next: response => {
+        if (response.status !== API_SUCCESS) { state.fail(response, fallback); return; }
+        into.set(response.data ?? []);
+        state.done();
+      },
+      error: err => state.fail(err, fallback),
+    });
   }
 
   /** Internal only -- there is no more UI that adds, removes or edits a tag row by hand. */
@@ -498,13 +547,32 @@ export class TaskEdit implements OnInit {
    * since moved off is dropped.
    */
   readonly pipelinesLoading = signal(false);
+  /** Owner 2026-10-27: the topic's registry tasks could not be read -- said under the field, not as "none exists". */
+  readonly pipelinesError = signal('');
+  /** Bumped by Try again, so the effect below reads the topic's registry tasks again. */
+  private readonly pipelinesAttempt = signal(0);
+  retryPipelines(): void { this.pipelinesAttempt.update(n => n + 1); }
+
+  /**
+   * Owner 2026-10-27: the pipeline's steps are read after the task and its topic's registry tasks; until that answer the
+   * page does not know whether it is a step pipeline, so it shows that it is loading rather than the Details form (which
+   * then jumped to Steps). A failure says so with Try again instead of silently staying on Details.
+   */
+  readonly definitionLoading = signal(false);
+  readonly definitionError = signal('');
+  private readonly definitionAttempt = signal(0);
+  retryDefinition(): void { this.definitionAttempt.update(n => n + 1); }
+  readonly stepsPending = computed(() => this.isEdit() && !this.loading() && !this.loadError() && !this.stepsView()
+    && !!this.pipelineChosen().trim() && (this.pipelinesLoading() || this.definitionLoading()));
 
   constructor() {
     // The chosen topic's pipelines, fetched as described above pipelinesLoading.
     effect(() => {
       const topic = this.selectedTopicId();
+      this.pipelinesAttempt();
       untracked(() => {
-        if (topic == null) { this.pipelines.set([]); return; }
+        this.pipelinesError.set('');
+        if (topic == null) { this.pipelines.set([]); this.pipelinesLoading.set(false); return; }
         this.pipelinesLoading.set(true);
         this.http.get<ApiResponse<Pipeline[]>>(`${API_BASE}/pipeline.json/listForTopic`,
           { params: { sourceTaskTypeId: topic } }).subscribe({
@@ -512,9 +580,13 @@ export class TaskEdit implements OnInit {
             if (this.selectedTopicId() !== topic) return;
             this.pipelinesLoading.set(false);
             if (response.status === API_SUCCESS) this.pipelines.set(response.data ?? []);
+            else this.pipelinesError.set(loadErrorText(response, 'This topic’s registry tasks could not be read.'));
           },
-          // Not fatal: the Pipeline field just offers nothing to pick until a retry.
-          error: () => { if (this.selectedTopicId() === topic) this.pipelinesLoading.set(false); },
+          error: err => {
+            if (this.selectedTopicId() !== topic) return;
+            this.pipelinesLoading.set(false);
+            this.pipelinesError.set(loadErrorText(err, 'This topic’s registry tasks could not be read.'));
+          },
         });
       });
     });
@@ -522,17 +594,26 @@ export class TaskEdit implements OnInit {
     // the legacy step leaves today's form exactly as it was. A new task has no pipeline to ask about yet.
     effect(() => {
       const key = this.isEdit() ? this.stepsPipelineKey() : null;
+      this.definitionAttempt();
       untracked(() => {
-        if (key == null) { this.stepsView.set(null); return; }
+        this.definitionError.set('');
+        if (key == null) { this.stepsView.set(null); this.definitionLoading.set(false); return; }
         if (this.stepsView()?.pipelineKey === key) return;
+        this.definitionLoading.set(true);
         this.stepsApi.definition(key).subscribe({
           next: r => {
             if (this.stepsPipelineKey() !== key) return;
+            this.definitionLoading.set(false);
             const view = r.status === API_SUCCESS ? r.data : null;
             // An answer without a definition (an older Core, a refusal) is no steps: the page stays as it was.
             this.stepsView.set(view && typeof view === 'object' && !Array.isArray(view) && view.definition ? view : null);
           },
-          error: () => { if (this.stepsPipelineKey() === key) this.stepsView.set(null); },
+          error: err => {
+            if (this.stepsPipelineKey() !== key) return;
+            this.definitionLoading.set(false);
+            this.stepsView.set(null);
+            this.definitionError.set(loadErrorText(err, 'The pipeline’s steps could not be read.'));
+          },
         });
       });
     });
@@ -572,6 +653,7 @@ export class TaskEdit implements OnInit {
   readonly pipelineHint = computed(() => {
     if (this.selectedTopicId() == null) return 'Pick a topic first; its registry tasks appear here.';
     if (this.pipelinesLoading()) return 'Loading this topic’s registry tasks…';
+    if (this.pipelinesError()) return 'This topic’s registry tasks could not be read.';
     if (!this.pipelinesForTopic().length) return 'No registry task listens on this topic yet — add one under Configuration › Task Registry.';
     return 'Picking one loads its form below, if it has one.';
   });
@@ -590,6 +672,7 @@ export class TaskEdit implements OnInit {
     if (pipelineId === this.loadedFormPipeline) return;
     this.loadedFormPipeline = pipelineId;
 
+    this.formError.set('');
     if (!pipelineId) {
       this.clearForm();
       return;
@@ -614,11 +697,20 @@ export class TaskEdit implements OnInit {
         this.form.get('taskPayload')!.clearValidators();
         this.form.get('taskPayload')!.updateValueAndValidity({ emitEvent: false });
       },
-      error: () => {
+      error: err => {
         this.formLoading.set(false);
-        if (this.loadedFormPipeline === pipelineId) this.clearForm();
+        if (this.loadedFormPipeline !== pipelineId) return;
+        this.clearForm();
+        this.formError.set(loadErrorText(err, 'This registry task’s form could not be read.'));
       },
     });
+  }
+
+  /** Try again under the form's place: reads the chosen registry task's form again. */
+  retryForm(): void {
+    const id = this.loadedFormPipeline ?? '';
+    this.loadedFormPipeline = null;
+    this.loadFormForPipeline(id);
   }
 
   private clearForm(): void {
@@ -866,6 +958,21 @@ export class TaskEdit implements OnInit {
   /** Report Studio phase 5: the pipeline's schedules, whose latest run is a generate_report step's data. */
   readonly jobIdsOf = computed(() => this.jobs().map(j => j.jobId));
   readonly jobsLoaded = signal(false);
+  /** Owner 2026-10-27: a reload keeps the list on screen (jobsLoading), and a failed read says so (jobsError). */
+  readonly jobsLoading = signal(false);
+  readonly jobsError = signal('');
+  private jobsFor: number | null = null;
+  /** Owner 2026-10-27: the Schedules tab's columns sort; the API's order until one is picked. */
+  readonly jobSort = createTableSort<LinkedJob>({
+    id: 'pipeline-schedules',
+    columns: {
+      schedule: j => j.jobName,
+      runs: j => (j.execution === 'Manual' ? 'Only when started' : 'On a timetable'),
+      lastRun: { value: j => j.lastJobRun, kind: 'date' },
+      state: { value: j => j.jobStatus || 'Active', kind: 'status' },
+    },
+  });
+  readonly sortedJobs = computed(() => this.jobSort.apply(this.jobs()));
   readonly running = signal(false);
   readonly runLabel = computed(() => (this.dirty() && !this.locked() ? 'Save & run now' : 'Run now'));
   readonly runHint = computed(() => {
@@ -898,12 +1005,29 @@ export class TaskEdit implements OnInit {
     setTimeout(() => this.host?.nativeElement.querySelector(`#${anchor}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   }
 
+  /** Try again on the Schedules tab. */
+  retryJobs(): void { this.loadJobs(this.taskIdNumber()); }
+
   private loadJobs(task: number | null): void {
-    this.jobsLoaded.set(false);
-    if (!task) { this.jobs.set([]); return; }
+    // Another pipeline: nothing is known about its schedules yet. The same one again keeps its list until the answer.
+    if (task !== this.jobsFor) { this.jobsLoaded.set(false); this.jobs.set([]); }
+    this.jobsFor = task;
+    this.jobsError.set('');
+    if (!task) { this.jobs.set([]); this.jobsLoading.set(false); return; }
+    this.jobsLoading.set(true);
     this.stepsApi.jobsOf(task).subscribe({
-      next: r => { this.jobs.set(r.status === API_SUCCESS ? r.data ?? [] : []); this.jobsLoaded.set(true); },
-      error: () => { this.jobs.set([]); this.jobsLoaded.set(true); },
+      next: r => {
+        if (task !== this.jobsFor) return;
+        this.jobsLoading.set(false);
+        if (r.status !== API_SUCCESS) { this.jobsError.set(loadErrorText(r, 'The schedules could not be read.')); return; }
+        this.jobs.set(r.data ?? []);
+        this.jobsLoaded.set(true);
+      },
+      error: err => {
+        if (task !== this.jobsFor) return;
+        this.jobsLoading.set(false);
+        this.jobsError.set(loadErrorText(err, 'The schedules could not be read.'));
+      },
     });
   }
 

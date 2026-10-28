@@ -19,9 +19,8 @@
     <app-needs-workspace what="The catalog is" todo="see its datasets, files and sensitive fields" icon="database" />
   } @else {
 
-  @if (kpis().length) {
-    <app-stat-strip [items]="kpis()" [cols]="2" [smCols]="4" align="start" size="md" label="The catalog at a glance" />
-  }
+  <app-stat-strip [items]="kpis()" [cols]="2" [smCols]="4" align="start" size="md" label="The catalog at a glance"
+                  [loading]="summaryState.pending()" [failed]="!!summaryState.error() && !summary()" />
 
   <!-- UX review B5 (CT1): sensitive data, said once at the top -- how much is marked, the way to it, and how to mark more. -->
   @if (summary(); as s) {
@@ -64,7 +63,9 @@
     </ng-container>
     <table class="table-modern">
       <thead>
-        <tr><th>Asset</th><th class="hidden xl:table-cell">Type</th><th>Owner</th><th class="num">Freshness</th><th>Sensitive fields</th><th class="hidden lg:table-cell">Sensitivity</th><th class="text-right">Quality</th></tr>
+        <tr><th appSort="name" [sortBy]="sort">Asset</th><th class="hidden xl:table-cell" appSort="kind" [sortBy]="sort">Type</th><th appSort="owner" [sortBy]="sort">Owner</th>
+          <th class="num" appSort="freshness" [sortBy]="sort">Freshness</th><th>Sensitive fields</th><th class="hidden lg:table-cell" appSort="sensitivity" [sortBy]="sort">Sensitivity</th>
+          <th class="text-right" appSort="quality" [sortBy]="sort">Quality</th></tr>
       </thead>
       <tbody>
         @for (a of shown(); track a.assetId) {

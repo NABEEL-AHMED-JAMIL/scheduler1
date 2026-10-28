@@ -8,6 +8,7 @@ import { ToastService } from '../../../shared/ui/toast.service';
 import { Icon } from '../../../shared/ui/icon';
 import { LoadError } from '../../../shared/ui/load-error';
 import { BlurLoader } from '../../../shared/ui/blur-loader';
+import { InlineStatus, loadErrorText } from '../../../shared/ui/loading';
 import { SENSITIVITY_TEXT } from '../../../shared/ui/sensitivity';
 import { ModelConnection } from '../../ai/ai-providers';
 import { DataPolicyApi } from './data-policy.api';
@@ -38,7 +39,7 @@ const readable = (text: string | null | undefined) => (text ?? '').replace(/\s--
  */
 @Component({
   selector: 'app-data-policies',
-  imports: [WorkspaceSelect, RefreshButton, PageHeader, Icon, LoadError, BlurLoader, RouterLink, ReviewPolicyCard, RetentionCard, NeedsWorkspace],
+  imports: [WorkspaceSelect, RefreshButton, PageHeader, Icon, LoadError, BlurLoader, RouterLink, ReviewPolicyCard, RetentionCard, NeedsWorkspace, InlineStatus],
   templateUrl: './data-policies.html',
   styles: `
     .policy-table { table-layout: fixed; min-width: 56rem; }
@@ -80,6 +81,12 @@ export class DataPolicies implements OnInit {
   readonly drafts = signal<LevelDraft[]>([]);
   readonly connections = signal<ModelConnection[]>([]);
   readonly connectionsError = signal('');
+  /**
+   * Owner 2026-10-27: the model list's own state, so each level says "Loading model connections…" rather than "No model
+   * connections in this workspace yet." while the list is on its way, and a failed read can be tried again.
+   */
+  readonly connectionsLoading = signal(false);
+  readonly connectionsLoaded = signal(false);
 
   readonly state = computed(() => policyState(this.levels()));
   readonly choices = computed(() => modelChoices(this.connections(), this.tenantId()));
@@ -121,12 +128,20 @@ export class DataPolicies implements OnInit {
       },
       error: err => { this.loading.set(false); this.error.set(err?.error?.message || 'The data policy could not be read.'); },
     });
-    if (this.canEdit() && !this.connections().length) {
-      this.api.connections().subscribe({
-        next: r => { if (r.status === API_SUCCESS) this.connections.set(r.data ?? []); else this.connectionsError.set(r.message); },
-        error: err => this.connectionsError.set(err?.error?.message || 'The model connections could not be read.'),
-      });
-    }
+    if (this.canEdit() && !this.connections().length) this.loadConnections();
+  }
+
+  loadConnections(): void {
+    this.connectionsLoading.set(true);
+    this.connectionsError.set('');
+    this.api.connections().subscribe({
+      next: r => {
+        this.connectionsLoading.set(false);
+        if (r.status === API_SUCCESS) { this.connections.set(r.data ?? []); this.connectionsLoaded.set(true); }
+        else this.connectionsError.set(loadErrorText(r, 'The model connections could not be read.'));
+      },
+      error: err => { this.connectionsLoading.set(false); this.connectionsError.set(loadErrorText(err, 'The model connections could not be read.')); },
+    });
   }
 
   private show(levels: PolicyLevel[]): void {

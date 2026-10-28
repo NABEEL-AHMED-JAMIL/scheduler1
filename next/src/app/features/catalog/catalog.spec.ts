@@ -3,7 +3,8 @@ import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { Dialog, DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
-import { Observable, Subject, of } from 'rxjs';
+import { NEVER, Observable, Subject, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { ToastService } from '../../shared/ui/toast.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { Catalog } from './catalog';
@@ -284,5 +285,76 @@ describe('phiHint (UX review B5, CT1)', () => {
     expect(phiHint('risk_level')).toBeNull();
     expect(phiHint('total')).toBeNull();
     expect(phiHint('')).toBeNull();
+  });
+});
+
+describe('Data Catalog -- loading, empty, error and sorting (owner 2026-10-27)', () => {
+  const fail500 = () => throwError(() => new HttpErrorResponse({ status: 500, error: 'Internal Server Error' }));
+
+  function pageWith(change: (fake: ReturnType<typeof api>) => void) {
+    try { localStorage.clear(); } catch { /* none */ }
+    const fake = api();
+    change(fake);
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [provideZonelessChangeDetection(), provideRouter([]), { provide: CatalogApi, useValue: fake }, { provide: Dialog, useValue: { open: vi.fn() } }],
+    });
+    const fixture = TestBed.createComponent(Catalog);
+    fixture.detectChanges();
+    return { screen: fixture.componentInstance, el: fixture.nativeElement as HTMLElement };
+  }
+
+  it('keeps the strip as placeholders, not zeros, until the figures answer', () => {
+    const { screen, el } = pageWith(f => f.summary.mockReturnValue(NEVER as never));
+    expect(screen.summaryState.pending()).toBe(true);
+    expect(screen.kpis().map(k => k.label)).toEqual(['Assets', 'With sensitive fields', 'Stale', 'Without an owner']);
+    expect(el.querySelector('app-stat-strip')!.getAttribute('aria-busy')).toBe('true');
+  });
+
+  it('says the figures are not available when their read fails', () => {
+    const { screen } = pageWith(f => f.summary.mockReturnValue(fail500() as never));
+    expect(screen.summaryState.loading()).toBe(false);
+    expect(screen.summaryState.error()).toBe('The catalog figures could not be read.');
+    expect(screen.summary()).toBeNull();
+  });
+
+  it('a panel says why the lineage failed instead of "nothing seen"', () => {
+    const failed = panel();
+    failed.fake.lineage.mockReturnValue(fail500() as never);
+    failed.screen.loadLineage();
+    failed.fixture.detectChanges();
+    expect(failed.screen.lineageState.error()).toBe('The lineage could not be read.');
+    expect(failed.el.querySelector('[data-lineage]')!.textContent).toContain('The lineage could not be read.');
+    expect(failed.el.querySelector('[data-lineage]')!.textContent).not.toContain('Nothing seen');
+  });
+
+  it('sorts the assets on the server: no sort before a heading is picked, then the column and direction from page 1', () => {
+    try { localStorage.clear(); } catch { /* none */ }
+    const { fake, screen, fixture, el } = page();
+    expect(fake.list.mock.calls[0]).toEqual([{ q: undefined, kind: undefined, flag: undefined, withDeleted: false, withSystem: false, page: 0, size: 50 }]);
+    expect(el.querySelectorAll('thead th button.th-sort').length).toBe(6);
+    screen.goTo(3);
+    screen.sort.toggle('freshness');
+    fixture.detectChanges();
+    expect(screen.page()).toBe(1);
+    expect(fake.list).toHaveBeenLastCalledWith(expect.objectContaining({ page: 0, sort: 'freshness', dir: 'desc' }));
+    screen.sort.toggle('freshness');
+    expect(fake.list).toHaveBeenLastCalledWith(expect.objectContaining({ page: 0, sort: 'freshness', dir: 'asc' }));
+    screen.sort.toggle('name');
+    expect(fake.list).toHaveBeenLastCalledWith(expect.objectContaining({ sort: 'name', dir: 'asc' }));
+    // The next page keeps the order.
+    screen.goTo(2);
+    expect(fake.list).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, sort: 'name', dir: 'asc' }));
+    try { localStorage.clear(); } catch { /* none */ }
+  });
+
+  it('a panel sorts its columns by Empty both ways, keeping the dataset order first', () => {
+    try { localStorage.clear(); } catch { /* none */ }
+    const { screen } = panel();
+    expect(screen.sortedColumns().map(c => c.name)).toEqual(['email', 'region']);
+    screen.columnSort.toggle('empty');
+    expect(screen.sortedColumns().map(c => c.name)).toEqual(['region', 'email']);
+    screen.columnSort.toggle('empty');
+    expect(screen.sortedColumns().map(c => c.name)).toEqual(['email', 'region']);
   });
 });

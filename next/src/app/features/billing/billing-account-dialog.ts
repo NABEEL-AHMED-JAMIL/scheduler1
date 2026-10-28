@@ -6,6 +6,7 @@ import { ToastService } from '../../shared/ui/toast.service';
 import { FormDialog } from '../../shared/ui/form-dialog';
 import { Field } from '../../shared/ui/field';
 import { BillingApi } from './billing.service';
+import { AppLoading, loadErrorText } from '../../shared/ui/loading';
 
 /**
  * Who is billed: legal name, address, billing email, tax number and rate, currency, terms.
@@ -13,13 +14,14 @@ import { BillingApi } from './billing.service';
  */
 @Component({
   selector: 'app-billing-account-dialog',
-  imports: [ReactiveFormsModule, FormDialog, Field],
+  imports: [ReactiveFormsModule, FormDialog, Field, AppLoading],
   template: `
     <app-form-dialog heading="Billing profile" subtitle="Who the invoice is made out to, and whether tax applies." [saving]="saving()" confirmLabel="Save"
                      [confirmDisabled]="loading() || !!loadError()"
                      (confirmed)="save()" (cancelled)="ref.close(false)">
       @if (loading()) {
-        <div class="py-8 text-center text-sm text-[color:var(--text-muted)]"><div class="spinner mx-auto mb-3"></div>Reading the profile…</div>
+        <!-- Owner 2026-10-27: the shared loader -- a status line for a screen reader, "Still loading…" when it is slow. -->
+        <app-loading shape="panel" label="Reading the profile…" [count]="6" />
       } @else if (loadError()) {
         <div class="py-8 text-center" role="alert">
           <p class="text-sm">{{ loadError() }}</p>
@@ -89,14 +91,14 @@ export class BillingAccountDialog implements OnInit {
     this.loadError.set('');
     this.api.account(this.data.tenantId).subscribe({ next: r => {
       this.loading.set(false);
-      if (r.status !== API_SUCCESS) { this.loadError.set(r.message || 'The billing profile could not be read.'); return; }
+      if (r.status !== API_SUCCESS) { this.loadError.set(loadErrorText(r, 'The billing profile could not be read.')); return; }
       if (!r.data) return;
       const a = r.data;
       this.form.patchValue({ legalName: a.legalName ?? '', address: a.address ?? '', billingEmail: a.billingEmail ?? '', taxId: a.taxId ?? '',
         taxRatePercent: Number(a.taxRatePercent ?? 0), taxLabel: a.taxLabel ?? 'VAT', currency: a.currency ?? 'USD', paymentTermsDays: a.paymentTermsDays ?? 30 });
     }, error: err => {
       this.loading.set(false);
-      this.loadError.set(err?.error?.message || 'The billing profile could not be read.');
+      this.loadError.set(loadErrorText(err, 'The billing profile could not be read.'));
     } });
   }
 

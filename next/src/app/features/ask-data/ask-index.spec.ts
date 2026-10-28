@@ -3,7 +3,7 @@ import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { HttpErrorResponse } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
-import { Observable, of, throwError } from 'rxjs';
+import { NEVER, Observable, of, throwError } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { ToastService } from '../../shared/ui/toast.service';
 import { AskDataApi } from './ask-data.api';
@@ -131,5 +131,37 @@ describe('Ask your data -- the index panel is a workspace administrator\'s', () 
     const member = page(false);
     expect(member.el.querySelector('[data-test=ask-index]')).toBeNull();
     expect(member.api.indexStatus).not.toHaveBeenCalled();
+  });
+});
+
+describe('Ask your data -- the search index loads, fails and retries in plain words (owner 2026-10-27)', () => {
+  it('is reading, not blank, until the index answers', () => {
+    const { panel } = render({ status: () => NEVER });
+    expect(panel.state.pending()).toBe(true);
+    expect(panel.loadError()).toBeNull();
+    expect(panel.summary()).toBe('');
+  });
+
+  it('says why when the index could not be read, in the header and in the opened card with Try again', () => {
+    const { fixture, q, el, panel } = render({ status: () => throwError(() => new HttpErrorResponse({ status: 500, error: 'Internal Server Error' })) });
+    expect(panel.state.loading()).toBe(false);
+    expect(q('[data-test=index-summary]')!.textContent).toContain('The search index could not be read.');
+    (q('[data-test=index-toggle]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    const retry = Array.from(el.querySelectorAll('button')).find(b => b.textContent?.includes('Try again'));
+    expect(retry).toBeTruthy();
+  });
+
+  it('says when the folder connections could not be read, and that there are none', () => {
+    const failed = render();
+    failed.api.buckets.mockImplementation(() => throwError(() => new HttpErrorResponse({ status: 500 })) as never);
+    failed.panel.toggle();
+    expect(failed.panel.bucketsState.error()).toBe('The folder connections could not be read.');
+
+    const none = render();
+    none.api.buckets.mockImplementation(() => of({ status: 'SUCCESS', data: [] }) as never);
+    none.panel.toggle();
+    expect(none.panel.bucketsState.loaded()).toBe(true);
+    expect(none.panel.buckets()).toEqual([]);
   });
 });

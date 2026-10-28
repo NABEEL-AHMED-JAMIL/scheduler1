@@ -1,4 +1,11 @@
-import { fieldLabel, imageKeyOf, reviewFields } from './run-review-card';
+import { provideZonelessChangeDetection } from '@angular/core';
+import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { of } from 'rxjs';
+import { StorageService } from '../objects/storage.service';
+import { RunReviewCard, fieldLabel, imageKeyOf, reviewFields } from './run-review-card';
 
 describe('Run review card (owner 2026-10-20)', () => {
   const row = {
@@ -25,5 +32,46 @@ describe('Run review card (owner 2026-10-20)', () => {
     expect(f.text).toEqual({ label: 'Description', value: 'An irregular hypoechoic mass.' });
     expect(f.rest.map(x => x.label)).toContain('Lesion area pct');
     expect(f.rest.map(x => x.label)).not.toContain('Finding');
+  });
+});
+
+describe('Run review card -- loading, empty, error (owner 2026-10-27)', () => {
+  function mount() {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [provideZonelessChangeDetection(), provideRouter([]), provideHttpClient(), provideHttpClientTesting(),
+        { provide: StorageService, useValue: { download: () => of(new Blob(['png'], { type: 'image/png' })) } }],
+    });
+    const http = TestBed.inject(HttpTestingController);
+    const f = TestBed.createComponent(RunReviewCard);
+    f.componentRef.setInput('jobQueueId', 1019);
+    f.componentRef.setInput('link', '/pipelines/schedules/1006/runs/1019');
+    f.detectChanges();
+    return { f, http, el: f.nativeElement as HTMLElement };
+  }
+
+  it('is loading until the run answers', () => {
+    const { f, el } = mount();
+    expect(f.componentInstance.loading()).toBe(true);
+    expect(el.querySelector('app-loading')).not.toBeNull();
+    expect(el.querySelector('[data-test="run-review-none"]')).toBeNull();
+  });
+
+  it('says the run kept nothing to show, rather than drawing nothing', () => {
+    const { f, http, el } = mount();
+    http.expectOne(r => r.url.endsWith('/sourceJob.json/runOutputs')).flush({ status: 'SUCCESS', data: { outputs: [] } });
+    f.detectChanges();
+    expect(f.componentInstance.loading()).toBe(false);
+    expect(el.querySelector('[data-test="run-review-none"]')?.textContent).toContain('no result or PDF');
+  });
+
+  it('says the result could not be read, with Try again, and reads it again', () => {
+    const { f, http, el } = mount();
+    http.expectOne(r => r.url.endsWith('/sourceJob.json/runOutputs')).flush({}, { status: 500, statusText: 'Server Error' });
+    f.detectChanges();
+    expect(f.componentInstance.loadError()).toBe('What the run made could not be read.');
+    expect(el.querySelector('[data-test="run-review-error"]')?.textContent).toContain('Try again');
+    f.componentInstance.retry();
+    expect(http.match(r => r.url.endsWith('/sourceJob.json/runOutputs')).length).toBe(1);
   });
 });

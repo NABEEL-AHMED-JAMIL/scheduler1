@@ -117,6 +117,10 @@
           </button>
         }
       </div>
+      <!-- Owner 2026-10-27: the run history is its own read; say while it comes, and say when it failed (the answers
+           about runs then say so too) instead of answering "0 runs". -->
+      <app-inline-status [loading]="runsState.loading()" [error]="runsState.error()"
+                         label="Reading this schedule's runs…" (retry)="loadRuns()" />
     </div>
 
     @if (!turns().length) {
@@ -162,7 +166,7 @@
                  The agent's name rides with it so the reader knows who is talking. -->
             @case ('ai') {
               @if (turn.answer.pending) {
-                <p class="text-sm text-[color:var(--text-muted)] flex items-center gap-2">
+                <p class="text-sm text-[color:var(--text-muted)] flex items-center gap-2" role="status">
                   <span class="spinner [--spinner-size:0.9rem]" aria-hidden="true"></span>
                   Asking {{ block.agent }}…
                 </p>
@@ -215,10 +219,14 @@
               <div class="overflow-x-auto mt-3 rounded-lg border border-subtle">
                 <table class="table-modern">
                   <thead>
-                    <tr><th>Run</th><th>Started</th><th>Status</th><th>Message</th><th class="w-16"></th></tr>
+                    <tr>
+                      <th appSort="run" [sortBy]="runSort">Run</th><th appSort="started" [sortBy]="runSort">Started</th>
+                      <th appSort="status" [sortBy]="runSort">Status</th><th appSort="message" [sortBy]="runSort">Message</th>
+                      <th class="w-16"></th>
+                    </tr>
                   </thead>
                   <tbody>
-                    @for (run of block.runs; track run.jobQueueId) {
+                    @for (run of runSort.apply(block.runs); track run.jobQueueId) {
                       <tr>
                         <td class="mono">#{{ run.jobQueueId }}</td>
                         <td class="whitespace-nowrap text-[color:var(--text-secondary)]">

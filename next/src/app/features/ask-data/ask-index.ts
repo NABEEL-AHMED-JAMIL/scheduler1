@@ -1,11 +1,12 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { HttpErrorResponse } from '@angular/common/http';
 import { API_SUCCESS } from '../../core/api/api.config';
 import { Icon } from '../../shared/ui/icon';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { ToastService } from '../../shared/ui/toast.service';
 import { AskDataApi } from './ask-data.api';
 import { AskIndexStatus, IndexFolder } from './ask-data.model';
+import { AppLoading, InlineStatus, createLoadState, loadErrorText } from '../../shared/ui/loading';
+import { LoadError } from '../../shared/ui/load-error';
 
 /**
  * MIG-281: the workspace's search index, as its administrator chooses it on the Ask your data page -- on or off, Document
@@ -15,7 +16,7 @@ import { AskIndexStatus, IndexFolder } from './ask-data.model';
  */
 @Component({
   selector: 'app-ask-index',
-  imports: [Icon, ServerTimePipe],
+  imports: [Icon, ServerTimePipe, AppLoading, InlineStatus, LoadError],
   templateUrl: './ask-index.html',
 })
 export class AskIndex implements OnInit {
@@ -24,7 +25,14 @@ export class AskIndex implements OnInit {
 
   readonly open = signal(false);
   readonly status = signal<AskIndexStatus | null>(null);
-  readonly loadError = signal<string | null>(null);
+  /**
+   * Owner 2026-10-27: the index's read in its three states -- the header line says "Reading…" instead of nothing, and
+   * an opened card shows the reason with Try again instead of an empty body.
+   */
+  readonly state = createLoadState();
+  readonly loadError = computed(() => this.state.error() || null);
+  /** The folder connections' read (on first open): loading, none, or why not, under the Folders list. */
+  readonly bucketsState = createLoadState(false);
   readonly saving = signal(false);
   readonly saveError = signal<string | null>(null);
   readonly buckets = signal<{ bucket: string; label?: string | null }[]>([]);
@@ -59,27 +67,35 @@ export class AskIndex implements OnInit {
   }
 
   load(): void {
-    this.loadError.set(null);
+    this.state.start();
     this.api.indexStatus().subscribe({
       next: res => {
         if (res.status !== API_SUCCESS || !res.data) {
-          this.loadError.set(res.message || 'The search index could not be read.');
+          this.state.fail(res, 'The search index could not be read.');
           return;
         }
         this.apply(res.data);
+        this.state.done();
       },
-      error: (err: unknown) => this.loadError.set(this.errorText(err, 'The search index could not be read.')),
+      error: (err: unknown) => this.state.fail(err, 'The search index could not be read.'),
     });
   }
 
   toggle(): void {
     this.open.update(o => !o);
-    if (this.open() && !this.buckets().length) {
-      this.api.buckets().subscribe({
-        next: res => this.buckets.set(res.status === API_SUCCESS && res.data ? res.data : []),
-        error: () => this.buckets.set([]),
-      });
-    }
+    if (this.open() && !this.bucketsState.loaded() && !this.bucketsState.loading()) this.loadBuckets();
+  }
+
+  loadBuckets(): void {
+    this.bucketsState.start();
+    this.api.buckets().subscribe({
+      next: res => {
+        if (res.status !== API_SUCCESS) { this.bucketsState.fail(res, 'The folder connections could not be read.'); return; }
+        this.buckets.set(res.data ?? []);
+        this.bucketsState.done();
+      },
+      error: err => this.bucketsState.fail(err, 'The folder connections could not be read.'),
+    });
   }
 
   addFolder(): void {
@@ -116,7 +132,7 @@ export class AskIndex implements OnInit {
       },
       error: (err: unknown) => {
         this.saving.set(false);
-        this.saveError.set(this.errorText(err, 'The search index could not be saved.'));
+        this.saveError.set(loadErrorText(err, 'The search index could not be saved.'));
       },
     });
   }
@@ -131,13 +147,5 @@ export class AskIndex implements OnInit {
     this.documents.set(s.documents);
     this.forms.set(s.forms);
     this.folders.set((s.folders ?? []).map(f => ({ connection: f.connection, prefix: f.prefix ?? '' })));
-  }
-
-  private errorText(err: unknown, otherwise: string): string {
-    if (err instanceof HttpErrorResponse) {
-      const body = err.error as { message?: string } | null;
-      if (body && typeof body === 'object' && body.message) return body.message;
-    }
-    return otherwise;
   }
 }

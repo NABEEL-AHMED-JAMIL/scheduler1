@@ -2,6 +2,7 @@ import { Component, Injector, computed, effect, inject, input, linkedSignal, out
 import { TeamsApi } from '../../../core/teams/teams.api';
 import { Field } from '../../../shared/ui/field';
 import { Icon } from '../../../shared/ui/icon';
+import { InlineStatus, createLoadState } from '../../../shared/ui/loading';
 import {
   ApiRequestChoice, BucketChoice, DocumentTypeChoice, FieldKind, FieldSpec, JsonSchema, PromptChoice, ScheduleChoice, StepProblem, WebhookChoice, coerce, fieldsOf, isMapSchema, mapValueKind, parseJson, withValue,
 } from './steps.model';
@@ -27,7 +28,7 @@ interface MapRow { key: string; value: unknown; }
  */
 @Component({
   selector: 'app-schema-form',
-  imports: [Field, Icon],
+  imports: [Field, Icon, InlineStatus],
   template: `
     @if (isMap()) {
       <div class="flex flex-col gap-2 min-w-0">
@@ -269,14 +270,18 @@ interface MapRow { key: string; value: unknown; }
                   </select>
                 </app-field>
                 @if (reviewersChoice(f) === 'team') {
-                  <app-field label="Team" [for]="idOf(f) + '-team'" [hint]="teamChoices().length ? '' : 'No team yet: make one in Administration › Teams.'">
+                  <!-- Owner 2026-10-27: "No team yet" only once the teams have answered; loading and a failed read say so. -->
+                  <app-field label="Team" [for]="idOf(f) + '-team'" [hint]="teamsState.loaded() && !teamChoices().length ? 'No team yet: make one in Administration › Teams.' : ''">
                     <select [id]="idOf(f) + '-team'" class="input" [disabled]="disabled()" (change)="pickTeam(f, $any($event.target).value)">
-                      <option value="" [selected]="!reviewersTeam(f)">Choose a team…</option>
+                      <option value="" [selected]="!reviewersTeam(f)">{{ teamsState.loading() ? 'Loading teams…' : 'Choose a team…' }}</option>
                       @for (t of teamChoices(); track t.teamId) {
                         <option [value]="'' + t.teamId" [selected]="reviewersTeam(f) === '' + t.teamId">{{ t.name }}</option>
                       }
-                      @if (reviewersTeam(f) && !knownTeam(f)) { <option [value]="reviewersTeam(f)" selected>Team {{ reviewersTeam(f) }} (not in this workspace's list)</option> }
+                      @if (reviewersTeam(f) && !knownTeam(f)) {
+                        <option [value]="reviewersTeam(f)" selected>Team {{ reviewersTeam(f) }}{{ teamsState.loaded() ? " (not in this workspace's list)" : '' }}</option>
+                      }
                     </select>
+                    <app-inline-status [loading]="teamsState.loading()" [error]="teamsState.error()" label="Loading teams…" (retry)="loadTeams()" />
                   </app-field>
                 }
               </div>
@@ -402,20 +407,31 @@ export class SchemaForm {
   private readonly injector = inject(Injector);
   /** The workspace's teams by name, read only when a form asks who reviews. */
   readonly teamChoices = signal<{ teamId: number; name: string }[]>([]);
+  /** Owner 2026-10-27: the teams' read, so "No team yet" waits for an answer and a failure is said. */
+  readonly teamsState = createLoadState(false);
   private teamsAsked = false;
   /** Reads the teams the first time a who-reviews setting is drawn. */
   readonly askTeams = effect(() => {
     if (this.teamsAsked || !this.fields().some(f => f.kind === 'reviewers')) return;
     this.teamsAsked = true;
+    this.loadTeams();
+  });
+
+  loadTeams(): void {
     let api: TeamsApi;
     // A form drawn where no HTTP is provided (a test, a read-only preview) simply offers no teams.
     try { api = this.injector.get(TeamsApi); } catch { return; }
+    this.teamsState.start();
     api.list().subscribe({
-      next: r => this.teamChoices.set((r.data ?? []).filter(t => t.status !== 'ARCHIVED').map(t => ({ teamId: t.teamId, name: t.name }))
-        .sort((a, b) => a.name.localeCompare(b.name))),
-      error: () => this.teamChoices.set([]),
+      next: r => {
+        if (r.status && r.status !== 'SUCCESS') { this.teamsState.fail(r, 'The teams could not be read.'); return; }
+        this.teamChoices.set((r.data ?? []).filter(t => t.status !== 'ARCHIVED').map(t => ({ teamId: t.teamId, name: t.name }))
+          .sort((a, b) => a.name.localeCompare(b.name)));
+        this.teamsState.done();
+      },
+      error: err => this.teamsState.fail(err, 'The teams could not be read.'),
     });
-  });
+  }
   readonly isMap = computed(() => isMapSchema(this.schema()));
   readonly mapKind = computed<FieldKind>(() => mapValueKind(this.schema()));
   /** What this form last handed back, until the parent hands it a new value. */

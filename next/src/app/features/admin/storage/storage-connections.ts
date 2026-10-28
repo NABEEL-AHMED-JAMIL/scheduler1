@@ -28,6 +28,9 @@ import { Pagination } from '../../../shared/ui/pagination';
 import { ManagedBanner } from '../../../shared/ui/managed-banner';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
+import { loadErrorText } from '../../../shared/ui/loading';
 
 interface StorageConnection {
   /** Owning workspace; null for the two platform buckets. */
@@ -60,7 +63,7 @@ interface StorageConnection {
 
 @Component({
   selector: 'app-storage-connections',
-  imports: [WorkspaceSelect, RefreshButton, PageHeader, MineFilter, ViewToggle, StatTile, Icon, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, CopyButton, Pagination, ManagedBanner],
+  imports: [WorkspaceSelect, RefreshButton, PageHeader, MineFilter, ViewToggle, StatTile, Icon, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, CopyButton, Pagination, ManagedBanner, SortHeader],
   templateUrl: './storage-connections.html',
 })
 export class StorageConnections implements OnInit {
@@ -71,6 +74,8 @@ export class StorageConnections implements OnInit {
   readonly connections = signal<StorageConnection[]>([]);
   readonly loading = signal(true);
   readonly error = signal('');
+  /** Owner 2026-10-27: the list has answered once, so the tiles can show figures instead of a placeholder (not 0). */
+  readonly loaded = signal(false);
   readonly search = signal('');
   readonly providerFilter = signal('');
   readonly workspaceFilter = signal(String(inject(WorkspaceDirectory).remembered() ?? ''));
@@ -125,9 +130,30 @@ export class StorageConnections implements OnInit {
     });
   });
 
+  /**
+   * Owner 2026-10-27: every column that holds a value sorts, before the pager cuts a page (the cards follow the same
+   * order); the list keeps the server's order until a heading is picked.
+   */
+  readonly sort = createTableSort<StorageConnection>({
+    id: 'storage-connections',
+    columns: {
+      name: c => c.connectionName,
+      alias: c => c.alias,
+      provider: c => c.provider,
+      target: c => this.target(c),
+      workspace: c => this.workspaceName(c),
+      credentials: { value: c => !!(c.secretKeyConfigured || c.passwordConfigured), kind: 'bool' },
+      lastTest: { value: c => this.testLabel(c), kind: 'status' },
+      createdBy: c => c.createdByName,
+      updatedBy: c => c.updatedByName,
+      state: { value: c => c.status, kind: 'status' },
+    },
+  });
+  readonly sorted = computed(() => this.sort.apply(this.filtered()));
+
   /** Paged like Users; "on screen" for the bulk tick means this page. */
   readonly pager = createPager<StorageConnection>();
-  readonly paged = computed(() => this.pager.slice(this.filtered()));
+  readonly paged = computed(() => this.pager.slice(this.sorted()));
   goToPage(next: number): void { this.pager.goTo(next, this.filtered().length); }
   setPageSize(size: number): void { this.pager.setSize(size); }
 
@@ -175,14 +201,15 @@ export class StorageConnections implements OnInit {
           if (response.status === API_SUCCESS) {
             const rows = response.data ?? [];
             this.connections.set(rows);
+            this.loaded.set(true);
             this.pruneSelection(rows);
           } else {
-            this.error.set(response.message);
+            this.error.set(loadErrorText(response, 'Could not load connections.'));
           }
         },
         error: err => {
           this.loading.set(false);
-          this.error.set(err?.error?.message || 'Could not load connections.');
+          this.error.set(loadErrorText(err, 'Could not load connections.'));
         },
       });
   }
@@ -405,6 +432,10 @@ export class StorageConnections implements OnInit {
       : this.toast.error(`${passed} reached their bucket, ${failed} did not — see Last test.`);
   }
 
+  /**
+   * The workspace names on the rows. Cosmetic on purpose: a failed read leaves "Tenant N" on a row, which is still
+   * true and still usable, so it stays silent (owner 2026-10-27 audit: names falling back are allowed to).
+   */
   private loadTenants(): void {
     if (!this.canSeeWorkspace()) return;
     this.http.get<ApiResponse<TenantName[]>>(`${API_BASE}/tenant.json/listTenants`).subscribe({

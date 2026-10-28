@@ -153,3 +153,26 @@ describe('ReadDocumentDialog', () => {
     expect(api.extract).not.toHaveBeenCalled();
   });
 });
+
+describe('ReadDocumentDialog -- the storage connections (owner 2026-10-27)', () => {
+  it('says there is none once an empty list answers', async () => {
+    const { fixture, dialog } = dialogWith({}, {}, { buckets: vi.fn(() => ok([])) });
+    await fixture.whenStable();
+    expect(dialog.bucketsLoading()).toBe(false);
+    expect(dialog.bucketsEmpty()).toBe(true);
+    expect(dialog.bucketsError()).toBe('');
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('no storage connection yet');
+  });
+
+  it('says why they could not be read, and reads them again on Try again', async () => {
+    const buckets = vi.fn(() => throwError(() => new HttpErrorResponse({ status: 500 })));
+    const { fixture, dialog, storage } = dialogWith({}, {}, { buckets });
+    await fixture.whenStable();
+    expect(dialog.bucketsLoading()).toBe(false);
+    expect(dialog.bucketsError()).toBe('The storage connections could not be listed.');
+    (storage.buckets as ReturnType<typeof vi.fn>).mockReturnValue(ok([{ bucket: 'ui-review-s3', label: 'UI-REVIEW', provider: 'S3' }]));
+    dialog.loadBuckets();
+    expect(dialog.bucketsError()).toBe('');
+    expect(dialog.bucket()).toBe('ui-review-s3');
+  });
+});

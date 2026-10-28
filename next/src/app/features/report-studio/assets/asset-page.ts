@@ -14,9 +14,13 @@ import { confirmWith } from '../../../shared/ui/confirm';
 import { AuthService } from '../../../core/auth/auth.service';
 import { ReportStudioApi, studioError } from '../report-studio.api';
 import { TemplateDefinition, TemplateRow } from '../report-studio.model';
-import { AssetCard, AssetDetail, KIND_WORDS, Person, stateTone, stateWord, typeOf } from '../assets.model';
+import { AssetCard, AssetDetail, AssetUse, AssetVersion, KIND_WORDS, Person, stateTone, stateWord, typeOf } from '../assets.model';
 import { RsPickSearch } from '../pick-search';
 import { AssetPicture } from './asset-picture';
+import { AppLoading, InlineStatus, createLoadState } from '../../../shared/ui/loading';
+import { BlurLoader } from '../../../shared/ui/blur-loader';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
 import { UploadData, UploadPanel } from './upload-panel';
 
 /**
@@ -28,7 +32,7 @@ import { UploadData, UploadPanel } from './upload-panel';
  */
 @Component({
   selector: 'app-asset-page',
-  imports: [PageHeader, Icon, LoadError, RsTimePipe, FormsModule, RouterLink, AssetPicture, RsPickSearch],
+  imports: [PageHeader, Icon, LoadError, RsTimePipe, FormsModule, RouterLink, AssetPicture, RsPickSearch, AppLoading, InlineStatus, BlurLoader, SortHeader],
   templateUrl: './asset-page.html',
   styleUrl: './assets.css',
 })
@@ -41,7 +45,16 @@ export class AssetPage implements OnInit {
   private readonly router = inject(Router);
 
   readonly a = signal<AssetDetail | null>(null);
-  readonly error = signal('');
+  /**
+   * Owner 2026-10-27: the asset's read. The page error shows only while there is no asset on screen: a reload after an
+   * action that fails keeps the page and says so in a toast, instead of swapping the whole page for an error.
+   */
+  readonly state = createLoadState();
+  readonly error = this.state.error;
+  /** The pickers' reads (grant to, template, stamp): each says it is loading or why it failed, never an empty choice. */
+  readonly peopleState = createLoadState(false);
+  readonly templatesState = createLoadState(false);
+  readonly stampsState = createLoadState(false);
   readonly busy = signal(false);
   readonly people = signal<Person[]>([]);
   readonly templates = signal<TemplateRow[]>([]);
@@ -76,6 +89,28 @@ export class AssetPage implements OnInit {
   readonly pending = computed(() => this.a()?.versions.find(v => v.state === 'PENDING') ?? null);
   readonly approvedVersions = computed(() => (this.a()?.versions ?? []).filter(v => v.state === 'APPROVED' || v.state === 'SUPERSEDED'));
   readonly ownerWord = computed(() => this.a()?.ownerName ?? 'its owner');
+  /** Owner 2026-10-27: the versions sort by any column; the API's order (newest first) until one is picked. */
+  readonly versionSort = createTableSort<AssetVersion>({
+    id: 'report-asset-versions',
+    columns: {
+      version: { value: v => v.version, kind: 'number' },
+      uploadedBy: v => v.uploadedByName,
+      review: v => this.reviewOf(v),
+      date: { value: v => v.uploadedAt, kind: 'date' },
+    },
+  });
+  /** A copy: the side panel reads the unsorted list's last entry as the first upload. */
+  readonly sortedVersions = computed(() => this.versionSort.apply(this.a()?.versions ?? []));
+  readonly usageSort = createTableSort<AssetUse>({
+    id: 'report-asset-usage',
+    columns: {
+      usedIn: u => u.name,
+      version: { value: u => u.assetVersion, kind: 'number' },
+      use: { value: u => (u.kind === 'TEMPLATE' ? u.reports ?? 0 : null), kind: 'number' },
+    },
+  });
+  readonly sortedUsage = computed(() => this.usageSort.apply(this.a()?.usage ?? []));
+  readonly usageKey = (u: AssetUse) => `${u.kind}:${u.templateId ?? u.name}:${u.templateVersion ?? ''}`;
   readonly reviewOf = (v: { reviewedByName?: string | null; reviewedAt?: string | null; state: string; reviewRequired: boolean }) =>
     v.state === 'PENDING' ? 'Waiting for an approver' : !v.reviewRequired ? 'Usable on upload' : v.reviewedByName ?? '—';
 
@@ -84,43 +119,61 @@ export class AssetPage implements OnInit {
   }
 
   load(): void {
-    this.error.set('');
+    const kept = !!this.a();
+    this.state.start();
     this.api.asset(this.assetId()).subscribe({
       next: a => {
         this.a.set(a);
+        this.state.done();
         this.placeVersion.set(a.currentVersion ?? null);
-        if (a.you.mayGrant && !this.people().length) this.api.people().subscribe({ next: p => this.people.set(p), error: () => { /* none to pick */ } });
+        if (a.you.mayGrant && !this.people().length) this.loadPeople();
         if (a.restricted && this.canTemplates() && a.you.mayPlace && !this.templates().length) {
           this.findTemplates('');
           this.findStamps('');
         }
       },
-      error: e => this.error.set(studioError(e, 'The asset could not be read.').message),
+      error: e => {
+        if (kept) { this.state.done(); this.toast.error(studioError(e, 'The asset could not be read again; what is shown may be out of date.').message); return; }
+        this.state.fail(e, 'The asset could not be read.');
+      },
+    });
+  }
+
+  /** The people use can be granted to. */
+  loadPeople(): void {
+    this.peopleState.start();
+    this.api.people().subscribe({
+      next: p => { this.people.set(p); this.peopleState.done(); },
+      error: e => this.peopleState.fail(e, 'The people could not be read.'),
     });
   }
 
   /** The placement's template picker, searched on the service (the first 200 and how many match; the picked one kept). */
   findTemplates(q: string): void {
+    this.templatesState.start();
     this.api.list({ q, limit: 200 }).subscribe({
       next: l => {
+        this.templatesState.done();
         const picked = this.templates().find(t => t.templateId === this.placeTemplate());
         this.templates.set([...(picked && !l.templates.some(t => t.templateId === picked.templateId) ? [picked] : []), ...l.templates]);
         this.templatesTotal.set(l.total);
       },
-      error: () => { /* none to pick */ },
+      error: e => this.templatesState.fail(e, 'The templates could not be read.'),
     });
   }
 
   /** The placement's stamp picker: the stamps this person may place, searched on the service. */
   findStamps(q: string): void {
+    this.stampsState.start();
     this.api.usable(null, { q, kinds: ['STAMP'] }).subscribe({
       next: u => {
+        this.stampsState.done();
         const picked = this.stamps().find(x => x.assetId === this.placeStamp());
         const found = u.assets.filter(x => x.mayPlace);
         this.stamps.set([...(picked && !found.some(x => x.assetId === picked.assetId) ? [picked] : []), ...found]);
         this.stampsTotal.set(u.total);
       },
-      error: () => { /* none to pick */ },
+      error: e => this.stampsState.fail(e, 'The stamps could not be read.'),
     });
   }
 

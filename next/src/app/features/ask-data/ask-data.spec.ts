@@ -3,7 +3,7 @@ import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { HttpErrorResponse } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
-import { Observable, Subject, of, throwError } from 'rxjs';
+import { NEVER, Observable, Subject, of, throwError } from 'rxjs';
 import { AskDataApi } from './ask-data.api';
 import { AskAnswer, chartAnswerOf, csvOf, refusalText, searchedText, segments } from './ask-data.model';
 import { AskData } from './ask-data';
@@ -284,5 +284,25 @@ describe('Ask your data -- before the first question (UX final AD1)', () => {
     fixture.detectChanges();
     expect(localStorage.getItem('etl.ask.history.2960.4641')).toBeNull();
     expect(q('[data-test="examples"]')).not.toBeNull();
+  });
+});
+
+describe('Ask your data -- the suggestions load, answer empty, or fail (owner 2026-10-27)', () => {
+  it('is looking, not empty, until the suggestions answer', () => {
+    const { screen, q } = render({ suggestions: () => NEVER });
+    expect(screen.suggestionsLoading()).toBe(true);
+    expect(q('[data-test=nothing]')).toBeNull();
+    expect(q('[data-test=no-suggestions]')).toBeNull();
+  });
+
+  it('says so when there is data but no suggestion, instead of a blank row', () => {
+    const { q } = render({ suggestions: () => of({ status: 'SUCCESS', data: { suggestions: [], searched: SEARCHED, warnings: [] } }) });
+    expect(q('[data-test=no-suggestions]')!.textContent).toContain('type your own');
+  });
+
+  it('stops looking and says why when the read fails', () => {
+    const { screen } = render({ suggestions: () => throwError(() => new HttpErrorResponse({ status: 500 })) });
+    expect(screen.suggestionsLoading()).toBe(false);
+    expect(screen.suggestionsError()).toBeTruthy();
   });
 });

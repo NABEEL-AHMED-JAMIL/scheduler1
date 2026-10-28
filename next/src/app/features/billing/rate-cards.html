@@ -14,13 +14,14 @@
     </div>
   </app-page-header>
 
+  <!-- Owner 2026-10-27: placeholders until the versions answer, "Not available" when they could not be read. -->
   <div class="grid grid-cols-2 md:grid-cols-4 stat-strip stat-row is-md is-start" role="list">
     <app-stat-tile label="Default card today" [value]="today().defaultCard ? 'v' + today().defaultCard!.version : '—'" icon="layers" tone="info"
-                   [foot]="today().defaultCard ? 'since ' + (today().defaultCard!.effective_from | serverTime: 'date') : 'no card in effect'" />
+                   [foot]="today().defaultCard ? 'since ' + (today().defaultCard!.effective_from | serverTime: 'date') : 'no card in effect'" [loading]="state.pending()" [failed]="!!error() && !state.loaded()" />
     <app-stat-tile label="Workspace cards" [value]="today().own.length" icon="building" [tone]="today().own.length ? 'warn' : 'muted'"
-                   [foot]="today().own.length ? 'on a card of their own' : 'all on the default'" />
-    <app-stat-tile label="Versions" [value]="cards().length" icon="history" tone="muted" [foot]="cards().length ? 'never edited, only added to' : 'seeded on the meter’s first start'" />
-    <app-stat-tile label="Scheduled" [value]="upcoming()" icon="calendar" [tone]="upcoming() ? 'info' : 'muted'" [foot]="upcoming() ? 'not yet in effect' : 'none dated ahead'" />
+                   [foot]="today().own.length ? 'on a card of their own' : 'all on the default'" [loading]="state.pending()" [failed]="!!error() && !state.loaded()" />
+    <app-stat-tile label="Versions" [value]="cards().length" icon="history" tone="muted" [foot]="cards().length ? 'never edited, only added to' : 'seeded on the meter’s first start'" [loading]="state.pending()" [failed]="!!error() && !state.loaded()" />
+    <app-stat-tile label="Scheduled" [value]="upcoming()" icon="calendar" [tone]="upcoming() ? 'info' : 'muted'" [foot]="upcoming() ? 'not yet in effect' : 'none dated ahead'" [loading]="state.pending()" [failed]="!!error() && !state.loaded()" />
   </div>
 
   <div class="card lookup-split">
@@ -40,16 +41,18 @@
         }
       </div>
 
-      @if (loading() && !cards().length) {
-        <div class="lookup-rail-empty"><app-icon name="refresh" class="spin icon-muted" /> Loading…</div>
-      } @else if (error()) {
-        <div class="lookup-rail-empty text-crit-500">{{ error() }}<button type="button" class="btn btn-default btn-sm mt-2" (click)="load()">Try again</button></div>
+      @if (error()) {
+        <app-load-error [message]="error()" (retry)="load()" />
+      } @else if (state.pending() || (loading() && !cards().length)) {
+        <app-loading shape="list" label="Loading rate cards…" [count]="6" />
       } @else if (!visible().length && !visibleDrafts().length) {
         <div class="lookup-rail-empty">
           <app-icon name="layers" size="1.4rem" class="icon-muted" />
           {{ cards().length ? 'No version matches.' : 'No rate card yet — the meter seeds one on its first start.' }}
         </div>
       } @else {
+        @if (draftsError()) { <app-inline-status class="px-3" [error]="draftsError()" (retry)="load()" /> }
+        <app-blur-loader [active]="loading()" label="Refreshing…">
         <ul class="lookup-rail-list" role="listbox" aria-label="Rate card versions">
           <!-- Owner #23: drafts first -- versions being prepared, which price nothing until they are published. -->
           @for (d of visibleDrafts(); track d.draft_id) {
@@ -80,6 +83,7 @@
             </li>
           }
         </ul>
+        </app-blur-loader>
       }
     </aside>
 
@@ -128,8 +132,8 @@
               </select>
             </div>
             <div class="p-3">
-              @if (previewing()) { <span class="text-xs text-[color:var(--text-muted)]"><span class="spinner inline-block align-middle mr-2"></span>Pricing last month…</span> }
-              @else if (previewError()) { <span class="text-xs text-crit-500" role="alert">{{ previewError() }}</span> }
+              @if (previewing()) { <app-loading shape="inline" label="Pricing last month…" /> }
+              @else if (previewError()) { <app-inline-status [error]="previewError()" (retry)="previewDraft(d)" /> }
               @else { <app-rate-preview [preview]="preview()" [currency]="d.card.currency" /> }
             </div>
           </section>
@@ -141,9 +145,9 @@
           </div>
           <div class="lookup-entries-scroll">
             <table class="table-modern lookup-entry-table">
-              <thead><tr><th>Meter</th><th class="text-right">Price</th><th class="text-right hidden md:table-cell">Included / month</th><th class="hidden lg:table-cell">Tiers</th></tr></thead>
+              <thead><tr><th appSort="meter" [sortBy]="meterSort">Meter</th><th class="text-right" appSort="price" [sortBy]="meterSort">Price</th><th class="text-right hidden md:table-cell" appSort="included" [sortBy]="meterSort">Included / month</th><th class="hidden lg:table-cell" appSort="tiers" [sortBy]="meterSort">Tiers</th></tr></thead>
               <tbody>
-                @for (g of draftGroups(d); track g.service) {
+                @for (g of sortedGroups(draftGroups(d)); track g.service) {
                   <tr class="bg-sunken"><td colspan="4" class="text-xs font-semibold uppercase tracking-wide text-[color:var(--text-muted)] !py-1.5">{{ g.service }}</td></tr>
                   @for (i of g.items; track i.meter) {
                     <tr>
@@ -205,9 +209,9 @@
           </div>
           <div class="lookup-entries-scroll">
             <table class="table-modern lookup-entry-table">
-              <thead><tr><th>Meter</th><th class="text-right">Price</th><th class="text-right hidden md:table-cell">Included / month</th><th class="hidden lg:table-cell">Tiers</th></tr></thead>
+              <thead><tr><th appSort="meter" [sortBy]="meterSort">Meter</th><th class="text-right" appSort="price" [sortBy]="meterSort">Price</th><th class="text-right hidden md:table-cell" appSort="included" [sortBy]="meterSort">Included / month</th><th class="hidden lg:table-cell" appSort="tiers" [sortBy]="meterSort">Tiers</th></tr></thead>
               <tbody>
-                @for (g of groups(c); track g.service) {
+                @for (g of sortedGroups(groups(c)); track g.service) {
                   <tr class="bg-sunken"><td colspan="4" class="text-xs font-semibold uppercase tracking-wide text-[color:var(--text-muted)] !py-1.5">{{ g.service }}</td></tr>
                   @for (i of g.items; track i.meter) {
                     <tr [class.is-changed]="changedAgainstBase(c).includes(i.label ?? i.meter)">
@@ -227,7 +231,9 @@
           </div>
         </section>
         <ng-container *ngTemplateOutlet="rulesTable; context: { rules: c.rules ?? [], items: c.items, currency: c.currency }" />
-      } @else if (!loading()) {
+      } @else if (state.pending() || loading()) {
+        <app-loading shape="panel" label="Loading rate cards…" [count]="6" />
+      } @else {
         <div class="lookup-entries-empty lookup-detail-empty">
           <app-icon name="layers" size="1.5rem" class="icon-muted" />
           <p>Pick a version to see its calculation.</p>

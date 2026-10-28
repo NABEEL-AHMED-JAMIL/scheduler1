@@ -2,7 +2,8 @@ import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Dialog } from '@angular/cdk/dialog';
-import { of, Subject, throwError } from 'rxjs';
+import { NEVER, Observable, of, Subject, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { Invoices } from './invoices';
 import { BillingApi } from './billing.service';
 import { WorkspacePicker } from './workspace-picker';
@@ -153,3 +154,41 @@ describe('Invoices, rail tone and statement', () => {
   });
 });
 
+describe('Invoices -- loading, empty, error (owner 2026-10-27)', () => {
+  function screen(answer: () => Observable<unknown>, ready = true) {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [
+      { provide: BillingApi, useValue: { invoices: vi.fn(answer) } }, { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn() } },
+      { provide: Dialog, useValue: { open: () => ({ closed: of(false) }) } }, { provide: Router, useValue: { navigate: vi.fn() } },
+      { provide: AuthService, useValue: { isPlatformAdmin: () => true } },
+      { provide: ActivatedRoute, useValue: { paramMap: of(new Map()), snapshot: { paramMap: new Map() } } },
+      { provide: WorkspacePicker, useValue: { tenantId: Object.assign(() => null, { set: vi.fn() }), options: () => [], ready: (then: () => void) => { if (ready) then(); }, isPlatformAdmin: () => true } },
+    ] });
+    const component = TestBed.runInInjectionContext(() => new Invoices());
+    component.ngOnInit();
+    return component;
+  }
+
+  it('is loading, not "No invoice yet", while the workspaces and then the invoices are read', () => {
+    const waiting = screen(() => NEVER, false);
+    expect(waiting.state.pending()).toBe(true);
+    expect(waiting.firstLoad()).toBe(true);
+    const reading = screen(() => NEVER);
+    expect(reading.loading()).toBe(true);
+    expect(reading.firstLoad()).toBe(true);
+  });
+
+  it('is empty once an empty list answers', () => {
+    const component = screen(() => of({ status: API_SUCCESS, data: [] }));
+    expect(component.loading()).toBe(false);
+    expect(component.firstLoad()).toBe(false);
+    expect(component.visible()).toEqual([]);
+  });
+
+  it('says the invoices could not be read, in plain words, and stops loading', () => {
+    const component = screen(() => throwError(() => new HttpErrorResponse({ status: 500, error: 'Internal Server Error' })));
+    expect(component.loading()).toBe(false);
+    expect(component.firstLoad()).toBe(false);
+    expect(component.error()).toBe('The invoices could not be read.');
+  });
+});

@@ -27,6 +27,9 @@ import { RefreshButton } from '../../../shared/ui/refresh-button';
 import { WorkspaceSelect } from '../../../shared/ui/workspace-select';
 import { WorkspaceDirectory } from '../../../core/workspaces/workspace-directory';
 import { ApiLimitsDialog, ApiLimitsDialogData } from '../../admin/tenants/api-limits-dialog';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
+import { InlineStatus, createLoadState } from '../../../shared/ui/loading';
 
 /**
  * MIG-332: Integration › API Clients (workspace administrators). The workspace's API clients for the customer API --
@@ -48,7 +51,7 @@ import { ApiLimitsDialog, ApiLimitsDialogData } from '../../admin/tenants/api-li
 @Component({
   selector: 'app-api-clients',
   imports: [RefreshButton, PageHeader, TableShell, Icon, ServerTimePipe, ManagedBanner, CdkMenu, CdkMenuItem, CdkMenuTrigger, SandboxPanel,
-    WorkspaceSelect],
+    WorkspaceSelect, SortHeader, InlineStatus],
   templateUrl: './api-clients.html',
 })
 export class ApiClients implements OnInit {
@@ -65,36 +68,97 @@ export class ApiClients implements OnInit {
 
   readonly clients = signal<ApiClientRow[]>([]);
   readonly scopes = signal<ScopeRow[]>([]);
-  readonly loading = signal(true);
-  readonly error = signal('');
+  /**
+   * Owner 2026-10-27: the scopes feed New API client; a failed read used to leave the button disabled with no word, so
+   * the page now says why and offers Try again.
+   */
+  readonly scopesState = createLoadState();
+  /** The clients' read: loading until the first answer, so the table never says "No API clients yet" before it. */
+  readonly state = createLoadState();
+  readonly loading = this.state.loading;
+  readonly error = this.state.error;
   readonly showRevoked = signal(false);
   /** The client a rotate or revoke is in flight for. */
   readonly busy = signal<string | null>(null);
   readonly shown = computed(() => this.clients().filter(c => this.showRevoked() || c.status !== 'Revoked'));
   readonly revokedCount = computed(() => this.clients().filter(c => c.status === 'Revoked').length);
+  /** Owner 2026-10-27: every column that holds one value sorts; the list keeps the API's order until one is picked. */
+  readonly clientSort = createTableSort<ApiClientRow>({
+    id: 'api-clients',
+    columns: {
+      name: c => c.name,
+      allowed: c => c.ipAllowlist.join(', '),
+      limit: { value: c => c.limit?.ratePerMinute, kind: 'number' },
+      calls: { value: c => c.callsThisMonth, kind: 'number' },
+      lastUsed: { value: c => c.lastUsedAt, kind: 'date' },
+      expires: { value: c => c.expiresAt, kind: 'date' },
+      state: { value: c => c.status, kind: 'status' },
+    },
+  });
+  readonly sortedClients = computed(() => this.clientSort.apply(this.shown()));
 
   readonly routes = signal<EventRouteRow[]>([]);
   readonly pipelines = signal<RouteTarget[]>([]);
-  readonly routesLoading = signal(true);
-  readonly routesError = signal('');
+  readonly routesState = createLoadState();
+  readonly routesLoading = this.routesState.loading;
+  readonly routesError = this.routesState.error;
+  readonly routeSort = createTableSort<EventRouteRow>({
+    id: 'api-client-routes',
+    columns: {
+      eventType: r => r.eventType,
+      target: r => this.targetOf(r),
+      contract: r => r.contractName || (r.contractId ? 'Contract ' + r.contractId : ''),
+      state: { value: r => (r.active ? 'Active' : 'Inactive'), kind: 'status' },
+    },
+  });
+  readonly sortedRoutes = computed(() => this.routeSort.apply(this.routes()));
   readonly routeBusy = signal<number | null>(null);
 
   readonly webhooks = signal<WebhookRow[]>([]);
   readonly eventTypes = signal<EventTypeRow[]>([]);
-  readonly webhooksLoading = signal(true);
-  readonly webhooksError = signal('');
+  readonly webhooksState = createLoadState();
+  readonly webhooksLoading = this.webhooksState.loading;
+  readonly webhooksError = this.webhooksState.error;
+  readonly webhookSort = createTableSort<WebhookRow>({
+    id: 'api-client-webhooks',
+    columns: {
+      url: w => w.url,
+      lastDelivered: { value: w => w.lastSuccessAt, kind: 'date' },
+      // What wants a look first: a failing webhook, then a paused one.
+      state: { value: w => this.webhookState(w), kind: 'status', order: ['Failing', 'Paused', 'Active'] },
+    },
+  });
+  readonly sortedWebhooks = computed(() => this.webhookSort.apply(this.webhooks()));
   readonly webhookBusy = signal<string | null>(null);
 
   /** MIG-337: the workspace's API limits and this month's calls; null until read (or when they cannot be). */
   readonly limits = signal<ApiLimitsRow | null>(null);
+  /**
+   * Owner 2026-10-27: the limits card was simply absent when its read failed, so the quota looked unset; it now says
+   * the limits could not be read, with Try again.
+   */
+  readonly limitsState = createLoadState();
 
   ngOnInit(): void {
     if (!this.needsWorkspace()) this.loadAll();
+    this.loadScopes();
+  }
+
+  loadScopes(): void {
+    this.scopesState.start();
     this.api.scopes().subscribe({
-      next: r => this.scopes.set(r.status === API_SUCCESS ? r.data ?? [] : []),
-      error: () => this.scopes.set([]),
+      next: r => {
+        if (r.status !== API_SUCCESS) { this.scopes.set([]); this.scopesState.fail(r, 'The API scopes could not be read, so no client can be made yet.'); return; }
+        this.scopes.set(r.data ?? []);
+        this.scopesState.done();
+      },
+      error: err => { this.scopes.set([]); this.scopesState.fail(err, 'The API scopes could not be read, so no client can be made yet.'); },
     });
   }
+
+  /** Why New API client is disabled, as its tooltip. */
+  readonly newClientBlocked = computed(() => this.scopesState.loading() ? 'Reading the API scopes…'
+    : this.scopesState.error() ? this.scopesState.error() : !this.scopes().length ? 'No API scope is available.' : '');
 
   /** Every section of the page, for the workspace shown. */
   loadAll(): void {
@@ -116,43 +180,54 @@ export class ApiClients implements OnInit {
   }
 
   load(): void {
-    this.loading.set(true);
-    this.error.set('');
+    this.state.start();
     const asked = this.tenantId();
-    this.api.limits(asked).subscribe({
-      next: r => { if (asked === this.tenantId()) this.limits.set(r.status === API_SUCCESS ? r.data ?? null : null); },
-      error: () => { if (asked === this.tenantId()) this.limits.set(null); },
-    });
+    this.loadLimits();
     this.api.list(asked).subscribe({
       next: r => {
         if (asked !== this.tenantId()) return;
-        this.loading.set(false);
-        if (r.status === API_SUCCESS) this.clients.set(r.data ?? []);
-        else this.error.set(r.message || 'The API clients could not be read.');
+        if (r.status !== API_SUCCESS) { this.state.fail(r, 'The API clients could not be read.'); return; }
+        this.clients.set(r.data ?? []);
+        this.state.done();
       },
       error: err => {
         if (asked !== this.tenantId()) return;
-        this.loading.set(false);
-        this.error.set(err?.error?.message || 'The API clients could not be read.');
+        this.state.fail(err, 'The API clients could not be read.');
+      },
+    });
+  }
+
+  loadLimits(): void {
+    this.limitsState.start();
+    const asked = this.tenantId();
+    this.api.limits(asked).subscribe({
+      next: r => {
+        if (asked !== this.tenantId()) return;
+        if (r.status !== API_SUCCESS) { this.limits.set(null); this.limitsState.fail(r, 'The API limits could not be read.'); return; }
+        this.limits.set(r.data ?? null);
+        this.limitsState.done();
+      },
+      error: err => {
+        if (asked !== this.tenantId()) return;
+        this.limits.set(null);
+        this.limitsState.fail(err, 'The API limits could not be read.');
       },
     });
   }
 
   loadRoutes(): void {
-    this.routesLoading.set(true);
-    this.routesError.set('');
+    this.routesState.start();
     const asked = this.tenantId();
     this.api.routesList(asked).subscribe({
       next: r => {
         if (asked !== this.tenantId()) return;
-        this.routesLoading.set(false);
-        if (r.status === API_SUCCESS) this.routes.set(r.data ?? []);
-        else this.routesError.set(r.message || 'The event routes could not be read.');
+        if (r.status !== API_SUCCESS) { this.routesState.fail(r, 'The event routes could not be read.'); return; }
+        this.routes.set(r.data ?? []);
+        this.routesState.done();
       },
       error: err => {
         if (asked !== this.tenantId()) return;
-        this.routesLoading.set(false);
-        this.routesError.set(err?.error?.message || 'The event routes could not be read.');
+        this.routesState.fail(err, 'The event routes could not be read.');
       },
     });
     this.api.routeTargets(asked).subscribe({
@@ -292,20 +367,18 @@ export class ApiClients implements OnInit {
   // ------------------------------------------------------------------------------------------------ webhooks (MIG-333)
 
   loadWebhooks(): void {
-    this.webhooksLoading.set(true);
-    this.webhooksError.set('');
+    this.webhooksState.start();
     const asked = this.tenantId();
     this.api.webhookList(asked).subscribe({
       next: r => {
         if (asked !== this.tenantId()) return;
-        this.webhooksLoading.set(false);
-        if (r.status === API_SUCCESS) this.webhooks.set(r.data ?? []);
-        else this.webhooksError.set(r.message || 'The webhooks could not be read.');
+        if (r.status !== API_SUCCESS) { this.webhooksState.fail(r, 'The webhooks could not be read.'); return; }
+        this.webhooks.set(r.data ?? []);
+        this.webhooksState.done();
       },
       error: err => {
         if (asked !== this.tenantId()) return;
-        this.webhooksLoading.set(false);
-        this.webhooksError.set(err?.error?.message || 'The webhooks could not be read.');
+        this.webhooksState.fail(err, 'The webhooks could not be read.');
       },
     });
     this.api.eventTypes().subscribe({

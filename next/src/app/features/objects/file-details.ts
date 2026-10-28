@@ -2,12 +2,12 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { DIALOG_DATA } from '@angular/cdk/dialog';
 import { RouterLink } from '@angular/router';
 import { SidePanel } from '../../shared/ui/side-panel';
-import { Icon } from '../../shared/ui/icon';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { formatSize } from '../../shared/ui/format-size';
 import { ObjectSummary, StorageService } from './storage.service';
 import { GeneratedService } from '../documents/generated/generated.service';
 import { GeneratedReport, findRunOf } from '../documents/generated/generated.model';
+import { AppLoading, InlineStatus, loadErrorText } from '../../shared/ui/loading';
 
 export interface FileDetailsData { bucket: string; key: string; name: string; size?: number; lastModified?: string; contentType?: string; }
 
@@ -24,7 +24,7 @@ export interface FileDetailsData { bucket: string; key: string; name: string; si
  */
 @Component({
   selector: 'app-file-details',
-  imports: [SidePanel, Icon, ServerTimePipe, RouterLink],
+  imports: [SidePanel, ServerTimePipe, RouterLink, AppLoading, InlineStatus],
   templateUrl: './file-details.html',
 })
 export class FileDetails implements OnInit {
@@ -36,6 +36,8 @@ export class FileDetails implements OnInit {
     size: this.data.size, lastModified: this.data.lastModified, contentType: this.data.contentType,
   });
   readonly metaError = signal('');
+  /** Owner 2026-10-27: the checksum read "—" while the metadata was still coming, as if there were none. */
+  readonly metaLoading = signal(true);
   readonly run = signal<GeneratedReport | null>(null);
   /** How many runs were searched; null while searching, -1 when they could not be read. */
   readonly runsSearched = signal<number | null>(null);
@@ -43,13 +45,7 @@ export class FileDetails implements OnInit {
   readonly lookedUp = signal(false);
 
   ngOnInit(): void {
-    this.storage.objectMetadata(this.data.bucket, this.data.key).subscribe({
-      next: r => {
-        if (r.status === 'SUCCESS' && r.data) this.meta.update(m => ({ ...m, ...r.data }));
-        else this.metaError.set(r.message || 'Could not read this file\'s metadata.');
-      },
-      error: e => this.metaError.set(e?.error?.message || 'Could not read this file\'s metadata.'),
-    });
+    this.loadMeta();
     this.generated.objectWriter(this.data.bucket, this.data.key).subscribe({
       next: writer => {
         this.run.set(writer);
@@ -58,6 +54,26 @@ export class FileDetails implements OnInit {
       },
       error: () => this.searchRecentRuns(),
     });
+  }
+
+  /** The object's own metadata; Try again reads it again after a failure. */
+  loadMeta(): void {
+    this.metaLoading.set(true);
+    this.metaError.set('');
+    this.storage.objectMetadata(this.data.bucket, this.data.key).subscribe({
+      next: r => {
+        this.metaLoading.set(false);
+        if (r.status === 'SUCCESS' && r.data) this.meta.update(m => ({ ...m, ...r.data }));
+        else this.metaError.set(loadErrorText(r, 'Could not read this file\'s metadata.'));
+      },
+      error: e => { this.metaLoading.set(false); this.metaError.set(loadErrorText(e, 'Could not read this file\'s metadata.')); },
+    });
+  }
+
+  /** Try again after the recent runs could not be read. */
+  retryRuns(): void {
+    this.runsSearched.set(null);
+    this.searchRecentRuns();
   }
 
   /** Core could not say: the recent runs' outputs are searched instead, and the panel says how far. */

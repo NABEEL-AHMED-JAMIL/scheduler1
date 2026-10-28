@@ -2,7 +2,8 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { Dialog } from '@angular/cdk/dialog';
-import { of, throwError } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { FIND_DELAY_MS, GeneratedReports } from './generated-reports';
 import { GeneratedService } from './generated.service';
 import { reportsFromRun } from './generated.model';
@@ -27,13 +28,15 @@ const RUN_REPORTS = reportsFromRun(RUN, [
     recordedAt: '2026-09-29T07:07:05.863214', bucket: 'ui-review-s3', key: 'registry-live-check/customers-clean.json' },
 ]);
 
-function page(opts: { runsFail?: boolean; listObjects?: (b: string, prefix: string, token?: string) => unknown } = {}) {
+function page(opts: { runsFail?: boolean; listObjects?: (b: string, prefix: string, token?: string) => unknown;
+                      buckets?: () => unknown } = {}) {
+  try { localStorage.clear(); } catch { /* none */ }
   const listObjects = vi.fn(opts.listObjects ?? ((_b: string, prefix: string) => of(ok({ objects: prefix === 'reports/'
     ? [{ name: '2026', key: 'reports/2026/', folder: true },
        { name: 'Q3.pdf', key: 'reports/Q3.pdf', folder: false, size: 13841, lastModified: '2026-09-28T12:00:00Z' }]
     : [{ name: 'Sep.xlsx', key: 'reports/2026/Sep.xlsx', folder: false, size: 900, lastModified: '2026-09-27T12:00:00Z' }] }))));
   const storage = {
-    buckets: vi.fn(() => of(ok([{ bucket: 'ui-review-s3', label: 'UI-REVIEW', provider: 'S3' }]))),
+    buckets: vi.fn(opts.buckets ?? (() => of(ok([{ bucket: 'ui-review-s3', label: 'UI-REVIEW', provider: 'S3' }])))),
     listObjects,
     download: vi.fn(() => of(new Blob(['x']))),
     share: vi.fn(() => of(ok(null))),
@@ -230,5 +233,64 @@ describe('Generated reports layout (UX final RP1, CV1)', () => {
     expect(menus.length).toBe(p.paged().length);
     expect(menus[0].getAttribute('aria-label')).toBe('Actions for ' + p.paged()[0].name);
     expect(el.querySelectorAll('tbody .btn-circle').length).toBe(0);
+  });
+});
+
+describe('Generated outputs -- sorting (owner 2026-10-27)', () => {
+  it('starts newest first, as the list was, and sorts by name both ways', () => {
+    const { p } = page();
+    expect(p.sort.key()).toBe('created');
+    expect(p.paged().map(r => r.name)).toEqual(['customers-clean.json', 'customers-clean.json', 'Q3.pdf', 'Sep.xlsx']);
+    p.sort.toggle('name');
+    expect(p.paged().map(r => r.name)).toEqual(['customers-clean.json', 'customers-clean.json', 'Q3.pdf', 'Sep.xlsx']);
+    p.sort.toggle('name');
+    expect(p.paged().map(r => r.name)).toEqual(['Sep.xlsx', 'Q3.pdf', 'customers-clean.json', 'customers-clean.json']);
+  });
+
+  it('sorts sizes as numbers, the largest first', () => {
+    const { p } = page();
+    p.sort.toggle('size');
+    expect(p.paged().map(r => r.size)).toEqual([13841, 900, 169, 169]);
+  });
+});
+
+describe('Generated outputs -- loading, empty, error (owner 2026-10-27)', () => {
+  it('is loading, not empty, while the buckets are still being read', () => {
+    const { p, fixture } = page({ buckets: () => NEVER });
+    expect(p.loading()).toBe(true);
+    expect(p.bucketsState.pending()).toBe(true);
+    expect(fixture.nativeElement.textContent).not.toContain('Nothing generated yet');
+  });
+
+  it('says there is no storage connection once an empty list answers, and still reads the runs', () => {
+    const { p, fixture, storage } = page({ buckets: () => of(ok([])) });
+    fixture.detectChanges();
+    expect(p.loading()).toBe(false);
+    expect(storage.listObjects).not.toHaveBeenCalled();
+    expect(fixture.nativeElement.textContent).toContain('No storage connection yet.');
+  });
+
+  it('says why the buckets could not be read, in plain words, with Try again', () => {
+    const { p, fixture } = page({ buckets: () => throwError(() => new HttpErrorResponse({ status: 500, error: 'boom' })) });
+    fixture.detectChanges();
+    expect(p.loading()).toBe(false);
+    expect(p.bucketsState.error()).toBe('The storage connections could not be read.');
+    expect(fixture.nativeElement.textContent).toContain('Try again');
+  });
+
+  it('says Find failed instead of claiming no other schedule has it', () => {
+    vi.useFakeTimers();
+    try {
+      const { p, service } = page();
+      service.matchingOutputs.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 502 })));
+      p.search('readmission');
+      vi.advanceTimersByTime(FIND_DELAY_MS);
+      expect(p.found()).toBeNull();
+      expect(p.finding()).toBe(false);
+      expect(p.findError()).toContain('could not be searched');
+      expect(p.reach()).not.toContain('no other schedule');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

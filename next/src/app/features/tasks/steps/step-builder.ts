@@ -1,4 +1,5 @@
-import { Component, ComponentRef, OnInit, ViewContainerRef, computed, effect, inject, input, linkedSignal, output, signal, untracked, viewChild } from '@angular/core';
+import { Component, ComponentRef, DestroyRef, OnInit, ViewContainerRef, WritableSignal, computed, effect, inject, input, linkedSignal, output, signal, untracked, viewChild } from '@angular/core';
+import { Observable } from 'rxjs';
 import { Dialog } from '@angular/cdk/dialog';
 import { RouterLink } from '@angular/router';
 import { API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
@@ -17,7 +18,7 @@ import {
   addStep, canonical, definitionJson, inputColumns, isLegacyDefinition, refusalOf, moveStep, onErrorLabel, problemsByStep, removeStep, replaceStep,
   sameDefinition, sampleRowsOf, sourceLabel, taskEntry, taskLabel, taskOptions, toYaml, updateSettings, updateSource, usesBucket, usesPrompt,
   withSample, BucketChoice, PromptChoice, usesWebhook, WebhookChoice, usesApiRequest, ApiRequestChoice, DocumentTypeChoice, usesDocumentType, updateParameters,
-  ScheduleChoice, usesSchedule,
+  ScheduleChoice, usesSchedule, VersionRow,
 } from './steps.model';
 import { ParameterEditor } from './parameter-editor';
 import type { RunParameter } from '../../jobs/run-parameters/run-parameters';
@@ -27,6 +28,9 @@ import { Segmented, SegmentOption } from '../../../shared/ui/segmented';
 import { Section } from '../../../shared/ui/section';
 import type { StepFlow } from './step-flow';
 import { stageGroups } from './overview';
+import { AppLoading, InlineStatus, createLoadState, loadErrorText } from '../../../shared/ui/loading';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
 
 export type BuilderTab = 'steps' | 'settings' | 'history' | 'yaml' | 'json';
 
@@ -61,7 +65,7 @@ type Tone = 'ok' | 'warn' | 'crit';
  */
 @Component({
   selector: 'app-step-builder',
-  imports: [Icon, Field, Combobox, ServerTimePipe, Segmented, RouterLink, Section, ParameterEditor],
+  imports: [Icon, Field, Combobox, ServerTimePipe, Segmented, RouterLink, Section, ParameterEditor, AppLoading, InlineStatus, SortHeader],
   templateUrl: './step-builder.html',
   // UX review 2026-10-12 (B2/B3): this screen's own rules, in its lazy chunk rather than the console's first download.
   styles: `
@@ -114,6 +118,8 @@ export class StepBuilder implements OnInit {
   readonly meta = linkedSignal(() => this.view());
   readonly draft = linkedSignal<Definition>(() => structuredClone(this.meta().definition));
   readonly tasks = signal<StepTaskEntry[]>([]);
+  /** Owner 2026-10-27: the Task Registry's read for Add step and the step names; a failure is said with Try again. */
+  readonly tasksState = createLoadState();
   readonly problems = signal<Problem[]>([]);
   /** ZT-S4: the last Validate's warnings, shown on their steps (a move, an edit's save or Discard clears them with the problems). */
   readonly warnings = signal<Problem[]>([]);
@@ -170,6 +176,16 @@ export class StepBuilder implements OnInit {
     return m.stored && !m.legacy ? `Version ${m.version}` : this.unscheduled() ? 'No steps saved yet' : 'Runs as its legacy step: no steps saved';
   });
   readonly latestVersion = computed(() => this.meta().versions?.[0] ?? null);
+  /** Owner 2026-10-27: the History tab's versions sort by any column; the API's order (newest first) until one is picked. */
+  readonly versionSort = createTableSort<VersionRow>({
+    id: 'pipeline-versions',
+    columns: {
+      version: { value: v => v.version, kind: 'number' },
+      saved: { value: v => v.dateCreated, kind: 'date' },
+      by: v => v.createdByName || (v.createdBy ? 'User #' + v.createdBy : null),
+    },
+  });
+  readonly sortedVersions = computed(() => this.versionSort.apply(this.meta().versions ?? []));
 
   private shownTab: BuilderTab = 'steps';
 
@@ -319,10 +335,15 @@ export class StepBuilder implements OnInit {
     saveStepsLayout(layout);
   }
 
+  /** Set once the builder is gone, so a flow view that finishes loading afterwards is not placed into a destroyed one. */
+  private destroyed = false;
+  private readonly destroyRef = inject(DestroyRef);
+
   private async mountFlow(host: ViewContainerRef): Promise<void> {
+    this.destroyRef.onDestroy(() => { this.destroyed = true; });
     const { StepFlow } = await import('./step-flow');
-    // Back on the list (or the tab left) while it loaded: nothing to place.
-    if (this.flowHost() !== host) return;
+    // The page left while the chunk loaded (NG0205 otherwise), or back on the list: nothing to place.
+    if (this.destroyed || this.flowHost() !== host) return;
     host.clear();
     const view = host.createComponent(StepFlow);
     view.instance.open.subscribe(index => this.open(index));
@@ -356,63 +377,60 @@ export class StepBuilder implements OnInit {
   /** MIG-424: the workspace's schedules, read the first time a step that calls one (Run pipeline) is opened. */
   private readonly scheduleChoices = signal<ScheduleChoice[] | null>(null);
 
+  /**
+   * Owner 2026-10-27: the step whose panel is waiting for its choice lists (its card shows it is opening; a click used to
+   * do nothing visible until up to six reads answered), and the lists that could not be read: the panel still opens --
+   * a saved choice shows by its id -- and the builder says which list is missing, with Try again on the next open.
+   */
+  readonly openingKey = signal<string | null>(null);
+  readonly choiceErrors = signal<string[]>([]);
+  private readonly failedChoices = new Set<WritableSignal<unknown[] | null>>();
+
+  /** Reads one choice list, then carries on opening the step. A failure leaves the list empty and says so. */
+  private readChoice<T>(read: Observable<T[]>, into: WritableSignal<T[] | null>, what: string, index: number): void {
+    read.subscribe({
+      next: rows => { into.set(rows); this.open(index); },
+      error: err => {
+        into.set([]);
+        this.failedChoices.add(into as WritableSignal<unknown[] | null>);
+        this.choiceErrors.update(list => [...list.filter(w => !w.startsWith(what)), `${what} could not be read (${loadErrorText(err, 'no answer')}).`]);
+        this.open(index);
+      },
+    });
+  }
+
+  /** Try again: the lists that failed are read again the next time a step that needs them opens. */
+  retryChoices(): void {
+    for (const list of this.failedChoices) list.set(null);
+    this.failedChoices.clear();
+    this.choiceErrors.set([]);
+  }
+
   open(index: number): void {
     const step = this.draft().steps[index];
     if (!step) return;
     this.selected.set(step.key);
+    this.openingKey.set(step.key);
     const schema = this.taskOf(step)?.configSchema;
-    if (this.promptChoices() === null && usesPrompt(schema)) {
-      // A list that cannot be read leaves the choice empty: a saved prompt still shows by its id.
-      this.api.prompts().subscribe({
-        next: prompts => { this.promptChoices.set(prompts); this.open(index); },
-        error: () => { this.promptChoices.set([]); this.open(index); },
-      });
-      return;
-    }
-    if (this.bucketChoices() === null && usesBucket(schema)) {
-      // Likewise: without the list the box still takes an alias typed by hand.
-      this.api.buckets().subscribe({
-        next: buckets => { this.bucketChoices.set(buckets); this.open(index); },
-        error: () => { this.bucketChoices.set([]); this.open(index); },
-      });
-      return;
-    }
-    if (this.webhookChoices() === null && usesWebhook(schema)) {
-      // Likewise: without the list a saved webhook still shows by its id.
-      this.api.webhooks().subscribe({
-        next: webhooks => { this.webhookChoices.set(webhooks); this.open(index); },
-        error: () => { this.webhookChoices.set([]); this.open(index); },
-      });
-      return;
-    }
+    // A list that cannot be read leaves its choice empty: a saved prompt, webhook, request, schedule or type still shows
+    // by its id, and a bucket alias can be typed by hand.
+    if (this.promptChoices() === null && usesPrompt(schema)) { this.readChoice(this.api.prompts(), this.promptChoices, 'The prompts', index); return; }
+    if (this.bucketChoices() === null && usesBucket(schema)) { this.readChoice(this.api.buckets(), this.bucketChoices, 'The buckets', index); return; }
+    if (this.webhookChoices() === null && usesWebhook(schema)) { this.readChoice(this.api.webhooks(), this.webhookChoices, 'The webhooks', index); return; }
     if (this.apiRequestChoices() === null && usesApiRequest(schema)) {
-      // Likewise: without the list a saved request still shows by its id.
-      this.api.apiRequests(this.tenantId()).subscribe({
-        next: requests => { this.apiRequestChoices.set(requests); this.open(index); },
-        error: () => { this.apiRequestChoices.set([]); this.open(index); },
-      });
+      this.readChoice(this.api.apiRequests(this.tenantId()), this.apiRequestChoices, 'The saved API requests', index);
       return;
     }
-    if (this.scheduleChoices() === null && usesSchedule(schema)) {
-      // Likewise: without the list a saved schedule still shows by its id.
-      this.api.schedules().subscribe({
-        next: schedules => { this.scheduleChoices.set(schedules); this.open(index); },
-        error: () => { this.scheduleChoices.set([]); this.open(index); },
-      });
-      return;
-    }
+    if (this.scheduleChoices() === null && usesSchedule(schema)) { this.readChoice(this.api.schedules(), this.scheduleChoices, 'The schedules', index); return; }
     if (this.documentTypeChoices() === null && usesDocumentType(schema)) {
-      // Likewise: without the list a saved type still shows by its id.
-      this.api.documentTypes().subscribe({
-        next: types => { this.documentTypeChoices.set(types); this.open(index); },
-        error: () => { this.documentTypeChoices.set([]); this.open(index); },
-      });
+      this.readChoice(this.api.documentTypes(), this.documentTypeChoices, 'The document types', index);
       return;
     }
     this.openPanel(index);
   }
 
   private openPanel(index: number): void {
+    this.openingKey.set(null);
     const step = this.draft().steps[index];
     if (!step) return;
     const data: StepPanelData = {
@@ -556,8 +574,16 @@ export class StepBuilder implements OnInit {
     return this.grouped().other.filter(p => p.path === 'settings.tags' || p.path.startsWith('settings.tags[')).map(p => p.message).join(' · ');
   }
 
-  private reloadTasks(): void {
-    this.api.tasks().subscribe({ next: r => { if (r.status === API_SUCCESS) this.tasks.set(r.data ?? []); }, error: () => {} });
+  reloadTasks(): void {
+    this.tasksState.start();
+    this.api.tasks().subscribe({
+      next: r => {
+        if (r.status !== API_SUCCESS) { this.tasksState.fail(r, 'The Task Registry could not be read: Add step has nothing to offer.'); return; }
+        this.tasks.set(r.data ?? []);
+        this.tasksState.done();
+      },
+      error: err => this.tasksState.fail(err, 'The Task Registry could not be read: Add step has nothing to offer.'),
+    });
   }
 
   // ------------------------------------------------------------------------------------------ actions

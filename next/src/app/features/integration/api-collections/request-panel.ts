@@ -14,6 +14,8 @@ import { PairsEditor } from './pairs-editor';
 import { ResponseViewer } from './response-viewer';
 import { folderOptions } from './folders';
 import { LastTests } from './last-tests';
+import { AppLoading, loadErrorText } from '../../../shared/ui/loading';
+import { LoadError } from '../../../shared/ui/load-error';
 
 export interface RequestPanelData {
   collection: CollectionRow;
@@ -42,7 +44,7 @@ type SecretState = 'configured' | 'not set' | 'plain' | 'missing' | null;
  */
 @Component({
   selector: 'app-request-panel',
-  imports: [SidePanel, Icon, Field, PairsEditor, ResponseViewer],
+  imports: [SidePanel, Icon, Field, PairsEditor, ResponseViewer, AppLoading, LoadError],
   templateUrl: './request-panel.html',
 })
 export class RequestPanel {
@@ -115,18 +117,26 @@ export class RequestPanel {
 
   constructor() {
     if (this.data.requestId) {
-      this.loading.set(true);
-      this.api.getRequest(this.data.requestId, this.data.tenantId).subscribe({
-        next: r => {
-          this.loading.set(false);
-          if (r.status !== API_SUCCESS || !r.data) { this.loadError.set(r.message); return; }
-          this.take(requestEditOf(r.data));
-        },
-        error: err => { this.loading.set(false); this.loadError.set(err?.error?.message || 'Could not read the API.'); },
-      });
+      this.readRequest();
     } else {
       this.take(blankRequest(this.data.collection.collectionId, this.data.folderId ?? null), false);
     }
+  }
+
+  /** The API being edited; Try again reads it again after a failure. */
+  readRequest(): void {
+    const id = this.data.requestId;
+    if (!id) return;
+    this.loading.set(true);
+    this.loadError.set('');
+    this.api.getRequest(id, this.data.tenantId).subscribe({
+      next: r => {
+        this.loading.set(false);
+        if (r.status !== API_SUCCESS || !r.data) { this.loadError.set(loadErrorText(r, 'The API could not be read.')); return; }
+        this.take(requestEditOf(r.data));
+      },
+      error: err => { this.loading.set(false); this.loadError.set(loadErrorText(err, 'The API could not be read.')); },
+    });
   }
 
   private take(e: RequestEdit, saved = true): void {

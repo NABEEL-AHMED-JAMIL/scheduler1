@@ -93,3 +93,36 @@ describe('Run page: the Items tab', () => {
     expect(location.path()).toBe('/pipelines/schedules/2808/runs/8814?tab=items&status=failed');
   });
 });
+
+describe('Run page: the Items tab when its read fails (owner 2026-10-27)', () => {
+  it('stays on the Items tab and says the items could not be read, with Try again', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ imports: [JobLogs], providers: [provideRouter([]), provideLocationMocks(), provideHttpClient(), provideHttpClientTesting(),
+      { provide: JobEventsService, useValue: { connected: signal(false), events: new Subject() } },
+      { provide: ActivatedRoute, useValue: { snapshot: { url: [{ path: '8814' }], firstChild: { url: [] }, queryParamMap: convertToParamMap({ tab: 'items' }) } } }] });
+    const fixture = TestBed.createComponent(JobLogs);
+    fixture.componentRef.setInput('jobId', '2808');
+    fixture.componentRef.setInput('jobQueueId', '8814');
+    fixture.detectChanges();
+    const http = TestBed.inject(HttpTestingController);
+    http.expectOne(r => r.url.endsWith('/sourceJob.json/findSourceJobAuditLog')).flush({ status: API_SUCCESS, data: LOGS });
+    http.match(r => r.url.endsWith('/aiPrompt.json/runsForJob')).forEach(r => r.flush({ status: API_SUCCESS, data: [] }));
+    fixture.detectChanges();
+    http.match(r => r.url.endsWith('/sourceJob.json/stepExecutions')).forEach(r => r.flush({ status: API_SUCCESS, data: ENGINE }));
+    http.match(r => r.url.endsWith('/sourceJob.json/runOutputs')).forEach(r => r.flush({ status: API_SUCCESS, data: { outputs: [] } }));
+    http.match(r => r.url.endsWith('/sourceJob.json/review')).forEach(r => r.flush({ status: API_SUCCESS, data: { reviewStatus: 'NOT_REQUIRED' } }));
+    http.match(r => r.url.endsWith('/sourceJob.json/runItems')).forEach(a => a.flush('boom', { status: 500, statusText: 'Server Error' }));
+    fixture.detectChanges();
+    TestBed.tick();
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    expect(component.tab()).toBe('items');
+    expect(component.itemsError()).toBe("The run's items could not be read.");
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('[data-test="run-items-error"]')?.textContent).toContain('Try again');
+    component.retryItems();
+    expect(component.itemsError()).toBe('');
+    http.match(r => r.url.endsWith('/sourceJob.json/runItems')).forEach(a => a.flush({ status: API_SUCCESS, data: ITEMS(true) }));
+    expect(component.items()?.itemRun).toBe(true);
+  });
+});

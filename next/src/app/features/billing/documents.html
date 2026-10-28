@@ -15,11 +15,12 @@
     </div>
   </app-page-header>
 
+  <!-- Owner 2026-10-27: placeholders until the list answers, "Not available" when it failed -- never 0 before the answer. -->
   <div class="grid grid-cols-2 md:grid-cols-4 stat-strip stat-row is-md is-start" role="list">
-    <app-stat-tile label="Documents" [value]="summary().documents" icon="folder" tone="info" [foot]="'in ' + year()" />
-    <app-stat-tile label="Invoices" [value]="summary().invoices" icon="file" [tone]="summary().invoices ? 'info' : 'muted'" [foot]="summary().invoices ? totals(summary().invoiced) + ' invoiced' : 'none issued'" />
-    <app-stat-tile label="Receipts" [value]="summary().receipts" icon="check" [tone]="summary().receipts ? 'ok' : 'muted'" [foot]="summary().receipts ? totals(summary().received) + ' received' : 'none yet'" />
-    <app-stat-tile label="Payment slips" [value]="summary().slips" icon="upload" [tone]="summary().slips ? 'warn' : 'muted'" [foot]="summary().slips ? 'uploaded by the workspace' : 'none uploaded'" />
+    <app-stat-tile label="Documents" [value]="summary().documents" icon="folder" tone="info" [foot]="'in ' + year()" [loading]="firstLoad()" [failed]="!!error() && !listState.loaded()" />
+    <app-stat-tile label="Invoices" [value]="summary().invoices" icon="file" [tone]="summary().invoices ? 'info' : 'muted'" [foot]="summary().invoices ? totals(summary().invoiced) + ' invoiced' : 'none issued'" [loading]="firstLoad()" [failed]="!!error() && !listState.loaded()" />
+    <app-stat-tile label="Receipts" [value]="summary().receipts" icon="check" [tone]="summary().receipts ? 'ok' : 'muted'" [foot]="summary().receipts ? totals(summary().received) + ' received' : 'none yet'" [loading]="firstLoad()" [failed]="!!error() && !listState.loaded()" />
+    <app-stat-tile label="Payment slips" [value]="summary().slips" icon="upload" [tone]="summary().slips ? 'warn' : 'muted'" [foot]="summary().slips ? 'uploaded by the workspace' : 'none uploaded'" [loading]="firstLoad()" [failed]="!!error() && !listState.loaded()" />
   </div>
 
   <div class="card lookup-split">
@@ -43,16 +44,17 @@
         }
       </div>
 
-      @if (loading() && !rows().length) {
-        <div class="lookup-rail-empty"><app-icon name="refresh" class="spin icon-muted" /> Loading…</div>
-      } @else if (error()) {
-        <div class="lookup-rail-empty text-crit-500">{{ error() }}<button type="button" class="btn btn-default btn-sm mt-2" (click)="load()">Try again</button></div>
+      @if (error()) {
+        <app-load-error [message]="error()" (retry)="load()" />
+      } @else if (firstLoad()) {
+        <app-loading shape="list" label="Loading documents…" [count]="6" />
       } @else if (!visible().length) {
         <div class="lookup-rail-empty">
           <app-icon name="folder" size="1.4rem" class="icon-muted" />
           {{ hasFilters() ? 'No document matches the current filters.' : 'No document in ' + year() + ' — the first invoice PDF is made when a month is issued.' }}
         </div>
       } @else {
+        <app-blur-loader [active]="loading()" label="Refreshing…">
         <ul class="lookup-rail-list" role="listbox" aria-label="Documents">
           @for (d of visible(); track d.documentId) {
             <li role="presentation">
@@ -76,6 +78,7 @@
             </li>
           }
         </ul>
+        </app-blur-loader>
       }
     </aside>
 
@@ -128,14 +131,16 @@
 
         <div class="bill-preview">
           @if (previewLoading()) {
-            <div class="lookup-entries-empty lookup-detail-empty"><app-icon name="refresh" class="spin icon-muted" /> Reading {{ d.fileName }}…</div>
+            <app-loading shape="spinner" [label]="'Reading ' + d.fileName + '…'" />
           } @else if (previewError()) {
-            <div class="lookup-entries-empty lookup-detail-empty"><app-icon name="alert" size="1.5rem" class="icon-crit" /><p class="text-crit-500">{{ previewError() }}</p></div>
+            <app-load-error [message]="previewError()" (retry)="pick(d.documentId)" />
           } @else if (previewUrl() && previewKind() === 'pdf' && sideBySide()) {
             <div class="grid grid-cols-2 gap-2 flex-1 min-h-0" data-test="side-by-side">
               <div class="flex flex-col min-h-0"><p class="text-xs font-semibold px-2 py-1">As issued</p><app-pdf-viewer [src]="previewUrl()" /></div>
               <div class="flex flex-col min-h-0"><p class="text-xs font-semibold px-2 py-1">Report Studio's copy (not stored)</p>
-                @if (copyUrl()) { <app-pdf-viewer [src]="copyUrl()" /> } @else { <p class="text-xs text-[color:var(--text-muted)] p-2">{{ copyError() || 'Drawing it…' }}</p> }</div>
+                @if (copyUrl()) { <app-pdf-viewer [src]="copyUrl()" /> }
+                @else if (copyError()) { <app-inline-status class="p-2" [error]="copyError()" (retry)="readCopy(d)" /> }
+                @else { <app-loading class="p-2" shape="inline" label="Drawing it…" /> }</div>
             </div>
           } @else if (previewUrl() && previewKind() === 'pdf') {
             <app-pdf-viewer [src]="previewUrl()" />
@@ -148,6 +153,8 @@
             </div>
           }
         </div>
+      } @else if (firstLoad()) {
+        <app-loading shape="panel" label="Loading documents…" [count]="6" />
       } @else {
         <div class="lookup-entries-empty lookup-detail-empty">
           <app-icon name="folder" size="1.5rem" class="icon-muted" />

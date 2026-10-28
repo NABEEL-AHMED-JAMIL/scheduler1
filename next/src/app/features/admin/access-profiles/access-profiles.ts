@@ -20,6 +20,8 @@ import { PageHeader } from '../../../shared/ui/page-header';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
 import { NeedsWorkspace } from '../../../shared/ui/needs-workspace';
 import { isOwnPlatformSignIn } from '../../../core/auth/workspace-data';
+import { AppLoading, InlineStatus, createLoadState, loadErrorText } from '../../../shared/ui/loading';
+import { LoadError } from '../../../shared/ui/load-error';
 
 /** A profile's pages arranged the way the menu arranges them, for the card. */
 interface CardSection { section: string; opens: string[]; withholds: string[]; }
@@ -33,7 +35,7 @@ interface CardSection { section: string; opens: string[]; withholds: string[]; }
  */
 @Component({
   selector: 'app-access-profiles',
-  imports: [WorkspaceSelect, RefreshButton, PageHeader, Icon, StatTile, CdkMenu, CdkMenuItem, CdkMenuTrigger, AccessPeopleGrid, AccessGrants, NeedsWorkspace],
+  imports: [WorkspaceSelect, RefreshButton, PageHeader, Icon, StatTile, CdkMenu, CdkMenuItem, CdkMenuTrigger, AccessPeopleGrid, AccessGrants, NeedsWorkspace, AppLoading, InlineStatus, LoadError],
   templateUrl: './access-profiles.html',
 })
 export class AccessProfiles implements OnInit {
@@ -70,9 +72,22 @@ export class AccessProfiles implements OnInit {
     if (this.searchTimer) clearTimeout(this.searchTimer);
     this.searchTimer = setTimeout(() => this.gridSearch.set(text), 250);
   }
-  readonly loading = signal(false);
+  /**
+   * Owner 2026-10-27: the profiles' read, so the tiles show a placeholder instead of "0 / none yet" before the answer
+   * and "Not available right now" after a failure; the catalogue has its own (a platform administrator reads it before
+   * a workspace is picked, and only the Pages tile shows it then).
+   */
+  readonly state = createLoadState(false);
+  readonly loading = this.state.loading;
+  readonly error = this.state.error;
+  readonly pagesState = createLoadState(false);
+  readonly tilesLoading = computed(() => !this.needsWorkspace() && (this.state.pending() || (this.loading() && !this.profiles().length)));
+  readonly tilesFailed = computed(() => !!this.error() && !this.profiles().length);
   readonly peopleLoading = signal(false);
-  readonly error = signal('');
+  /** The people list has answered once for this workspace: until then an empty list is not "nobody". */
+  readonly peopleLoaded = signal(false);
+  /** A member's delegation is read before the page knows which of its two faces to show. */
+  readonly delegationLoading = signal(false);
   /** The profile, or the person, whose action is in flight. */
   readonly busy = signal<number | null>(null);
   readonly assigning = signal<number | null>(null);
@@ -116,7 +131,11 @@ export class AccessProfiles implements OnInit {
 
   ngOnInit(): void {
     if (!this.auth.isTenantAdmin()) {
-      this.delegation.load().subscribe(() => this.loadPeople());
+      this.delegationLoading.set(true);
+      this.delegation.load().subscribe({
+        next: () => { this.delegationLoading.set(false); this.loadPeople(); },
+        error: () => this.delegationLoading.set(false),
+      });
       return;
     }
     // A link from the Users screen lands on one person's row: the grid view, their name in the
@@ -127,12 +146,14 @@ export class AccessProfiles implements OnInit {
     this.gridSearch.set(this.search());
     const linkedTenant = Number(params.get('tenantId'));
     if (this.canPickTenant()) {
+      // Owner 2026-10-27: a failed catalogue read shows on the Pages tile ("Not available right now"), not as a toast only.
+      this.pagesState.start();
       this.api.pages().subscribe({
         next: r => {
-          if (r.status === API_SUCCESS) this.pages.set(r.data ?? []);
-          else this.toast.error(r.message || 'The page catalogue could not be loaded.');
+          if (r.status === API_SUCCESS) { this.pages.set(r.data ?? []); this.pagesState.done(); }
+          else this.pagesState.fail(r, 'The page catalogue could not be loaded.');
         },
-        error: err => this.toast.error(err?.error?.message || 'The page catalogue could not be loaded.'),
+        error: err => this.pagesState.fail(err, 'The page catalogue could not be loaded.'),
       });
       // A deep link's workspace, else the one picked on the last screen (owner #5: the choice is kept for the session).
       const remembered = this.directory.remembered();
@@ -148,6 +169,8 @@ export class AccessProfiles implements OnInit {
     this.tenantId.set(Number.isFinite(id) && id > 0 ? id : null);
     this.profiles.set([]);
     this.people.set([]);
+    this.peopleLoaded.set(false);
+    this.peopleError.set('');
     if (this.tenantId()) this.load();
   }
 
@@ -194,18 +217,22 @@ export class AccessProfiles implements OnInit {
 
   load(): void {
     if (this.needsWorkspace()) return;
-    this.loading.set(true);
-    this.error.set('');
-    forkJoin({ pages: this.api.pages(), profiles: this.api.list(this.tenantId()) }).subscribe({
+    this.state.start();
+    if (!this.pagesState.loaded()) this.pagesState.start();
+    const tenant = this.tenantId();
+    forkJoin({ pages: this.api.pages(), profiles: this.api.list(tenant) }).subscribe({
       next: ({ pages, profiles }) => {
-        this.loading.set(false);
-        if (pages.status === API_SUCCESS) this.pages.set(pages.data ?? []);
-        if (profiles.status === API_SUCCESS) this.profiles.set(profiles.data ?? []);
-        else this.error.set(profiles.message || 'Access profiles could not be loaded.');
+        // A workspace picked while this was on its way: its own read answers instead.
+        if (tenant !== this.tenantId()) return;
+        if (pages.status === API_SUCCESS) { this.pages.set(pages.data ?? []); this.pagesState.done(); }
+        else if (!this.pagesState.loaded()) this.pagesState.fail(pages, 'The page catalogue could not be loaded.');
+        if (profiles.status === API_SUCCESS) { this.profiles.set(profiles.data ?? []); this.state.done(); }
+        else this.state.fail(profiles, 'Access profiles could not be loaded.');
       },
       error: err => {
-        this.loading.set(false);
-        this.error.set(err?.error?.message || 'Access profiles could not be loaded.');
+        if (tenant !== this.tenantId()) return;
+        this.state.fail(err, 'Access profiles could not be loaded.');
+        if (!this.pagesState.loaded()) this.pagesState.fail(err, 'The page catalogue could not be loaded.');
       },
     });
     if (this.view() === 'people') this.loadPeople();
@@ -220,15 +247,18 @@ export class AccessProfiles implements OnInit {
     if (this.needsWorkspace()) return;
     this.peopleLoading.set(true);
     this.peopleError.set('');
-    this.api.people(this.tenantId()).subscribe({
+    const tenant = this.tenantId();
+    this.api.people(tenant).subscribe({
       next: response => {
+        if (tenant !== this.tenantId()) return;
         this.peopleLoading.set(false);
-        if (response.status === API_SUCCESS) this.people.set(response.data ?? []);
-        else this.peopleError.set(response.message || 'People could not be loaded.');
+        if (response.status === API_SUCCESS) { this.people.set(response.data ?? []); this.peopleLoaded.set(true); }
+        else this.peopleError.set(loadErrorText(response, 'People could not be loaded.'));
       },
       error: err => {
+        if (tenant !== this.tenantId()) return;
         this.peopleLoading.set(false);
-        this.peopleError.set(err?.error?.message || 'People could not be loaded.');
+        this.peopleError.set(loadErrorText(err, 'People could not be loaded.'));
       },
     });
   }

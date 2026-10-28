@@ -15,6 +15,7 @@ import { DateField } from '../../../shared/ui/date-field';
 import { TimeField } from '../../../shared/ui/time-field';
 import { Icon } from '../../../shared/ui/icon';
 import { LoadError } from '../../../shared/ui/load-error';
+import { AppLoading, InlineStatus, createLoadState, loadErrorText } from '../../../shared/ui/loading';
 import { NOTIFY_OPTIONS } from '../notify-summary';
 import { SERVER_ZONE } from '../../../core/instant';
 import { dayLabel } from '../../../shared/ui/time-format';
@@ -51,6 +52,14 @@ const FREQUENCIES = [
 interface Preview { runs: string[]; ends: boolean; error: string; loading: boolean; }
 const NO_PREVIEW: Preview = { runs: [], ends: false, error: '', loading: false };
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/** The saved extras read beside the job: its two Event starts and the model each AI step runs on. */
+type ExtraRead = 'inbox' | 'documents' | 'ai';
+const EXTRA_READS: Record<ExtraRead, { path: string; fallback: string }> = {
+  inbox: { path: 'inboxTrigger', fallback: "This schedule's inbox trigger could not be read." },
+  documents: { path: 'documentTrigger', fallback: "This schedule's document trigger could not be read." },
+  ai: { path: 'aiModelChoice', fallback: "This schedule's AI models could not be read." },
+};
 
 /** Worked examples under the Cron field: minute hour day-of-month month day-of-week. */
 const CRON_EXAMPLES = [
@@ -103,7 +112,7 @@ function endAfterStart(group: AbstractControl): ValidationErrors | null {
 
 @Component({
   selector: 'app-job-edit',
-  imports: [ActionsBar, PageHeader, StatusPill, Icon, ReactiveFormsModule, RouterLink, Field, Combobox, LoadError, AiModelPicks, ManagedBanner, DateField, TimeField],
+  imports: [ActionsBar, PageHeader, StatusPill, Icon, ReactiveFormsModule, RouterLink, Field, Combobox, LoadError, AppLoading, InlineStatus, AiModelPicks, ManagedBanner, DateField, TimeField],
   templateUrl: './job-edit.html',
   /*
    * The weekday picker is the one multi-select .seg: several days can be on at once, so "on" has
@@ -197,12 +206,18 @@ export class JobEdit implements OnInit {
   readonly advancedOpen = signal(false);
   private readonly destroyRef = inject(DestroyRef);
   private readonly previewAsks = new Subject<void>();
-  readonly preview = signal<Preview>(NO_PREVIEW);
+  /** Owner 2026-10-27: loading from the start, so the debounce before the first ask does not show an empty list. */
+  readonly preview = signal<Preview>({ ...NO_PREVIEW, loading: true });
   readonly days = DAYS;
   readonly notifyOptions = NOTIFY_OPTIONS;
   readonly monthDays = Array.from({ length: 31 }, (_, i) => i + 1);
 
   readonly tasks = signal<any[]>([]);
+  /**
+   * Owner 2026-10-27: the pipeline list's read. The box said "No matches" while it was out and a failure was a toast
+   * only; the field now says "Loading pipelines…", the reason with Try again, or that there is no pipeline yet.
+   */
+  readonly tasksState = createLoadState();
   /** Tasks as searchable rows: name first, the topic and pipeline as the hint so either finds it. */
   readonly taskOptions = computed<ComboboxOption[]>(() => this.tasks().map(t => ({
     value: String(t.taskDetailId),
@@ -295,6 +310,8 @@ export class JobEdit implements OnInit {
   private readonly savedDocumentTrigger = signal<DocumentTrigger | null>(null);
   /** The workspace's document types (Document Intelligence), read the first time the document start is shown; null until then. */
   readonly documentTypes = signal<DocumentType[] | null>(null);
+  /** Owner 2026-10-27: why the types could not be read -- a failure no longer reads as "no document types yet". */
+  readonly documentTypesError = signal('');
   private readonly documentsApi = inject(DocumentsApi);
   /** The choices: the workspace's types by name, and a saved type the list no longer has, by its id. */
   readonly documentTypeOptions = computed(() => {
@@ -324,16 +341,27 @@ export class JobEdit implements OnInit {
     this.documentTypeId.set(value === '' ? null : Number(value));
   }
 
-  /** Once: a list that cannot be read leaves the choice empty, and a saved type still shows by its id. */
+  /**
+   * Once: a saved type still shows by its id. A list that cannot be read says so under the field with Try again
+   * (owner 2026-10-27) rather than claiming the workspace has no document types.
+   */
   private loadDocumentTypes(): void {
     if (this.documentTypes() !== null || this.documentTypesAsked) return;
     this.documentTypesAsked = true;
+    this.documentTypesError.set('');
+    const fallback = "The workspace's document types could not be read.";
     this.documentsApi.types().subscribe({
-      next: response => this.documentTypes.set(response.status === API_SUCCESS && Array.isArray(response.data) ? response.data : []),
-      error: () => this.documentTypes.set([]),
+      next: response => {
+        if (response.status === API_SUCCESS && Array.isArray(response.data)) { this.documentTypes.set(response.data); return; }
+        this.documentTypesAsked = false;
+        this.documentTypesError.set(loadErrorText(response, fallback));
+      },
+      error: err => { this.documentTypesAsked = false; this.documentTypesError.set(loadErrorText(err, fallback)); },
     });
   }
   private documentTypesAsked = false;
+
+  retryDocumentTypes(): void { this.loadDocumentTypes(); }
 
   /**
    * MIG-251 on MIG-242: the model each AI step runs on when this schedule runs it (sourceJob.json/aiModelChoice). Only
@@ -341,6 +369,20 @@ export class JobEdit implements OnInit {
    */
   readonly aiSteps = signal<AiStepChoice[]>([]);
   readonly modelPicks = signal<ModelPicks>({});
+  /**
+   * Owner 2026-10-27: the saved extras' reads (an edit only). While any is out the two "Also starts when" switches wait
+   * -- they used to show off and flip on a moment later, over what the reader had just set -- and a failed one says so
+   * with Try again instead of showing its section as for none.
+   */
+  readonly extrasPending = signal<ReadonlySet<ExtraRead>>(new Set());
+  readonly extrasFailed = signal<Partial<Record<ExtraRead, string>>>({});
+  readonly extrasLoading = computed(() => this.extrasPending().size > 0);
+  readonly extrasError = computed(() => {
+    const failed = this.extrasFailed();
+    return failed.inbox || failed.documents || failed.ai || '';
+  });
+  /** The trigger switches wait for the triggers' own reads. */
+  readonly triggersLoading = computed(() => this.extrasPending().has('inbox') || this.extrasPending().has('documents'));
 
   /** A manual job has no timetable, so the whole schedule section is irrelevant. */
   readonly isScheduled = computed(() => this.executionValue() !== 'Manual');
@@ -435,13 +477,7 @@ export class JobEdit implements OnInit {
     // Explicitly limited, because the endpoint's own default is ten: this dropdown is the only
     // way to attach a job to a task, so without the limit the eleventh task onwards could not
     // be chosen at all -- and the control gave no hint that anything was missing.
-    this.http.post<ApiResponse<any[]>>(`${API_BASE}/sourceTask.json/listSourceTask`, {},
-      { params: { limit: LIST_LIMIT } }).subscribe({
-      next: response => {
-        if (response.status === API_SUCCESS) this.tasks.set(response.data ?? []);
-      },
-      error: () => this.toast.error('Could not load the pipeline list.'),
-    });
+    this.loadTasks();
 
     // A Manual job has no schedule: the section is hidden, and its required fields (start date...) must not
     // hold the form invalid with nothing on screen to fix -- a Manual job could not be created or saved.
@@ -485,6 +521,20 @@ export class JobEdit implements OnInit {
   }
 
   retryLoad(): void { this.loadJob(); }
+
+  /** The pipelines to choose from (see tasksState). */
+  loadTasks(): void {
+    this.tasksState.start();
+    this.http.post<ApiResponse<any[]>>(`${API_BASE}/sourceTask.json/listSourceTask`, {},
+      { params: { limit: LIST_LIMIT } }).subscribe({
+      next: response => {
+        if (response.status !== API_SUCCESS) { this.tasksState.fail(response, 'The pipelines could not be read.'); return; }
+        this.tasks.set(response.data ?? []);
+        this.tasksState.done();
+      },
+      error: err => this.tasksState.fail(err, 'The pipelines could not be read.'),
+    });
+  }
 
   private loadJob(): void {
     this.loadError.set('');
@@ -553,38 +603,57 @@ export class JobEdit implements OnInit {
     });
   }
 
-  /** The job's trigger and AI steps. Neither is the point of the page, so a failed read leaves its section as for none. */
+  /** The job's triggers and AI steps, each its own read (see extrasPending). */
   private loadExtras(): void {
-    const params = { jobId: String(this.jobId()) };
-    this.http.get<ApiResponse<unknown>>(`${API_BASE}/sourceJob.json/inboxTrigger`, { params }).subscribe({
+    (Object.keys(EXTRA_READS) as ExtraRead[]).forEach(kind => this.readExtra(kind));
+  }
+
+  /** Try again on the extras that failed only: one that answered may already hold the reader's changes. */
+  retryExtras(): void {
+    (Object.keys(this.extrasFailed()) as ExtraRead[]).forEach(kind => this.readExtra(kind));
+  }
+
+  private readExtra(kind: ExtraRead): void {
+    const read = EXTRA_READS[kind];
+    const settle = (why?: unknown, failed = false) => {
+      this.extrasPending.update(set => { const next = new Set(set); next.delete(kind); return next; });
+      if (failed) this.extrasFailed.update(map => ({ ...map, [kind]: loadErrorText(why, read.fallback) }));
+    };
+    this.extrasPending.update(set => new Set(set).add(kind));
+    this.extrasFailed.update(map => { const next = { ...map }; delete next[kind]; return next; });
+    this.http.get<ApiResponse<unknown>>(`${API_BASE}/sourceJob.json/${read.path}`, { params: { jobId: String(this.jobId()) } }).subscribe({
       next: response => {
-        const trigger = response.status === API_SUCCESS ? triggerOf(response.data) : null;
-        this.savedTrigger.set(trigger);
-        this.onArrival.set(!!trigger?.configured && trigger.enabled !== false);
-        this.filePattern.set(trigger?.filePattern ?? '');
-        this.batchSize.set(Number(trigger?.batchSize ?? 1));
+        if (response.status !== API_SUCCESS) { settle(response, true); return; }
+        settle();
+        if (kind === 'inbox') this.applyInboxTrigger(response);
+        else if (kind === 'documents') this.applyDocumentTrigger(response);
+        else this.applyAiChoice(response);
       },
-      error: () => {},
+      error: err => settle(err, true),
     });
-    this.http.get<ApiResponse<unknown>>(`${API_BASE}/sourceJob.json/documentTrigger`, { params }).subscribe({
-      next: response => {
-        const trigger = response.status === API_SUCCESS ? documentTriggerOf(response.data) : null;
-        this.savedDocumentTrigger.set(trigger);
-        this.onApproval.set(!!trigger?.configured && trigger.enabled !== false);
-        this.documentTypeId.set(trigger?.documentTypeId === null || trigger?.documentTypeId === undefined ? null : Number(trigger.documentTypeId));
-        this.documentBatch.set(Number(trigger?.batchSize ?? 1));
-        if (trigger?.configured) this.loadDocumentTypes();
-      },
-      error: () => {},
-    });
-    this.http.get<ApiResponse<unknown>>(`${API_BASE}/sourceJob.json/aiModelChoice`, { params }).subscribe({
-      next: response => {
-        const steps = response.status === API_SUCCESS ? stepsOf(response.data) : [];
-        this.aiSteps.set(steps);
-        this.modelPicks.set(picksOf(steps));
-      },
-      error: () => {},
-    });
+  }
+
+  private applyInboxTrigger(response: ApiResponse<unknown>): void {
+    const trigger = triggerOf(response.data);
+    this.savedTrigger.set(trigger);
+    this.onArrival.set(!!trigger?.configured && trigger.enabled !== false);
+    this.filePattern.set(trigger?.filePattern ?? '');
+    this.batchSize.set(Number(trigger?.batchSize ?? 1));
+  }
+
+  private applyDocumentTrigger(response: ApiResponse<unknown>): void {
+    const trigger = documentTriggerOf(response.data);
+    this.savedDocumentTrigger.set(trigger);
+    this.onApproval.set(!!trigger?.configured && trigger.enabled !== false);
+    this.documentTypeId.set(trigger?.documentTypeId === null || trigger?.documentTypeId === undefined ? null : Number(trigger.documentTypeId));
+    this.documentBatch.set(Number(trigger?.batchSize ?? 1));
+    if (trigger?.configured) this.loadDocumentTypes();
+  }
+
+  private applyAiChoice(response: ApiResponse<unknown>): void {
+    const steps = stepsOf(response.data);
+    this.aiSteps.set(steps);
+    this.modelPicks.set(picksOf(steps));
   }
 
   /** The trigger request the form asks for, or null when it asks for what is already saved. */

@@ -12,6 +12,9 @@ import { formatSize } from '../../../shared/ui/format-size';
 import { catchError } from 'rxjs';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { ToastService } from '../../../shared/ui/toast.service';
+import { InlineStatus, loadErrorText } from '../../../shared/ui/loading';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
 
 export interface PreviewData {
   bucket: string;
@@ -44,7 +47,7 @@ const VIDEO = ['mp4', 'webm', 'ogv', 'mov', 'm4v'];
 
 @Component({
   selector: 'app-preview-dialog',
-  imports: [Icon, ServerTimePipe, AudioPlayer, PdfViewer, BlurLoader],
+  imports: [Icon, ServerTimePipe, AudioPlayer, PdfViewer, BlurLoader, InlineStatus, SortHeader],
   templateUrl: './preview-dialog.html',
 })
 export class PreviewDialog implements OnInit {
@@ -101,6 +104,12 @@ export class PreviewDialog implements OnInit {
   readonly tableLimit = 100;
   readonly tableSearch = signal('');
   readonly tableLoading = signal(false);
+  /**
+   * Owner 2026-10-27: a page of rows that failed to come (Prev, Next, another sheet) keeps the page on screen and says
+   * so above it, with Try again; it replaced the whole table with the error. The page asked for, to try again.
+   */
+  readonly pageError = signal('');
+  private pageAsked: { offset: number; sheet?: string } | null = null;
   /** Rows on the page that match the search, with their absolute row number. */
   readonly tableRows = computed(() => {
     const t = this.table();
@@ -109,6 +118,25 @@ export class PreviewDialog implements OnInit {
     return t.rows.map((cells, i) => ({ n: t.offset + i + 1, cells }))
       .filter(r => !q || r.cells.some(c => c.toLowerCase().includes(q)));
   });
+  /**
+   * Owner 2026-10-27 ("add a sort on each table"): the table view sorts the rows of the page shown -- the file is read a
+   * page at a time and the server keeps the file's own order, so the headers say that is all a sort covers. Columns are
+   * keyed by position (c0, c1, ...: a file may repeat a heading), each read as numbers, times or text as its cells allow;
+   * # is the row's number in the file. Not remembered: the next file has other columns.
+   */
+  readonly rowSort = createTableSort<{ n: number; cells: string[] }>({
+    id: 'preview-table-rows',
+    columns: { n: { value: r => r.n, kind: 'number', first: 'asc' } },
+    dynamic: key => {
+      const at = /^c(\d+)$/.exec(key);
+      if (!at) return null;
+      const index = Number(at[1]);
+      return { value: r => r.cells[index], kind: 'auto' };
+    },
+    note: `Sorts the rows on this page only (${this.tableLimit} at a time)`,
+    remember: false,
+  });
+  readonly sortedRows = computed(() => this.rowSort.apply(this.tableRows()));
   readonly tableLast = computed(() => { const t = this.table(); return t ? t.offset + t.rows.length : 0; });
   readonly tableHasMore = computed(() => { const t = this.table(); return !!t && (t.totalRows < 0 ? t.rows.length === t.limit : this.tableLast() < t.totalRows); });
   readonly tableTotalLabel = computed(() => {
@@ -124,6 +152,18 @@ export class PreviewDialog implements OnInit {
     const q = this.entrySearch().trim().toLowerCase();
     return this.entries().filter(e => !q || e.name.toLowerCase().includes(q));
   });
+  /** Owner 2026-10-27: the entries sort by any column, in the archive's own order until one is picked; not remembered. */
+  readonly entrySort = createTableSort<ArchiveEntry>({
+    id: 'preview-archive-entries',
+    columns: {
+      entry: e => e.name,
+      size: { value: e => (e.directory ? null : e.size), kind: 'number' },
+      stored: { value: e => (e.directory || e.compressedSize < 0 ? null : e.compressedSize), kind: 'number' },
+      modified: { value: e => (e.lastModified > 0 ? e.lastModified : null), kind: 'date' },
+    },
+    remember: false,
+  });
+  readonly sortedEntries = computed(() => this.entrySort.apply(this.visibleEntries()));
   readonly archiveTotal = computed(() => this.entries().filter(e => !e.directory).reduce((n, e) => n + Math.max(0, e.size), 0));
 
   /** For a file nobody registered: the first bytes, as hex, when they were not text. */
@@ -196,26 +236,35 @@ export class PreviewDialog implements OnInit {
    */
   private loadTable(offset: number, sheet?: string, orElse?: () => void): void {
     this.tableLoading.set(true);
+    this.pageError.set('');
+    this.pageAsked = { offset, sheet };
+    // A JSON file that is not a list of records goes on to be read as text: the dialog keeps loading until that answers
+    // (it showed an empty JSON view for the moment the text read took).
+    const failed = (message: string) => {
+      if (orElse) { orElse(); return; }
+      this.loading.set(false);
+      if (this.table()) this.pageError.set(message); else this.error.set(message);
+    };
     this.storage.previewTable(this.data.bucket, this.data.key, offset, this.tableLimit, sheet ?? this.table()?.sheet).subscribe({
       next: r => {
         this.tableLoading.set(false);
+        if (r.status !== API_SUCCESS || !r.data) { failed(loadErrorText(r, 'Could not read this file as a table.')); return; }
         this.loading.set(false);
-        if (r.status !== API_SUCCESS || !r.data) {
-          if (orElse) { orElse(); return; }
-          this.error.set(r.message || 'Could not read this file as a table.');
-          return;
-        }
         this.kind.set('table');
         this.table.set(r.data);
         this.tableOffset.set(r.data.offset);
       },
       error: err => {
         this.tableLoading.set(false);
-        this.loading.set(false);
-        if (orElse) { orElse(); return; }
-        this.error.set(err?.error?.message || 'Could not read this file as a table.');
+        failed(loadErrorText(err, 'Could not read this file as a table.'));
       },
     });
+  }
+
+  /** Asks for the page that failed again. */
+  retryPage(): void {
+    const asked = this.pageAsked;
+    if (asked) this.loadTable(asked.offset, asked.sheet);
   }
 
   tablePage(direction: 1 | -1): void {
@@ -226,6 +275,8 @@ export class PreviewDialog implements OnInit {
 
   pickSheet(sheet: string): void {
     this.tableSearch.set('');
+    // Another sheet has other columns: a sort by position would land on whatever sits there now.
+    this.rowSort.reset();
     this.loadTable(0, sheet);
   }
 

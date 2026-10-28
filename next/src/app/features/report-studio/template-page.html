@@ -149,9 +149,10 @@
             <p class="p-3 text-sm text-[color:var(--text-muted)]">No data contract: every bound path must be in the data.</p>
           } @else {
             <table class="table-modern">
-              <thead><tr><th>Path</th><th>Type</th><th>Required</th></tr></thead>
+              <thead><tr><th appSort="path" [sortBy]="contractSort">Path</th><th appSort="type" [sortBy]="contractSort">Type</th>
+                <th appSort="required" [sortBy]="contractSort">Required</th></tr></thead>
               <tbody>
-                @for (f of contract(); track f.path) {
+                @for (f of sortedContract(); track f.path) {
                   <tr><td class="mono text-xs">{{ f.path }}</td><td class="text-xs">{{ f.type }}</td><td class="text-xs">{{ f.required ? 'Yes' : 'No' }}</td></tr>
                 }
               </tbody>
@@ -162,6 +163,6 @@
     </div>
   } @else {
     <app-page-header title="Template" />
-    <div class="flex justify-center py-16"><span class="spinner" role="status" aria-label="Loading"></span></div>
+    <app-loading shape="panel" label="Loading the template…" [count]="6" />
   }
 </div>

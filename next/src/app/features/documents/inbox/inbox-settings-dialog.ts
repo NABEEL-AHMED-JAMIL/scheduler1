@@ -9,6 +9,8 @@ import { confirmWith } from '../../../shared/ui/confirm';
 import { BucketSummary } from '../../objects/storage.service';
 import { InboxSettings, capProblem, limitText, megabytes } from './inbox.model';
 import { InboxApi } from './inbox.service';
+import { InlineStatus, createLoadState } from '../../../shared/ui/loading';
+import { RouterLink } from '@angular/router';
 
 export interface InboxSettingsData { settings: InboxSettings; }
 
@@ -21,7 +23,7 @@ const MB = 1048576;
  */
 @Component({
   selector: 'app-inbox-settings-dialog',
-  imports: [FormDialog, Field, Icon],
+  imports: [FormDialog, Field, Icon, InlineStatus, RouterLink],
   template: `
     <app-form-dialog heading="File drop settings"
                      subtitle="Where uploaded files are stored, and how large one may be."
@@ -43,10 +45,13 @@ const MB = 1048576;
             }
           </select>
         </app-field>
-        @if (bucketsError()) { <p class="text-sm text-crit-500" role="alert">{{ bucketsError() }}</p> }
-        @if (!loadingBuckets() && !bucketsError() && !options().length) {
-          <p class="text-sm text-[color:var(--text-muted)]">This workspace has no storage connection yet. Add one under Connections › Storage first.</p>
-        }
+        <!-- Owner 2026-10-27: the connections' read says why it failed, with Try again, and an empty list links to where
+             one is added. -->
+        <app-inline-status [loading]="loadingBuckets()" [error]="bucketsError()" label="Reading the connections…"
+                           [empty]="bucketsState.loaded() && !options().length"
+                           emptyText="This workspace has no storage connection yet." (retry)="loadBuckets()">
+          <a class="link-inline" routerLink="/connections/storage" (click)="cancel()">Add one under Connections › Storage</a>
+        </app-inline-status>
         <app-field label="Size limit (MB)" for="inboxCap" [error]="capError()" [hint]="capHint">
           <input id="inboxCap" class="input max-w-40" inputmode="numeric" [value]="capMb()" placeholder="No lower limit"
                  (input)="capMb.set($any($event.target).value); capError.set('')" />
@@ -64,8 +69,9 @@ export class InboxSettingsDialog {
   private readonly toast = inject(ToastService);
 
   private readonly buckets = signal<BucketSummary[]>([]);
-  readonly loadingBuckets = signal(true);
-  readonly bucketsError = signal('');
+  readonly bucketsState = createLoadState();
+  readonly loadingBuckets = this.bucketsState.loading;
+  readonly bucketsError = this.bucketsState.error;
   readonly alias = signal(this.data.settings.alias ?? '');
   readonly capMb = signal(this.data.settings.workspaceMaxBytes ? String(megabytes(this.data.settings.workspaceMaxBytes)) : '');
   readonly aliasError = signal('');
@@ -80,14 +86,18 @@ export class InboxSettingsDialog {
     label: b.label && b.label !== b.bucket ? `${b.label} (${b.bucket})` : b.bucket,
   })));
 
-  constructor() {
+  constructor() { this.loadBuckets(); }
+
+  /** An empty message on a refusal left a blank line that also hid the empty text; it now says something. */
+  loadBuckets(): void {
+    this.bucketsState.start();
     this.api.buckets().subscribe({
       next: r => {
-        this.loadingBuckets.set(false);
-        if (r.status === API_SUCCESS) this.buckets.set(r.data ?? []);
-        else this.bucketsError.set(r.message);
+        if (r.status !== API_SUCCESS) { this.bucketsState.fail(r, 'The storage connections could not be read.'); return; }
+        this.buckets.set(r.data ?? []);
+        this.bucketsState.done();
       },
-      error: err => { this.loadingBuckets.set(false); this.bucketsError.set(err?.error?.message || 'The storage connections could not be read.'); },
+      error: err => this.bucketsState.fail(err, 'The storage connections could not be read.'),
     });
   }
 

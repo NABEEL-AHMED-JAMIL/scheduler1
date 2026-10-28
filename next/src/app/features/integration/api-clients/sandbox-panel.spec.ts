@@ -2,7 +2,8 @@ import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { Dialog } from '@angular/cdk/dialog';
-import { of, throwError } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
 import { SandboxPanel } from './sandbox-panel';
 import { ApiClientsApi } from './api-clients.api';
@@ -18,12 +19,14 @@ const KEYS = [
 const MADE = { ...KEYS[0], clientId: 'cl_test_new000000000000000000', clientSecret: 'cs_test-shown-once' };
 const SCOPES = [{ scope: 'runs:read', description: 'Read runs.' }];
 
-function setup(answer: { sandbox?: unknown; fails?: boolean; confirm?: boolean } = {}) {
+function setup(answer: { sandbox?: unknown; fails?: boolean; confirm?: boolean; pending?: boolean; keys?: unknown[] } = {}) {
+  try { localStorage.clear(); } catch { /* none */ }
   const api = {
-    sandbox: vi.fn(() => answer.fails
-      ? throwError(() => ({ error: { message: 'Identity is not answering.' } }))
+    sandbox: vi.fn(() => answer.pending ? NEVER : answer.fails
+      // Owner 2026-10-27: a real HTTP failure, so the service's own plain words reach the screen through loadErrorText.
+      ? throwError(() => new HttpErrorResponse({ status: 503, error: { message: 'Identity is not answering.' } }))
       : of({ status: 'SUCCESS', message: '', data: 'sandbox' in answer ? answer.sandbox : SANDBOX })),
-    sandboxList: vi.fn(() => of({ status: 'SUCCESS', message: '', data: KEYS })),
+    sandboxList: vi.fn(() => of({ status: 'SUCCESS', message: '', data: answer.keys ?? KEYS })),
     rotateSecret: vi.fn(() => of({ status: 'SUCCESS', message: '', data: MADE })),
     revoke: vi.fn(() => of({ status: 'SUCCESS', message: 'Test key revoked.' })),
   };
@@ -105,5 +108,31 @@ describe('MIG-336: API Clients › Sandbox', () => {
     const { el } = setup({ fails: true });
     expect(el.querySelector('[role="alert"]')!.textContent).toContain('Identity is not answering.');
     expect(el.textContent).toContain('Try again');
+  });
+});
+
+describe('API Clients › Sandbox -- loading and sorting (owner 2026-10-27)', () => {
+  it('is loading, not "No sandbox yet", until the sandbox answers', () => {
+    const { panel, el } = setup({ pending: true });
+    expect(panel.loading()).toBe(true);
+    expect(panel.state.pending()).toBe(true);
+    expect(el.querySelector('[data-no-sandbox]')).toBeNull();
+    expect(el.querySelector('[data-sandbox-loading]')).not.toBeNull();
+  });
+
+  it('stops loading on a failure, in plain words', () => {
+    const { panel } = setup({ fails: true });
+    expect(panel.loading()).toBe(false);
+    expect(panel.error()).toBe('Identity is not answering.');
+  });
+
+  it('sorts the test keys by name both ways, and keeps the API order until then', () => {
+    const second = { ...KEYS[0], clientId: 'cl_test_alpha000000000000000', name: 'Alpha test', lastUsedAt: '2026-10-07T09:00:00' };
+    const { panel } = setup({ keys: [KEYS[0], second] });
+    expect(panel.sorted().map(c => c.name)).toEqual(['Portal test', 'Alpha test']);
+    panel.sort.toggle('name');
+    expect(panel.sorted().map(c => c.name)).toEqual(['Alpha test', 'Portal test']);
+    panel.sort.toggle('name');
+    expect(panel.sorted().map(c => c.name)).toEqual(['Portal test', 'Alpha test']);
   });
 });

@@ -18,6 +18,18 @@ import {
 import { SourcesApi } from './sources.service';
 import { PreviewTable } from './preview-table';
 import { SchemaView } from './schema-view';
+import { AppLoading, InlineStatus, loadErrorText } from '../../../shared/ui/loading';
+import { LoadError } from '../../../shared/ui/load-error';
+
+type PickerSlot = 'buckets' | 'connections' | 'collections';
+/** One picker's read (owner 2026-10-27): a select said only "Pick a …" while loading, when empty and when its read failed. */
+interface PickerState { loading: boolean; error: string; loaded: boolean }
+const PICKER_IDLE: PickerState = { loading: false, error: '', loaded: false };
+const PICKER_FAILED: Record<PickerSlot, string> = {
+  buckets: 'The storage connections could not be read.',
+  connections: 'The database connections could not be read.',
+  collections: 'The API collections could not be read.',
+};
 import { ConnectionDialog, ConnectionDialogData } from './connection-dialog';
 
 export interface SourcePanelData {
@@ -39,7 +51,7 @@ type ResultTab = 'preview' | 'schema';
  */
 @Component({
   selector: 'app-source-panel',
-  imports: [SidePanel, Icon, Field, Segmented, ServerTimePipe, PreviewTable, SchemaView],
+  imports: [SidePanel, Icon, Field, Segmented, ServerTimePipe, PreviewTable, SchemaView, AppLoading, InlineStatus, LoadError],
   templateUrl: './source-panel.html',
 })
 export class SourcePanel {
@@ -86,6 +98,10 @@ export class SourcePanel {
   readonly versions = signal<number[]>([]);
   readonly environments = signal<EnvironmentRow[]>([]);
   private readonly read = new Set<string>();
+  readonly pickerStates = signal<Record<PickerSlot, PickerState>>({ buckets: PICKER_IDLE, connections: PICKER_IDLE, collections: PICKER_IDLE });
+  /** The picked collection's APIs, versions and environments are on their way, or could not be read. */
+  readonly collectionLoading = signal(false);
+  readonly collectionError = signal('');
 
   readonly dirty = computed(() => !!this.edit() && JSON.stringify(this.edit()) !== this.savedAs());
   readonly busy = computed(() => this.saving() || !!this.running());
@@ -117,29 +133,37 @@ export class SourcePanel {
 
   constructor() {
     if (this.data.sourceId) {
-      this.loading.set(true);
-      this.api.get(this.data.sourceId).subscribe({
-        next: r => {
-          if (r.status !== API_SUCCESS || !r.data) { this.loading.set(false); this.loadError.set(r.message); return; }
-          this.detail.set(r.data);
-          const d = r.data;
-          if (d.kind === 'API' && d.requestId) {
-            // The source names its request only; the pickers need the request's collection.
-            this.collectionsApi.getRequest(d.requestId).subscribe({
-              next: q => { this.loading.set(false); this.opened(d, q.status === API_SUCCESS ? q.data?.collectionId ?? null : null); },
-              error: () => { this.loading.set(false); this.opened(d, null); },
-            });
-          } else {
-            this.loading.set(false);
-            this.opened(d, null);
-          }
-        },
-        error: err => { this.loading.set(false); this.loadError.set(err?.error?.message || 'Could not read the source.'); },
-      });
+      this.readSource();
     } else {
       this.take({ ...blankSource('FILE'), tenantId: this.data.tenantId ?? null }, false);
       this.pickersFor('FILE');
     }
+  }
+
+  /** The source being opened; Try again reads it again (owner 2026-10-27: a failure was a dead end but for Close). */
+  readSource(): void {
+    const sourceId = this.data.sourceId;
+    if (!sourceId) return;
+    this.loading.set(true);
+    this.loadError.set('');
+    this.api.get(sourceId).subscribe({
+      next: r => {
+        if (r.status !== API_SUCCESS || !r.data) { this.loading.set(false); this.loadError.set(loadErrorText(r, 'The source could not be read.')); return; }
+        this.detail.set(r.data);
+        const d = r.data;
+        if (d.kind === 'API' && d.requestId) {
+          // The source names its request only; the pickers need the request's collection.
+          this.collectionsApi.getRequest(d.requestId).subscribe({
+            next: q => { this.loading.set(false); this.opened(d, q.status === API_SUCCESS ? q.data?.collectionId ?? null : null); },
+            error: () => { this.loading.set(false); this.opened(d, null); },
+          });
+        } else {
+          this.loading.set(false);
+          this.opened(d, null);
+        }
+      },
+      error: err => { this.loading.set(false); this.loadError.set(loadErrorText(err, 'The source could not be read.')); },
+    });
   }
 
   private opened(d: SourceDetail, collectionId: number | null): void {
@@ -153,26 +177,58 @@ export class SourcePanel {
     this.savedAs.set(saved ? JSON.stringify(e) : '');
   }
 
-  /** A read that may be refused (a member without API Collections, say): the picker is then empty, never an error. */
-  private once<T>(key: string, call: () => Observable<ApiResponse<T>>, done: (data: T) => void): void {
+  /**
+   * A picker's choices, read once. Owner 2026-10-27: a refusal (a member without API Collections, say) or a failure is
+   * said under the field with Try again, instead of a select that only says "Pick a …"; an empty answer says so too.
+   */
+  private once<T>(slot: PickerSlot, key: string, call: () => Observable<ApiResponse<T>>, done: (data: T) => void): void {
     if (this.read.has(key)) return;
     this.read.add(key);
-    call().subscribe({ next: r => { if (r.status === API_SUCCESS && r.data) done(r.data); }, error: () => { /* the picker stays empty */ } });
+    const set = (s: PickerState) => this.pickerStates.update(all => ({ ...all, [slot]: s }));
+    set({ loading: true, error: '', loaded: false });
+    call().subscribe({
+      next: r => {
+        if (r.status !== API_SUCCESS) {
+          this.read.delete(key);
+          set({ loading: false, error: loadErrorText(r, PICKER_FAILED[slot]), loaded: false });
+          return;
+        }
+        if (r.data) done(r.data);
+        set({ loading: false, error: '', loaded: true });
+      },
+      error: err => {
+        this.read.delete(key);
+        set({ loading: false, error: loadErrorText(err, PICKER_FAILED[slot]), loaded: false });
+      },
+    });
+  }
+
+  picker(slot: PickerSlot): PickerState { return this.pickerStates()[slot]; }
+
+  /** Try again under a picker: read the open kind's choices again. */
+  retryPickers(): void {
+    const kind = this.edit()?.kind;
+    if (kind) this.pickersFor(kind);
   }
 
   private pickersFor(kind: SourceKind): void {
-    if (kind === 'FILE' || kind === 'BUCKET') this.once('buckets', () => this.api.buckets(), d => this.buckets.set(d));
-    if (kind === 'DATABASE') this.once('connections', () => this.api.connections(), d => this.connections.set(d));
+    if (kind === 'FILE' || kind === 'BUCKET') this.once('buckets', 'buckets', () => this.api.buckets(), d => this.buckets.set(d));
+    if (kind === 'DATABASE') this.once('connections', 'connections', () => this.api.connections(), d => this.connections.set(d));
     // A platform administrator's API-library reads name the source's workspace (integration-service refuses one that names none).
     const tenant = this.data.tenants ? this.tenantId() : null;
-    if (kind === 'API') this.once(`collections:${tenant ?? ''}`, () => this.collectionsApi.list('', 1, 100, tenant), d => this.collections.set(d));
+    if (kind === 'API') this.once('collections', `collections:${tenant ?? ''}`, () => this.collectionsApi.list('', 1, 100, tenant), d => this.collections.set(d));
   }
 
   /** A collection's APIs, versions and environments; `pick` also pins its current version and default environment. */
-  private readCollection(collectionId: number, pick: boolean): void {
+  readCollection(collectionId: number, pick: boolean): void {
+    this.collectionLoading.set(true);
+    this.collectionError.set('');
     this.collectionsApi.get(collectionId, this.data.tenants ? this.tenantId() : null).subscribe({
       next: r => {
-        if (r.status !== API_SUCCESS || !r.data) { if (pick) this.error.set(r.message); return; }
+        // A reply for a collection picked away from is dropped.
+        if (this.edit()?.collectionId !== collectionId) return;
+        this.collectionLoading.set(false);
+        if (r.status !== API_SUCCESS || !r.data) { this.collectionError.set(loadErrorText(r, 'The collection could not be read.')); return; }
         const d = r.data;
         this.requests.set(d.requests ?? []);
         const versions = (d.versions ?? []).map(v => v.version).sort((a, b) => b - a);
@@ -183,8 +239,18 @@ export class SourcePanel {
           this.patch({ version: d.collection?.currentVersion ?? versions[0] ?? null, environmentId: env?.environmentId ?? null });
         }
       },
-      error: err => { if (pick) this.error.set(err?.error?.message || 'Could not read the collection.'); },
+      error: err => {
+        if (this.edit()?.collectionId !== collectionId) return;
+        this.collectionLoading.set(false);
+        this.collectionError.set(loadErrorText(err, 'The collection could not be read.'));
+      },
     });
+  }
+
+  /** Try again under the API, Version and Environment fields. */
+  retryCollection(): void {
+    const e = this.edit();
+    if (e?.collectionId) this.readCollection(e.collectionId, !e.requestId);
   }
 
   patch(change: Partial<SourceEdit>): void {
@@ -202,6 +268,8 @@ export class SourcePanel {
     this.requests.set([]);
     this.versions.set([]);
     this.environments.set([]);
+    this.collectionError.set('');
+    this.collectionLoading.set(false);
     if (collectionId) this.readCollection(collectionId, true);
   }
 

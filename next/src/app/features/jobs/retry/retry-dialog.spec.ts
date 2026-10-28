@@ -238,3 +238,19 @@ describe('Run logs: the retry of a failed run', () => {
     expect(el.querySelector('[data-test="run-retry"]')).toBeNull();
   });
 });
+
+describe('Retry this run -- a plan that could not be read (owner 2026-10-27)', () => {
+  it('is loading, then says why in plain words, and reads the plan again on Try again', () => {
+    const { fixture, http, ask } = openDialog();
+    expect(fixture.componentInstance.loading()).toBe(true);
+    ask.flush('boom', { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+    expect(fixture.componentInstance.loading()).toBe(false);
+    expect(fixture.componentInstance.problem()).toBe('What a retry would do could not be read.');
+    const el = fixture.nativeElement as HTMLElement;
+    [...el.querySelectorAll('button')].find(b => b.textContent!.trim() === 'Try again')!.click();
+    http.expectOne(r => r.url.endsWith('/sourceJob.json/retryPlan')).flush({ status: API_SUCCESS, data: PLAN });
+    expect(fixture.componentInstance.plan()?.jobQueueId).toBe(7701);
+    expect(fixture.componentInstance.problem()).toBe('');
+  });
+});

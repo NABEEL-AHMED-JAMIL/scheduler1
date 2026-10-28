@@ -3,6 +3,7 @@ import {
 } from '@angular/core';
 import { Subscription } from 'rxjs';
 import { Icon } from '../../shared/ui/icon';
+import { AppLoading } from '../../shared/ui/loading';
 import { Box, boxPercent, refusalText } from './documents.model';
 import { DocumentsApi } from './documents.service';
 
@@ -32,7 +33,7 @@ export interface ViewerBox {
  */
 @Component({
   selector: 'app-page-viewer',
-  imports: [Icon],
+  imports: [Icon, AppLoading],
   template: `
     <div class="page-viewer">
       <div class="page-viewer-bar">
@@ -53,12 +54,16 @@ export interface ViewerBox {
         <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Zoom in" [disabled]="zoom() >= 3" (click)="setZoom(1)"><app-icon name="plus" /></button>
       </div>
       <div class="page-viewer-scroll" data-test="page-scroll">
+        <!-- Owner 2026-10-27: a page that could not be fetched or drawn offers Try again; the loading line is announced. -->
         @if (error()) {
-          <p class="text-sm text-crit-500 p-4" role="alert">{{ error() }}</p>
+          <div class="p-4" role="alert">
+            <p class="text-sm text-crit-500">{{ error() }}</p>
+            <button type="button" class="btn btn-default btn-sm mt-3" data-test="page-retry" (click)="retry()"><app-icon name="refresh" />Try again</button>
+          </div>
         } @else {
-          @if (!url()) { <p class="text-sm text-[color:var(--text-muted)] p-4">Loading page {{ page() }}…</p> }
+          @if (!url()) { <app-loading class="p-4" shape="inline" [label]="'Loading page ' + page() + '…'" /> }
           <div class="page-viewer-sheet" [style.width.%]="zoom() * 100" [class.hidden]="!url()">
-            <img class="page-viewer-image" [src]="url()" [alt]="'Page ' + page() + ' of the document'" (load)="loaded($event)" />
+            <img class="page-viewer-image" [src]="url()" [alt]="'Page ' + page() + ' of the document'" (load)="loaded($event)" (error)="imageFailed()" />
             @if (natural()) {
               <div class="page-viewer-overlay">
                 @for (b of placed(); track b.id) {
@@ -177,6 +182,16 @@ export class PageViewer {
   loaded(event: Event): void {
     const img = event.target as HTMLImageElement;
     if (img.naturalWidth > 0) this.natural.set({ width: img.naturalWidth, height: img.naturalHeight });
+  }
+
+  /** Fetches the page shown again, after a failure. */
+  retry(): void { this.load(this.ocrDocumentId(), this.page()); }
+
+  /** The image came but would not decode: it showed as a broken picture with no word. An empty src is not a failure. */
+  imageFailed(): void {
+    if (!this.url()) return;
+    this.release();
+    this.error.set(`Page ${this.page()} could not be shown.`);
   }
 
   private load(ocrDocumentId: number, page: number): void {

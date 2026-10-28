@@ -5,6 +5,7 @@ import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config
 import { ToastService } from '../../../shared/ui/toast.service';
 import { Icon } from '../../../shared/ui/icon';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
+import { AppLoading, InlineStatus, loadErrorText } from '../../../shared/ui/loading';
 
 /** One party's recorded decision (sourceJob.json/review). */
 export interface ReviewDecision {
@@ -47,10 +48,17 @@ const STATUS: Record<string, { label: string; tone: string; icon: string }> = {
  */
 @Component({
   selector: 'app-run-review',
-  imports: [Icon, ServerTimePipe],
+  imports: [Icon, ServerTimePipe, AppLoading, InlineStatus],
   // No box of its own: its card is one of the run's stacked cards, and nothing at all when no review is required.
   host: { class: 'contents' },
   template: `
+    <!-- Owner 2026-10-27: in the Task inbox the review is the point, so its read says it is loading and, when it failed,
+         why (with Try again) -- it used to draw nothing either way. -->
+    @if (loading() && !review()) {
+      <app-loading shape="inline" label="Reading the run's review…" />
+    } @else if (error() && !review()) {
+      <app-inline-status [error]="error()" (retry)="load()" data-test="run-review-error" />
+    }
     @if (review(); as r) {
       @if (r.reviewStatus !== 'NOT_REQUIRED' && r.reviewStatus !== 'NOT_APPLICABLE') {
         <section class="card p-4 space-y-3" data-review aria-labelledby="run-review-heading">
@@ -123,6 +131,8 @@ export class RunReview implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
 
   readonly review = signal<RunReviewView | null>(null);
+  readonly loading = signal(true);
+  readonly error = signal('');
   readonly busy = signal(false);
   readonly rejecting = signal(false);
   readonly comment = signal('');
@@ -141,12 +151,22 @@ export class RunReview implements OnInit {
   }
 
   load(): void {
+    this.loading.set(true);
+    this.error.set('');
     this.http.get<ApiResponse<RunReviewView>>(`${API_BASE}/sourceJob.json/review`, { params: { jobQueueId: this.jobQueueId() } })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: r => this.review.set(r.status === API_SUCCESS ? r.data ?? null : null),
-        // A run whose review cannot be read shows no panel: the run page is about the run.
-        error: () => this.review.set(null),
+        next: r => {
+          this.loading.set(false);
+          this.review.set(r.status === API_SUCCESS ? r.data ?? null : null);
+        },
+        // A refusal (403/404: not this reader's) is "no review", as before; any other failure is said, with Try again.
+        error: err => {
+          this.loading.set(false);
+          this.review.set(null);
+          const refused = [403, 404].includes(Number((err as { status?: unknown })?.status));
+          this.error.set(refused ? '' : loadErrorText(err, "The run's review could not be read."));
+        },
       });
   }
 

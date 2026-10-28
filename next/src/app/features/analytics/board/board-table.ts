@@ -4,6 +4,7 @@ import { Subject, Subscription, debounceTime } from 'rxjs';
 import { API_SUCCESS } from '../../../core/api/api.config';
 import { Icon } from '../../../shared/ui/icon';
 import { columnLabel } from '../../../shared/ui/column-label';
+import { InlineStatus, loadErrorText } from '../../../shared/ui/loading';
 import type { ExportFile } from '../analytics.service';
 import { BoardApi, PageColumn, TablePage, TableRequest } from './board-api';
 import type { BoardFilterOutcome, BoardFilterWire } from './board-filters';
@@ -54,7 +55,7 @@ export interface TableRead {
  */
 @Component({
   selector: 'app-board-table',
-  imports: [Icon],
+  imports: [Icon, InlineStatus],
   host: { class: 'board-table' },
   styles: `
     :host { display: flex; flex-direction: column; gap: 0.5rem; min-width: 0; }
@@ -116,9 +117,8 @@ export interface TableRead {
     </div>
     @if (exportNote()) { <p class="text-xs text-[color:var(--text-muted)]">{{ exportNote() }}</p> }
 
-    @if (error()) {
-      <div class="flex items-start gap-2 text-sm text-crit-500 py-3" role="alert"><app-icon name="alert" class="icon-crit shrink-0 mt-0.5" />{{ error() }}</div>
-    } @else {
+    <!-- Owner 2026-10-27: a failed read is said inside the table, with Try again, so the filters and the pager stay in
+         reach -- a filter that matched badly can be changed (the error used to replace the whole table). -->
       <div class="bt-scroll" [style.max-height.px]="maxHeight()" [attr.aria-busy]="loading()">
         <table class="bt-table" [attr.aria-label]="name() || 'Table'" [attr.aria-rowcount]="(page()?.totalRows ?? 0) + 1">
           <thead>
@@ -170,6 +170,11 @@ export interface TableRead {
             </tr>
           </thead>
           <tbody>
+            @if (error() && !loading()) {
+              <tr><td [attr.colspan]="shownColumns().length || 1" class="py-4">
+                <app-inline-status [error]="error()" (retry)="retry()" />
+              </td></tr>
+            } @else {
             @if (!page() && loading()) {
               @for (row of skeletonRows; track row) {
                 <tr>@for (c of skeletonCols; track c) { <td><span class="bt-skel pulse" [style.width.%]="60 + ((row * 7 + c * 13) % 35)"></span></td> }</tr>
@@ -184,6 +189,7 @@ export interface TableRead {
               </tr>
             } @empty {
               @if (page()) { <tr><td [attr.colspan]="shownColumns().length || 1" class="text-center text-[color:var(--text-muted)] py-6">No row matches these filters.</td></tr> }
+            }
             }
           </tbody>
         </table>
@@ -202,7 +208,6 @@ export interface TableRead {
           <button type="button" class="btn btn-default btn-icon btn-xs" aria-label="Next page" [disabled]="pageAt() + 1 >= pageCount() || loading()" (click)="goTo(pageAt() + 1)"><app-icon name="chevronRight" /></button>
         </div>
       </div>
-    }
   `,
 })
 export class BoardTable {
@@ -351,6 +356,9 @@ export class BoardTable {
     };
   }
 
+  /** Try again on a page that could not be read. */
+  retry(): void { this.fetch(); }
+
   private fetch(): void {
     const request = this.request(this.pageAt(), this.needFacets);
     if (!request) return;
@@ -365,7 +373,7 @@ export class BoardTable {
         if (mine !== this.seq) return;
         this.loading.set(false);
         if (response.status !== API_SUCCESS || !response.data) {
-          const message = response.message || 'This table could not be read.';
+          const message = loadErrorText(response, 'This table could not be read.');
           this.error.set(message);
           this.read.emit({ state: 'failed', error: message });
           return;
@@ -382,7 +390,7 @@ export class BoardTable {
       error: err => {
         if (mine !== this.seq) return;
         this.loading.set(false);
-        const message = err?.error?.message || 'This table could not be read.';
+        const message = loadErrorText(err, 'This table could not be read.');
         this.error.set(message);
         this.read.emit({ state: 'failed', error: message });
       },

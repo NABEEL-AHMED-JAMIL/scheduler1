@@ -10,6 +10,7 @@ import { DOCS, DOWNLOADS, scrollToFragments } from './developer-docs';
 import { GuideBody } from './guide-body';
 import { PORTAL, parseGuide } from './guide-markdown';
 import { PageHeader } from '../../shared/ui/page-header';
+import { AppLoading, loadErrorText } from '../../shared/ui/loading';
 import { WorkspaceDirectory } from '../../core/workspaces/workspace-directory';
 
 /**
@@ -19,7 +20,7 @@ import { WorkspaceDirectory } from '../../core/workspaces/workspace-directory';
  */
 @Component({
   selector: 'app-developer-overview',
-  imports: [PageHeader, RouterLink, Icon, CopyButton, GuideBody],
+  imports: [PageHeader, RouterLink, Icon, CopyButton, GuideBody, AppLoading],
   styles: [`@media (min-width: 1536px) { .overview-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 26rem); } }`],
   template: `
     <div class="page" data-developer-overview>
@@ -90,9 +91,13 @@ import { WorkspaceDirectory } from '../../core/workspaces/workspace-directory';
                 Pick a workspace in <a class="md-link" routerLink="/developers/api-clients">API Clients</a> to see its sandbox.
               </p>
             } @else if (sandboxLoading()) {
-              <p class="text-sm text-[color:var(--text-muted)]">Looking for your sandbox…</p>
+              <app-loading shape="inline" label="Loading your sandbox…" />
             } @else if (sandboxError()) {
-              <p class="text-sm text-[color:var(--warn-text)]" role="alert">{{ sandboxError() }}</p>
+              <!-- Owner 2026-10-27: a failed read says why and can be tried again without reloading the page. -->
+              <p class="text-sm text-[color:var(--warn-text)] flex flex-wrap items-center gap-2" role="alert">
+                {{ sandboxError() }}
+                <button type="button" class="btn btn-default btn-sm" (click)="loadSandbox()"><app-icon name="refresh" />Try again</button>
+              </p>
             } @else if (sandbox(); as s) {
               <p class="text-sm">Your sandbox: <span class="font-medium">{{ s.name }}</span> (workspace {{ s.tenantId }}).</p>
               <p class="text-sm text-[color:var(--text-secondary)] mt-1">
@@ -149,17 +154,18 @@ export class DeveloperOverview {
     if (this.isAdmin && !this.pickFirst) this.loadSandbox();
   }
 
-  private loadSandbox(): void {
+  loadSandbox(): void {
     this.sandboxLoading.set(true);
+    this.sandboxError.set('');
     this.api.sandbox(this.tenantId).subscribe({
       next: r => {
         this.sandboxLoading.set(false);
         if (r.status === API_SUCCESS) this.sandbox.set(r.data ?? null);
-        else this.sandboxError.set(r.message || 'Your sandbox could not be read just now.');
+        else this.sandboxError.set(loadErrorText(r, 'Your sandbox could not be read just now.'));
       },
       error: err => {
         this.sandboxLoading.set(false);
-        this.sandboxError.set(err?.error?.message || 'Your sandbox could not be read just now.');
+        this.sandboxError.set(loadErrorText(err, 'Your sandbox could not be read just now.'));
       },
     });
   }

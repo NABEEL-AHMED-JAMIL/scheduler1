@@ -51,6 +51,8 @@ Tested by ______ on ______
 | QA-18.20 | Bulk decisions stop at 100 | **Review**, **Select all matching** with more than 100 items | At most 100 go into one decision | ☐ Pass ☐ Fail |
 | QA-18.21 | Bulk retry stops at 100 | **Runs › Failed**, select more than 100 failed runs (if you have them) | At most 100 are retried in one go | ☐ Pass ☐ Fail |
 | QA-18.22 | A zip of items stops at 200 | A run with more than 200 items: select all, **Download zip** | At most 200 items in one zip | ☐ Pass ☐ Fail |
+| QA-18.23 | Sorting covers every page | **Runs › Failed** (or **Reports › Library**) with more than one page: click **Ended**, then go to the last page | The last page holds the oldest runs, not a re-sort of page 1; clicking again reverses it; a third click gives the list's own order back; the choice is still there after a reload | ☐ Pass ☐ Fail |
+| QA-18.24 | Loading never reads as empty | Open **Billing › Cost & usage** and **Administration › Users** on a slow connection (browser developer tools, network *Slow 3G*) | Placeholder tiles and rows show, then the figures: never $0.00, 0 or *No … yet* before the answer; with the network set to *Offline*, **Refresh** says the service could not be reached and offers **Try again** | ☐ Pass ☐ Fail |
 
 ## Example
 At Summit Valley **1M orders: streaming totals** reads 1,000,000 orders, keeps 965,517 that pass, and saves 30

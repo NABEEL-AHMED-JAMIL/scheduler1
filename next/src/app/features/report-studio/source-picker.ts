@@ -17,6 +17,7 @@ import {
 } from './report-studio.model';
 import { BucketSummary, StorageService } from '../objects/storage.service';
 import { API_SUCCESS } from '../../core/api/api.config';
+import { InlineStatus, createLoadState } from '../../shared/ui/loading';
 
 export type SourceMode = 'paste' | 'step' | 'run' | 'bucket' | 'saved' | 'sample' | 'bundle';
 type Mode = SourceMode;
@@ -95,7 +96,7 @@ export function newestRuns(lists: RunRow[][], limit = 10): RunRow[] {
  */
 @Component({
   selector: 'app-report-source-picker',
-  imports: [FormsModule, Segmented, RsTimePipe, UpperCasePipe, Icon],
+  imports: [FormsModule, Segmented, RsTimePipe, UpperCasePipe, Icon, InlineStatus],
   template: `
     <div class="flex flex-col gap-3">
       @if (modes().length > 1) { <div class="rs-source-modes"><app-segmented [options]="modes()" [(value)]="mode" ariaLabel="Where the data comes from" /></div> }
@@ -119,17 +120,22 @@ export function newestRuns(lists: RunRow[][], limit = 10): RunRow[] {
           <label class="field">
             <span class="label">Run of this pipeline</span>
             <select class="input" [ngModel]="stepRunId()" (ngModelChange)="pickStepRun($event)" aria-label="Run of this pipeline">
-              <option [ngValue]="null">{{ stepRuns().length ? 'Choose a run' : stepRunsLoaded() ? 'No runs yet: run the pipeline, or paste sample JSON' : 'Reading the runs…' }}</option>
+              <option [ngValue]="null">{{ stepRuns().length ? 'Choose a run' : stepRunsError() ? 'The runs could not be read' : stepRunsLoaded() ? 'No runs yet: run the pipeline, or paste sample JSON' : 'Reading the runs…' }}</option>
               @for (r of stepRuns(); track r.jobQueueId) {
                 <option [ngValue]="r.jobQueueId">#{{ r.jobQueueId }} · {{ r.jobStatus || '—' }} · {{ r.startTime | rsTime: 'dateTime' }}</option>
               }
             </select>
+            <app-inline-status [loading]="!stepRunsLoaded()" [error]="stepRunsError()" label="Reading the runs…" (retry)="retryStepRuns()" />
           </label>
           @if (stepRunId() !== null) {
             @if (stepInput(); as rows) {
               <p class="field-note text-[color:var(--text-muted)]" data-step-input>
                 {{ rows.stepKey }} · {{ rows.name }}@if (rows.rowCount != null) { ({{ rows.rowCount }} rows)}.
               </p>
+            } @else if (stepInputError()) {
+              <app-inline-status [error]="stepInputError()" (retry)="pickStepRun(stepRunId())" />
+            } @else if (!stepInputRead()) {
+              <app-inline-status [loading]="true" label="Reading the run's rows…" />
             } @else if (stepInputRead()) {
               <p class="field-note text-[color:var(--text-muted)]" role="status">This run kept no rows for this step any more (they expire with the job's retention): pick a newer run.</p>
             }
@@ -137,34 +143,37 @@ export function newestRuns(lists: RunRow[][], limit = 10): RunRow[] {
           <p class="field-note text-[color:var(--text-muted)]">The rows the report step read in a recent run, read as you. Kept with the design, a copy is frozen: the first 500 rows, sensitive columns masked.</p>
         }
         @case ('run') {
-          @if (runsError()) { <p class="field-note text-[color:var(--crit-text)]" role="alert">{{ runsError() }}</p> }
           <label class="field">
             <span class="label">Pipeline schedule</span>
             <select class="input" [ngModel]="jobId()" (ngModelChange)="pickJob($event)" aria-label="Pipeline schedule">
-              <option [ngValue]="null">Choose a schedule</option>
+              <option [ngValue]="null">{{ jobsState.loading() && !jobs().length ? 'Loading schedules…' : 'Choose a schedule' }}</option>
               @for (j of jobs(); track j.jobId) { <option [ngValue]="j.jobId">{{ j.label }}</option> }
             </select>
+            <app-inline-status [loading]="jobsState.loading()" [error]="runsError()" label="Loading schedules…"
+                               [empty]="jobsState.loaded() && !jobs().length" emptyText="No schedule you can open yet." (retry)="retryJobs()" />
           </label>
           @if (jobId() !== null) {
             <label class="field">
               <span class="label">Run</span>
               <select class="input" [ngModel]="runId()" (ngModelChange)="pickRun($event)" aria-label="Run">
-                <option [ngValue]="null">{{ runs().length ? 'Choose a run' : 'No runs yet' }}</option>
+                <option [ngValue]="null">{{ runs().length ? 'Choose a run' : runsState.loading() ? 'Loading runs…' : runsState.error() ? 'The runs could not be read' : 'No runs yet' }}</option>
                 @for (r of runs(); track r.jobQueueId) {
                   <option [ngValue]="r.jobQueueId">#{{ r.jobQueueId }} · {{ r.jobStatus || '—' }} · {{ r.startTime | rsTime: 'dateTime' }}</option>
                 }
               </select>
+              <app-inline-status [loading]="runsState.loading()" [error]="runsState.error()" label="Loading runs…" (retry)="pickJob(jobId())" />
             </label>
           }
           @if (runId() !== null) {
             <label class="field">
               <span class="label">Output</span>
               <select class="input" [ngModel]="datasetId()" (ngModelChange)="pickDataset($event)" aria-label="Output">
-                <option [ngValue]="null">{{ outputs().length ? 'Choose an output' : 'This run kept no data a report can read' }}</option>
+                <option [ngValue]="null">{{ outputs().length ? 'Choose an output' : outputsState.loading() ? 'Reading the run\'s outputs…' : outputsState.error() ? 'The outputs could not be read' : 'This run kept no data a report can read' }}</option>
                 @for (o of outputs(); track o.runOutputId) {
                   <option [ngValue]="o.runDatasetId">{{ o.stepKey ? o.stepKey + ' · ' : '' }}{{ o.name }} ({{ (o.format || 'data') | uppercase }}@if (o.rowCount != null) {, {{ o.rowCount }} rows})</option>
                 }
               </select>
+              <app-inline-status [loading]="outputsState.loading()" [error]="outputsState.error()" label="Reading the run's outputs…" (retry)="pickRun(runId())" />
             </label>
           }
           @if (newerRun(); as newest) {
@@ -176,9 +185,10 @@ export function newestRuns(lists: RunRow[][], limit = 10): RunRow[] {
           <label class="field">
             <span class="label">Bucket</span>
             <select class="input" [ngModel]="bucket()" (ngModelChange)="bucket.set($event); publish()" aria-label="Bucket">
-              <option value="">{{ buckets().length ? 'Choose a bucket' : 'No buckets you may browse' }}</option>
+              <option value="">{{ buckets().length ? 'Choose a bucket' : bucketsState.loading() ? 'Loading buckets…' : bucketsState.error() ? 'The buckets could not be read' : 'No buckets you may browse' }}</option>
               @for (b of buckets(); track b.bucket) { <option [value]="b.bucket">{{ b.label || b.bucket }}</option> }
             </select>
+            <app-inline-status [loading]="bucketsState.loading()" [error]="bucketsState.error()" label="Loading buckets…" (retry)="retryBuckets()" />
           </label>
           <label class="field">
             <span class="label">File (JSON or CSV)</span>
@@ -190,9 +200,10 @@ export function newestRuns(lists: RunRow[][], limit = 10): RunRow[] {
           <label class="field">
             <span class="label">Uploaded or saved data</span>
             <select class="input" [ngModel]="sourceId()" (ngModelChange)="sourceId.set($event); publish()" aria-label="Saved data">
-              <option [ngValue]="null">{{ saved().length ? 'Choose a source' : 'Nothing saved yet: upload on the Data tab' }}</option>
+              <option [ngValue]="null">{{ saved().length ? 'Choose a source' : savedState.loading() ? 'Loading uploads…' : savedState.error() ? 'The uploads could not be read' : 'Nothing saved yet: upload on the Data tab' }}</option>
               @for (s of saved(); track s.sourceId) { <option [ngValue]="s.sourceId">{{ s.name }} ({{ s.format }})</option> }
             </select>
+            <app-inline-status [loading]="savedState.loading()" [error]="savedState.error()" label="Loading uploads…" (retry)="retrySaved()" />
           </label>
         }
         @case ('sample') {
@@ -275,6 +286,17 @@ export class ReportSourcePicker implements OnInit {
   readonly outputs = signal<RunOutput[]>([]);
   readonly saved = signal<DataSourceRow[]>([]);
   readonly runsError = signal('');
+  /**
+   * Owner 2026-10-27: every list the picker reads says it is loading, and why it failed with Try again -- a failure no
+   * longer reads as "No runs yet", "No buckets you may browse" or "Nothing saved yet".
+   */
+  readonly jobsState = createLoadState(false);
+  readonly runsState = createLoadState(false);
+  readonly outputsState = createLoadState(false);
+  readonly bucketsState = createLoadState(false);
+  readonly savedState = createLoadState(false);
+  readonly stepRunsError = signal('');
+  readonly stepInputError = signal('');
   readonly jobId = signal<number | null>(null);
   readonly runId = signal<number | null>(null);
   readonly datasetId = signal<number | null>(null);
@@ -409,18 +431,35 @@ export class ReportSourcePicker implements OnInit {
 
   private loadJobs(): void {
     this.runsError.set('');
+    this.jobsState.start();
     this.generated.schedules().subscribe({
-      next: all => this.allJobs.set(all.map(j => ({ jobId: j.jobId, tenantId: (j as { tenantId?: number | null }).tenantId, label: `${j.jobName ?? 'Schedule ' + j.jobId}${pipelineOf(j) ? ' · ' + pipelineOf(j) : ''}` }))),
-      error: () => { this.asked.delete('run'); this.runsError.set('Your schedules could not be read (they need the Schedules or Runs pages).'); },
+      next: all => {
+        this.allJobs.set(all.map(j => ({ jobId: j.jobId, tenantId: (j as { tenantId?: number | null }).tenantId, label: `${j.jobName ?? 'Schedule ' + j.jobId}${pipelineOf(j) ? ' · ' + pipelineOf(j) : ''}` })));
+        this.jobsState.done();
+      },
+      error: e => {
+        this.asked.delete('run');
+        this.jobsState.fail(e, 'Your schedules could not be read.');
+        this.runsError.set('Your schedules could not be read (they need the Schedules or Runs pages).');
+      },
     });
   }
 
+  retryJobs(): void { this.asked.add('run'); this.loadJobs(); }
+
   private loadBuckets(): void {
+    this.bucketsState.start();
     this.storage.buckets().subscribe({
-      next: r => this.buckets.set(r.status === API_SUCCESS ? (r.data ?? []) : []),
-      error: () => { this.asked.delete('bucket'); this.buckets.set([]); },
+      next: r => {
+        if (r.status !== API_SUCCESS) { this.asked.delete('bucket'); this.bucketsState.fail(r, 'The buckets could not be read.'); return; }
+        this.buckets.set(r.data ?? []);
+        this.bucketsState.done();
+      },
+      error: e => { this.asked.delete('bucket'); this.buckets.set([]); this.bucketsState.fail(e, 'The buckets could not be read.'); },
     });
   }
+
+  retryBuckets(): void { this.asked.add('bucket'); this.loadBuckets(); }
 
   /** "Use a newer run": the schedule's newest run, its output of the same name when it has one. */
   useNewest(): void {
@@ -431,8 +470,14 @@ export class ReportSourcePicker implements OnInit {
   }
 
   private loadSaved(): void {
-    this.api.sources().subscribe({ next: list => this.saved.set(list), error: () => { this.asked.delete('saved'); this.saved.set([]); } });
+    this.savedState.start();
+    this.api.sources().subscribe({
+      next: list => { this.saved.set(list); this.savedState.done(); },
+      error: e => { this.asked.delete('saved'); this.saved.set([]); this.savedState.fail(e, 'The uploads could not be read.'); },
+    });
   }
+
+  retrySaved(): void { this.asked.add('saved'); this.loadSaved(); }
 
   // ---------------------------------------------------------------- this step's input (ZT-R39)
 
@@ -445,8 +490,13 @@ export class ReportSourcePicker implements OnInit {
 
   private loadStepRuns(): void {
     const jobs = this.stepJobs();
+    this.stepRunsError.set('');
     if (!jobs.length) { this.stepRunsLoaded.set(true); return; }
-    forkJoin(jobs.map(id => this.generated.runs(id, 10).pipe(catchError(() => of([] as RunRow[]))))).subscribe(lists => {
+    this.stepRunsLoaded.set(false);
+    // A schedule whose runs cannot be read is left out; all of them failing is said (not "No runs yet").
+    forkJoin(jobs.map(id => this.generated.runs(id, 10).pipe(catchError(() => of(null))))).subscribe(answers => {
+      const lists = answers.filter((l): l is RunRow[] => l !== null);
+      if (!lists.length) { this.stepRunsLoaded.set(true); this.stepRunsError.set('The runs of this pipeline could not be read.'); return; }
       const runs = newestRuns(lists);
       this.stepRuns.set(runs);
       this.stepRunsLoaded.set(true);
@@ -454,14 +504,20 @@ export class ReportSourcePicker implements OnInit {
     });
   }
 
+  retryStepRuns(): void { this.loadStepRuns(); }
+
   pickStepRun(runId: number | null): void {
     this.stepRunId.set(runId);
     this.stepInput.set(null);
     this.stepInputRead.set(false);
+    this.stepInputError.set('');
     this.publish();
     if (runId === null) return;
-    this.stepsApi.timeline(runId).pipe(map(r => r.data ?? null), catchError(() => of(null))).subscribe(t => {
+    const failed = Symbol('failed');
+    this.stepsApi.timeline(runId).pipe(map(r => r.data ?? null), catchError(() => of(failed))).subscribe(answer => {
       if (this.stepRunId() !== runId) return;
+      if (answer === failed) { this.stepInputError.set('The run\'s rows could not be read.'); return; }
+      const t = answer as Timeline | null;
       const rows = stepRowsOf(t, this.stepKey());
       this.stepInput.set(rows.find(o => o.name.endsWith(INPUT_ROWS)) ?? null);
       this.stepInputRead.set(true);
@@ -476,8 +532,12 @@ export class ReportSourcePicker implements OnInit {
     this.runs.set([]);
     this.outputs.set([]);
     this.publish();
-    if (jobId === null) return;
-    this.generated.runs(jobId, 10).subscribe({ next: runs => this.runs.set(runs), error: () => this.runs.set([]) });
+    this.runsState.start();
+    if (jobId === null) { this.runsState.done(); return; }
+    this.generated.runs(jobId, 10).subscribe({
+      next: runs => { if (this.jobId() !== jobId) return; this.runs.set(runs); this.runsState.done(); },
+      error: e => { if (this.jobId() !== jobId) return; this.runs.set([]); this.runsState.fail(e, 'The runs could not be read.'); },
+    });
   }
 
   pickRun(runId: number | null, keepOutput: string | null = null): void {
@@ -485,12 +545,19 @@ export class ReportSourcePicker implements OnInit {
     this.datasetId.set(null);
     this.outputs.set([]);
     this.publish();
-    if (runId === null) return;
+    this.outputsState.start();
+    if (runId === null) { this.outputsState.done(); return; }
+    const failed = Symbol('failed');
     // ZT-R39: the files a Save/Write step kept, and the rows each step kept (a report step's own input among them).
-    forkJoin([this.generated.runOutputs(runId).pipe(catchError(() => of(null))),
-      this.stepsApi.timeline(runId).pipe(map(r => r.data ?? null), catchError(() => of(null)))]).subscribe({
-      next: ([list, timeline]) => {
+    forkJoin([this.generated.runOutputs(runId).pipe(catchError(() => of(failed))),
+      this.stepsApi.timeline(runId).pipe(map(r => r.data ?? null), catchError(() => of(failed)))]).subscribe({
+      next: ([listAnswer, timelineAnswer]) => {
         if (this.runId() !== runId) return;
+        // Both reads failed: said, not "This run kept no data a report can read". One of them failing keeps the other's.
+        if (listAnswer === failed && timelineAnswer === failed) { this.outputsState.fail(null, 'The run\'s outputs could not be read.'); return; }
+        this.outputsState.done();
+        const list = listAnswer === failed ? null : listAnswer as RunOutput[] | null;
+        const timeline = timelineAnswer === failed ? null : timelineAnswer as Timeline | null;
         const files = (list ?? []).filter(o => o.kind === 'file' && o.runDatasetId != null && !o.expired
           && DATA_FORMATS.has(String(o.format ?? '').toLowerCase()));
         const kept = new Set(files.map(o => o.runDatasetId));
@@ -500,7 +567,7 @@ export class ReportSourcePicker implements OnInit {
         const same = keepOutput ? outputs.find(o => o.name === keepOutput) : files.length === 1 ? files[0] : !files.length ? input : undefined;
         if (same?.runDatasetId != null) this.pickDataset(same.runDatasetId);
       },
-      error: () => this.outputs.set([]),
+      error: e => { if (this.runId() === runId) { this.outputs.set([]); this.outputsState.fail(e, 'The run\'s outputs could not be read.'); } },
     });
   }
 

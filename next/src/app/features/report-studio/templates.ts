@@ -25,6 +25,8 @@ import { ImportTemplatePanel, NewTemplateData, NewTemplatePanel } from './templa
 import { TestPanel, TestPanelData } from './test-panel';
 import { downloadJson } from './report-files';
 import { RsTabCounts } from './rs-tab-counts';
+import { SortHeader } from '../../shared/ui/sort-header';
+import { SortState, createTableSort, sortRows } from '../../shared/ui/sort';
 
 /** Which templates the library shows (Figma frame 2's tabs). */
 type Group = 'all' | 'workspace' | 'starters' | 'shared';
@@ -50,7 +52,7 @@ export interface LibraryItem {
 @Component({
   selector: 'app-report-templates',
   imports: [PageHeader, WorkspaceSelect, RefreshButton, Icon, TableShell, StatusPill, RsTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger,
-    Segmented, ViewToggle, Pagination],
+    Segmented, ViewToggle, Pagination, SortHeader],
   templateUrl: './templates.html',
   styleUrl: './templates.css',
   host: { '[style.--rst-brand]': 'brandColour()' },
@@ -105,6 +107,40 @@ export class ReportTemplates implements OnInit {
       && (!this.state() || this.state() === 'PUBLISHED') && (!this.owner() || this.owner() === 'starter')
       && (!q || [s.name, s.description, s.category].some(v => (v ?? '').toLowerCase().includes(q))));
   });
+  /**
+   * Owner 2026-10-27 ("add a sort on each table"): the table's headings sort on the server (reportTemplate.json/fetchAll's
+   * sort and dir), so a sort covers every one of the workspace's templates, not only the page shown. The templates arrive
+   * newest change first -- Updated, newest first, the table's own order -- and the request names no sort until another
+   * one is picked. The starters are not the service's to sort (they come whole with every answer): they stay in their
+   * own block after the templates, sorted here by the same column -- by name or category; they have no maker or change
+   * time, so by From or Updated they keep their order. The cards show the same order. A new order goes back to page 1.
+   */
+  private static readonly OWN_ORDER: SortState = { key: 'updated', direction: 'desc' };
+  readonly sort = createTableSort<LibraryItem>({
+    id: 'report-templates', server: true, initial: ReportTemplates.OWN_ORDER,
+    note: 'Sorts all of the workspace\'s templates; the starters follow them',
+    columns: {
+      template: { value: i => i.name, kind: 'text', param: 'name' },
+      category: { value: i => i.category, kind: 'text', param: 'category' },
+      from: { value: i => (i.template ? this.ownerOf(i.template) : ''), kind: 'text', param: 'from' },
+      updated: { value: i => i.template?.updatedAt, kind: 'date', param: 'updatedAt' },
+    },
+    onChange: () => { this.page.set(1); this.read(); },
+  });
+  /** The matching starters in the order of the column picked (see sort): by name or category; otherwise as they come. */
+  readonly sortedStarters = computed<StarterRow[]>(() => {
+    const rows = this.starterMatches();
+    const key = this.sort.key();
+    const value = key === 'template' ? (s: StarterRow) => s.name : key === 'category' ? (s: StarterRow) => s.category : null;
+    return value ? sortRows(rows, value, this.sort.direction(), 'text') : rows;
+  });
+  /** What a read carries for the sort: nothing for the table's own order (so the service keeps it), else sort and dir. */
+  private sortParams(): { sort?: string; dir?: 'asc' | 'desc' } {
+    const p = this.sort.param();
+    const s = this.sort.state();
+    if (!p || (s.key === ReportTemplates.OWN_ORDER.key && s.direction === ReportTemplates.OWN_ORDER.direction)) return {};
+    return { sort: p.sort, dir: p.dir };
+  }
   private readonly withTemplates = computed(() => this.group() === 'all' || this.group() === 'workspace');
   private readonly withStarters = computed(() => this.group() === 'all' || this.group() === 'starters');
   /**
@@ -118,7 +154,7 @@ export class ReportTemplates implements OnInit {
     const end = start + this.size();
     const before = this.withTemplates() ? this.templateTotal() : 0;
     const rows = this.withTemplates() ? this.templates() : [];
-    const starters = this.withStarters() ? this.starterMatches().slice(Math.max(0, start - before), Math.max(0, end - before)) : [];
+    const starters = this.withStarters() ? this.sortedStarters().slice(Math.max(0, start - before), Math.max(0, end - before)) : [];
     return [
       ...rows.map(t => ({ kind: 'template' as const, id: t.templateId, name: t.name, description: t.description, category: t.category, template: t })),
       ...starters.map(s => ({ kind: 'starter' as const, id: 'starter:' + s.key, name: s.name, description: s.description, category: s.category, starter: s })),
@@ -192,7 +228,7 @@ export class ReportTemplates implements OnInit {
     const start = (this.page() - 1) * this.size();
     const owner = this.owner() === 'starter' ? 'STARTER' : this.owner() === 'copy' ? 'COPY' : this.owner() === 'me' ? 'ME' : '';
     const query: TemplateQuery = { archived: this.archived(), q: this.search(), category: this.category(), state: this.state(), owner,
-      limit: this.size(), offset: start };
+      limit: this.size(), offset: start, ...this.sortParams() };
     this.api.list(query, scope).subscribe({
       next: lib => {
         if (asked !== this.asked) return;

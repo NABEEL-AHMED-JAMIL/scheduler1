@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
-import { of, throwError } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
 import { FileDetails, FileDetailsData } from './file-details';
 import { StorageService } from './storage.service';
 import { GeneratedService } from '../documents/generated/generated.service';
@@ -27,7 +27,7 @@ const WRITER = { id: 'writer-8380', name: 'statistics.csv', type: 'CSV', origin:
   status: 'In storage' as const, owner: 'Riverside Health admin', bucket: 'riverside-health-s3', key: 'datasets/readmission/results/statistics.csv',
   jobQueueId: 8380, jobId: 2905, jobName: 'Hospital readmission risk (daily)', pipeline: 'Hospital readmission risk' };
 
-function details(data: FileDetailsData, opts: { meta?: 'fail'; recent?: typeof RECENT; writer?: typeof WRITER | null | 'fail' } = {}) {
+function details(data: FileDetailsData, opts: { meta?: 'fail' | 'never'; recent?: typeof RECENT; writer?: typeof WRITER | null | 'fail' } = {}) {
   const writer = opts.writer === undefined ? 'fail' : opts.writer;
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
@@ -35,8 +35,8 @@ function details(data: FileDetailsData, opts: { meta?: 'fail'; recent?: typeof R
       provideRouter([]),
       { provide: DIALOG_DATA, useValue: data },
       { provide: DialogRef, useValue: { close: vi.fn() } },
-      { provide: StorageService, useValue: { objectMetadata: vi.fn(() => opts.meta === 'fail'
-        ? throwError(() => ({ error: { message: 'No such object.' } })) : of({ status: 'SUCCESS', message: '', data: META })) } },
+      { provide: StorageService, useValue: { objectMetadata: vi.fn(() => opts.meta === 'never' ? NEVER : opts.meta === 'fail'
+        ? throwError(() => ({ status: 404, error: { message: 'No such object.' } })) : of({ status: 'SUCCESS', message: '', data: META })) } },
       { provide: GeneratedService, useValue: {
         objectWriter: vi.fn(() => writer === 'fail' ? throwError(() => new Error('404')) : of(writer)),
         recentOutputs: vi.fn(() => of(opts.recent ?? RECENT)) } },
@@ -103,5 +103,29 @@ describe('Storage file details', () => {
     const { text } = details({ bucket: 'ui-review-s3', key: KEY, name: 'customers-clean.json', size: 169 }, { meta: 'fail' });
     expect(text()).toContain('No such object.');
     expect(text()).toContain('169 B');
+  });
+
+  it('offers Try again when the metadata cannot be read (owner 2026-10-27)', () => {
+    const { d, fixture } = details({ bucket: 'ui-review-s3', key: KEY, name: 'customers-clean.json', size: 169 }, { meta: 'fail' });
+    expect(d.metaLoading()).toBe(false);
+    expect((fixture.nativeElement as HTMLElement).querySelector('app-inline-status')?.textContent).toContain('Try again');
+  });
+
+  it('shows the checksum as loading, not as none, until the metadata answers (owner 2026-10-27)', () => {
+    const { d, text, fixture } = details({ bucket: 'ui-review-s3', key: KEY, name: 'customers-clean.json', size: 169 }, { meta: 'never' });
+    expect(d.metaLoading()).toBe(true);
+    expect((fixture.nativeElement as HTMLElement).querySelector('[data-file-details] dd app-loading')).not.toBeNull();
+    expect(text()).toContain('169 B');
+  });
+
+  it('offers Try again when the recent runs could not be read, and searches again (owner 2026-10-27)', () => {
+    const { d, generated, fixture } = details({ bucket: 'ui-review-s3', key: KEY, name: 'customers-clean.json' });
+    generated.recentOutputs.mockReturnValue(throwError(() => new Error('down')));
+    d.retryRuns();
+    fixture.detectChanges();
+    expect(d.runsSearched()).toBe(-1);
+    generated.recentOutputs.mockReturnValue(of(RECENT));
+    d.retryRuns();
+    expect(d.runsSearched()).not.toBe(-1);
   });
 });

@@ -134,3 +134,23 @@ describe('Public form (share link)', () => {
     expect(refusalOf(503, 'Try again in a minute.').text).toBe('Try again in a minute.');
   });
 });
+
+describe('Public form -- loading and Try again (owner 2026-10-27)', () => {
+  it('offers Try again after a server error, and opens the form when it then answers', () => {
+    const { el, api, screen, fixture } = render({ openFails: { status: 503 } });
+    expect(screen.loading()).toBe(false);
+    expect(el.querySelector('[data-refused]')?.textContent).toContain('This form cannot be opened right now');
+    api.open.mockReturnValue(of({ status: 'SUCCESS', message: 'Form fetched.', data: VIEW }) as never);
+    (el.querySelector('[data-retry]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(screen.refusal()).toBeNull();
+    expect(screen.view()).not.toBeNull();
+  });
+
+  it('offers no Try again where trying cannot help (an expired link)', () => {
+    const { el } = render({ openFails: { status: 410 } });
+    expect(el.querySelector('[data-retry]')).toBeNull();
+    expect(refusalOf(0, '').retry).toBe(true);
+    expect(refusalOf(404, '').retry).toBeFalsy();
+  });
+});

@@ -28,7 +28,8 @@
       { label: 'Failing', value: summary().failing, foot: summary().failing ? 'need attention' : 'nothing failing', icon: 'xCircle', tone: summary().failing ? 'crit' : 'muted' },
       { label: 'Runs · 30 days', value: summary().runs30d, foot: (summary().tokens30d | number) + ' tokens', icon: 'sparkle', tone: 'info' }
     ]; track tile.label) {
-      <app-stat-tile [label]="tile.label" [value]="tile.value" [icon]="tile.icon" [tone]="$any(tile.tone)" [foot]="tile.foot" />
+      <app-stat-tile [label]="tile.label" [value]="tile.value" [icon]="tile.icon" [tone]="$any(tile.tone)" [foot]="tile.foot"
+                     [loading]="state.pending()" [failed]="!!error() && !state.loaded()" />
     }
   </div>
 
@@ -58,7 +59,7 @@
       </div>
 
       @if (loading() && !connections().length) {
-        <div class="lookup-rail-empty"><div class="spinner" role="status" aria-label="Loading"></div> Loading…</div>
+        <app-loading shape="list" label="Loading connections…" [count]="4" />
       } @else if (error()) {
         <div class="lookup-rail-empty text-crit-500">{{ error() }}
           <button type="button" class="btn btn-default btn-sm mt-2" (click)="load()">Try again</button></div>
@@ -225,9 +226,9 @@
               @if (activity()) { <span class="text-xs text-[color:var(--text-muted)]">{{ activityRuns() | number }} run{{ activityRuns() === 1 ? '' : 's' }}</span> }
             </div>
             @if (activityLoading()) {
-              <div class="py-8 text-center text-sm text-[color:var(--text-muted)]"><div class="spinner mx-auto mb-2"></div>Reading its runs…</div>
+              <app-loading shape="panel" label="Loading its runs…" [count]="3" />
             } @else if (activityError()) {
-              <p class="text-sm text-crit-500">{{ activityError() }}</p>
+              <app-load-error [message]="activityError()" (retry)="loadActivity(c.connectionId)" />
             } @else if (activity()) {
               <app-bar-chart [data]="activityBars()" [height]="140" emptyMessage="No runs on this connection in the last 30 days." />
             }
@@ -240,9 +241,16 @@
                 @if (a.recent.length) {
                   <div class="overflow-x-auto">
                     <table class="table-modern" data-test="connection-recent-runs">
-                      <thead><tr><th>When</th><th>Prompt</th><th class="hidden xl:table-cell">Model</th><th>Status</th><th class="text-right">Time</th><th class="text-right hidden lg:table-cell">Tokens</th></tr></thead>
+                      <thead><tr>
+                        <th appSort="when" [sortBy]="recentSort">When</th>
+                        <th appSort="prompt" [sortBy]="recentSort">Prompt</th>
+                        <th class="hidden xl:table-cell" appSort="model" [sortBy]="recentSort">Model</th>
+                        <th appSort="status" [sortBy]="recentSort">Status</th>
+                        <th class="text-right" appSort="time" [sortBy]="recentSort">Time</th>
+                        <th class="text-right hidden lg:table-cell" appSort="tokens" [sortBy]="recentSort">Tokens</th>
+                      </tr></thead>
                       <tbody>
-                        @for (r of a.recent; track r.runId) {
+                        @for (r of sortedRecent(); track r.runId) {
                           <tr>
                             <td class="text-xs whitespace-nowrap">{{ r.at | serverTime: 'dateTime' }}</td>
                             <!-- One line, cut with the whole name as its title: wrapped, a long name made each row four lines (review 2026-10-07). -->
@@ -295,7 +303,10 @@
             </div>
           }
         </div>
-      } @else if (!loading() && !error()) {
+      } @else if (state.pending()) {
+        <!-- Owner 2026-10-27: the pane waits with the rail instead of standing blank. -->
+        <app-loading shape="panel" label="Loading the connection…" [count]="5" />
+      } @else if (!error()) {
         <div class="lookup-entries-empty lookup-detail-empty">
           <app-icon name="server" size="1.6rem" class="icon-muted" />
           <p>Pick a connection on the left.</p>

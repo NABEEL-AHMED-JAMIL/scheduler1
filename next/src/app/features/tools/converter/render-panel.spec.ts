@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { Dialog } from '@angular/cdk/dialog';
-import { of, throwError } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { RenderPanel } from './render-panel';
 import { GeneratedService } from '../../documents/generated/generated.service';
 import { StorageService } from '../../objects/storage.service';
@@ -160,5 +161,62 @@ describe('From an execution', () => {
     p.pickRun('7405');
     expect(p.datasets()).toEqual([]);
     expect(p.canPreview()).toBe(false);
+  });
+});
+
+describe('From a run -- each list loads, is empty, or fails in place (owner 2026-10-27)', () => {
+  const FAIL = () => throwError(() => new HttpErrorResponse({ status: 500, error: 'Internal Server Error' }));
+
+  it('a schedule\'s runs are loading, not "No runs yet", until they answer', () => {
+    const { fixture, p } = panel({ runs: vi.fn(() => NEVER) });
+    fixture.componentRef.setInput('source', 'execution');
+    fixture.detectChanges();
+    p.pickSchedule('2849');
+    fixture.detectChanges();
+    expect(p.runsState.loading()).toBe(true);
+    expect((fixture.nativeElement as HTMLElement).querySelector('#render-run')!.textContent).toContain('Loading runs…');
+  });
+
+  it('runs that cannot be read say so under the field, with no toast, and read again', () => {
+    let runs: () => unknown = FAIL;
+    const { fixture, p, toast } = panel({ runs: vi.fn(() => runs()) });
+    fixture.componentRef.setInput('source', 'execution');
+    fixture.detectChanges();
+    p.pickSchedule('2849');
+    expect(p.runsState.error()).toBe('This schedule\'s runs could not be read.');
+    expect(toast.error).not.toHaveBeenCalled();
+    runs = () => of([{ jobQueueId: 7405, jobStatus: 'Completed' }]);
+    p.loadRuns();
+    expect(p.runsState.error()).toBe('');
+    expect(p.runList().length).toBe(1);
+  });
+
+  it('a run\'s outputs that cannot be read are not "This run kept no dataset"', () => {
+    const { fixture, p } = panel({ runOutputs: vi.fn(FAIL) });
+    fixture.componentRef.setInput('source', 'execution');
+    fixture.detectChanges();
+    p.pickSchedule('2849');
+    p.pickRun('7405');
+    fixture.detectChanges();
+    expect(p.outputs()).toBeNull();
+    expect(p.outputsState.error()).toBe('What this run put out could not be read.');
+    expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('This run kept no dataset');
+  });
+
+  it('a dataset that cannot be read says so with Try again', () => {
+    const { fixture, p } = panel({ runDataset: vi.fn(FAIL) });
+    fixture.componentRef.setInput('source', 'execution');
+    fixture.detectChanges();
+    p.pickSchedule('2849');
+    p.pickRun('7405');
+    expect(p.rowsError()).toBe('That dataset could not be read; it may have expired.');
+    expect(p.readingRun()).toBe(false);
+  });
+
+  it('the schedules\' failure is in plain words, never the raw HTTP text', () => {
+    const { fixture, p } = panel({ schedules: vi.fn(() => throwError(() => new HttpErrorResponse({ status: 502, url: '/x', statusText: 'Bad Gateway' }))) });
+    fixture.componentRef.setInput('source', 'execution');
+    fixture.detectChanges();
+    expect(p.schedulesError()).toBe('The schedules could not be read.');
   });
 });

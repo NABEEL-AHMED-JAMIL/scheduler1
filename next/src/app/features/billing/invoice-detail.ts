@@ -23,6 +23,10 @@ import { BillingApi, cardPaymentChip, DOCUMENT_KIND_LABEL, InvoiceDetail as Deta
 import { ApiClientsApi } from '../integration/api-clients/api-clients.api';
 import { dayInZone, daysOverdue, formatMoney, formatQuantity, formatUnitPrice, moneyDigits, monthName } from './billing-format';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
+import { createTableSort } from '../../shared/ui/sort';
+import { SortHeader } from '../../shared/ui/sort-header';
+import { AppLoading, loadErrorText } from '../../shared/ui/loading';
+import { LoadError } from '../../shared/ui/load-error';
 
 /** One entry of the invoice's story, in order. */
 interface HistoryEntry { at: string; text: string; tone?: 'ok' | 'warn' | 'crit' | 'muted'; }
@@ -36,7 +40,7 @@ interface HistoryEntry { at: string; text: string; tone?: 'ok' | 'warn' | 'crit'
  */
 @Component({
   selector: 'app-invoice-pane',
-  imports: [Icon, RouterLink, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, CopyButton],
+  imports: [Icon, RouterLink, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, CopyButton, SortHeader, AppLoading, LoadError],
   templateUrl: './invoice-detail.html',
   // UX final BL2: the lines are shown whole (no inner scroll box of a fixed height cutting a row); only a narrow window
   // scrolls the table sideways.
@@ -92,6 +96,33 @@ export class InvoicePane implements OnDestroy {
   readonly crediting = signal(false);
   readonly creditAmount = signal('');
   readonly creditReason = signal('');
+
+  /**
+   * Owner 2026-10-27: the lines sort, but start in the bill's own order (the issued PDF's), so initial is null; the rate
+   * sorts per unit, so prices per 1,000 and per GB compare as prices.
+   */
+  readonly lineSort = createTableSort<InvoiceLine>({
+    id: 'billing-invoice-lines',
+    columns: {
+      description: l => l.description,
+      quantity: { value: l => l.quantity, kind: 'number' },
+      rate: { value: l => (l.unit === 'each' ? null : Number(l.unitPrice) / (Number(l.per) || 1)), kind: 'number' },
+      amount: { value: l => l.amount, kind: 'number' },
+    },
+  });
+  readonly sortedLines = computed(() => this.lineSort.apply(this.invoice()?.lines ?? []));
+  /** The payments sort too; Billing's order stays until a heading is picked. */
+  readonly paymentSort = createTableSort<PaymentRow>({
+    id: 'billing-invoice-payments',
+    columns: {
+      received: { value: p => p.receivedOn ?? p.dateCreated, kind: 'date' },
+      payment: p => this.methodChip(p).label,
+      by: p => (p.method === 'card' && p.provider ? 'Paid online' : (p.submittedBy || 'The platform')),
+      amount: { value: p => p.amount, kind: 'number' },
+      state: { value: p => this.stateChip(p).label, kind: 'status' },
+    },
+  });
+  readonly sortedPayments = computed(() => this.paymentSort.apply(this.invoice()?.payments ?? []));
 
   /** Money that arrived: verified payments that were not a credit note applied. */
   readonly paid = computed(() => (this.invoice()?.payments ?? []).filter(p => p.status === 'verified' && p.method !== 'credit_note').reduce((n, p) => n + Number(p.amount), 0));
@@ -173,13 +204,17 @@ export class InvoicePane implements OnDestroy {
 
   load(): void {
     this.loading.set(true); this.error.set('');
-    this.api.invoice(this.number()).subscribe({
+    const number = this.number();
+    const unread = 'The invoice could not be read.';
+    this.api.invoice(number).subscribe({
       next: r => {
+        // A reply for the invoice picked before this one is dropped: it would show the old bill under the new number.
+        if (number !== this.number()) return;
         this.loading.set(false);
         // Anything but one invoice object (a list, a bare value) is not an invoice: say so rather than
         // render it and crash on the first field it lacks.
         if (r.status !== API_SUCCESS || !r.data || typeof r.data !== 'object' || Array.isArray(r.data)) {
-          this.error.set(r.message && r.status !== API_SUCCESS ? r.message : 'No such invoice.');
+          this.error.set(r.status !== API_SUCCESS ? loadErrorText(r, unread) : 'No such invoice.');
           return;
         }
         const d = r.data;
@@ -191,7 +226,7 @@ export class InvoicePane implements OnDestroy {
         this.afterCheckout(d);
         if ((d.lines ?? []).some(l => !!l.breakdown)) this.loadClientNames(d.tenantId);
       },
-      error: err => { this.loading.set(false); this.error.set(err?.error?.message || 'Could not read the invoice.'); },
+      error: err => { if (number !== this.number()) return; this.loading.set(false); this.error.set(loadErrorText(err, unread)); },
     });
   }
 

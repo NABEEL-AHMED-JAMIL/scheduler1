@@ -3,7 +3,8 @@ import { provideZonelessChangeDetection, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
-import { of } from 'rxjs';
+import { NEVER, Observable, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { AuthService } from '../../../core/auth/auth.service';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { WorkflowsApi } from '../../workflows/workflows.api';
@@ -29,10 +30,10 @@ const TIMELINE = { jobQueueId: 8298, jobId: 2977, runStatus: 'Running', attempt:
 const TASK = { id: 1136, instanceId: 1130, stepKey: 'approve', stepType: 'approval', name: 'Approve the run to continue', state: 'Open',
   assigneeKind: 'team', assigneeValue: '1063', rejectNeedsComment: true, requestTitle: APPROVAL.title, subjectId: 'pipeline-approval:1006' };
 
-function box(opts: { tasks?: unknown[]; inbox?: boolean; admin?: boolean; timeline?: unknown }) {
+function box(opts: { tasks?: unknown[]; inbox?: boolean; admin?: boolean; timeline?: unknown; answer?: () => Observable<unknown> }) {
   const get = vi.fn(() => of({ status: 'SUCCESS', message: '', data: [{ teamId: 1063, name: 'Reviewer', members: [] }, { teamId: 1064, name: 'Viewer', members: [] }] }));
   const api = {
-    forSubject: vi.fn(() => of({ status: 'SUCCESS', message: '', data: opts.tasks ?? [] })),
+    forSubject: vi.fn(opts.answer ?? (() => of({ status: 'SUCCESS', message: '', data: opts.tasks ?? [] }))),
     act: vi.fn(() => of({ status: 'SUCCESS', message: 'Approved.', data: {} })),
   };
   const toast = { success: vi.fn(), error: vi.fn() };
@@ -128,5 +129,23 @@ describe('Run page: waiting for approval', () => {
     const { el, api } = box({ timeline: { ...TIMELINE, waitingForApproval: false, steps: [TIMELINE.steps[0]] } });
     expect(el.querySelector('[data-test="approval-next"]')).toBeNull();
     expect(api.forSubject).not.toHaveBeenCalled();
+  });
+});
+
+describe("the Next steps box while the reader's task is looked up (owner 2026-10-27)", () => {
+  it('says it is checking, with no inbox link or buttons yet', () => {
+    const { el } = box({ answer: () => NEVER });
+    expect(TestBed.inject(RunApprovalStore).taskLoading()).toBe(true);
+    expect(el.querySelector('[data-test="approval-inbox"]')).toBeNull();
+    expect(el.querySelector('[data-test="approval-buttons"]')).toBeNull();
+  });
+
+  it('says the lookup failed, with Try again, rather than only the inbox link', () => {
+    const { el } = box({ answer: () => throwError(() => new HttpErrorResponse({ status: 500 })) });
+    const store = TestBed.inject(RunApprovalStore);
+    expect(store.taskLoading()).toBe(false);
+    expect(store.taskError()).toBe('Whether you decide this could not be checked.');
+    expect(el.querySelector('[data-test="approval-inbox"]')).toBeNull();
+    expect(el.textContent).toContain('Try again');
   });
 });

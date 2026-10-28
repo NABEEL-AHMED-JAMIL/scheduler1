@@ -51,6 +51,7 @@ function screenWith(opts: { admin?: boolean; settings?: InboxSettings; closeWith
     }),
   };
   TestBed.resetTestingModule();
+  try { localStorage.clear(); } catch { /* none */ }
   TestBed.configureTestingModule({
     providers: [
       provideZonelessChangeDetection(),
@@ -228,5 +229,30 @@ describe('Inbox -- settings', () => {
     expect(screen.canManage()).toBe(false);
     screen.openSettings();
     expect(dialog.open).not.toHaveBeenCalled();
+  });
+});
+
+describe('Inbox -- sorting the arrivals (owner 2026-10-27)', () => {
+  const OLDER: InboxFile = { ...FILE, arrivalId: 'a-older', fileName: 'admissions.csv', bytes: 9000, uploadedAt: '2026-09-27T08:00:00' };
+  const withTwo = () => {
+    const api = stubApi();
+    api.files.mockReturnValue(of({ status: 'SUCCESS', message: '', data: [FILE, OLDER] }));
+    return screenWith({ api }).screen;
+  };
+
+  it('keeps the service order until a heading is picked, then sorts by it both ways', () => {
+    const screen = withTwo();
+    expect(screen.sortedFiles().map(f => f.fileName)).toEqual(['live-customers.csv', 'admissions.csv']);
+    screen.sort.toggle('file');
+    expect(screen.sortedFiles().map(f => f.fileName)).toEqual(['admissions.csv', 'live-customers.csv']);
+    screen.sort.toggle('file');
+    expect(screen.sortedFiles().map(f => f.fileName)).toEqual(['live-customers.csv', 'admissions.csv']);
+  });
+
+  it('sorts sizes as numbers and says it covers the newest 50', () => {
+    const screen = withTwo();
+    screen.sort.toggle('size');
+    expect(screen.sortedFiles().map(f => f.bytes)).toEqual([9000, 115]);
+    expect(screen.sort.note).toBe('Sorts the newest 50 shown');
   });
 });

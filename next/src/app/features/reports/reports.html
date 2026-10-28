@@ -65,7 +65,9 @@
     </div>
   }
 
-  @if (loading()) {
+  <!-- Owner 2026-10-27: only the first read (nothing on screen yet) swaps the page for the loading card; a Refresh or
+       a date change keeps the runs on screen under the blur below until the new ones arrive. -->
+  @if (loading() && !rawData().rows.length) {
     <div class="card p-12 text-center" role="status" aria-live="polite">
       <div class="spinner mx-auto mb-3" aria-hidden="true"></div>
       <p class="text-sm text-[color:var(--text-muted)]">Reading your runs…</p>
@@ -101,6 +103,8 @@
       }
     </div>
   } @else {
+    <app-blur-loader [active]="loading()" label="Refreshing…">
+    <div class="space-y-5">
 
     <!-- ── Overview ───────────────────────────────────────────────────────────────────── -->
     <section class="space-y-3">
@@ -220,23 +224,24 @@
         <table class="table-modern">
           <thead>
             <tr>
-              <th>Pipeline</th>
-              <th class="text-right hidden lg:table-cell" title="Distinct schedules that ran this pipeline">Schedules</th>
-              <th class="text-right">Runs</th>
+              <th appSort="task" [sortBy]="healthSort">Pipeline</th>
+              <th class="text-right hidden lg:table-cell" title="Distinct schedules that ran this pipeline" appSort="jobs" [sortBy]="healthSort">Schedules</th>
+              <th class="text-right" appSort="runs" [sortBy]="healthSort">Runs</th>
               <!-- One column per outcome, not a single "Failed": Interrupt is a different
                    problem from Failed (the run was stopped, not broken), and Skip and Missed
                    are the only trace a task leaves when it never ran at all. -->
               @for (col of outcomeColumns; track col.status) {
-                <th class="text-right" [class.hidden]="'rare' in col" [class.2xl:table-cell]="'rare' in col" [title]="col.title">{{ col.label }}</th>
+                <th class="text-right" [class.hidden]="'rare' in col" [class.2xl:table-cell]="'rare' in col" [title]="col.title"
+                    [appSort]="'o-' + col.status" [sortBy]="healthSort">{{ col.label }}</th>
               }
-              <th class="text-right 2xl:hidden" [title]="rareTitle">Other</th>
-              <th class="text-right">Success</th>
-              <th class="text-right">Median</th>
-              <th class="text-right hidden xl:table-cell" title="Slowest finished run">Slowest</th>
-              <th class="hidden md:table-cell">Last run</th>
+              <th class="text-right 2xl:hidden" [title]="rareTitle" appSort="other" [sortBy]="healthSort">Other</th>
+              <th class="text-right" appSort="success" [sortBy]="healthSort">Success</th>
+              <th class="text-right" appSort="median" [sortBy]="healthSort">Median</th>
+              <th class="text-right hidden xl:table-cell" title="Slowest finished run" appSort="slowest" [sortBy]="healthSort">Slowest</th>
+              <th class="hidden md:table-cell" appSort="lastRun" [sortBy]="healthSort">Last run</th>
               <!-- Pinned right: at 1024 the verdict was the column past the card edge, and the
                    Interrupted, Skipped and Missed columns must stay (see above). -->
-              <th class="text-right col-pin-right">State</th>
+              <th class="text-right col-pin-right" appSort="state" [sortBy]="healthSort">State</th>
             </tr>
           </thead>
           <tbody>
@@ -342,13 +347,13 @@
           <table class="table-modern">
             <thead>
               <tr>
-                <th>Schedule</th>
-                <th class="hidden lg:table-cell">When</th>
-                <th class="text-right hidden md:table-cell">Took</th>
+                <th appSort="schedule" [sortBy]="failureSort">Schedule</th>
+                <th class="hidden lg:table-cell" appSort="when" [sortBy]="failureSort">When</th>
+                <th class="text-right hidden md:table-cell" appSort="took" [sortBy]="failureSort">Took</th>
                 <!-- Owner 2026-10-12: as on every run list, the status right before the message (the error), then the
                      actions pinned right. -->
-                <th class="w-32">Status</th>
-                <th>Error</th>
+                <th class="w-32" appSort="status" [sortBy]="failureSort">Status</th>
+                <th appSort="error" [sortBy]="failureSort">Error</th>
                 <th class="text-right col-pin-right th-actions">Actions</th>
               </tr>
             </thead>
@@ -435,18 +440,18 @@
           <table class="table-modern">
             <thead>
               <tr>
-                <th>Prompt</th>
-                <th class="text-right">Calls</th>
-                <th class="text-right">Failed</th>
-                <th class="text-right hidden md:table-cell" title="Runs from the editor's Try it">Tries</th>
-                <th class="text-right">Tokens in</th>
-                <th class="text-right">Tokens out</th>
-                <th class="text-right hidden lg:table-cell">Median</th>
-                <th class="hidden lg:table-cell">Last call</th>
+                <th appSort="prompt" [sortBy]="aiUsageSort">Prompt</th>
+                <th class="text-right" appSort="calls" [sortBy]="aiUsageSort">Calls</th>
+                <th class="text-right" appSort="failed" [sortBy]="aiUsageSort">Failed</th>
+                <th class="text-right hidden md:table-cell" title="Runs from the editor's Try it" appSort="tries" [sortBy]="aiUsageSort">Tries</th>
+                <th class="text-right" appSort="tokensIn" [sortBy]="aiUsageSort">Tokens in</th>
+                <th class="text-right" appSort="tokensOut" [sortBy]="aiUsageSort">Tokens out</th>
+                <th class="text-right hidden lg:table-cell" appSort="median" [sortBy]="aiUsageSort">Median</th>
+                <th class="hidden lg:table-cell" appSort="lastCall" [sortBy]="aiUsageSort">Last call</th>
               </tr>
             </thead>
             <tbody>
-              @for (r of aiUsage(); track r.promptName + r.promptId) {
+              @for (r of aiUsageSorted(); track r.promptName + r.promptId) {
                 <tr>
                   <!-- The service names calls whose prompt is gone "deleted prompt": said as a row label, not a lower-case name. -->
                   <td class="max-w-64">
@@ -473,6 +478,8 @@
       </section>
     }
 
+    </div>
+    </app-blur-loader>
   }
 
   <!-- ── The builder ──────────────────────────────────────────────────────────────────
@@ -483,7 +490,7 @@
 
        And outside the loading / error / empty chain for the same reason: inside it, every
        Refresh, date change or Try again destroyed the builder on the way through "loading". -->
-  <section class="space-y-3" [hidden]="!showBuilder() || loading() || !!error() || !hasRows()">
+  <section class="space-y-3" [hidden]="!showBuilder() || (loading() && !rawData().rows.length) || !!error() || !hasRows()">
       <div>
         <h2 class="section-title">Build your own view</h2>
         <p class="section-sub">

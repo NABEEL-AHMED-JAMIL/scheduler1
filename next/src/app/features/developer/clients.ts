@@ -5,6 +5,7 @@ import { AuthService } from '../../core/auth/auth.service';
 import { PageHeader } from '../../shared/ui/page-header';
 import { Icon } from '../../shared/ui/icon';
 import { LoadError } from '../../shared/ui/load-error';
+import { AppLoading, loadErrorText } from '../../shared/ui/loading';
 import { ApiClientRow, ApiClientsApi, ScopeRow } from '../integration/api-clients/api-clients.api';
 import { DOCS } from './developer-docs';
 import { DevCode } from './code-block';
@@ -26,7 +27,7 @@ import { PORTAL } from './guide-markdown';
  */
 @Component({
   selector: 'app-developer-clients',
-  imports: [PageHeader, RouterLink, Icon, LoadError, DevCode, WorkspaceSelect],
+  imports: [PageHeader, RouterLink, Icon, LoadError, AppLoading, DevCode, WorkspaceSelect],
   template: `
     <div class="page" data-developer-clients>
       <app-page-header title="Your API clients"
@@ -49,7 +50,8 @@ import { PORTAL } from './guide-markdown';
         <div class="grid gap-4 xl:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
           <section class="card py-1" aria-label="API clients">
             @if (loading()) {
-              <p class="text-sm text-[color:var(--text-muted)] p-3"><span class="spinner inline-block align-middle mr-2"></span>Reading the clients…</p>
+              <!-- Owner 2026-10-27: the shared loader, so a screen reader hears what is loading and a slow read says so. -->
+              <app-loading shape="list" label="Loading API clients…" [count]="3" />
             } @else if (!clients().length) {
               <p class="text-sm text-[color:var(--text-muted)] p-3">No API client yet. <a class="link-inline" routerLink="/developers/api-clients">Make one</a>.</p>
             }
@@ -180,7 +182,7 @@ export class DeveloperClients {
       next: r => {
         if (asked !== this.tenantId()) return;
         this.loading.set(false);
-        if (r.status !== API_SUCCESS) { this.error.set(r.message || 'Could not read the API clients.'); return; }
+        if (r.status !== API_SUCCESS) { this.error.set(loadErrorText(r, 'The API clients could not be read.')); return; }
         const active = (r.data ?? []).filter(c => c.status === 'Active');
         this.clients.set(active);
         if (!this.chosen() && active.length) this.chosen.set(active[0]);
@@ -188,7 +190,7 @@ export class DeveloperClients {
       error: err => {
         if (asked !== this.tenantId()) return;
         this.loading.set(false);
-        this.error.set(err?.error?.message || 'Could not read the API clients.');
+        this.error.set(loadErrorText(err, 'The API clients could not be read.'));
       },
     });
     this.api.scopes().subscribe({

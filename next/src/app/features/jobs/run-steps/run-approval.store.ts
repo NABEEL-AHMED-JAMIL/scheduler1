@@ -7,6 +7,7 @@ import { InboxTask, WorkflowsApi } from '../../workflows/workflows.api';
 import { LogNames } from '../logs/log-segments';
 import { RunTimelineStore } from './run-timeline.store';
 import { approvalTeams, waitingApproval } from './run-approval.model';
+import { loadErrorText } from '../../../shared/ui/loading';
 
 /** workflow-service's subject for an Approval step's request (RunReviewTasks.APPROVAL_PREFIX there). */
 export const APPROVAL_SUBJECT = 'pipeline-approval:';
@@ -29,6 +30,13 @@ export class RunApprovalStore {
   readonly waiting = computed(() => waitingApproval(this.timelines.timeline()));
   /** The reader's open task about the request, when they may decide it; null otherwise. */
   readonly task = signal<InboxTask | null>(null);
+  /**
+   * Owner 2026-10-27: the reader's task is being looked up. Until it lands the box said "Open Review › Approvals" (or
+   * nothing) and then grew the decide buttons; it now says it is checking.
+   */
+  readonly taskLoading = signal(false);
+  /** Why the reader's task could not be looked up (a reader who may decide would otherwise only see the inbox link). */
+  readonly taskError = signal('');
   readonly canOpenInbox = computed(() => this.auth.canOpen('task-inbox'));
 
   /** Each team id the run's approvals name, with its name. */
@@ -61,19 +69,38 @@ export class RunApprovalStore {
   forget(): void {
     this.taskFor = null;
     this.task.set(null);
+    this.taskError.set('');
+  }
+
+  /** Try again on the task lookup that failed. */
+  retryTask(): void {
+    const approvalId = this.waiting()?.approval.approvalId ?? null;
+    this.taskFor = null;
+    this.findTask(approvalId);
   }
 
   private findTask(approvalId: number | null): void {
     if (approvalId === this.taskFor) return;
     this.taskFor = approvalId;
     this.task.set(null);
+    this.taskError.set('');
+    this.taskLoading.set(false);
     if (approvalId === null || !this.canOpenInbox()) return;
+    this.taskLoading.set(true);
+    const fallback = 'Whether you decide this could not be checked.';
     this.inbox.forSubject(APPROVAL_SUBJECT + approvalId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: r => {
         if (this.taskFor !== approvalId) return;
-        this.task.set(r.status === API_SUCCESS ? (r.data ?? []).find(t => t.stepType === 'approval' && t.state === 'Open') ?? null : null);
+        this.taskLoading.set(false);
+        if (r.status !== API_SUCCESS) { this.taskError.set(loadErrorText(r, fallback)); return; }
+        this.task.set((r.data ?? []).find(t => t.stepType === 'approval' && t.state === 'Open') ?? null);
       },
-      error: () => this.task.set(null),
+      error: err => {
+        if (this.taskFor !== approvalId) return;
+        this.taskLoading.set(false);
+        this.task.set(null);
+        this.taskError.set(loadErrorText(err, fallback));
+      },
     });
   }
 
@@ -85,6 +112,7 @@ export class RunApprovalStore {
         if (r.status !== API_SUCCESS) return;
         this.teamNames.set(new Map((r.data ?? []).map(t => [String(t.teamId), t.name])));
       },
+      // Cosmetic: without the names, the teams are said by their number.
       error: () => {},
     });
   }

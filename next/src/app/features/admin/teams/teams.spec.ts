@@ -4,7 +4,8 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { NEVER, Observable, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { API_SUCCESS } from '../../../core/api/api.config';
 import { AuthService } from '../../../core/auth/auth.service';
 import { Team, TeamsApi } from '../../../core/teams/teams.api';
@@ -39,11 +40,12 @@ const FULL_USAGE: TeamUsage = {
   ]]]),
 };
 
-function mount(opts: { admin?: boolean; me?: number; teams?: Team[]; usage?: TeamUsage; query?: Record<string, string> } = {}) {
+function mount(opts: { admin?: boolean; me?: number; teams?: Team[]; usage?: TeamUsage; query?: Record<string, string>;
+  listAnswer?: () => Observable<unknown>; usageAnswer?: () => Observable<TeamUsage> } = {}) {
   const admin = opts.admin ?? true;
   const teams = opts.teams ?? [WOUND, BILLING];
   const api = {
-    list: vi.fn((_t: unknown, withArchived: boolean) => of({ status: API_SUCCESS, message: '', data: withArchived ? [...teams, OLD] : teams })),
+    list: vi.fn((_t: unknown, withArchived: boolean) => opts.listAnswer?.() ?? of({ status: API_SUCCESS, message: '', data: withArchived ? [...teams, OLD] : teams })),
     create: vi.fn(() => of({ status: API_SUCCESS, message: 'Team "Intake" made.', data: { ...BILLING, teamId: 8, name: 'Intake' } })),
     addMember: vi.fn(() => of({ status: API_SUCCESS, message: 'Cara is in "Wound care" as member.', data: { ...WOUND, memberCount: 3,
       members: [...WOUND.members, { appUserId: 43, teamRole: 'MEMBER', fullName: 'Cara Clerk' }] } })),
@@ -53,12 +55,13 @@ function mount(opts: { admin?: boolean; me?: number; teams?: Team[]; usage?: Tea
   };
   const toast = { success: vi.fn(), error: vi.fn() };
   TestBed.resetTestingModule();
+  try { localStorage.clear(); } catch { /* none */ }
   TestBed.configureTestingModule({ providers: [provideZonelessChangeDetection(), provideRouter([]), provideHttpClient(), provideHttpClientTesting(),
     { provide: TeamsApi, useValue: api },
     { provide: WorkflowsApi, useValue: { colleagues: () => of({ status: API_SUCCESS, message: '', data: [
       { userId: 41, fullName: 'Ana Lead', username: 'ana@x' }, { userId: 42, fullName: 'Ben Nurse', username: 'ben@x' },
       { userId: 43, fullName: 'Cara Clerk', username: 'cara@x' }] }) } },
-    { provide: TeamUsageReader, useValue: { read: () => of(opts.usage ?? FULL_USAGE) } },
+    { provide: TeamUsageReader, useValue: { read: () => opts.usageAnswer?.() ?? of(opts.usage ?? FULL_USAGE) } },
     { provide: ToastService, useValue: toast },
     { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap(opts.query ?? {}) } } },
     { provide: AuthService, useValue: { isTenantAdmin: signal(admin), isPlatformAdmin: signal(false), user: signal({ appUserId: opts.me ?? 1 }),
@@ -266,5 +269,51 @@ describe('Teams', () => {
     await confirmIt(fixture);
     expect(api.archive).toHaveBeenCalledWith(6);
     expect(api.list).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('Teams -- sorting (owner 2026-10-27)', () => {
+  it('keeps active-then-name until a heading is picked, then sorts by members both ways', () => {
+    const { fixture } = mount();
+    const page = fixture.componentInstance;
+    expect(page.paged().map(t => t.name)).toEqual(['Billing', 'Wound care']);
+    page.sort.toggle('members');
+    expect(page.paged().map(t => t.memberCount)).toEqual([2, 0]);
+    page.sort.toggle('members');
+    expect(page.paged().map(t => t.memberCount)).toEqual([0, 2]);
+  });
+
+  it('puts a team without a lead last when sorting by lead', () => {
+    const { fixture } = mount();
+    const page = fixture.componentInstance;
+    page.sort.toggle('lead');
+    expect(page.paged().map(t => t.name)).toEqual(['Wound care', 'Billing']);
+  });
+});
+
+describe('Teams -- loading, empty, error (owner 2026-10-27)', () => {
+  it('is loading, with placeholder tiles and no "No teams yet", until the list answers', () => {
+    const { fixture, el } = mount({ listAnswer: () => NEVER, usageAnswer: () => NEVER });
+    expect(fixture.componentInstance.loading()).toBe(true);
+    expect(fixture.componentInstance.loaded()).toBe(false);
+    expect(fixture.componentInstance.usageLoading()).toBe(true);
+    expect(el.textContent).not.toContain('No teams yet');
+  });
+
+  it('says there is no team once an empty list answers', () => {
+    const { fixture, el } = mount({ teams: [] });
+    expect(fixture.componentInstance.loaded()).toBe(true);
+    expect(el.textContent).toContain('No teams yet');
+  });
+
+  it('says the list could not be read in the table (no toast as well), and a failed usage read is not "used nowhere"', () => {
+    const { fixture, el, toast } = mount({ listAnswer: () => throwError(() => new HttpErrorResponse({ status: 500 })),
+      usageAnswer: () => throwError(() => new Error('down')) });
+    fixture.detectChanges();
+    expect(fixture.componentInstance.loading()).toBe(false);
+    expect(fixture.componentInstance.error()).toBe('The teams could not be read.');
+    expect(el.textContent).toContain('The teams could not be read.');
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(fixture.componentInstance.usageError()).toBe('Where the teams are used could not be read.');
   });
 });

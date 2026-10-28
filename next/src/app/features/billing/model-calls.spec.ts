@@ -2,7 +2,9 @@ import { describe, it, expect, vi } from 'vitest';
 import { Component, provideZonelessChangeDetection, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { of } from 'rxjs';
+import { NEVER, Observable, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
+import { By } from '@angular/platform-browser';
 import { API_SUCCESS } from '../../core/api/api.config';
 import { BillingApi, UsageQuery } from './billing.service';
 import { ModelCalls, callerLabel, promptIdOf, rateSentences } from './model-calls';
@@ -42,9 +44,11 @@ class Host {
 }
 
 function mount(rows: object[] = [call('ai-run#4913', '2026-10-20T00:29:00Z'), call('ai-run#4912', '2026-10-20T00:28:00Z'), call('ai-run#4900', '2026-10-19T15:00:00Z', { job_queue_id: 8381 })],
-  days: object[] = [{ day: '2026-10-19', runs: 199, amount: '36.69' }], promptNames = new Map<number, string>()) {
+  days: object[] = [{ day: '2026-10-19', runs: 199, amount: '36.69' }], promptNames = new Map<number, string>(),
+  summary: () => Observable<unknown> = () => of({ status: API_SUCCESS, message: '', data: SUMMARY })) {
+  try { localStorage.clear(); } catch { /* none */ }
   const api = {
-    runSummary: vi.fn(() => of({ status: API_SUCCESS, message: '', data: SUMMARY })),
+    runSummary: vi.fn(summary),
     promptNames: vi.fn(() => of(promptNames)),
     runs: vi.fn((_q: UsageQuery, page: number) => of({ status: API_SUCCESS, message: '', data: { total: 2066, page, limit: 25, rows: page === 1 ? rows : [call('ai-run#1', '2026-10-01T15:00:00Z')], days } })),
   };
@@ -52,7 +56,8 @@ function mount(rows: object[] = [call('ai-run#4913', '2026-10-20T00:29:00Z'), ca
   TestBed.configureTestingModule({ providers: [provideZonelessChangeDetection(), provideRouter([]), { provide: BillingApi, useValue: api }] });
   const fixture = TestBed.createComponent(Host);
   fixture.detectChanges();
-  return { fixture, api, el: fixture.nativeElement as HTMLElement };
+  const calls = fixture.debugElement.query(By.directive(ModelCalls)).componentInstance as ModelCalls;
+  return { fixture, api, calls, el: fixture.nativeElement as HTMLElement };
 }
 
 /** An element's text as it reads, a space between elements (textContent runs "2026" and "9 runs" together). */
@@ -192,5 +197,101 @@ describe('Cost & usage: AI model calls', () => {
     all.click();
     fixture.detectChanges();
     expect(el.querySelectorAll('[data-test="model-source"]')).toHaveLength(11);
+  });
+});
+
+describe('AI model calls -- sorting (owner 2026-10-27)', () => {
+  it('keeps the dearest-first order until a heading is picked, then sorts the sources by calls both ways', async () => {
+    const { fixture, calls } = mount();
+    await fixture.whenStable();
+    expect(calls.shownSources().map(s => s.label)).toEqual(['Prompt 1075', 'Tool runs', 'Console calls']);
+    calls.sourceSort.toggle('calls');
+    expect(calls.shownSources().map(s => s.calls)).toEqual([511, 476, 4]);
+    calls.sourceSort.toggle('calls');
+    expect(calls.shownSources().map(s => s.calls)).toEqual([4, 476, 511]);
+  });
+
+  it('sorts the models by name and by tokens', async () => {
+    const { fixture, calls } = mount();
+    await fixture.whenStable();
+    calls.modelSort.toggle('model');
+    expect(calls.sortedModels().map(m => m.model)).toEqual(['llama3.2:3b', 'qwen3:8b']);
+    calls.modelSort.toggle('tokens');
+    expect(calls.sortedModels().map(m => m.model)).toEqual(['qwen3:8b', 'llama3.2:3b']);
+  });
+});
+
+describe('AI model calls -- Every call sorts on the server (owner 2026-10-27)', () => {
+  async function every() {
+    const m = mount();
+    await m.fixture.whenStable();
+    ([...m.el.querySelectorAll('[data-test="model-call-view"] button')].find(b => text(b) === 'Every call') as HTMLButtonElement).click();
+    m.fixture.detectChanges();
+    await m.fixture.whenStable();
+    return m;
+  }
+  const args = (api: { runs: { mock: { calls: unknown[][] } } }, n: number) => api.runs.mock.calls[n];
+
+  it('sends no sort before a heading is picked, then the column and its direction from the first page', async () => {
+    const { fixture, el, api, calls } = await every();
+    expect(args(api, 0)[3]).toBeNull();
+    expect(el.querySelectorAll('[data-test="model-calls"] th button.th-sort').length).toBe(5);
+    calls.callSort.toggle('cost');
+    fixture.detectChanges();
+    expect(args(api, 1)[1]).toBe(1);
+    expect(args(api, 1)[3]).toEqual({ sort: 'cost', dir: 'desc' });
+    calls.callSort.toggle('cost');
+    fixture.detectChanges();
+    expect(args(api, 2)[3]).toEqual({ sort: 'cost', dir: 'asc' });
+    calls.callSort.toggle('model');
+    fixture.detectChanges();
+    expect(args(api, 3)[3]).toEqual({ sort: 'model', dir: 'asc' });
+    // Show more pages on through the same order.
+    (el.querySelector('[data-test="more-calls"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(args(api, 4)[1]).toBe(2);
+    expect(args(api, 4)[3]).toEqual({ sort: 'model', dir: 'asc' });
+  });
+
+  it('keeps the day headers in time order only; sorted by anything else the calls are one list with their dates', async () => {
+    const { fixture, el, calls } = await every();
+    expect(el.querySelectorAll('[data-test="day-group"]').length).toBe(1);
+    calls.callSort.toggle('tokensIn');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(el.querySelectorAll('[data-test="day-group"]').length).toBe(0);
+    expect(text(el.querySelector('[data-test="run-time"]'))).toContain('19:29');
+    expect(text(el.querySelector('[data-test="run-time"]'))).not.toBe('19:29');
+    calls.callSort.toggle('time');
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(el.querySelectorAll('[data-test="day-group"]').length).toBe(1);
+  });
+});
+
+describe('AI model calls -- loading, empty, error (owner 2026-10-27)', () => {
+  it('shows placeholders, not 0 and $0.00, until the summary answers', async () => {
+    const { fixture, calls, el } = mount(undefined, undefined, undefined, () => NEVER);
+    await fixture.whenStable();
+    expect(calls.summaryLoading()).toBe(true);
+    expect(calls.tilesLoading()).toBe(true);
+    expect(el.textContent).not.toContain('No model calls in this month yet.');
+  });
+
+  it('is empty once an empty month answers', async () => {
+    const empty = { ...SUMMARY, totals: { calls: 0, runs: 0, tokens_in: 0, tokens_out: 0, amount: 0, last: null }, bySource: [], byModel: [] };
+    const { fixture, calls } = mount(undefined, undefined, undefined, () => of({ status: API_SUCCESS, message: '', data: empty }));
+    await fixture.whenStable();
+    expect(calls.summaryLoading()).toBe(false);
+    expect(calls.tilesLoading()).toBe(false);
+    expect(calls.sources()).toEqual([]);
+  });
+
+  it('says the calls could not be read, on the tiles and both tables, in plain words', async () => {
+    const { fixture, calls } = mount(undefined, undefined, undefined, () => throwError(() => new HttpErrorResponse({ status: 500, error: 'Internal Server Error' })));
+    await fixture.whenStable();
+    expect(calls.summaryLoading()).toBe(false);
+    expect(calls.summaryError()).toBe('The model calls could not be read.');
+    expect(calls.tilesFailed()).toBe(true);
   });
 });

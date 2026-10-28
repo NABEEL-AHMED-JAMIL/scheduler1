@@ -5,6 +5,8 @@ import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { Icon } from '../../shared/ui/icon';
 import { StorageService } from '../objects/storage.service';
 import { DRAFT_TITLE } from './request-data';
+import { AppLoading, loadErrorText } from '../../shared/ui/loading';
+import { LoadError } from '../../shared/ui/load-error';
 
 /** One output a run recorded (sourceJob.json/runOutputs), as far as this card reads it. */
 interface RunOutputRow {
@@ -55,7 +57,7 @@ export function reviewFields(row: Record<string, unknown>): { first: { label: st
  */
 @Component({
   selector: 'app-run-review-card',
-  imports: [Icon, RouterLink],
+  imports: [Icon, RouterLink, AppLoading, LoadError],
   styles: `
     .rrc { display: grid; grid-template-columns: minmax(0, 13rem) minmax(0, 1fr); gap: 1rem; align-items: start; }
     @media (max-width: 60rem) { .rrc { grid-template-columns: minmax(0, 1fr); } }
@@ -70,8 +72,12 @@ export function reviewFields(row: Record<string, unknown>): { first: { label: st
     .rrc-more summary { cursor: pointer; color: var(--text-secondary); }
   `,
   template: `
+    <!-- Owner 2026-10-27: the shared loader; a failed read says so with Try again; a run with nothing to show says so
+         (the card was blank in both cases). -->
     @if (loading()) {
-      <p class="text-sm text-[color:var(--text-muted)]" data-test="run-review-loading">Reading what the run made…</p>
+      <app-loading shape="panel" data-test="run-review-loading" label="Reading what the run made…" [count]="3" />
+    } @else if (loadError()) {
+      <app-load-error data-test="run-review-error" [message]="loadError()" (retry)="retry()" />
     } @else if (row(); as r) {
       <section aria-labelledby="run-review-title" data-test="run-review-card">
         <div class="flex flex-wrap items-center gap-2 mb-3">
@@ -88,8 +94,15 @@ export function reviewFields(row: Record<string, unknown>): { first: { label: st
           @if (imageKey()) {
             <div class="rrc-img" data-test="run-review-image">
               @if (imageUrl(); as src) { <img [src]="src" [alt]="'The image this run reviewed: ' + imageKey()" /> }
-              @else if (imageError()) { <span class="text-xs text-[color:var(--text-muted)] p-3 text-center">{{ imageError() }}</span> }
-              @else { <span class="text-xs text-[color:var(--text-muted)]">Loading the image…</span> }
+              @else if (imageError()) {
+                <span class="flex flex-col items-center gap-2 text-xs text-[color:var(--text-muted)] p-3 text-center" role="alert">
+                  {{ imageError() }}
+                  @if (imageRetryable()) {
+                    <button type="button" class="btn btn-default btn-sm" data-test="run-review-image-retry" (click)="retryImage()"><app-icon name="refresh" />Try again</button>
+                  }
+                </span>
+              }
+              @else { <app-loading shape="inline" label="Loading the image…" /> }
             </div>
           }
           <div class="flex flex-col gap-3 min-w-0">
@@ -117,6 +130,11 @@ export function reviewFields(row: Record<string, unknown>): { first: { label: st
           <button type="button" class="btn btn-default btn-sm" (click)="openPdf(p)" [disabled]="opening()"><app-icon name="file" />{{ p.name || 'Report PDF' }}</button>
         </div>
       </section>
+    } @else {
+      <p class="text-sm text-[color:var(--text-secondary)]" data-test="run-review-none">
+        This run kept no result or PDF to show here.
+        @if (link()) { <a class="link-inline" [routerLink]="link()!">Open the run</a> to see its steps and outputs. }
+      </p>
     }
   `,
 })
@@ -131,6 +149,9 @@ export class RunReviewCard implements OnDestroy {
   readonly draftTitle = DRAFT_TITLE;
 
   readonly loading = signal(true);
+  /** Why the run's result could not be read (it was silent: the card showed nothing). */
+  readonly loadError = signal('');
+  private loadSeq = 0;
   readonly outputs = signal<RunOutputRow[]>([]);
   readonly rows = signal<Record<string, unknown>[]>([]);
   readonly row = computed(() => this.rows()[0] ?? null);
@@ -145,6 +166,8 @@ export class RunReviewCard implements OnDestroy {
   readonly pdf = computed(() => this.outputs().find(o => (o.format ?? '').toLowerCase() === 'pdf' && o.runDatasetId && !o.expired) ?? null);
   readonly imageUrl = signal<string | null>(null);
   readonly imageError = signal('');
+  /** A failed download can be asked again; "Not an image" cannot. */
+  readonly imageRetryable = signal(false);
   readonly opening = signal(false);
   private released = false;
 
@@ -166,30 +189,48 @@ export class RunReviewCard implements OnDestroy {
 
   private drop(): void { const u = this.imageUrl(); if (u) URL.revokeObjectURL(u); this.imageUrl.set(null); }
 
+  /** Reads the run's result again after a failure. */
+  retry(): void { this.load(this.jobQueueId(), this.attempt()); }
+
   private load(jobQueueId: number, attempt: number): void {
+    // Only the newest read writes: the inbox opens the next task in this same card.
+    const seq = ++this.loadSeq;
+    const current = () => seq === this.loadSeq && !this.released;
+    const failed = (err: unknown) => {
+      if (!current()) return;
+      this.loadError.set(loadErrorText(err, 'What the run made could not be read.'));
+      this.loading.set(false);
+    };
     this.loading.set(true);
+    this.loadError.set('');
     this.rows.set([]);
     this.http.get<ApiResponse<{ outputs?: RunOutputRow[] }>>(`${API_BASE}/sourceJob.json/runOutputs`,
       { params: { jobQueueId: String(jobQueueId), attempt: String(attempt) } }).subscribe({
       next: r => {
-        const outs = r.status === API_SUCCESS ? r.data?.outputs ?? [] : [];
+        if (!current()) return;
+        if (r.status !== API_SUCCESS) { this.outputs.set([]); failed(r); return; }
+        const outs = r.data?.outputs ?? [];
         this.outputs.set(outs);
         const result = outs.find(o => o.runDatasetId && !o.expired && ['csv', 'json', 'jsonl'].includes((o.format ?? '').toLowerCase())
           && (o.rowCount ?? 0) > 0 && (o.rowCount ?? 0) <= MAX_ROWS);
         if (!result) { this.loading.set(false); return; }
         this.http.get<Record<string, unknown>[]>(`${API_BASE}/sourceJob.json/runDataset`,
           { params: { runDatasetId: String(result.runDatasetId), format: 'json' } }).subscribe({
-          next: rows => { this.rows.set(Array.isArray(rows) ? rows.slice(0, MAX_ROWS) : []); this.loading.set(false); },
-          error: () => this.loading.set(false),
+          next: rows => { if (!current()) return; this.rows.set(Array.isArray(rows) ? rows.slice(0, MAX_ROWS) : []); this.loading.set(false); },
+          error: failed,
         });
       },
-      error: () => { this.outputs.set([]); this.loading.set(false); },
+      error: err => { if (!current()) return; this.outputs.set([]); failed(err); },
     });
   }
+
+  /** Downloads the image again after a failure. */
+  retryImage(): void { this.loadImage(this.bucket(), this.imageKey()); }
 
   private loadImage(bucket: string | null, key: string | null): void {
     this.drop();
     this.imageError.set('');
+    this.imageRetryable.set(false);
     if (!bucket || !key) return;
     this.storage.download(bucket, key).subscribe({
       next: blob => {
@@ -197,7 +238,11 @@ export class RunReviewCard implements OnDestroy {
         if (!blob.type.startsWith('image/') && !IMAGE.test(key)) { this.imageError.set('Not an image.'); return; }
         this.imageUrl.set(URL.createObjectURL(blob));
       },
-      error: () => this.imageError.set('The image could not be read (it may have been removed, or you may not see that bucket).'),
+      error: () => {
+        if (this.released) return;
+        this.imageError.set('The image could not be read (it may have been removed, or you may not see that bucket).');
+        this.imageRetryable.set(true);
+      },
     });
   }
 

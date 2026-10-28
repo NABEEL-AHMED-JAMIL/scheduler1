@@ -2,7 +2,8 @@ import { describe, it, expect, vi } from 'vitest';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { Observable, of } from 'rxjs';
+import { NEVER, Observable, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { AuthService } from '../../../core/auth/auth.service';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { AssistantApi } from '../assistant/assistant.api';
@@ -275,3 +276,64 @@ function TOOLS_BLOCKED(row: (n: string) => HTMLElement, cells: (n: string) => st
   expect(r.querySelector('button[aria-label^="Put"]')).toBeNull();
   void row; void cells; void el;
 }
+
+/** Owner 2026-10-27: the sort and the loading / empty / error states, at the component instance. */
+function instance(answer: () => Observable<any>) {
+  TestBed.resetTestingModule();
+  try { localStorage.clear(); } catch { /* none */ }
+  TestBed.configureTestingModule({
+    providers: [
+      provideZonelessChangeDetection(),
+      { provide: AssistantApi, useValue: { tools: vi.fn(answer), toolHistory: vi.fn(() => of({ status: 'SUCCESS', data: [] })) } },
+      { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn(), info: vi.fn() } },
+      { provide: Dialog, useValue: {} },
+      { provide: AuthService, useValue: { canManageAgents: () => false, builderLocked: () => false, isTenantAdmin: () => false, isPlatformAdmin: () => false } },
+    ],
+  });
+  const screen = TestBed.runInInjectionContext(() => new ToolRegistry());
+  screen.ngOnInit();
+  return screen;
+}
+
+describe('Tool Registry -- sorting inside the groups (owner 2026-10-27)', () => {
+  it('keeps the registry order, then sorts by the tool name both ways while Reads stay above Writes', () => {
+    const screen = instance(() => of({ status: 'SUCCESS', data: structuredClone(TOOLS) }));
+    const reads = () => screen.sortedGroups()[0].tools.map(t => t.name);
+    expect(reads()).toEqual(['get_jobs', 'call_api', 'join_data', 'get_reports', 'read_s3']);
+    screen.sort.toggle('tool');
+    expect(reads()).toEqual(['call_api', 'join_data', 'get_jobs', 'read_s3', 'get_reports']);
+    screen.sort.toggle('tool');
+    expect(reads()).toEqual(['get_reports', 'read_s3', 'get_jobs', 'join_data', 'call_api']);
+    expect(screen.sortedGroups().map(g => g.kind)).toEqual(['read', 'write']);
+  });
+
+  it('sorts last used newest first, never-used last', () => {
+    const screen = instance(() => of({ status: 'SUCCESS', data: structuredClone(TOOLS) }));
+    screen.sort.toggle('lastUsed');
+    expect(screen.sortedGroups()[0].tools[0].name).toBe('get_jobs');
+    expect(screen.sortedGroups()[0].tools.slice(1).every(t => !t.lastUsedAt)).toBe(true);
+  });
+});
+
+describe('Tool Registry -- loading, empty, error (owner 2026-10-27)', () => {
+  it('is loading, and the tiles wait, until the list answers', () => {
+    const screen = instance(() => NEVER);
+    expect(screen.loading()).toBe(true);
+    expect(screen.listState.pending()).toBe(true);
+    expect(screen.tilesLoading()).toBe(true);
+  });
+
+  it('is empty once an empty list answers', () => {
+    const screen = instance(() => of({ status: 'SUCCESS', data: [] }));
+    expect(screen.loading()).toBe(false);
+    expect(screen.tilesLoading()).toBe(false);
+    expect(screen.filtered()).toEqual([]);
+  });
+
+  it('says the list could not be read, in plain words, and the tiles say so', () => {
+    const screen = instance(() => throwError(() => new HttpErrorResponse({ status: 500 })));
+    expect(screen.loading()).toBe(false);
+    expect(screen.error()).toBe('The tools could not be read.');
+    expect(screen.tilesFailed()).toBe(true);
+  });
+});

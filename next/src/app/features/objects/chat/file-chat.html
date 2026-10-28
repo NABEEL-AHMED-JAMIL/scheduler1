@@ -23,27 +23,42 @@
               [value]="agentId() ?? ''"
               (change)="onAgentChange(+$any($event.target).value)"
               [disabled]="!agents().length">
-        @if (!agents().length) { <option value="">No usable agents</option> }
+        @if (!agents().length) { <option value="">{{ agentsLoading() ? 'Loading agents…' : 'No usable agents' }}</option> }
         @for (agent of agents(); track agent.aiAgentId) {
           <option [value]="agent.aiAgentId">{{ agent.agentName }} · {{ agent.provider }}</option>
         }
       </select>
     </div>
+    <!-- Owner 2026-10-27: the agent list says it is loading, why it failed (with Try again; it was a toast, or nothing),
+         and that there is none. -->
+    @if (agentsLoading() || agentsError() || !agents().length) {
+      <div class="px-3.5 pb-1.5 border-b shrink-0 border-subtle" data-agents-status>
+        <app-inline-status [loading]="agentsLoading()" [error]="agentsError()" [empty]="!agents().length"
+                           label="Loading agents…" emptyText="No usable agent yet: an administrator adds one with its API key."
+                           (retry)="retryAgents()" />
+      </div>
+    }
 
     <div #scroller class="flex-1 overflow-y-auto px-3.5 py-3 space-y-3 min-h-0">
-      @if (preparing()) {
-        <p class="text-center text-sm text-[color:var(--text-muted)] py-8">Reading the file…</p>
+      @if (preparing() && !messages().length) {
+        <app-loading class="py-6" shape="spinner" label="Reading the file…" />
+      } @else if (preparing()) {
+        <!-- Another agent picked mid-chat: the conversation stays on screen while the file is read for it. -->
+        <app-loading class="justify-center w-full" shape="inline" label="Reading the file for this agent…" />
       } @else if (prepareError()) {
         <!-- The error is shown, but it is not an exit. When no agent matches this file's type
              loadAgents deliberately offers every usable one and selects the first, so the agent
              the backend would have accepted is usually sitting in the picker above; disabling the
              composer on this error also removed the only reason to go and change it, and left the
              reader looking at a dropdown they could see but could not act on. -->
-        <div class="text-center py-8 space-y-1">
+        <div class="text-center py-8 space-y-1" role="alert">
           <p class="text-sm text-crit-500">{{ prepareError() }}</p>
           @if (agents().length > 1) {
             <p class="text-xs text-[color:var(--text-muted)]">Choosing another agent above may work.</p>
           }
+          <button type="button" class="btn btn-default btn-sm mt-2" data-prepare-retry (click)="retryPrepare()">
+            <app-icon name="refresh" />Try again
+          </button>
         </div>
       } @else {
         <!-- The server has always known when a file overruns what the model can read, and the

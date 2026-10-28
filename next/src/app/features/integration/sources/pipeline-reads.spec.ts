@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { provideZonelessChangeDetection } from '@angular/core';
+import { provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { API_BASE } from '../../../core/api/api.config';
 import { SourcesApi } from './sources.service';
-import { PipelineRead, READERS_SHOWN, readKindIcon, readKindLabel, readKindPill, readingPipelines, readsSentence } from './pipeline-reads';
+import { PipelineRead, PipelineReads, READERS_SHOWN, readKindIcon, readKindLabel, readKindPill, readingPipelines, readsSentence } from './pipeline-reads';
 
 /** UX review 2026-10-13 (I1): the words and counts of what the pipelines read. */
 const read = (kind: string, ids: number[]): PipelineRead => ({
@@ -50,5 +51,35 @@ describe('SourcesApi.pipelineReads', () => {
     call.flush({ status: 'SUCCESS', message: '1 of 1 pipeline(s) read 1 place(s).', data: [read('api', [1932])] });
     expect(answered?.[0].pipelines[0].taskDetailId).toBe(1932);
     http.verify();
+  });
+});
+
+describe('PipelineReads -- sorting (owner 2026-10-27)', () => {
+  function table(reads: PipelineRead[]) {
+    try { localStorage.clear(); } catch { /* none */ }
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [provideZonelessChangeDetection(), provideRouter([])] });
+    const fixture = TestBed.createComponent(PipelineReads);
+    fixture.componentRef.setInput('reads', reads);
+    return fixture.componentInstance;
+  }
+
+  it('keeps Core\'s order, then sorts by how many pipelines read a place, both ways', () => {
+    const t = table([read('storage', [1]), read('api', [1, 2, 3, 4, 5])]);
+    expect(t.sorted().map(r => r.kind)).toEqual(['storage', 'api']);
+    t.sort.toggle('readBy');
+    expect(t.sorted().map(r => r.kind)).toEqual(['api', 'storage']);
+    t.sort.toggle('readBy');
+    expect(t.sorted().map(r => r.kind)).toEqual(['storage', 'api']);
+  });
+
+  it('keeps "+N more" open on the place it was opened for when the rows move', () => {
+    const t = table([read('storage', [1]), read('api', [1, 2, 3, 4, 5])]);
+    const api = t.sorted()[1];
+    t.expand(api);
+    t.sort.toggle('readBy');
+    expect(t.sorted()[0].kind).toBe('api');
+    expect(t.shownReaders(t.sorted()[0]).length).toBe(5);
+    expect(t.hiddenReaders(t.sorted()[1])).toBe(0);
   });
 });

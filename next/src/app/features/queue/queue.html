@@ -90,8 +90,9 @@
 
   <app-table-shell heading="Runs" [loading]="loading()" [error]="error()"
                    [isEmpty]="!data().length" [shown]="data().length" [total]="rows().length"
-                   emptyMessage="Nothing in the queue for these filters."
-                   emptyIcon="clock"
+                   emptyMessage="No run in these dates and filters."
+                   emptyHint="Runs are listed by the day they were queued: widen the dates, or clear the filters."
+                   emptyIcon="clock" loadingLabel="Loading runs…"
                    (retry)="load()">
     <ng-container toolbar>
       <div class="search-field max-w-56">
@@ -120,16 +121,16 @@
     <table class="table-modern">
       <thead>
         <tr>
-          <th>Run</th>
-          <th>Schedule</th>
-          <th>Created</th>
+          <th appSort="run" [sortBy]="sort">Run</th>
+          <th appSort="schedule" [sortBy]="sort">Schedule</th>
+          <th appSort="created" [sortBy]="sort">Created</th>
           <!-- Duration waits for lg: below it Message is the column worth the width, and at 768 the
                table only fits beside the pinned Status without it (UI review U5). -->
-          <th class="hidden lg:table-cell text-right">Duration</th>
+          <th class="hidden lg:table-cell text-right" appSort="duration" [sortBy]="sort">Duration</th>
           <!-- Owner 2026-10-12: the status right before the message, a fixed width so the badges line up; the pinned
                column keeps only the actions. -->
-          <th class="w-32">Status</th>
-          <th>Message</th>
+          <th class="w-32" appSort="status" [sortBy]="sort">Status</th>
+          <th appSort="message" [sortBy]="sort">Message</th>
           <th class="text-right col-pin-right th-actions">Actions</th>
         </tr>
       </thead>

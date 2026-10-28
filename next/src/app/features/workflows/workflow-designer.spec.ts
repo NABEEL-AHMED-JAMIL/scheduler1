@@ -4,7 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { of, throwError } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { ToastService } from '../../shared/ui/toast.service';
 import { AccessProfilesService } from '../admin/access-profiles/access-profiles.service';
@@ -315,5 +315,63 @@ describe('Call API in a workflow (owner #25)', () => {
     expect(condition.type).toBe('condition');
     expect(condition.name).toBe('Completed?');
     expect(condition.condition).toEqual({ field: `${runSaveAs(run.key)}.ok`, op: 'eq', value: true });
+  });
+});
+
+describe('Workflow designer -- loading, empty, error (owner 2026-10-27)', () => {
+  it('says the list could not be read with Try again, and clears it once it is read', () => {
+    const { api, screen, fixture, el } = screenWith();
+    api.list.mockReturnValueOnce(throwError(() => ({ status: 500 })) as never);
+    screen.loadList();
+    fixture.detectChanges();
+    expect(screen.error()).toBe('Workflows could not be read.');
+    (el.querySelector('[data-test="workflows-error"] button') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(screen.error()).toBe('');
+  });
+
+  it('says a workflow is opening, not "Pick a workflow", until it arrives', () => {
+    const { api, screen, fixture, el } = screenWith();
+    screen.current.set(null);
+    api.fetch.mockReturnValueOnce(new Subject<never>() as never);
+    screen.open('purchase', true);
+    fixture.detectChanges();
+    expect(screen.opening()).toBe('purchase');
+    expect(el.querySelector('[data-test="designer-opening"]')).not.toBeNull();
+    expect(el.querySelector('[data-test="designer-empty"]')).toBeNull();
+  });
+
+  it('keeps a failed open on the pane with Try again, never only a toast', () => {
+    const { api, toast, screen, fixture, el } = screenWith();
+    screen.current.set(null);
+    api.fetch.mockReturnValueOnce(throwError(() => ({ status: 500 })) as never);
+    screen.open('purchase');
+    fixture.detectChanges();
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(el.querySelector('[data-test="designer-open-error"]')?.textContent).toContain('Try again');
+    screen.retryOpen();
+    fixture.detectChanges();
+    expect(screen.openError()).toBe('');
+    expect(screen.current()?.key).toBe('purchase');
+  });
+
+  it('says the schedules are loading, then why they could not be read', () => {
+    const { screen } = screenWith();
+    const http = TestBed.inject(HttpTestingController);
+    screen.loadJobs();
+    expect(screen.jobsLoading()).toBe(true);
+    http.expectOne(r => r.url.endsWith('/sourceJob.json/listSourceJob')).flush({}, { status: 500, statusText: 'Server Error' });
+    expect(screen.jobsLoading()).toBe(false);
+    expect(screen.jobsError()).toBe('The schedules could not be read.');
+  });
+
+  it('does not say "No teams yet" while the teams are loading', () => {
+    const { screen } = screenWith();
+    screen.loadTeams();
+    expect(screen.teamsLoading()).toBe(true);
+    const http = TestBed.inject(HttpTestingController);
+    http.match(() => true).forEach(r => r.flush({}, { status: 503, statusText: 'Unavailable' }));
+    expect(screen.teamsLoading()).toBe(false);
+    expect(screen.teamsError()).toBe('The teams could not be read.');
   });
 });

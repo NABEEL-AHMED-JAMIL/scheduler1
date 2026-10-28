@@ -1,6 +1,7 @@
 import { Component, Injector, OnInit, computed, inject, input, model, signal } from '@angular/core';
 import { Combobox, ComboboxOption } from './combobox';
 import { Icon } from './icon';
+import { InlineStatus } from './loading';
 import { WorkspaceDirectory } from '../../core/workspaces/workspace-directory';
 import { ManagedSession } from '../../features/admin/managed-service/managed-session';
 
@@ -22,7 +23,7 @@ import { ManagedSession } from '../../features/admin/managed-service/managed-ses
  */
 @Component({
   selector: 'app-workspace-select',
-  imports: [Combobox, Icon],
+  imports: [Combobox, Icon, InlineStatus],
   host: { class: 'workspace-select-host', '[class.hidden]': '!picks()' },
   styles: `
     :host { display: inline-flex; align-items: center; gap: 0.5rem; order: -2; min-width: 0; }
@@ -34,10 +35,15 @@ import { ManagedSession } from '../../features/admin/managed-service/managed-ses
     @if (picks()) {
       <label class="ws-label" [attr.for]="boxId">{{ label() }}</label>
       <app-combobox class="ws-box" [id]="boxId" [ariaLabel]="label()" data-test="workspace-select"
-                    [placeholder]="allowAll() ? allLabel() : 'Pick a workspace'"
-                    [allowClear]="allowAll()" [clearLabel]="allLabel()"
+                    [placeholder]="listing() ? 'Loading workspaces…' : allowAll() ? allLabel() : 'Pick a workspace'"
+                    [allowClear]="allowAll()" [clearLabel]="allLabel()" [searching]="listing()"
                     [options]="options()" [selected]="value() === null ? '' : '' + value()"
                     (selectedChange)="pick($event)" />
+      <!-- Owner 2026-10-27: a list that could not be read says so beside the box, with Try again, instead of an empty
+           box that reads as "no workspace". -->
+      @if (directory.error()) {
+        <app-inline-status class="!mt-0" [error]="directory.error()" (retry)="reload()" data-test="workspace-select-error" />
+      }
       @if (offerWorkIn() && value() !== null) {
         <button type="button" class="btn btn-default btn-sm whitespace-nowrap" data-test="work-in-workspace"
                 [disabled]="opening()" (click)="workIn()"
@@ -68,6 +74,8 @@ export class WorkspaceSelect implements OnInit {
   private static next = 0;
   readonly boxId = `workspace-select-${++WorkspaceSelect.next}`;
   readonly picks = this.directory.picks;
+  /** The list is on its way: the box says "Loading workspaces…" rather than "No matches". */
+  readonly listing = computed(() => !this.directory.loaded() && !this.directory.error());
 
   /** The recent ones first, then every workspace by name. */
   readonly options = computed<ComboboxOption[]>(() => {
@@ -86,6 +94,11 @@ export class WorkspaceSelect implements OnInit {
 
   ngOnInit(): void {
     this.directory.load().subscribe();
+  }
+
+  /** Try again after the list failed. */
+  reload(): void {
+    this.directory.refresh().subscribe();
   }
 
   pick(raw: string): void {

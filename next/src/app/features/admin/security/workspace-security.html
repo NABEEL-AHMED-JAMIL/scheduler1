@@ -20,10 +20,16 @@
     </p>
   }
 
-  @if (error()) {
-    <div class="card p-4 text-sm text-crit-500" role="alert">{{ error() }}</div>
+  <!-- Owner 2026-10-27: the rules card is a skeleton until its read answers (it drew empty fields as if they were the
+       rules), a failed read says why with Try again, and a re-read keeps the form under a blur. Single sign-on and the
+       sign-in history are their own reads, so a failed rules read no longer hides them. -->
+  @if (error() && !loading()) {
+    <div class="card" role="alert" data-test="rules-error"><app-load-error [message]="error()" (retry)="load()" /></div>
+  } @else if (!rulesLoaded()) {
+    <div class="card"><app-loading shape="panel" [count]="6" label="Loading the sign-in rules…" /></div>
   } @else {
     <!-- Sign-in rules -->
+    <app-blur-loader [active]="loading()" label="Refreshing…">
     <section class="card p-4" aria-labelledby="rules-heading" data-test="rules-card">
       <div class="flex flex-wrap items-start gap-2">
         <app-icon name="shield" class="icon-muted mt-0.5 shrink-0" />
@@ -90,6 +96,8 @@
         </button>
       </app-actions-bar>
     </section>
+    </app-blur-loader>
+  }
 
     <!-- Single sign-on -->
     @if (!platformMode()) {
@@ -255,6 +263,8 @@
                       <option [value]="'' + p.pageAccessProfileId" [selected]="ssoDraft().defaultProfileId === '' + p.pageAccessProfileId">{{ p.profileName }}</option>
                     }
                   </select>
+                  <app-inline-status [loading]="profilesState.loading()" [error]="profilesState.error()" label="Loading access profiles…"
+                                     (retry)="loadProfiles()" />
                 </div>
               }
               <div class="rounded-md border border-subtle p-3 space-y-2 text-sm">
@@ -355,12 +365,14 @@
               <button type="button" class="btn btn-default btn-sm btn-intent-crit" (click)="removeSso()"><app-icon name="trash" />Remove</button>
             }
           </app-actions-bar>
+        } @else if (ssoError()) {
+          <!-- Owner 2026-10-27: a failed first read was only shown inside the loaded branch, so "Loading…" stayed for ever. -->
+          <app-load-error data-test="sso-error" [message]="ssoError()" (retry)="loadSso()" />
         } @else {
-          <p class="text-sm text-[color:var(--text-muted)] mt-4">Loading…</p>
+          <app-loading shape="panel" [count]="4" label="Loading single sign-on…" />
         }
       </section>
     }
 
     <app-sign-in-history scope="workspace" [tenantId]="tenantId()" />
-  }
 </div>

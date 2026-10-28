@@ -50,6 +50,9 @@ export interface ListFilter {
   pinned?: boolean;
   offset?: number;
   limit?: number;
+  /** Owner 2026-10-27: the server's order (title, kind, status, messages, updated) and asc or desc; none: pinned, then newest. */
+  sort?: string;
+  dir?: string;
 }
 
 /** The side list's chips: all, or one kind. */

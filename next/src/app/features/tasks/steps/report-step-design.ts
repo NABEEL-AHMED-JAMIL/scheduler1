@@ -7,6 +7,7 @@ import { ToastService } from '../../../shared/ui/toast.service';
 import { ReportStudioApi, studioError } from '../../report-studio/report-studio.api';
 import { SourceRef, TemplateDetail, TemplateRow } from '../../report-studio/report-studio.model';
 import { StepsApi } from './steps.service';
+import { InlineStatus, createLoadState } from '../../../shared/ui/loading';
 
 /** The three settings this editor owns; the step's other settings stay in its form. */
 export const REPORT_DESIGN_KEYS = ['design', 'templateId', 'templateVersion'];
@@ -25,7 +26,7 @@ export interface ReportDesignSettings { design: 'STEP' | 'TEMPLATE'; templateId?
  */
 @Component({
   selector: 'app-report-step-design',
-  imports: [FormsModule, Icon],
+  imports: [FormsModule, Icon, InlineStatus],
   template: `
     <div class="space-y-3" data-report-step-design>
       <div class="seg" role="radiogroup" aria-label="Where the report comes from">
@@ -40,6 +41,11 @@ export interface ReportDesignSettings { design: 'STEP' | 'TEMPLATE'; templateId?
       @if (mode() === 'STEP') {
         @if (!pipelineKey()) {
           <p class="text-sm text-[color:var(--text-secondary)]" data-save-first>Save the pipeline first: its step's design belongs to it.</p>
+        } @else if (designState.loading() || designState.error()) {
+          <!-- Owner 2026-10-27: while the step's own design is read, or when it could not be, "Design the report" is not
+               offered -- pressed then, it made the step a second design. -->
+          <app-inline-status [loading]="designState.loading()" [error]="designState.error()" label="Loading the step's design…"
+                             (retry)="retryDesign()" />
         } @else if (design(); as d) {
           <div class="rounded border border-[color:var(--border-subtle)] p-3 space-y-2">
             <div class="flex items-center gap-2 flex-wrap">
@@ -80,9 +86,12 @@ export interface ReportDesignSettings { design: 'STEP' | 'TEMPLATE'; templateId?
       } @else {
         <label class="field"><span class="label">Template</span>
           <select class="input" [ngModel]="templateId() ?? ''" (ngModelChange)="pickTemplate($event)" [disabled]="disabled()" aria-label="Template" data-template-pick>
-            <option value="">Pick a published template</option>
+            <option value="">{{ templatesState.pending() ? 'Loading templates…' : 'Pick a published template' }}</option>
             @for (t of templates(); track t.templateId) { <option [value]="t.templateId">{{ t.name }} · v{{ t.currentPublishedVersion }}</option> }
           </select></label>
+        <app-inline-status [loading]="templatesState.loading()" [error]="templatesState.error()" label="Loading templates…"
+                           [empty]="templatesState.loaded() && !templates().length" emptyText="No published template yet."
+                           (retry)="loadTemplates()" />
         @if (templateId()) {
           <label class="field"><span class="label">Version</span>
             <select class="input max-w-72" [ngModel]="version()" (ngModelChange)="setVersion($event)" [disabled]="disabled()" aria-label="Template version">
@@ -125,6 +134,9 @@ export class ReportStepDesign implements OnInit {
   readonly opening = signal(false);
   readonly saving = signal(false);
   readonly error = signal('');
+  /** Owner 2026-10-27: the reads of the step's design and of the published templates, each with its own state. */
+  readonly designState = createLoadState(false);
+  readonly templatesState = createLoadState(false);
   /** The name typed for "Save as a template"; null while not asked. */
   readonly naming = signal<string | null>(null);
   private readonly modeOverride = signal<'STEP' | 'TEMPLATE' | null>(null);
@@ -231,14 +243,24 @@ export class ReportStepDesign implements OnInit {
     });
   }
 
-  private loadDesign(id: string): void {
-    this.api.template(id).subscribe({ next: d => this.design.set(d), error: e => this.error.set(studioError(e, 'The step\'s design could not be read.').message) });
+  retryDesign(): void {
+    const id = this.templateId();
+    if (id) this.loadDesign(id);
   }
 
-  private loadTemplates(): void {
+  private loadDesign(id: string): void {
+    this.designState.start();
+    this.api.template(id).subscribe({
+      next: d => { this.design.set(d); this.designState.done(); },
+      error: e => this.designState.fail(studioError(e, 'The step\'s design could not be read.').message, 'The step\'s design could not be read.'),
+    });
+  }
+
+  loadTemplates(): void {
+    this.templatesState.start();
     this.api.list({ state: 'LIVE', limit: 200 }).subscribe({
-      next: l => this.templates.set(l.templates),
-      error: e => this.error.set(studioError(e, 'The templates could not be read.').message),
+      next: l => { this.templates.set(l.templates); this.templatesState.done(); },
+      error: e => this.templatesState.fail(studioError(e, 'The templates could not be read.').message, 'The templates could not be read.'),
     });
   }
 }

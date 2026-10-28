@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
-import { of } from 'rxjs';
+import { NEVER, Observable, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { ClientHistoryPanel } from './client-history-panel';
 import { ApiClientsApi } from './api-clients.api';
 
@@ -29,5 +30,35 @@ describe('ClientHistoryPanel', () => {
     const tight = text.replace(/\s+/g, '');
     expect(tight).toContain('Scopes:runs:read→runs:read,runs:write');
     expect(tight).toContain('IPallowlist:none→203.0.113.0/24');
+  });
+});
+
+describe('ClientHistoryPanel -- loading, empty, error (owner 2026-10-27)', () => {
+  function panel(answer: () => Observable<unknown>) {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [
+      { provide: ApiClientsApi, useValue: { history: vi.fn(answer) } },
+      { provide: DialogRef, useValue: { close: vi.fn() } },
+      { provide: DIALOG_DATA, useValue: { client: { clientId: 'cl_x', name: 'Referral portal' }, sandbox: false, names: {} } },
+    ] });
+    return TestBed.runInInjectionContext(() => new ClientHistoryPanel());
+  }
+
+  it('is loading until the history answers', () => {
+    const p = panel(() => NEVER);
+    expect(p.loading()).toBe(true);
+    expect(p.state.pending()).toBe(true);
+  });
+
+  it('is empty once an empty history answers', () => {
+    const p = panel(() => of({ status: 'SUCCESS', data: [] }));
+    expect(p.state.pending()).toBe(false);
+    expect(p.rows()).toEqual([]);
+  });
+
+  it('says the history could not be read, in plain words', () => {
+    const p = panel(() => throwError(() => new HttpErrorResponse({ status: 500 })));
+    expect(p.loading()).toBe(false);
+    expect(p.error()).toBe('The history could not be read.');
   });
 });

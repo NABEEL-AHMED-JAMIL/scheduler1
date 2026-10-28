@@ -80,7 +80,7 @@
         <p class="text-sm text-[color:var(--text-muted)]">Loading {{ kindLabel().toLowerCase() }}…</p>
       </div>
     } @else if (error()) {
-      <div class="flex flex-col items-center justify-center py-20 gap-3 px-6 text-center">
+      <div class="flex flex-col items-center justify-center py-20 gap-3 px-6 text-center" role="alert">
         <app-icon name="alert" size="1.75rem" class="icon-crit" />
         <p class="text-sm text-crit-500">{{ error() }}</p>
         <div class="flex gap-2 mt-1">
@@ -126,17 +126,18 @@
                 <button type="button" class="btn btn-default btn-sm" [disabled]="!tableHasMore() || tableLoading()" (click)="tablePage(1)">Next<app-icon name="chevronRight" /></button>
               </span>
             </div>
+            <app-inline-status class="mb-2" [error]="pageError()" (retry)="retryPage()" />
             <app-blur-loader [active]="tableLoading()" label="Loading rows…">
             <div class="overflow-auto rounded border border-subtle bg-code max-h-[68vh]">
               <table class="table-modern preview-grid">
                 <thead>
                   <tr>
-                    <th class="tabular text-[color:var(--text-muted)] text-right">#</th>
-                    @for (c of t.columns; track $index) { <th [title]="c">{{ c }}</th> }
+                    <th appSort="n" [sortBy]="rowSort" class="tabular text-[color:var(--text-muted)] text-right">#</th>
+                    @for (c of t.columns; track $index) { <th [appSort]="'c' + $index" [sortBy]="rowSort" [title]="c">{{ c }}</th> }
                   </tr>
                 </thead>
                 <tbody>
-                  @for (r of tableRows(); track r.n) {
+                  @for (r of sortedRows(); track r.n) {
                     <tr>
                       <td class="tabular text-right text-[color:var(--text-muted)]">{{ r.n }}</td>
                       @for (c of r.cells; track $index) { <td [title]="c">{{ c }}</td> }
@@ -166,9 +167,14 @@
           </div>
           <div class="overflow-auto rounded border border-subtle bg-code max-h-[68vh]">
             <table class="table-modern preview-grid">
-              <thead><tr><th>Entry</th><th class="text-right">Size</th><th class="text-right">Stored</th><th>Modified</th></tr></thead>
+              <thead><tr>
+                <th appSort="entry" [sortBy]="entrySort">Entry</th>
+                <th class="text-right" appSort="size" [sortBy]="entrySort">Size</th>
+                <th class="text-right" appSort="stored" [sortBy]="entrySort">Stored</th>
+                <th appSort="modified" [sortBy]="entrySort">Modified</th>
+              </tr></thead>
               <tbody>
-                @for (e of visibleEntries(); track e.name) {
+                @for (e of sortedEntries(); track e.name) {
                   <tr>
                     <td class="mono"><app-icon [name]="e.directory ? 'folder' : 'file'" size="0.9em" class="icon-muted mr-1" />{{ e.name }}</td>
                     <td class="text-right tabular">{{ e.directory ? '' : humanBytes(e.size) }}</td>

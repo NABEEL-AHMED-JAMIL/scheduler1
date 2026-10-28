@@ -3,7 +3,7 @@ import { DictationService } from '../../../shared/ui/dictation.service';
 import { TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
 import { Dialog } from '@angular/cdk/dialog';
-import { Observable, of } from 'rxjs';
+import { NEVER, Observable, of } from 'rxjs';
 import { AuthService } from '../../../core/auth/auth.service';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { FileChat, agentAcceptsFile, canonicalType, fileExtension, targetFileTypesList, Agent } from './file-chat';
@@ -300,6 +300,7 @@ function openPanel(options: PanelOptions = {}) {
     fixture,
     chat: fixture.componentInstance,
     toast,
+    http,
     posts,
     sends: () => posts.filter(p => p.url.includes('sendMessage')),
     html: () => fixture.nativeElement as HTMLElement,
@@ -722,7 +723,47 @@ describe('opening the panel when the agent list is refused', () => {
     panel.fixture.detectChanges();
 
     expect(panel.chat.preparing()).toBe(false);
-    expect(panel.toast.error).toHaveBeenCalledWith('You do not have access to AI agents.');
+    // Owner 2026-10-27: said under the agent field with Try again, not in a toast (a read's failure stays on screen).
+    expect(panel.chat.agentsError()).toBe('You do not have access to AI agents.');
+    expect(panel.chat.agentsLoading()).toBe(false);
+    expect(panel.html().querySelector('[data-agents-status]')?.textContent).toContain('Try again');
+    expect(panel.toast.error).not.toHaveBeenCalled();
     expect(panel.posts.some(p => p.url.includes('prepareContext'))).toBe(true);
+  });
+
+  it('reads the agents again on Try again (owner 2026-10-27)', () => {
+    const panel = openPanel({ agentsRefused: 'You do not have access to AI agents.' });
+    panel.fixture.detectChanges();
+    panel.http.get.mockReturnValue(of(OK([READER])) as never);
+    panel.chat.retryAgents();
+    expect(panel.chat.agentsError()).toBe('');
+    expect(panel.chat.agents().length).toBe(1);
+  });
+});
+
+describe('the agent list while it loads (owner 2026-10-27)', () => {
+  afterEach(() => sessionStorage.clear());
+
+  it('says it is loading, not "No usable agents", until the list answers', () => {
+    const panel = openPanel();
+    panel.http.get.mockReturnValue(NEVER as never);
+    panel.fixture.detectChanges();
+    panel.chat.retryAgents();
+    panel.fixture.detectChanges();
+    expect(panel.chat.agentsLoading()).toBe(true);
+  });
+
+  it('says there is no usable agent once an empty list answers', () => {
+    const panel = openPanel({ agents: [] });
+    panel.fixture.detectChanges();
+    expect(panel.chat.agentsLoading()).toBe(false);
+    expect(panel.html().querySelector('[data-agents-status]')?.textContent).toContain('No usable agent yet');
+  });
+
+  it('offers Try again when the file could not be read', () => {
+    const panel = openPanel({ prepare: () => ({ status: 'ERROR', message: '' }) });
+    panel.fixture.detectChanges();
+    expect(panel.chat.prepareError()).toBe('Could not read this file.');
+    expect(panel.html().querySelector('[data-prepare-retry]')).not.toBeNull();
   });
 });

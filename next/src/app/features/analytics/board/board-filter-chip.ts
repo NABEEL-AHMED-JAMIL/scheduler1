@@ -4,6 +4,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { API_SUCCESS } from '../../../core/api/api.config';
 import { Icon } from '../../../shared/ui/icon';
 import { BoardApi } from './board-api';
+import { AppLoading, InlineStatus, loadErrorText } from '../../../shared/ui/loading';
 import { BoardFilterDef, chipText } from './board-filters';
 
 /**
@@ -18,7 +19,7 @@ import { BoardFilterDef, chipText } from './board-filters';
  */
 @Component({
   selector: 'app-board-filter-chip',
-  imports: [Icon],
+  imports: [Icon, AppLoading, InlineStatus],
   host: { class: 'board-filter-chip' },
   styles: `
     :host { position: relative; display: inline-flex; }
@@ -56,10 +57,11 @@ import { BoardFilterDef, chipText } from './board-filters';
           <input type="search" class="input pl-7 py-1 text-sm w-full" [placeholder]="'Search ' + def().label.toLowerCase()" [value]="search()"
                  (input)="onSearch($any($event.target).value)" data-test="bf-search" />
         </label>
+        <!-- Owner 2026-10-27: a status line while the values come, and Try again when they could not be read. -->
         @if (loading()) {
-          <p class="text-xs text-[color:var(--text-muted)] flex items-center gap-1.5 py-2"><app-icon name="refresh" class="spin" size="0.9em" />Reading the values…</p>
+          <div class="py-2"><app-loading shape="inline" label="Loading the values…" /></div>
         } @else if (error()) {
-          <p class="text-xs text-crit-500 py-2">{{ error() }}</p>
+          <app-inline-status class="py-1" [error]="error()" [retryable]="!!def().source" (retry)="retry()" />
         } @else {
           <div class="bf-list" role="group" [attr.aria-label]="def().label + ' values'">
             @for (option of options(); track option.value) {
@@ -143,11 +145,14 @@ export class BoardFilterChip {
     if (!this.open()) return;
     this.open.set(false);
     this.inFlight?.unsubscribe();
+    this.loading.set(false);
     if (!apply) return;
     const next = this.draft();
     const now = this.values();
     if (next.length !== now.length || next.some(v => !now.includes(v))) this.changed.emit(next);
   }
+
+  retry(): void { this.fetch(this.search()); }
 
   private fetch(term: string): void {
     const source = this.def().source;
@@ -162,7 +167,7 @@ export class BoardFilterChip {
       next: response => {
         this.loading.set(false);
         if (response.status !== API_SUCCESS || !response.data) {
-          this.error.set(response.message || 'The values could not be read.');
+          this.error.set(loadErrorText(response, 'The values could not be read.'));
           return;
         }
         this.fetched.set(response.data.values ?? []);
@@ -171,7 +176,7 @@ export class BoardFilterChip {
       },
       error: err => {
         this.loading.set(false);
-        this.error.set(err?.error?.message || 'The values could not be read.');
+        this.error.set(loadErrorText(err, 'The values could not be read.'));
       },
     });
   }

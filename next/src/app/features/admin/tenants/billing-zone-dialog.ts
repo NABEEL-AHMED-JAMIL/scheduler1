@@ -7,6 +7,12 @@ import { Combobox, ComboboxOption } from '../../../shared/ui/combobox';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { BillingApi, BillingTimeZone } from '../../billing/billing.service';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
+import { AppLoading, InlineStatus, createLoadState, loadErrorText } from '../../../shared/ui/loading';
+import { LoadError } from '../../../shared/ui/load-error';
+
+type ZoneChange = BillingTimeZone['history'][number];
 
 export interface BillingZoneDialogData {
   tenantId: number;
@@ -26,7 +32,7 @@ export function monthDay(month: string | null | undefined): string {
  */
 @Component({
   selector: 'app-billing-zone-dialog',
-  imports: [Field, FormDialog, Combobox, ServerTimePipe],
+  imports: [Field, FormDialog, Combobox, ServerTimePipe, SortHeader, AppLoading, InlineStatus, LoadError],
   template: `
     <app-form-dialog [heading]="'Billing time zone: ' + data.tenantName"
         subtitle="The days and months this workspace's usage is billed in: Cost & usage, the invoice and the API quota month."
@@ -42,7 +48,10 @@ export function monthDay(month: string | null | undefined): string {
         <div class="form-grid mt-3" data-billing-zone-form>
           <app-field label="Time zone" for="billingZone" hint="An IANA time zone; daylight saving is followed.">
             <app-combobox id="billingZone" [options]="options()" [selected]="zone()" (selectedChange)="zone.set($event)"
-                          placeholder="Type to search, e.g. Europe/London" [allowClear]="false" />
+                          [placeholder]="zonesState.loading() ? 'Loading time zones…' : 'Type to search, e.g. Europe/London'" [allowClear]="false" />
+            <!-- Owner 2026-10-27: a failed list left no choices and Save never enabled, with no word. -->
+            <app-inline-status [loading]="zonesState.loading()" [error]="zonesState.error()" label="Loading time zones…"
+                               (retry)="loadZones()" />
           </app-field>
           <app-field label="Why" for="billingZoneReason" hint="Kept with the change.">
             <input id="billingZoneReason" class="input" maxlength="400" [value]="reason()" (input)="reason.set($any($event.target).value)"
@@ -53,9 +62,10 @@ export function monthDay(month: string | null | undefined): string {
           <div class="mt-3" data-billing-zone-history>
             <p class="eyebrow">Changes</p>
             <table class="table text-xs">
-              <thead><tr><th>From</th><th>Zone</th><th>Set</th><th>Why</th></tr></thead>
+              <thead><tr><th appSort="from" [sortBy]="historySort">From</th><th appSort="zone" [sortBy]="historySort">Zone</th>
+                <th appSort="set" [sortBy]="historySort">Set</th><th appSort="why" [sortBy]="historySort">Why</th></tr></thead>
               <tbody>
-                @for (h of z.history; track h.id) {
+                @for (h of sortedHistory(); track h.id) {
                   <tr>
                     <td>{{ monthDay(h.effectiveMonth) | serverTime: 'month' }}</td>
                     <td>{{ h.zone }}</td>
@@ -67,8 +77,11 @@ export function monthDay(month: string | null | undefined): string {
             </table>
           </div>
         }
+      } @else if (loadError()) {
+        <!-- Owner 2026-10-27: a failed read in red, with Try again, not a muted line in the loading text's place. -->
+        <app-load-error [message]="loadError()" (retry)="load()" />
       } @else {
-        <p class="text-sm text-[color:var(--text-muted)]">{{ loadError() || 'Reading the billing time zone…' }}</p>
+        <app-loading shape="panel" [count]="4" label="Loading the billing time zone…" />
       }
       @if (error()) { <p class="text-sm text-[color:var(--color-crit-500)]" role="alert">{{ error() }}</p> }
     </app-form-dialog>
@@ -89,6 +102,19 @@ export class BillingZoneDialog {
   readonly saving = signal(false);
   readonly error = signal('');
   readonly options = computed<ComboboxOption[]>(() => this.zones().map(z => ({ value: z, label: z })));
+  readonly zonesState = createLoadState();
+  /** Owner 2026-10-27: the changes sort by each column; the dialog opens fresh each time, so nothing is remembered. */
+  readonly historySort = createTableSort<ZoneChange>({
+    id: 'billing-zone-history',
+    remember: false,
+    columns: {
+      from: { value: h => monthDay(h.effectiveMonth), kind: 'date' },
+      zone: h => h.zone,
+      set: { value: h => h.setAt, kind: 'date' },
+      why: h => h.reason,
+    },
+  });
+  readonly sortedHistory = computed(() => this.historySort.apply(this.loaded()?.history ?? []));
   /** A zone from the list, other than the one the change month would have anyway. */
   readonly ready = computed(() => {
     const z = this.loaded();
@@ -96,14 +122,31 @@ export class BillingZoneDialog {
   });
 
   constructor() {
-    this.api.timeZones().subscribe({ next: r => { if (r.status === API_SUCCESS) this.zones.set(r.data ?? []); } });
+    this.loadZones();
+    this.load();
+  }
+
+  loadZones(): void {
+    this.zonesState.start();
+    this.api.timeZones().subscribe({
+      next: r => {
+        if (r.status !== API_SUCCESS) { this.zonesState.fail(r, 'The time zones could not be read.'); return; }
+        this.zones.set(r.data ?? []);
+        this.zonesState.done();
+      },
+      error: err => this.zonesState.fail(err, 'The time zones could not be read.'),
+    });
+  }
+
+  load(): void {
+    this.loadError.set('');
     this.api.timeZone(this.data.tenantId).subscribe({
       next: r => {
-        if (r.status !== API_SUCCESS || !r.data) { this.loadError.set(r.message || 'The billing time zone could not be read.'); return; }
+        if (r.status !== API_SUCCESS || !r.data) { this.loadError.set(loadErrorText(r, 'The billing time zone could not be read.')); return; }
         this.loaded.set(r.data);
         this.zone.set(this.zoneFrom(r.data));
       },
-      error: err => this.loadError.set(err?.error?.message || 'The billing time zone could not be read.'),
+      error: err => this.loadError.set(loadErrorText(err, 'The billing time zone could not be read.')),
     });
   }
 

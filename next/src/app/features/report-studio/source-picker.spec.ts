@@ -1,5 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
-import { of } from 'rxjs';
+import { NEVER, Observable, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
+import { StorageService } from '../objects/storage.service';
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
@@ -174,5 +176,67 @@ describe('a report step\'s own input rows', () => {
     // Found on the way: an empty list of schedules was asked for again and again, without end (the effect read what it filled).
     fixture.detectChanges();
     expect(generated.schedules).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * Owner 2026-10-27: the picker's lists say they are loading, and why they failed -- a failure no longer reads as "No runs
+ * yet", "No buckets you may browse" or "This run kept no data a report can read".
+ */
+describe('the source picker -- loading, empty, error', () => {
+  const failed = () => throwError(() => new HttpErrorResponse({ status: 500, error: 'Internal Server Error' }));
+
+  function picker(mode: string, g: { schedules?: () => Observable<unknown>; runs?: () => Observable<unknown>; runOutputs?: () => Observable<unknown> },
+                  timeline: () => Observable<unknown> = () => of({ status: 'SUCCESS', message: '', data: null }),
+                  buckets: () => Observable<unknown> = () => of({ status: 'SUCCESS', message: '', data: [] })) {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [ReportSourcePicker],
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([]),
+        { provide: GeneratedService, useValue: { schedules: vi.fn(g.schedules ?? (() => of([]))), runs: vi.fn(g.runs ?? (() => of([]))),
+          runOutputs: vi.fn(g.runOutputs ?? (() => of([]))) } },
+        { provide: StepsApi, useValue: { timeline: vi.fn(timeline) } },
+        { provide: StorageService, useValue: { buckets: vi.fn(buckets) } }],
+    });
+    TestBed.overrideComponent(ReportSourcePicker, { set: { template: '', imports: [] } });
+    const fixture = TestBed.createComponent(ReportSourcePicker);
+    fixture.componentRef.setInput('mode', mode);
+    fixture.detectChanges();
+    return fixture.componentInstance;
+  }
+
+  it('the schedules: loading, then empty, then why they could not be read', () => {
+    expect(picker('run', { schedules: () => NEVER }).jobsState.loading()).toBe(true);
+    const empty = picker('run', {});
+    expect(empty.jobsState.loaded()).toBe(true);
+    expect(empty.jobs()).toEqual([]);
+    const bad = picker('run', { schedules: failed });
+    expect(bad.jobsState.loading()).toBe(false);
+    expect(bad.runsError()).toContain('could not be read');
+  });
+
+  it('a schedule\'s runs: loading, then why they could not be read', () => {
+    const waiting = picker('run', { runs: () => NEVER });
+    waiting.pickJob(1097);
+    expect(waiting.runsState.loading()).toBe(true);
+    const bad = picker('run', { runs: failed });
+    bad.pickJob(1097);
+    expect(bad.runsState.loading()).toBe(false);
+    expect(bad.runsState.error()).toBe('The runs could not be read.');
+  });
+
+  it('a run\'s outputs: both reads failing is said, not "kept no data"', () => {
+    const p = picker('run', { runOutputs: failed }, failed);
+    p.pickJob(1097);
+    p.pickRun(1871);
+    expect(p.outputsState.loading()).toBe(false);
+    expect(p.outputsState.error()).toBe('The run\'s outputs could not be read.');
+    expect(p.outputs()).toEqual([]);
+  });
+
+  it('the buckets: a failure is said, not "No buckets you may browse"', () => {
+    const p = picker('bucket', {}, undefined, failed);
+    expect(p.bucketsState.error()).toBe('The buckets could not be read.');
+    expect(p.buckets()).toEqual([]);
   });
 });

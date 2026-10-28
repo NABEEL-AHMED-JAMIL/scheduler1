@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { Dialog, DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
-import { of } from 'rxjs';
+import { NEVER, Observable, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { RateCards } from './rate-cards';
 import { RateCardEditor } from './rate-card-editor';
 import { BillingApi, RateCard, RateCardDraft, RateCardDraftRow, RatePreview } from './billing.service';
@@ -49,9 +50,11 @@ const PREVIEW = {
         billableQuantity: 4, unitPrice: 0.05, amount: 0.2 }] }] }],
 } as unknown as RatePreview;
 
-function page() {
-  const api = { rateCards: vi.fn(() => of({ status: API_SUCCESS, data: { cards: CARDS } })), saveRateCard: vi.fn(),
-    rateCardDrafts: vi.fn(() => of({ status: API_SUCCESS, data: { drafts: [] } })) };
+function page(cards: () => Observable<unknown> = () => of({ status: API_SUCCESS, data: { cards: CARDS } }),
+              drafts: () => Observable<unknown> = () => of({ status: API_SUCCESS, data: { drafts: [] } })) {
+  try { localStorage.clear(); } catch { /* none */ }
+  const api = { rateCards: vi.fn(cards), saveRateCard: vi.fn(),
+    rateCardDrafts: vi.fn(drafts) };
   const dialog = { open: vi.fn(() => ({ closed: of(null) })) };
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({ providers: [
@@ -464,5 +467,66 @@ describe('RateCards, drafts and rules', () => {
     await component.discardDraft(DRAFT);
     expect(api.publishRateCardDraft).not.toHaveBeenCalled();
     expect(api.deleteRateCardDraft).not.toHaveBeenCalled();
+  });
+});
+
+describe('RateCards -- sorting the meters inside their services (owner 2026-10-27)', () => {
+  it('keeps the card order until a heading is picked, then sorts each group by price both ways, the groups in place', () => {
+    const { component } = page();
+    const c = { ...component.cards()[3], items: [...component.cards()[3].items,
+      { meter: 'seats.viewer_days', label: 'Viewer seats', service: 'Seats', unit: 'user-day', per: 1, unit_price: 0.5, included_quantity: 0, tiers: [] }] };
+    const seats = () => component.sortedGroups(component.groups(c))[0].items.map(i => i.meter);
+    expect(component.sortedGroups(component.groups(c)).map(g => g.service)).toEqual(['Seats', 'Model calls', 'Storage']);
+    expect(seats()).toEqual(['seats.user_days', 'seats.viewer_days']);
+    component.meterSort.toggle('price');
+    expect(seats()).toEqual(['seats.viewer_days', 'seats.user_days']);
+    component.meterSort.toggle('price');
+    expect(seats()).toEqual(['seats.user_days', 'seats.viewer_days']);
+    expect(component.sortedGroups(component.groups(c)).map(g => g.service)).toEqual(['Seats', 'Model calls', 'Storage']);
+  });
+});
+
+describe('RateCards -- loading, empty, error (owner 2026-10-27)', () => {
+  it('is loading, not "No rate card yet", until the versions answer', () => {
+    const { component } = page(() => NEVER, () => NEVER);
+    expect(component.loading()).toBe(true);
+    expect(component.state.pending()).toBe(true);
+  });
+
+  it('is empty once an empty list answers', () => {
+    const { component } = page(() => of({ status: API_SUCCESS, data: { cards: [] } }));
+    expect(component.state.pending()).toBe(false);
+    expect(component.loading()).toBe(false);
+    expect(component.visible()).toEqual([]);
+  });
+
+  it('says the versions could not be read, in plain words, and that the drafts could not when only they fail', () => {
+    const failed = page(() => throwError(() => new HttpErrorResponse({ status: 500, error: 'Internal Server Error' })));
+    expect(failed.component.loading()).toBe(false);
+    expect(failed.component.error()).toBe('The rate cards could not be read.');
+    const noDrafts = page(undefined, () => of({ status: 'ERROR', message: 'The drafts table is missing.' }));
+    expect(noDrafts.component.error()).toBe('');
+    expect(noDrafts.component.cards()).toHaveLength(4);
+    expect(noDrafts.component.draftsError()).toBe('The drafts table is missing.');
+  });
+});
+
+describe('RateCardEditor -- the pipeline list loading, empty, error (owner 2026-10-27)', () => {
+  it('is loading until the names answer, says when there are none, and says why it failed with Try again', () => {
+    const base = RateCards.numeric(CARDS[3] as unknown as RateCard);
+    const { component } = editor(base);
+    component.addRule();
+    const http = TestBed.inject(HttpTestingController);
+    let names = http.expectOne(r => r.url.endsWith('/sourceTask.json/names'));
+    expect(component.pipelinesLoading()).toBe(true);
+    names.flush('Internal Server Error', { status: 500, statusText: 'Server Error' });
+    expect(component.pipelinesLoading()).toBe(false);
+    expect(component.pipelinesError()).toBe('The pipelines could not be read.');
+    expect(component.pipelines()).toBeNull();
+    component.retryPipelines();
+    names = http.expectOne(r => r.url.endsWith('/sourceTask.json/names'));
+    names.flush({ status: API_SUCCESS, data: [] });
+    expect(component.pipelinesError()).toBe('');
+    expect(component.pipelines()).toEqual([]);
   });
 });

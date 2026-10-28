@@ -1,11 +1,14 @@
 import { Component, DestroyRef, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { NgTemplateOutlet } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { Icon } from '../../shared/ui/icon';
 import { ReportStudioApi, studioError } from '../report-studio/report-studio.api';
 import { AssetDetail } from '../report-studio/assets.model';
 import { ReportReviewCard as ReportCard, TemplateReviewCard } from '../report-studio/report-studio.model';
 import { RsTimePipe } from '../report-studio/rs-time.pipe';
+import { AppLoading } from '../../shared/ui/loading';
+import { LoadError } from '../../shared/ui/load-error';
 
 /** What a Report Studio review task is about, read from its subject id ("report-version:{id}:v{n}"). */
 export interface StudioSubject { kind: 'report' | 'template' | 'asset'; id: string; version: number; }
@@ -33,7 +36,7 @@ export const CARD_PAGES = 4;
  */
 @Component({
   selector: 'app-report-review-card',
-  imports: [Icon, RouterLink, FormsModule, RsTimePipe],
+  imports: [Icon, RouterLink, FormsModule, NgTemplateOutlet, RsTimePipe, AppLoading, LoadError],
   styles: `
     .rvc { display: grid; grid-template-columns: minmax(0, 22rem) minmax(0, 1fr); gap: 1.25rem; align-items: start; }
     @media (max-width: 70rem) { .rvc { grid-template-columns: minmax(0, 1fr); } }
@@ -53,10 +56,11 @@ export const CARD_PAGES = 4;
     .rvc-asset { max-height: 12rem; object-fit: contain; background: repeating-conic-gradient(var(--surface-sunken) 0 25%, transparent 0 50%) 50% / 16px 16px; }
   `,
   template: `
+    <!-- Owner 2026-10-27: the shared loader, and Try again on a failed read (a task that names nothing cannot be retried). -->
     @if (loading()) {
-      <p class="text-sm text-[color:var(--text-muted)]" data-test="report-review-loading">Reading what is reviewed…</p>
+      <app-loading shape="panel" data-test="report-review-loading" label="Reading what is reviewed…" />
     } @else if (error()) {
-      <p class="text-sm text-crit-500" role="alert">{{ error() }}</p>
+      <app-load-error role="alert" data-test="report-review-error" [message]="error()" [retryable]="!!subject()" (retry)="reload()" />
     } @else if (report(); as c) {
       <section aria-labelledby="rvc-title" data-test="report-review-card">
         <div class="flex flex-wrap items-center gap-2 mb-3">
@@ -71,7 +75,8 @@ export const CARD_PAGES = 4;
           <div>
             <div class="rvc-page" data-test="review-page">
               @if (pageUrl(); as src) { <img [src]="src" [alt]="'Page ' + shownPage() + ' of ' + c.name + ' version ' + c.version" /> }
-              @else { <span class="text-xs text-[color:var(--text-muted)]">{{ pageError() || 'Drawing page ' + shownPage() + '…' }}</span> }
+              @else if (pageError()) { <ng-container [ngTemplateOutlet]="pictureFailed" /> }
+              @else { <app-loading shape="inline" [label]="'Drawing page ' + shownPage() + '…'" /> }
             </div>
             @if ((c.pages ?? 0) > 1) {
               <div class="rvc-strip" data-test="review-strip" aria-label="The next pages">
@@ -143,7 +148,8 @@ export const CARD_PAGES = 4;
         <div class="rvc">
           <div class="rvc-page" data-test="publish-page">
             @if (pageUrl(); as src) { <img [src]="src" [alt]="'First page of the draft of ' + t.name" /> }
-            @else { <span class="text-xs text-[color:var(--text-muted)]">{{ pageError() || 'Drawing the first page…' }}</span> }
+            @else if (pageError()) { <ng-container [ngTemplateOutlet]="pictureFailed" /> }
+            @else { <app-loading shape="inline" label="Drawing the first page…" /> }
           </div>
           <div class="flex flex-col gap-3 min-w-0">
             <div><b class="text-base">{{ t.name }}</b>@if (t.description) { <br><span class="text-sm text-[color:var(--text-muted)]">{{ t.description }}</span> }</div>
@@ -180,7 +186,7 @@ export const CARD_PAGES = 4;
           <a class="btn btn-default btn-sm" [routerLink]="['/reports/assets', a.assetId]"><app-icon name="external" />Open the asset</a>
         </div>
         <div class="rvc">
-          <div class="rvc-page">@if (pageUrl(); as src) { <img class="rvc-asset" [src]="src" [alt]="a.name" /> } @else { <span class="text-xs">{{ pageError() || 'Loading the picture…' }}</span> }</div>
+          <div class="rvc-page">@if (pageUrl(); as src) { <img class="rvc-asset" [src]="src" [alt]="a.name" /> } @else if (pageError()) { <ng-container [ngTemplateOutlet]="pictureFailed" /> } @else { <app-loading shape="inline" label="Loading the picture…" /> }</div>
           <div class="flex flex-col gap-3 min-w-0">
             <div><b class="text-base">{{ a.name }}</b>@if (a.ownerName) { <br><span class="text-sm text-[color:var(--text-muted)]">{{ a.ownerName }}@if (a.ownerTitle) { · {{ a.ownerTitle }} }</span> }</div>
             @if (!done()) {
@@ -198,6 +204,14 @@ export const CARD_PAGES = 4;
         </div>
       </section>
     }
+
+    <!-- A page or picture that could not be drawn: why, and Try again (it said so with no way to ask again). -->
+    <ng-template #pictureFailed>
+      <span class="flex flex-col items-center gap-2 text-xs text-crit-500" role="alert" data-test="review-page-error">
+        {{ pageError() }}
+        <button type="button" class="btn btn-default btn-sm" (click)="retryPicture()"><app-icon name="refresh" />Try again</button>
+      </span>
+    </ng-template>
   `,
 })
 export class ReportReviewCard {
@@ -271,33 +285,57 @@ export class ReportReviewCard {
             error: () => undefined,
           }));
         },
-        error: e => { this.loading.set(false); this.error.set(studioError(e, 'The report could not be read.').message); },
+        error: e => { if (this.subject() !== s) return; this.loading.set(false); this.error.set(studioError(e, 'The report could not be read.').message); },
       });
     } else if (s.kind === 'template') {
       this.api.publishCard(s.id).subscribe({
         next: t => {
+          // A late answer for a task no longer open must not fill the next task's card (owner 2026-10-27).
+          if (this.subject() !== s) return;
           this.template.set(t);
           this.loading.set(false);
-          this.api.publishDraftPage(s.id).subscribe({
-            next: res => { if (res.body) this.pageUrl.set(this.keep(res.body)); },
-            error: e => this.pageError.set(studioError(e, 'The first page could not be drawn.').message),
-          });
+          this.loadPicture(s);
         },
-        error: e => { this.loading.set(false); this.error.set(studioError(e, 'The template could not be read.').message); },
+        error: e => { if (this.subject() !== s) return; this.loading.set(false); this.error.set(studioError(e, 'The template could not be read.').message); },
       });
     } else {
       this.api.asset(s.id).subscribe({
         next: a => {
+          if (this.subject() !== s) return;
           this.asset.set(a);
           this.loading.set(false);
-          this.api.assetFile(s.id, s.version).subscribe({
-            next: blob => this.pageUrl.set(this.keep(blob)),
-            error: () => this.pageError.set('The picture could not be read.'),
-          });
+          this.loadPicture(s);
         },
-        error: e => { this.loading.set(false); this.error.set(studioError(e, 'The asset could not be read.').message); },
+        error: e => { if (this.subject() !== s) return; this.loading.set(false); this.error.set(studioError(e, 'The asset could not be read.').message); },
       });
     }
+  }
+
+  /** Reads what is reviewed again, after a failure. */
+  reload(): void { this.load(this.subject()); }
+
+  /** The draft's first page (a template) or the picture (an asset). */
+  private loadPicture(s: StudioSubject): void {
+    this.pageUrl.set(null);
+    this.pageError.set('');
+    if (s.kind === 'template') {
+      this.api.publishDraftPage(s.id).subscribe({
+        next: res => { if (res.body && this.subject() === s) this.pageUrl.set(this.keep(res.body)); },
+        error: e => { if (this.subject() === s) this.pageError.set(studioError(e, 'The first page could not be drawn.').message); },
+      });
+    } else if (s.kind === 'asset') {
+      this.api.assetFile(s.id, s.version).subscribe({
+        next: blob => { if (this.subject() === s) this.pageUrl.set(this.keep(blob)); },
+        error: () => { if (this.subject() === s) this.pageError.set('The picture could not be read.'); },
+      });
+    }
+  }
+
+  /** Try again on the page or picture that could not be drawn. */
+  retryPicture(): void {
+    const s = this.subject();
+    if (!s) return;
+    if (s.kind === 'report') this.show(this.shownPage()); else this.loadPicture(s);
   }
 
   /** Shows page {@code page} large (the first by default). */
@@ -309,7 +347,7 @@ export class ReportReviewCard {
     this.pageError.set('');
     this.api.reviewPage(s.id, s.version, page, true).subscribe({
       next: res => { if (res.body && this.shownPage() === page && this.subject() === s) this.pageUrl.set(this.keep(res.body)); },
-      error: e => this.pageError.set(studioError(e, 'The page could not be drawn.').message),
+      error: e => { if (this.shownPage() === page && this.subject() === s) this.pageError.set(studioError(e, 'The page could not be drawn.').message); },
     });
   }
 

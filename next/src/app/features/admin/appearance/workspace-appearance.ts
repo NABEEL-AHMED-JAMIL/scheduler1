@@ -13,6 +13,9 @@ import { WorkspaceSelect } from '../../../shared/ui/workspace-select';
 import { WorkspaceDirectory } from '../../../core/workspaces/workspace-directory';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { ThemeChooser } from '../../../shared/ui/theme-chooser';
+import { AppLoading, loadErrorText } from '../../../shared/ui/loading';
+import { LoadError } from '../../../shared/ui/load-error';
+import { BlurLoader } from '../../../shared/ui/blur-loader';
 
 /** tenant.json/appearance: a workspace's default app theme; null when it sets none (each device's own light/dark). */
 export interface AppearanceSettings {
@@ -27,7 +30,7 @@ export interface AppearanceSettings {
  */
 @Component({
   selector: 'app-workspace-appearance',
-  imports: [Icon, PageHeader, ThemeChooser, Section, WorkspaceSelect, RefreshButton],
+  imports: [Icon, PageHeader, ThemeChooser, Section, WorkspaceSelect, RefreshButton, AppLoading, LoadError, BlurLoader],
   template: `
     <div class="page">
       <app-page-header title="Appearance"
@@ -40,11 +43,16 @@ export interface AppearanceSettings {
         </div>
       </app-page-header>
 
-      @if (error()) {
-        <div class="card p-4 text-sm text-crit-500" role="alert">{{ error() }}</div>
+      <!-- Owner 2026-10-27: until the workspace's value is known the section is a skeleton (it said "Now: no default"
+           before the answer); a failed read says why with Try again; a re-read keeps the section under a blur. -->
+      @if (error() && !loading()) {
+        <div class="card" role="alert"><app-load-error [message]="error()" (retry)="load()" /></div>
       } @else if (isPlatformAdmin() && tenantId() === null) {
         <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]" data-test="pick-workspace">Pick a workspace above to set its default theme.</div>
+      } @else if (!loaded()) {
+        <div class="card"><app-loading shape="panel" [count]="3" label="Loading the default theme…" /></div>
       } @else {
+        <app-blur-loader [active]="loading()" label="Refreshing…">
         <!-- Owner #4 (2026-10-19): one section -- title and the state in a sentence, the themes on the shared chooser's grid, and
              the actions in the section's footer, the primary rightmost. -->
         <app-section [card]="true" title="Default theme" data-test="workspace-theme-card"
@@ -61,6 +69,7 @@ export interface AppearanceSettings {
             </button>
           </div>
         </app-section>
+        </app-blur-loader>
       }
     </div>
   `,
@@ -79,6 +88,8 @@ export class WorkspaceAppearance implements OnInit {
   readonly loading = signal(false);
   readonly saving = signal(false);
   readonly error = signal('');
+  /** The chosen workspace's value has answered: before it, "Now: no default" would be a guess. */
+  readonly loaded = signal(false);
 
   readonly savedChoice = computed<ThemeChoice>(() => { const s = this.saved(); return isThemeChoice(s) ? s : 'system'; });
   readonly savedLabel = computed(() => (this.saved() ? themeLabel(this.saved()) : 'no default (each device’s light or dark)'));
@@ -94,20 +105,28 @@ export class WorkspaceAppearance implements OnInit {
   pickWorkspace(id: number | null): void {
     this.tenantId.set(id);
     this.error.set('');
+    this.loaded.set(false);
     if (this.tenantId() !== null) this.load();
   }
 
   load(): void {
     this.loading.set(true);
     this.error.set('');
-    const params = this.tenantId() ? `?tenantId=${this.tenantId()}` : '';
+    const tenant = this.tenantId();
+    const params = tenant ? `?tenantId=${tenant}` : '';
     this.http.get<ApiResponse<AppearanceSettings>>(`${API_BASE}/tenant.json/appearance${params}`).subscribe({
       next: r => {
+        // Another workspace picked meanwhile: its own read answers.
+        if (tenant !== this.tenantId()) return;
         this.loading.set(false);
-        if (r.status === API_SUCCESS && r.data) this.took(r.data);
-        else this.error.set(r.message || 'Could not read the workspace’s appearance.');
+        if (r.status === API_SUCCESS && r.data) { this.took(r.data); this.loaded.set(true); }
+        else this.error.set(loadErrorText(r, 'Could not read the workspace’s appearance.'));
       },
-      error: err => { this.loading.set(false); this.error.set(err?.error?.message || 'Could not read the workspace’s appearance.'); },
+      error: err => {
+        if (tenant !== this.tenantId()) return;
+        this.loading.set(false);
+        this.error.set(loadErrorText(err, 'Could not read the workspace’s appearance.'));
+      },
     });
   }
 

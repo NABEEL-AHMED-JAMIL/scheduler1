@@ -42,6 +42,9 @@ import { matchesWorkspace, workspaceName } from '../../shared/ui/workspace-name'
 import { ManagedBanner } from '../../shared/ui/managed-banner';
 import { PageHeader } from '../../shared/ui/page-header';
 import { RefreshButton } from '../../shared/ui/refresh-button';
+import { createTableSort } from '../../shared/ui/sort';
+import { SortHeader } from '../../shared/ui/sort-header';
+import { AppLoading, InlineStatus, createLoadState, loadErrorText } from '../../shared/ui/loading';
 
 export interface Scheduler {
   schedulerId: number;
@@ -118,7 +121,7 @@ const BULK_CONCURRENCY = 4;
 
 @Component({
   selector: 'app-jobs',
-  imports: [WorkspaceSelect, RefreshButton, PageHeader, MineFilter, AssistantDock, Icon, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Pagination, BarChart, StatStrip, ManagedBanner],
+  imports: [WorkspaceSelect, RefreshButton, SortHeader, AppLoading, InlineStatus, PageHeader, MineFilter, AssistantDock, Icon, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Pagination, BarChart, StatStrip, ManagedBanner],
   templateUrl: './jobs.html',
 })
 export class Jobs implements OnInit {
@@ -182,8 +185,13 @@ export class Jobs implements OnInit {
   private missedEvents = false;
 
   readonly jobs = signal<SourceJob[]>([]);
-  readonly loading = signal(true);
-  readonly error = signal('');
+  /**
+   * Owner 2026-10-27: the list's read in one place. `pending` until the first answer, so the live-count strip shows
+   * placeholders rather than five zeros, and the table its skeleton rather than "No schedules yet".
+   */
+  readonly state = createLoadState();
+  readonly loading = this.state.loading;
+  readonly error = this.state.error;
   readonly search = signal('');
   readonly statusFilter = signal('');
   readonly executionFilter = signal('');
@@ -214,7 +222,15 @@ export class Jobs implements OnInit {
 
   /** Run history per job, kept so re-opening a row does not refetch. */
   readonly runsByJob = signal<Record<number, Bar[]>>({});
-  readonly runsLoading = signal<number | null>(null);
+  /**
+   * The rows whose run history is on the way. A set, not one id: opening a second row while the first still read
+   * cleared the first one's loading early, and it then claimed "has not completed a run yet".
+   */
+  readonly runsLoadingFor = signal<ReadonlySet<number>>(new Set());
+  /** Owner 2026-10-27: a failed history read says so (with Try again) instead of "has not completed a run yet". */
+  readonly runsErrorFor = signal<Record<number, string>>({});
+  /** The same for a pipeline's payload: a failed read is not "has no payload configured". */
+  readonly payloadErrorFor = signal<Record<number, string>>({});
 
   readonly statuses = computed(() =>
     [...new Set(this.jobs().map(j => j.jobRunningStatus).filter(Boolean))].sort());
@@ -267,7 +283,29 @@ export class Jobs implements OnInit {
     });
   });
 
-  readonly paged = computed(() => this.pager.slice(this.filtered()));
+  /**
+   * Owner 2026-10-27: every column that shows a value sorts; the list keeps the API's order until one is picked. Next /
+   * last run sorts by the next run where the schedule has one, else by its last run, as the cell reads.
+   */
+  readonly sort = createTableSort<SourceJob>({
+    id: 'schedules',
+    columns: {
+      schedule: job => job.jobName,
+      workspace: job => workspaceName(job),
+      pipeline: job => job.taskDetail?.taskName,
+      mode: { value: job => job.execution, kind: 'text' },
+      when: job => this.scheduleSummary(job),
+      created: { value: job => job.dateCreated, kind: 'date' },
+      createdBy: job => job.createdByName,
+      updatedBy: job => job.updatedByName,
+      nextLast: { value: job => this.nextRun(job) ?? job.lastJobRun, kind: 'date' },
+      runStatus: { value: job => (this.isStalled(job) ? 'Stalled' : job.jobRunningStatus), kind: 'status' },
+      state: { value: job => job.jobStatus, kind: 'status' },
+    },
+  });
+  /** Sorted before paging, so a sort covers the whole filtered list and not just the page in view. */
+  readonly sorted = computed(() => this.sort.apply(this.filtered()));
+  readonly paged = computed(() => this.pager.slice(this.sorted()));
 
   /**
    * A run cannot be stacked on top of one already in flight, and a deleted job has nothing to
@@ -436,18 +474,14 @@ export class Jobs implements OnInit {
   ngOnInit(): void { this.load(); }
 
   load(): void {
-    this.loading.set(true);
-    this.error.set('');
+    this.state.start();
     this.http.get<ApiResponse<SourceJob[]>>(`${API_BASE}/sourceJob.json/listSourceJob`).subscribe({
       next: response => {
-        this.loading.set(false);
-        if (response.status === API_SUCCESS) this.jobs.set(response.data ?? []);
-        else this.error.set(response.message);
+        if (response.status !== API_SUCCESS) { this.state.fail(response, 'The schedules could not be read.'); return; }
+        this.jobs.set(response.data ?? []);
+        this.state.done();
       },
-      error: err => {
-        this.loading.set(false);
-        this.error.set(err?.error?.message || 'Could not load the schedules.');
-      },
+      error: err => this.state.fail(err, 'The schedules could not be read.'),
     });
   }
 
@@ -458,7 +492,7 @@ export class Jobs implements OnInit {
       next.has(job.jobId) ? next.delete(job.jobId) : next.add(job.jobId);
       return next;
     });
-    if (opening && !this.runsByJob()[job.jobId]) this.loadRuns(job.jobId);
+    if (opening && !this.runsByJob()[job.jobId] && !this.runsLoadingFor().has(job.jobId)) this.loadRuns(job.jobId);
     if (opening && !(job.jobId in this.triggerByJob())) this.loadTrigger(job.jobId);
     const taskId = job.taskDetail?.taskDetailId;
     if (opening && taskId && this.payloadByTask()[taskId] === undefined) this.loadPayload(taskId);
@@ -486,15 +520,31 @@ export class Jobs implements OnInit {
   }
 
   private loadPayload(taskDetailId: number): void {
+    this.payloadErrorFor.update(map => { const next = { ...map }; delete next[taskDetailId]; return next; });
     this.http.get<ApiResponse<any>>(`${API_BASE}/sourceTask.json/fetchSourceTaskWithSourceTaskId`,
       { params: { sourceTaskId: String(taskDetailId) } }).subscribe({
       next: response => {
-        const payload = response.status === API_SUCCESS ? (response.data?.taskPayload ?? '') : '';
-        this.payloadByTask.update(map => ({ ...map, [taskDetailId]: payload }));
+        if (response.status !== API_SUCCESS) {
+          this.payloadErrorFor.update(map => ({ ...map, [taskDetailId]: loadErrorText(response, "The pipeline's payload could not be read.") }));
+          return;
+        }
+        // An empty string marks it as fetched-and-absent, so it is not requested again.
+        this.payloadByTask.update(map => ({ ...map, [taskDetailId]: response.data?.taskPayload ?? '' }));
       },
-      // An empty string marks it as fetched-and-absent, so it is not requested again.
-      error: () => this.payloadByTask.update(map => ({ ...map, [taskDetailId]: '' })),
+      // Owner 2026-10-27: a failure is said as one, not stored as "no payload configured".
+      error: err => this.payloadErrorFor.update(map => ({ ...map, [taskDetailId]: loadErrorText(err, "The pipeline's payload could not be read.") })),
     });
+  }
+
+  /** Why this row's payload could not be read, or ''. */
+  payloadError(job: SourceJob): string {
+    const taskId = job.taskDetail?.taskDetailId;
+    return taskId ? this.payloadErrorFor()[taskId] ?? '' : '';
+  }
+
+  retryPayload(job: SourceJob): void {
+    const taskId = job.taskDetail?.taskDetailId;
+    if (taskId) this.loadPayload(taskId);
   }
 
   payloadFor(job: SourceJob): string | undefined {
@@ -514,15 +564,21 @@ export class Jobs implements OnInit {
    * legacy row carried the same chart and it is the quickest read of whether a job has been
    * getting slower or failing intermittently; a bar goes straight to that run's logs.
    */
-  private loadRuns(jobId: number): void {
-    this.runsLoading.set(jobId);
+  loadRuns(jobId: number): void {
+    this.runsLoadingFor.update(set => new Set(set).add(jobId));
+    this.runsErrorFor.update(map => { const next = { ...map }; delete next[jobId]; return next; });
+    const settle = () => this.runsLoadingFor.update(set => { const next = new Set(set); next.delete(jobId); return next; });
     this.http.get<ApiResponse<{ jobQueues?: any[] }>>(
       `${API_BASE}/sourceJob.json/fetchSourceJobQueueListWithJobId`,
       // The window the strip draws, plus the one run that may still be going: the server reads only these.
       { params: { jobId: String(jobId), limit: String(RECENT_RUN_BARS + 1) } }).subscribe({
       next: response => {
-        this.runsLoading.set(null);
-        const queues = response.status === API_SUCCESS ? (response.data?.jobQueues ?? []) : [];
+        settle();
+        if (response.status !== API_SUCCESS) {
+          this.runsErrorFor.update(map => ({ ...map, [jobId]: loadErrorText(response, "This schedule's recent runs could not be read.") }));
+          return;
+        }
+        const queues = response.data?.jobQueues ?? [];
         const bars: Bar[] = queues
           .filter(q => q.startTime && q.endTime)
           // "Recent runs" means recent: the panel is a strip a few hundred pixels wide, and a
@@ -541,9 +597,10 @@ export class Jobs implements OnInit {
           }));
         this.runsByJob.update(map => ({ ...map, [jobId]: bars }));
       },
-      error: () => {
-        this.runsLoading.set(null);
-        this.runsByJob.update(map => ({ ...map, [jobId]: [] }));
+      // Owner 2026-10-27: a failed read is said, with Try again -- it used to read "has not completed a run yet".
+      error: err => {
+        settle();
+        this.runsErrorFor.update(map => ({ ...map, [jobId]: loadErrorText(err, "This schedule's recent runs could not be read.") }));
       },
     });
   }

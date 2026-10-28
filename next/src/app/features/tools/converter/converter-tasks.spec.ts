@@ -86,3 +86,17 @@ describe('Converter, recent conversions', () => {
     expect(aside).toContain('busy');
   });
 });
+
+describe('Converter, recent conversions -- sorting (owner 2026-10-27)', () => {
+  it('keeps the API order until a heading is picked, then sorts by it both ways', () => {
+    const { c } = converter();
+    c.applyRange({ from: '', to: '', preset: 'all' });
+    expect(c.pagedTasks().map(t => t.documentConverterTaskId)).toEqual([1, 2]);
+    c.taskSort.toggle('name');
+    expect(c.pagedTasks().map(t => t.taskName)).toEqual(['Discharge summary', 'Lab results']);
+    c.taskSort.toggle('name');
+    expect(c.pagedTasks().map(t => t.taskName)).toEqual(['Lab results', 'Discharge summary']);
+    c.taskSort.toggle('created');
+    expect(c.pagedTasks().map(t => t.documentConverterTaskId)).toEqual([1, 2]);
+  });
+});

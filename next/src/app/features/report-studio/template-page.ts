@@ -18,6 +18,9 @@ import { Problem, SampleRow, TemplateDetail, TemplateDefinition, VersionRow, ori
 import { NewTemplateData, NewTemplatePanel, PublishData, PublishPanel } from './template-panels';
 import { TestPanel, TestPanelData } from './test-panel';
 import { downloadJson } from './report-files';
+import { createTableSort } from '../../shared/ui/sort';
+import { SortHeader } from '../../shared/ui/sort-header';
+import { AppLoading } from '../../shared/ui/loading';
 
 interface ContractField { path: string; type: string; required?: boolean; label?: string; }
 
@@ -34,7 +37,7 @@ export const TEMPLATE_DELETE_WORDS = 'Its versions, drafts and test samples are 
 @Component({
   selector: 'app-report-template-page',
   imports: [PageHeader, RefreshButton, Icon, RsTimePipe, LoadError, ProblemList, FormsModule, CdkMenu, CdkMenuItem,
-    CdkMenuTrigger, RouterLink],
+    CdkMenuTrigger, RouterLink, SortHeader, AppLoading],
   templateUrl: './template-page.html',
 })
 export class ReportTemplatePage implements OnInit {
@@ -67,6 +70,16 @@ export class ReportTemplatePage implements OnInit {
     const def = this.shown()?.definition?.template as { dataContract?: { fields?: ContractField[] } } | undefined;
     return def?.dataContract?.fields ?? [];
   });
+  /** Owner 2026-10-27: the data contract sorts by path, type or required; the definition's own order until one is picked. */
+  readonly contractSort = createTableSort<ContractField>({
+    id: 'report-template-contract',
+    columns: {
+      path: f => f.path,
+      type: f => f.type,
+      required: { value: f => !!f.required, kind: 'bool', first: 'desc' },
+    },
+  });
+  readonly sortedContract = computed(() => this.contractSort.apply(this.contract()));
 
   ngOnInit(): void {
     this.load();

@@ -34,6 +34,7 @@ const doc = (extractionId: number, over: Partial<Extraction> = {}): Extraction =
 function screen(opts: { admin?: boolean; tasks?: boolean; documents?: boolean; tenantId?: number | null } = {}) {
   const opened: { component: unknown; data: unknown }[] = [];
   const refresh = vi.fn();
+  try { localStorage.clear(); } catch { /* none */ }
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
     imports: [ReviewHome],
@@ -203,5 +204,28 @@ describe('Review: one bulk decision over mixed kinds', () => {
     expect(linkOf(item('task', 7))).toEqual({ path: ['/review/approvals'], query: { task: '7' } });
     expect(linkOf(item('core', 8311, { jobId: 2907, runId: 8311 }))).toEqual({ path: ['/pipelines/schedules', 2907, 'runs', 8311] });
     expect(linkOf(item('document', 1133))).toEqual({ path: ['/review/documents', 1133] });
+  });
+});
+
+describe('Review › All waiting -- sorting (owner 2026-10-27)', () => {
+  it('keeps its own order until a heading is picked, then sorts by it both ways', () => {
+    const s = screen();
+    answer(s, { teams: [task(7)], docs: [doc(1133)] });
+    expect(rows(s.el).map(r => r.getAttribute('data-item'))).toEqual(['document:1133', 'approval:7']);
+    s.component.sort.toggle('type');
+    s.fixture.detectChanges();
+    expect(rows(s.el).map(r => r.getAttribute('data-item'))).toEqual(['approval:7', 'document:1133']);
+    s.component.sort.toggle('type');
+    s.fixture.detectChanges();
+    expect(rows(s.el).map(r => r.getAttribute('data-item'))).toEqual(['document:1133', 'approval:7']);
+  });
+
+  it('sorts by waiting since as instants, the newest first', () => {
+    const s = screen();
+    answer(s, { teams: [task(7)], docs: [doc(1133)] });
+    s.component.sort.toggle('since');
+    // The task waits since 12:00 UTC, the document since 03:10 UTC the same day.
+    expect(s.component.sorted().map(i => i.kind)).toEqual(['approval', 'document']);
+    expect(s.component.sort.note).toContain('the first 100 of each list');
   });
 });

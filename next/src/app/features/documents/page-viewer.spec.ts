@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { of, throwError } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { DocumentsApi } from './documents.service';
 import { PageViewer, ViewerBox } from './page-viewer';
@@ -134,5 +134,33 @@ describe('PageViewer', () => {
     const { fixture } = await viewerWith();
     fixture.destroy();
     expect(revoked).toEqual(['blob:page-1']);
+  });
+
+  it('offers Try again when the page cannot be fetched, and fetches it again (owner 2026-10-27)', async () => {
+    const { fixture, el, api } = await viewerWith({ fail: true });
+    expect(el.querySelector('[data-test="page-retry"]')?.textContent).toContain('Try again');
+    api.pageImage.mockReturnValue(of(new Blob(['png'], { type: 'image/png' })));
+    (el.querySelector('[data-test="page-retry"]') as HTMLButtonElement).click();
+    await fixture.whenStable();
+    expect(api.pageImage).toHaveBeenCalledTimes(2);
+    expect(fixture.componentInstance.error()).toBe('');
+    expect(fixture.componentInstance.url()).toBe('blob:page-1');
+  });
+
+  it('says so when the image comes but cannot be drawn (owner 2026-10-27)', async () => {
+    const { fixture, el } = await viewerWith();
+    el.querySelector('img')!.dispatchEvent(new Event('error'));
+    await fixture.whenStable();
+    expect(el.querySelector('[role="alert"]')?.textContent).toContain('Page 1 could not be shown.');
+  });
+
+  it('is announced while the page is on the way (owner 2026-10-27)', async () => {
+    const api = { pageImage: vi.fn(() => NEVER) };
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [provideZonelessChangeDetection(), { provide: DocumentsApi, useValue: api }] });
+    const fixture = TestBed.createComponent(PageViewer);
+    fixture.componentRef.setInput('ocrDocumentId', 1001);
+    await fixture.whenStable();
+    expect((fixture.nativeElement as HTMLElement).querySelector('app-loading')?.getAttribute('aria-busy')).toBe('true');
   });
 });

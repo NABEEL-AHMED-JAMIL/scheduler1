@@ -7,6 +7,10 @@ import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { Icon } from '../../shared/ui/icon';
 import { StorageService } from '../objects/storage.service';
 import { fieldLabel } from './run-review-card';
+import { AppLoading, loadErrorText } from '../../shared/ui/loading';
+import { LoadError } from '../../shared/ui/load-error';
+import { createTableSort } from '../../shared/ui/sort';
+import { SortHeader } from '../../shared/ui/sort-header';
 
 /** One output a run recorded (sourceJob.json/runOutputs), as far as this card reads it. */
 interface RunOutput {
@@ -96,7 +100,7 @@ export function orderedColumns(columns: string[], kinds: string[]): string[] {
  */
 @Component({
   selector: 'app-pipeline-approval-card',
-  imports: [Icon, RouterLink],
+  imports: [Icon, RouterLink, AppLoading, LoadError, SortHeader],
   styles: `
     .pac { display: flex; flex-direction: column; gap: 1.25rem; }
     .pac-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr)); gap: 0.75rem; margin: 0;
@@ -175,8 +179,11 @@ export function orderedColumns(columns: string[], kinds: string[]): string[] {
           @if (link()) { <a class="btn btn-default btn-sm" [routerLink]="link()!"><app-icon name="external" />Open the run</a> }
         </div>
 
+        <!-- Owner 2026-10-27: the shared loader; a failed read says so with Try again (it said the run kept no rows). -->
         @if (loading()) {
-          <p class="text-sm text-[color:var(--text-muted)]" data-test="approval-rows-loading">Reading the rows the run kept…</p>
+          <app-loading shape="rows" data-test="approval-rows-loading" label="Reading the rows the run kept…" [count]="3" />
+        } @else if (loadError()) {
+          <app-load-error data-test="approval-rows-error" [message]="loadError()" (retry)="retry()" />
         } @else if (!rows().length) {
           <p class="text-sm text-[color:var(--text-secondary)]" data-test="approval-rows-none">
             This run kept no copy of its rows before the approval step, so they cannot be listed here. Open the run to see each step's counts and log;
@@ -211,9 +218,10 @@ export function orderedColumns(columns: string[], kinds: string[]): string[] {
           }
           <div class="pac-table" data-test="approval-rows">
             <table class="table-modern">
-              <thead><tr>@for (c of columns(); track c) { <th scope="col">{{ label(c) }}</th> }</tr></thead>
+              <thead><tr>@for (c of columns(); track c) { <th scope="col" [appSort]="c" [sortBy]="sort">{{ label(c) }}</th> }</tr></thead>
               <tbody>
-                @for (r of shownRows(); track $index) { <tr [class.pac-odd]="odd(r)">@for (c of columns(); track c) { <td>{{ r[c] }}</td> }</tr> }
+                <!-- Rows carry no state of their own, so $index stays a safe track after a sort. -->
+                @for (r of sortedRows(); track $index) { <tr [class.pac-odd]="odd(r)">@for (c of columns(); track c) { <td>{{ r[c] }}</td> }</tr> }
               </tbody>
             </table>
           </div>
@@ -241,6 +249,10 @@ export class PipelineApprovalCard {
   readonly open = input<boolean>(false);
 
   readonly loading = signal(true);
+  /** Owner 2026-10-27: why the rows could not be read; every failure used to read as "kept no copy of its rows". */
+  readonly loadError = signal('');
+  /** The newest read asked; a late answer for another task's run is dropped. */
+  private loadSeq = 0;
   readonly outputs = signal<RunOutput[]>([]);
   readonly rows = signal<Row[]>([]);
   readonly rowsBucket = signal<string | null>(null);
@@ -305,13 +317,25 @@ export class PipelineApprovalCard {
     const odd = this.isException();
     return [...rows.filter(odd), ...rows.filter(r => !odd(r))];
   });
-  /** The photos of the rows shown, captioned by the row's first identifying columns. */
+  /**
+   * Owner 2026-10-27: the rows sort by any column, typed from the values (the columns come from the data). Until one is
+   * picked they keep shownRows' order -- the rows to look at first, then the rest. Not remembered: each task's rows
+   * have their own columns.
+   */
+  readonly sort = createTableSort<Row>({
+    id: 'pipeline-approval-rows',
+    columns: {},
+    dynamic: k => ({ value: r => r[k], kind: 'auto' }),
+    remember: false,
+  });
+  readonly sortedRows = computed(() => this.sort.apply(this.shownRows()));
+  /** The photos of the rows shown, in the table's order, captioned by the row's first identifying columns. */
   readonly photoRows = computed(() => {
     const col = this.imageColumn();
     if (!col) return [];
     const captionCols = this.allColumns().slice(0, 2);
     const odd = this.isException();
-    return this.shownRows().filter(r => typeof r[col] === 'string' && IMAGE.test(r[col] as string)).slice(0, MAX_PHOTOS)
+    return this.sortedRows().filter(r => typeof r[col] === 'string' && IMAGE.test(r[col] as string)).slice(0, MAX_PHOTOS)
       .map(r => ({ key: r[col] as string, odd: odd(r),
         // A bare number says nothing on its own ("6"): it is named by its column ("Visit no 6").
         caption: captionCols.map(c => { const v = String(r[c] ?? ''); return /^-?\d+(\.\d+)?$/.test(v) ? `${fieldLabel(c)} ${v}` : v; })
@@ -351,29 +375,42 @@ export class PipelineApprovalCard {
     return Number.isNaN(d.getTime()) ? iso : d.toLocaleString(undefined, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false });
   }
 
+  /** Reads the rows again after a failure. */
+  retry(): void { this.load(this.jobQueueId(), this.attempt()); }
+
   private load(jobQueueId: number | null, attempt: number): void {
+    const seq = ++this.loadSeq;
+    const current = () => seq === this.loadSeq && !this.released;
+    const failed = (err: unknown) => {
+      if (!current()) return;
+      this.loadError.set(loadErrorText(err, 'The rows the run kept could not be read.'));
+      this.loading.set(false);
+    };
     this.loading.set(true);
+    this.loadError.set('');
     this.rows.set([]);
     this.filter.set(null);
     if (jobQueueId == null) { this.loading.set(false); return; }
     this.http.get<ApiResponse<{ outputs?: RunOutput[] }>>(`${API_BASE}/sourceJob.json/runOutputs`,
       { params: { jobQueueId: String(jobQueueId), attempt: String(attempt) } }).subscribe({
       next: r => {
-        const outs = r.status === API_SUCCESS ? r.data?.outputs ?? [] : [];
+        if (!current()) return;
+        if (r.status !== API_SUCCESS) { this.outputs.set([]); failed(r); return; }
+        const outs = r.data?.outputs ?? [];
         this.outputs.set(outs);
         const source = this.rowsSource(outs);
         if (!source) { this.loading.set(false); return; }
         if (source.runDatasetId) {
           this.http.get<Row[]>(`${API_BASE}/sourceJob.json/runDataset`, { params: { runDatasetId: String(source.runDatasetId), format: 'json' } })
-            .pipe(catchError(() => of([] as Row[]))).subscribe(rows => this.done(Array.isArray(rows) ? rows : [], null));
+            .subscribe({ next: rows => { if (current()) this.done(Array.isArray(rows) ? rows : [], null); }, error: failed });
         } else {
           this.storage.download(source.bucket!, source.key!).subscribe({
-            next: blob => blob.text().then(t => this.done(parseCsv(t), source.bucket!)),
-            error: () => this.done([], null),
+            next: blob => blob.text().then(t => { if (current()) this.done(parseCsv(t), source.bucket!); }, failed),
+            error: failed,
           });
         }
       },
-      error: () => { this.outputs.set([]); this.loading.set(false); },
+      error: err => { if (!current()) return; this.outputs.set([]); failed(err); },
     });
   }
 

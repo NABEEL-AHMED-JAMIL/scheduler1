@@ -4,6 +4,8 @@ import { Router } from '@angular/router';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { Segmented, SegmentOption } from '../../../shared/ui/segmented';
 import { forkJoin } from 'rxjs';
+import { AppLoading, createLoadState } from '../../../shared/ui/loading';
+import { LoadError } from '../../../shared/ui/load-error';
 import { API_SUCCESS } from '../../../core/api/api.config';
 import { Icon } from '../../../shared/ui/icon';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
@@ -24,7 +26,7 @@ import { AlertRulePanel, AlertRulePanelData } from './alert-rule-panel';
  */
 @Component({
   selector: 'app-alert-rules',
-  imports: [Icon, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, Segmented],
+  imports: [Icon, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, Segmented, AppLoading, LoadError],
   styles: `
     .alerts-layout { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); }
     @media (min-width: 80rem) { .alerts-layout { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); } }
@@ -51,16 +53,22 @@ import { AlertRulePanel, AlertRulePanelData } from './alert-rule-panel';
     <div [attr.data-alert-scope]="scope()">
       <div class="flex flex-wrap items-center gap-2 mb-3" data-test="alerts-toolbar">
         <!-- Owner #6 (2026-10-19): "Rules 6 of 50" was the rules in use against the scope's limit; it says so now. -->
-        <span class="rules-count" data-test="rules-count" [title]="limitHelp()">
-          <strong class="text-[color:var(--text-primary)]">{{ rules().length }} {{ rules().length === 1 ? 'rule' : 'rules' }}</strong>
-          · up to {{ maxRules() }} {{ scope() === 'workspace' ? 'per workspace' : 'for the platform' }}
-          @if (enabledCount() < rules().length) { · {{ rules().length - enabledCount() }} off }
-          @if (mutedCount()) { · {{ mutedCount() }} muted }
-        </span>
-        <span class="rules-count">· {{ openCount() }} {{ openCount() === 1 ? 'alert' : 'alerts' }} open</span>
+        <!-- Owner 2026-10-27: the counts wait for their read; "0 rules · 0 alerts open" before the answer read as none. -->
+        @if (rulesState.loaded()) {
+          <span class="rules-count" data-test="rules-count" [title]="limitHelp()">
+            <strong class="text-[color:var(--text-primary)]">{{ rules().length }} {{ rules().length === 1 ? 'rule' : 'rules' }}</strong>
+            · up to {{ maxRules() }} {{ scope() === 'workspace' ? 'per workspace' : 'for the platform' }}
+            @if (enabledCount() < rules().length) { · {{ rules().length - enabledCount() }} off }
+            @if (mutedCount()) { · {{ mutedCount() }} muted }
+          </span>
+        }
+        @if (alertsState.loaded()) {
+          <span class="rules-count">· {{ openCount() }} {{ openCount() === 1 ? 'alert' : 'alerts' }} open</span>
+        }
         <div class="ml-auto flex gap-2">
           <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()"><app-icon name="refresh" [busy]="loading()" />Refresh</button>
-          @if (scope() === 'workspace' && !rules().length && !loading()) {
+          <!-- Only once the rules have answered: offered after a failed read, it could add the five a second time. -->
+          @if (scope() === 'workspace' && rulesState.loaded() && !rulesState.loading() && !rulesState.error() && !rules().length) {
             <button type="button" class="btn btn-default btn-sm" (click)="addRecommended()" [disabled]="busy()" data-test="alerts-recommended">
               <app-icon name="sparkle" />Add the recommended rules</button>
           }
@@ -69,7 +77,6 @@ import { AlertRulePanel, AlertRulePanelData } from './alert-rule-panel';
             <app-icon name="plus" />New rule</button>
         </div>
       </div>
-      @if (error()) { <p class="text-sm text-crit-500 m-0 mb-3" role="alert">{{ error() }}</p> }
 
       <div class="alerts-layout">
         <section class="card p-4 min-w-0" aria-labelledby="alerts-title" data-test="alerts-list">
@@ -78,6 +85,11 @@ import { AlertRulePanel, AlertRulePanelData } from './alert-rule-panel';
             <span class="chart-sub">open first · resolved ones are kept 30 days</span>
             <app-segmented class="ml-auto" ariaLabel="Which alerts" [options]="filters" [value]="alertFilter()" (valueChange)="alertFilter.set($event)" />
           </div>
+          @if (alertsState.error()) {
+            <app-load-error [message]="alertsState.error()" (retry)="loadAlerts()" />
+          } @else if (alertsState.pending()) {
+            <app-loading shape="list" label="Loading alerts…" [count]="3" />
+          } @else {
           @for (a of shownAlerts(); track a.id) {
             <div class="alert-row" [attr.data-alert]="a.id" [attr.data-alert-state]="a.state">
               <span class="sev" [class]="'sev sev-' + (a.state === 'OPEN' ? a.severity : 'RESOLVED')" [attr.aria-label]="a.severity"></span>
@@ -99,13 +111,19 @@ import { AlertRulePanel, AlertRulePanelData } from './alert-rule-panel';
               </div>
             </div>
           } @empty {
-            <p class="text-sm text-[color:var(--text-muted)] m-0 py-4" data-test="alerts-empty">{{ loading() ? 'Reading the alerts…' : (alertFilter() === 'OPEN' ? 'No alert is open.' : 'No alert has fired.') }}</p>
+            <p class="text-sm text-[color:var(--text-muted)] m-0 py-4" data-test="alerts-empty">{{ alertFilter() === 'OPEN' ? 'No alert is open.' : 'No alert has fired.' }}</p>
+          }
           }
         </section>
 
         <section class="card p-4 min-w-0" aria-labelledby="rules-title" data-test="alert-rules">
           <h3 class="chart-title m-0" id="rules-title">Rules</h3>
           <p class="chart-sub m-0 mb-2">Grouped by what they watch. A rule opens in the panel to change.</p>
+          @if (rulesState.error()) {
+            <app-load-error [message]="rulesState.error()" (retry)="loadRules()" />
+          } @else if (rulesState.pending()) {
+            <app-loading shape="list" label="Loading alert rules…" [count]="3" />
+          } @else {
           @for (g of groups(); track g.kind) {
             <div class="kind-group" [attr.data-kind]="g.kind">
               <div class="kind-head"><h4 class="text-sm font-semibold m-0">{{ g.label }}</h4>
@@ -146,8 +164,9 @@ import { AlertRulePanel, AlertRulePanelData } from './alert-rule-panel';
               }
             </div>
           } @empty {
-            <p class="text-sm text-[color:var(--text-muted)] m-0 py-4">{{ loading() ? 'Reading the rules…' : (scope() === 'workspace'
-              ? 'No rule yet: nothing tells you when a run fails. Add the recommended rules to start.' : 'No platform rule.') }}</p>
+            <p class="text-sm text-[color:var(--text-muted)] m-0 py-4">{{ scope() === 'workspace'
+              ? 'No rule yet: nothing tells you when a run fails. Add the recommended rules to start.' : 'No platform rule.' }}</p>
+          }
           }
         </section>
       </div>
@@ -178,9 +197,14 @@ export class AlertRules implements OnInit {
 
   readonly answer = signal<AlertRulesAnswer | null>(null);
   readonly alerts = signal<Alert[]>([]);
-  readonly loading = signal(true);
+  /**
+   * Owner 2026-10-27: the rules and the alerts are two reads with their own loading and error, so one failing no longer
+   * leaves the other card claiming "No alert has fired" or "No rule yet".
+   */
+  readonly rulesState = createLoadState();
+  readonly alertsState = createLoadState();
+  readonly loading = computed(() => this.rulesState.loading() || this.alertsState.loading());
   readonly busy = signal(false);
-  readonly error = signal('');
   readonly rules = computed(() => this.answer()?.rules ?? []);
   readonly openCount = computed(() => this.alerts().filter(a => a.state === 'OPEN').length);
   readonly maxRules = computed(() => this.answer()?.maxRules ?? 50);
@@ -210,19 +234,30 @@ export class AlertRules implements OnInit {
   }
 
   load(): void {
-    this.loading.set(true);
-    this.error.set('');
-    forkJoin([this.api.rules(), this.api.alerts('all', 100)]).subscribe({
-      next: ([rules, alerts]) => {
-        this.loading.set(false);
-        if (rules?.status === API_SUCCESS && rules.data) this.answer.set(rules.data);
-        else this.error.set(rules?.message || 'The rules could not be read.');
-        this.alerts.set(alerts?.data ?? []);
+    this.loadRules();
+    this.loadAlerts();
+  }
+
+  loadRules(): void {
+    this.rulesState.start();
+    this.api.rules().subscribe({
+      next: rules => {
+        if (rules?.status === API_SUCCESS && rules.data) { this.answer.set(rules.data); this.rulesState.done(); }
+        else this.rulesState.fail(rules, 'The alert rules could not be read.');
       },
-      error: err => {
-        this.loading.set(false);
-        this.error.set(refusal(err, 'The alerts could not be read.'));
+      error: err => this.rulesState.fail(err, 'The alert rules could not be read.'),
+    });
+  }
+
+  loadAlerts(): void {
+    this.alertsState.start();
+    this.api.alerts('all', 100).subscribe({
+      next: alerts => {
+        if (alerts?.status !== API_SUCCESS) { this.alertsState.fail(alerts, 'The alerts could not be read.'); return; }
+        this.alerts.set(alerts.data ?? []);
+        this.alertsState.done();
       },
+      error: err => this.alertsState.fail(err, 'The alerts could not be read.'),
     });
   }
 

@@ -18,6 +18,7 @@ import {
 } from '../assets.model';
 import { RsPickSearch } from '../pick-search';
 import { AssetPicture } from './asset-picture';
+import { AppLoading, InlineStatus, LoadState, createLoadState } from '../../../shared/ui/loading';
 
 const FONTS = ['Noto Sans', 'Noto Serif', 'Noto Sans Mono', 'DejaVu Sans'];
 
@@ -35,7 +36,7 @@ type Picker = 'logos' | 'signatures' | 'stamps';
 
 @Component({
   selector: 'app-brand-profile',
-  imports: [PageHeader, Icon, LoadError, RsTimePipe, FormsModule, AssetPicture, RsPickSearch],
+  imports: [PageHeader, Icon, LoadError, RsTimePipe, FormsModule, AssetPicture, RsPickSearch, AppLoading, InlineStatus],
   templateUrl: './brand-profile.html',
   styleUrl: './assets.css',
 })
@@ -52,7 +53,16 @@ export class BrandProfilePage implements OnInit {
   readonly p = signal<BrandProfileDetail | null>(null);
   readonly def = signal<BrandDefinition>(emptyDefinition());
   readonly saved = signal('');
-  readonly error = signal('');
+  /**
+   * Owner 2026-10-27: the profile's read. Its error replaces the editor only while nothing is on screen; a reload after
+   * publishing that fails keeps the editor and says so in a toast.
+   */
+  readonly state = createLoadState();
+  readonly error = this.state.error;
+  /** Each picker's read: loading, or why it failed with Try again -- never a silent "nothing to choose". */
+  readonly pickerState: Record<Picker, LoadState> = {
+    logos: createLoadState(false), signatures: createLoadState(false), stamps: createLoadState(false),
+  };
   readonly busy = signal(false);
   readonly saveError = signal('');
   readonly previewHtml = signal('');
@@ -72,6 +82,7 @@ export class BrandProfilePage implements OnInit {
 
   readonly canEdit = computed(() => this.auth.canOpen('report-assets') && !this.auth.isPlatformAdmin() && this.p()?.status === 'ACTIVE');
   readonly canPublish = computed(() => this.auth.canOpen('report-publish') && !this.auth.isPlatformAdmin());
+  readonly isPlatformAdmin = computed(() => this.auth.isPlatformAdmin());
   readonly dirty = computed(() => JSON.stringify(this.def()) !== this.saved());
   readonly editingVersion = computed(() => this.p()?.draft?.version ?? ((this.p()?.currentPublishedVersion ?? 0) + 1));
   readonly textRatio = computed(() => contrastRatio(this.def().colors.text || PRINTED_LOOK.text, this.def().colors.background || PRINTED_LOOK.background));
@@ -97,16 +108,21 @@ export class BrandProfilePage implements OnInit {
   }
 
   load(): void {
-    this.error.set('');
+    const kept = !!this.p();
+    this.state.start();
     this.api.brandProfile(this.profileId()).subscribe({
       next: p => {
         this.p.set(p);
+        this.state.done();
         const d = { ...emptyDefinition(), ...(p.draft?.definition ?? p.published?.definition ?? {}) } as BrandDefinition;
         this.def.set(d);
         this.saved.set(JSON.stringify(d));
         this.redraw.next(d);
       },
-      error: e => this.error.set(studioError(e, 'The brand profile could not be read.').message),
+      error: e => {
+        if (kept) { this.state.done(); this.toast.error(studioError(e, 'The brand profile could not be read again; what is shown may be out of date.').message); return; }
+        this.state.fail(e, 'The brand profile could not be read.');
+      },
     });
     if (!this.auth.isPlatformAdmin()) {
       this.find('logos', '');
@@ -121,21 +137,31 @@ export class BrandProfilePage implements OnInit {
    */
   find(picker: Picker, q: string): void {
     const kinds = picker === 'logos' ? ['LOGO', 'IMAGE'] : picker === 'signatures' ? ['SIGNATURE'] : ['STAMP'];
+    const state = this.pickerState[picker];
+    state.start();
     this.api.usable(null, { q, kinds }).subscribe({
       next: u => {
+        state.done();
         const list = this[picker];
         const found = new Set(u.assets.map(a => a.assetId));
         const picked = new Set(this.pickedIds());
         list.set([...u.assets, ...list().filter(a => !found.has(a.assetId) && picked.has(a.assetId))]);
         this.totals.update(t => ({ ...t, [picker]: u.total }));
       },
-      error: () => { /* the pickers say there is nothing to choose */ },
+      error: e => state.fail(e, picker === 'logos' ? 'The logos could not be read.' : picker === 'signatures'
+        ? 'The signatures could not be read.' : 'The stamps could not be read.'),
     });
   }
 
   private pickedIds(): string[] {
     const d = this.def();
     return [d.logo?.assetId ?? '', ...(d.signatures ?? []).map(s => s.assetId), ...(d.stamps ?? []).map(s => s.assetId)].filter(Boolean);
+  }
+
+  /** Owner 2026-10-27: a preview that could not be drawn can be asked for again without editing anything. */
+  retryPreview(): void {
+    this.previewError.set('');
+    this.redraw.next(this.def());
   }
 
   /** One change to the definition: kept, the preview redrawn. */

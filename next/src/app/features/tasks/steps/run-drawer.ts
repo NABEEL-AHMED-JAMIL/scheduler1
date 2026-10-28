@@ -8,6 +8,7 @@ import { StatusPill } from '../../../shared/ui/status-pill';
 import { DataText } from '../../../shared/ui/data-text';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { StepsApi } from './steps.service';
+import { AppLoading, InlineStatus, loadErrorText } from '../../../shared/ui/loading';
 import { StepLogLine, Timeline, TimelineStep, durationText, errorText, runFinished } from './steps.model';
 
 export interface RunDrawerData {
@@ -26,13 +27,15 @@ export const FOLLOW_MS = 1500;
  */
 @Component({
   selector: 'app-run-drawer',
-  imports: [SidePanel, Icon, StatusPill, DataText, ServerTimePipe, RouterLink],
+  imports: [SidePanel, Icon, StatusPill, DataText, ServerTimePipe, RouterLink, AppLoading, InlineStatus],
   template: `
     <app-side-panel [heading]="'Run #' + data.jobQueueId" [subtitle]="data.jobName">
       <div class="flex flex-col gap-3 min-w-0">
         <div class="flex flex-wrap items-center gap-2">
           <span class="text-sm text-[color:var(--text-secondary)]">Run</span>
-          <app-status [label]="timeline()?.runStatus || 'Queue'" />
+          <!-- Owner 2026-10-27: the run's status once it has been read, not an assumed "Queue" before. -->
+          @if (timeline(); as t) { <app-status [label]="t.runStatus || 'Queue'" /> }
+          @else if (!error()) { <app-loading shape="inline" label="Reading the run…" /> }
           @if (following()) {
             <span class="text-xs text-[color:var(--text-muted)] flex items-center gap-1.5" role="status">
               <app-icon name="refresh" class="spin" size="0.9em" />Following the run…
@@ -42,7 +45,10 @@ export const FOLLOW_MS = 1500;
             <span class="text-xs text-[color:var(--text-muted)] ml-auto">Attempt {{ timeline()!.attempt }} of {{ timeline()!.attempts.length }}</span>
           }
         </div>
-        @if (error()) { <p class="text-sm text-crit-500" role="alert">{{ error() }}</p> }
+        @if (error()) {
+          <p class="text-sm text-crit-500 flex flex-wrap items-center gap-2" role="alert">{{ error() }}
+            <button type="button" class="btn btn-default btn-sm" (click)="retry()"><app-icon name="refresh" />Try again</button></p>
+        }
         @if (timeline(); as t) {
           @if (t.legacy) {
             <p class="text-xs text-[color:var(--text-muted)]" role="note">This run took the legacy path: its worker ran it, so it shows as one step.</p>
@@ -71,9 +77,15 @@ export const FOLLOW_MS = 1500;
                             [attr.aria-expanded]="logOpen() === s.stepExecutionId">{{ logOpen() === s.stepExecutionId ? 'Hide log' : 'Show log' }}</button>
                     @if (logOpen() === s.stepExecutionId) {
                       <div class="run-log mt-1.5">
+                        @if (logError()) {
+                          <app-inline-status [error]="logError()" (retry)="readLog(s.stepExecutionId!)" />
+                        } @else if (logLoading()) {
+                          <app-loading shape="inline" label="Loading the log…" />
+                        } @else {
                         @for (line of logLines(); track $index) {
                           <div><span class="text-[color:var(--text-muted)]">{{ line.loggedAt | serverTime:'timeSec' }} {{ line.level }}</span> <app-data-text [value]="line.message ?? ''" label="Log line" /></div>
-                        } @empty { <span class="text-[color:var(--text-muted)]">{{ logLoading() ? 'Reading…' : 'No lines.' }}</span> }
+                        } @empty { <span class="text-[color:var(--text-muted)]">No lines.</span> }
+                        }
                       </div>
                     }
                   }
@@ -109,6 +121,8 @@ export class RunDrawer {
   readonly logOpen = signal<number | null>(null);
   readonly logLines = signal<StepLogLine[]>([]);
   readonly logLoading = signal(false);
+  /** Owner 2026-10-27: a log that could not be read says so (it read as "No lines."). */
+  readonly logError = signal('');
   private timer: ReturnType<typeof setTimeout> | null = null;
   private stopped = false;
   /** A run still Queue answers "not found" for a moment on some paths; a few misses are waited out. */
@@ -140,6 +154,15 @@ export class RunDrawer {
     });
   }
 
+  /** Try again after the run could not be read: follows it again from the start. */
+  retry(): void {
+    if (this.timer) { clearTimeout(this.timer); this.timer = null; }
+    this.misses = 0;
+    this.error.set('');
+    this.following.set(true);
+    this.read();
+  }
+
   private next(): void {
     this.timer = setTimeout(() => { this.timer = null; this.read(); }, FOLLOW_MS);
   }
@@ -152,11 +175,25 @@ export class RunDrawer {
     if (!step.stepExecutionId) return;
     if (this.logOpen() === step.stepExecutionId) { this.logOpen.set(null); return; }
     this.logOpen.set(step.stepExecutionId);
+    this.readLog(step.stepExecutionId);
+  }
+
+  readLog(stepExecutionId: number): void {
     this.logLines.set([]);
+    this.logError.set('');
     this.logLoading.set(true);
-    this.api.stepLog(step.stepExecutionId).subscribe({
-      next: r => { this.logLoading.set(false); this.logLines.set(r.status === API_SUCCESS ? r.data?.lines ?? [] : []); },
-      error: () => this.logLoading.set(false),
+    this.api.stepLog(stepExecutionId).subscribe({
+      next: r => {
+        if (this.logOpen() !== stepExecutionId) return;
+        this.logLoading.set(false);
+        if (r.status !== API_SUCCESS) { this.logError.set(loadErrorText(r, 'The log could not be read.')); return; }
+        this.logLines.set(r.data?.lines ?? []);
+      },
+      error: err => {
+        if (this.logOpen() !== stepExecutionId) return;
+        this.logLoading.set(false);
+        this.logError.set(loadErrorText(err, 'The log could not be read.'));
+      },
     });
   }
 }

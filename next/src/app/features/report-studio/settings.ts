@@ -13,6 +13,13 @@ import { ReportStudioApi, studioError } from './report-studio.api';
 import { Assignee, RetentionPreview, StudioSettings, size } from './report-studio.model';
 import { RsTimePipe } from './rs-time.pipe';
 import { PageLimitCard } from './page-limit-card';
+import { AppLoading, InlineStatus, createLoadState } from '../../shared/ui/loading';
+import { BlurLoader } from '../../shared/ui/blur-loader';
+import { createTableSort } from '../../shared/ui/sort';
+import { SortHeader } from '../../shared/ui/sort-header';
+
+type RetentionVersion = RetentionPreview['versions'][number];
+type RetentionSnapshot = RetentionPreview['snapshots'][number];
 
 /**
  * The settings' "who": automatic (worked out from the page gate), a team (F4; its people must also hold the page the
@@ -42,7 +49,7 @@ export function assigneeOf(c: WhoChoice): Assignee | null {
  */
 @Component({
   selector: 'app-report-settings',
-  imports: [PageHeader, RefreshButton, Icon, LoadError, EmptyState, FormsModule, RouterLink, RsTimePipe, PageLimitCard],
+  imports: [PageHeader, RefreshButton, Icon, LoadError, EmptyState, FormsModule, RouterLink, RsTimePipe, PageLimitCard, AppLoading, InlineStatus, BlurLoader, SortHeader],
   templateUrl: './settings.html',
   styles: `
     .rss-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(28rem, 1fr)); gap: 1rem; align-items: start; }
@@ -66,6 +73,8 @@ export class ReportSettings implements OnInit {
   readonly error = signal('');
   readonly settings = signal<StudioSettings | null>(null);
   readonly teams = signal<Team[]>([]);
+  /** Owner 2026-10-27: the teams the two "who" choices offer: loading, or why they could not be read, never silently none. */
+  readonly teamsState = createLoadState(false);
   readonly reviewers = signal<WhoChoice>('auto');
   readonly publishers = signal<WhoChoice>('auto');
   readonly everyVersion = signal(false);
@@ -77,6 +86,33 @@ export class ReportSettings implements OnInit {
   readonly previewing = signal(false);
   readonly previewError = signal('');
   readonly size = size;
+
+  /**
+   * Owner 2026-10-27: the retention preview's two tables sort by their columns. The service sends at most 50 of each
+   * (its order until a heading is picked), so the sort covers those.
+   */
+  readonly retentionVersionSort = createTableSort<RetentionVersion>({
+    id: 'report-retention-versions',
+    note: 'Sorts the 50 shown',
+    columns: {
+      report: v => v.reportLabel,
+      version: { value: v => v.version, kind: 'number' },
+      made: { value: v => v.createdAt, kind: 'date' },
+      files: { value: v => v.bytes, kind: 'number' },
+    },
+  });
+  readonly retentionSnapshotSort = createTableSort<RetentionSnapshot>({
+    id: 'report-retention-snapshots',
+    note: 'Sorts the 50 shown',
+    columns: {
+      data: d => d.label || 'Data',
+      why: d => d.why,
+      taken: { value: d => d.takenAt, kind: 'date' },
+      size: { value: d => d.bytes, kind: 'number' },
+    },
+  });
+  readonly sortedRetentionVersions = computed(() => this.retentionVersionSort.apply(this.preview()?.versions ?? []));
+  readonly sortedRetentionSnapshots = computed(() => this.retentionSnapshotSort.apply(this.preview()?.snapshots ?? []));
 
   readonly dirty = computed(() => {
     const s = this.settings();
@@ -100,7 +136,15 @@ export class ReportSettings implements OnInit {
       next: s => { this.apply(s); this.loading.set(false); },
       error: e => { this.loading.set(false); this.error.set(studioError(e, 'The settings could not be read.').message); },
     });
-    this.teamsApi.list().subscribe({ next: r => this.teams.set(r?.data ?? []), error: () => this.teams.set([]) });
+    this.loadTeams();
+  }
+
+  loadTeams(): void {
+    this.teamsState.start();
+    this.teamsApi.list().subscribe({
+      next: r => { this.teams.set(r?.data ?? []); this.teamsState.done(); },
+      error: e => this.teamsState.fail(e, 'The teams could not be read.'),
+    });
   }
 
   private apply(s: StudioSettings): void {
@@ -116,7 +160,9 @@ export class ReportSettings implements OnInit {
   whoWords(resolved: { assignee: Assignee; automatic: boolean; why: string } | undefined): string {
     if (!resolved) return '';
     const a = resolved.assignee;
-    const who = a.kind === 'team' ? `the ${this.teams().find(t => String(t.teamId) === a.value)?.name ?? '#' + a.value} team`
+    const name = this.teams().find(t => String(t.teamId) === a.value)?.name;
+    // Before the teams have answered a team is "a team", not "#1063".
+    const who = a.kind === 'team' ? (name ? `the ${name} team` : this.teamsState.loaded() ? `the #${a.value} team` : 'a team')
       : a.kind === 'role' ? (a.value === 'TENANT_ADMIN' ? 'the workspace administrators' : 'every member') : `user #${a.value}`;
     return `Now: ${who}. ${resolved.why}`;
   }

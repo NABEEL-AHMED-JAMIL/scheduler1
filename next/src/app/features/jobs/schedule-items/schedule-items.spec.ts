@@ -157,3 +157,22 @@ describe('Schedule items tab', () => {
     expect(ask.request.params.get('bKey')).toBe('voice-intake/mig420-0231/call-a.m4a');
   });
 });
+
+describe('Schedule items tab -- loading, empty, error (owner 2026-10-27)', () => {
+  it('is loading (not the empty state) until the first page answers, then says no run processed it', () => {
+    const { http, el, fixture } = mount();
+    expect(el.querySelector('app-loading')).not.toBeNull();
+    http.expectOne(r => r.url.endsWith('/sourceJob.json/itemRuns')).flush({ status: API_SUCCESS, data: PAGE({ items: [], total: 0, keys: [], fields: [] }) });
+    fixture.detectChanges();
+    expect(el.querySelector('app-empty-state')).not.toBeNull();
+  });
+
+  it('says the items could not be read, with Try again, when the first read fails', () => {
+    const { http, el, fixture } = mount();
+    http.expectOne(r => r.url.endsWith('/sourceJob.json/itemRuns')).flush('boom', { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+    expect(el.textContent).toContain('The schedule\'s items could not be read.');
+    [...el.querySelectorAll('button')].find(b => b.textContent!.trim() === 'Try again')!.click();
+    expect(http.match(r => r.url.endsWith('/sourceJob.json/itemRuns'))).toHaveLength(1);
+  });
+});

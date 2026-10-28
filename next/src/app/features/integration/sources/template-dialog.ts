@@ -8,6 +8,8 @@ import { Icon } from '../../../shared/ui/icon';
 import { ComboboxOption } from '../../../shared/ui/combobox';
 import { TemplateRow, directionLabel } from './sources.model';
 import { SourcesApi } from './sources.service';
+import { AppLoading, createLoadState } from '../../../shared/ui/loading';
+import { LoadError } from '../../../shared/ui/load-error';
 
 export interface TemplateDialogData {
   /** The names of the workspace's own contracts: a template already installed is not offered again. */
@@ -29,7 +31,7 @@ export interface TemplateGroup { key: string; label: string; hint: string; templ
  */
 @Component({
   selector: 'app-template-dialog',
-  imports: [FormDialog, Field, Icon],
+  imports: [FormDialog, Field, Icon, AppLoading, LoadError],
   template: `
     <app-form-dialog heading="Install a contract template" [subtitle]="subtitle" [showConfirm]="false" cancelLabel="Close" size="wide"
                      (cancelled)="close()">
@@ -42,8 +44,14 @@ export interface TemplateGroup { key: string; label: string; hint: string; templ
             </select>
           </app-field>
         }
+        <!-- Owner 2026-10-27: the shared loader; a failed read with Try again; and an empty list says so instead of
+             nothing under the workspace field. -->
         @if (loading()) {
-          <p class="text-sm text-[color:var(--text-muted)]" role="status">Loading…</p>
+          <app-loading shape="list" label="Loading templates…" [count]="3" />
+        } @else if (listState.error()) {
+          <app-load-error [message]="listState.error()" (retry)="loadTemplates()" />
+        } @else if (!groups().length) {
+          <p class="text-sm text-[color:var(--text-muted)]" data-no-templates>No contract template is available yet. Propose a contract from a sample instead.</p>
         }
         @for (g of groups(); track g.key) {
           <section class="flex flex-col gap-2" [attr.aria-labelledby]="'tplGroup-' + g.key">
@@ -95,17 +103,26 @@ export class TemplateDialog {
       { key: 'example', label: 'Examples', hint: 'Complete contracts for one domain, to copy from or install as they are.', templates: examples },
     ].filter(g => g.templates.length);
   });
-  readonly loading = signal(true);
+  /** The templates' read; `error` stays for an install's answer. */
+  readonly listState = createLoadState();
+  readonly loading = this.listState.loading;
   readonly error = signal('');
   readonly installing = signal('');
   readonly tenantId = signal<number | null>(this.data.tenantId ?? null);
   private readonly installed = signal(new Set(this.data.installed ?? []));
   private done = false;
 
-  constructor() {
+  constructor() { this.loadTemplates(); }
+
+  loadTemplates(): void {
+    this.listState.start();
     this.api.templates().subscribe({
-      next: r => { this.loading.set(false); if (r.status === API_SUCCESS) this.templates.set(r.data ?? []); else this.error.set(r.message); },
-      error: err => { this.loading.set(false); this.error.set(err?.error?.message || 'Could not read the templates.'); },
+      next: r => {
+        if (r.status !== API_SUCCESS) { this.listState.fail(r, 'The templates could not be read.'); return; }
+        this.templates.set(r.data ?? []);
+        this.listState.done();
+      },
+      error: err => this.listState.fail(err, 'The templates could not be read.'),
     });
   }
 

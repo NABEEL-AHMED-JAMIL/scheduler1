@@ -405,3 +405,44 @@ describe('the drawer lists what the clicked number counts', () => {
     expect(pivot.drillRows().length).toBe(pivot.pivot().colTotals[0]);
   });
 });
+
+describe('ReportPivot headings sort (owner 2026-10-27)', () => {
+  it('sorts the rows by a picked heading, both ways, over the Row order switch', () => {
+    try { localStorage.clear(); } catch { /* none */ }
+    const pivot = pivotFor(manyTasks(5));
+    expect(pivot.pivot().rowLabels[0]).toBe('task-04');
+    pivot.gridSort.toggle('label');
+    expect(pivot.pivot().rowLabels).toEqual(['task-00', 'task-01', 'task-02', 'task-03', 'task-04']);
+    pivot.gridSort.toggle('label');
+    expect(pivot.pivot().rowLabels[0]).toBe('task-04');
+    pivot.gridSort.toggle('all');
+    expect(pivot.pivot().rowTotals).toEqual([5, 4, 3, 2, 1]);
+    pivot.gridSort.toggle('all');
+    expect(pivot.pivot().rowTotals).toEqual([1, 2, 3, 4, 5]);
+    // The switch goes back to its own order.
+    pivot.setRowOrder('total');
+    expect(pivot.gridSort.key()).toBe('');
+    expect(pivot.pivot().rowLabels[0]).toBe('task-04');
+  });
+
+  it('sorts by one column of the grid, the export following what is on screen', () => {
+    const pivot = pivotFor(manyTasks(5));
+    const first = pivot.pivot().colLabels[0];
+    pivot.gridSort.toggle(pivot.colKey(first));
+    pivot.gridSort.toggle(pivot.colKey(first));
+    expect(pivot.pivot().rowLabels[0]).toBe('task-00');
+    pivot.export('csv');
+    expect(lastExport!.rows[0][0]).toBe('task-00');
+  });
+
+  it('sorts the runs behind a number before the first 300 are cut', () => {
+    const pivot = pivotFor(manyTasks(30));
+    pivot.drillColumn(0);
+    expect(pivot.drillRows().length).toBe(465);
+    pivot.drillSort.toggle('run');
+    expect(pivot.drillShown().length).toBe(300);
+    expect(pivot.drillShown()[0][6]).toBe(465);
+    pivot.drillSort.toggle('run');
+    expect(pivot.drillShown()[0][6]).toBe(1);
+  });
+});

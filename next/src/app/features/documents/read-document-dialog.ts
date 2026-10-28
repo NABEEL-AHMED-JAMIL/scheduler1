@@ -11,6 +11,7 @@ import { ObjectPicker, PickedObject, objectPickerConfig } from '../../shared/ui/
 import { BucketSummary, StorageService } from '../objects/storage.service';
 import { DocumentType, Extraction, OCR_EXTENSIONS, OcrDocument, documentName, isWorking, refusalText, statusLabel } from './documents.model';
 import { DocumentsApi } from './documents.service';
+import { InlineStatus, loadErrorText } from '../../shared/ui/loading';
 
 export interface ReadDocumentData {
   /** The types to extract as (the overview has them already). */
@@ -41,7 +42,7 @@ const STEPS: { id: Stage; label: string }[] = [
  */
 @Component({
   selector: 'app-read-document-dialog',
-  imports: [FormDialog, Field, Icon, FileDropzone, Segmented],
+  imports: [FormDialog, Field, Icon, FileDropzone, Segmented, InlineStatus],
   template: `
     <app-form-dialog [heading]="data.read ? 'Extract a document' : 'Read a document'"
                      [subtitle]="data.read ? readName() : 'From one of this workspace\\'s storage connections'"
@@ -56,7 +57,9 @@ const STEPS: { id: Stage; label: string }[] = [
               @for (b of buckets(); track b.bucket) { <option [value]="b.bucket" [selected]="b.bucket === bucket()">{{ b.label || b.bucket }}</option> }
             </select>
           </app-field>
-          @if (bucketsError()) { <p class="text-xs text-crit-500" role="alert">{{ bucketsError() }}</p> }
+          <!-- Owner 2026-10-27: a failed read of the connections offers Try again; none at all is said as such. -->
+          <app-inline-status [error]="bucketsError()" [empty]="bucketsEmpty()" (retry)="loadBuckets()"
+                             emptyText="This workspace has no storage connection yet. An administrator adds one under Connections › Storage." />
 
           <app-segmented [(value)]="source" [options]="sourceOptions()" ariaLabel="Which file" />
 
@@ -121,6 +124,8 @@ export class ReadDocumentDialog implements OnInit {
   readonly buckets = signal<BucketSummary[]>([]);
   readonly bucketsLoading = signal(false);
   readonly bucketsError = signal('');
+  /** The connections answered with none. */
+  readonly bucketsEmpty = signal(false);
   readonly bucket = signal('');
   readonly source = signal<Source>('upload');
   readonly file = signal<File | null>(null);
@@ -172,14 +177,20 @@ export class ReadDocumentDialog implements OnInit {
 
   ngOnInit(): void {
     if (this.data.read) return;
+    this.loadBuckets();
+  }
+
+  loadBuckets(): void {
     this.bucketsLoading.set(true);
+    this.bucketsError.set('');
+    this.bucketsEmpty.set(false);
     this.storage.buckets().subscribe({
       next: r => {
         this.bucketsLoading.set(false);
-        if (r.status !== API_SUCCESS) { this.bucketsError.set(r.message); return; }
+        if (r.status !== API_SUCCESS) { this.bucketsError.set(loadErrorText(r, 'The storage connections could not be listed.')); return; }
         this.buckets.set(r.data ?? []);
-        if (r.data?.length) this.bucket.set(r.data[0].bucket);
-        else this.bucketsError.set('This workspace has no storage connection yet. An administrator adds one under Connections › Storage.');
+        if (r.data?.length) { if (!this.bucket()) this.bucket.set(r.data[0].bucket); }
+        else this.bucketsEmpty.set(true);
       },
       error: err => { this.bucketsLoading.set(false); this.bucketsError.set(refusalText(err, 'The storage connections could not be listed.')); },
     });

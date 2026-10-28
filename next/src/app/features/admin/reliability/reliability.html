@@ -56,12 +56,15 @@
         <h2 id="status-runs-title" class="stat-label">Pipeline execution</h2>
         <button type="button" class="btn btn-default btn-sm -mt-1" (click)="scrollTo('slo-runs')">Details</button>
       </div>
-      @if (runsLoading()) {
-        <div class="py-6 text-center text-sm text-[color:var(--text-muted)]"><div class="spinner mx-auto mb-3"></div>Reading…</div>
-      } @else if (runsError()) {
-        <div class="py-4"><p class="text-sm text-crit-500">{{ runsError() }}</p>
+      <!-- Owner 2026-10-27: a skeleton the first time; a range change or Refresh keeps the figures under a blur. -->
+      @if (runsLoading() && !runs()) {
+        <app-loading shape="panel" [count]="3" label="Loading the pipeline execution figures…" />
+      } @else if (runsError() && !runsLoading()) {
+        <div class="py-4" role="alert"><p class="text-sm text-crit-500">{{ runsError() }}</p>
           <button type="button" class="btn btn-default btn-sm mt-3" (click)="loadRuns()"><app-icon name="refresh" />Try again</button></div>
       } @else if (runs(); as r) {
+        <app-blur-loader [active]="runsLoading()" label="Refreshing…">
+        <div class="flex flex-col gap-3">
         <p class="rel-health" data-testid="health" [class]="'rel-tone-' + runsHealth().tone">
           <app-icon [name]="runsHealth().health === 'healthy' ? 'check' : runsHealth().health === 'unknown' ? 'info' : 'alert'"
             [class]="'icon-' + runsHealth().tone" size="1.1em" />{{ runsHealth().label }}
@@ -104,6 +107,8 @@
         } @else if (!runsFiring().length) {
           <p class="text-xs text-[color:var(--text-muted)]">No alert is firing.</p>
         }
+        </div>
+        </app-blur-loader>
       }
     </article>
 
@@ -113,12 +118,14 @@
         <h2 id="status-billing-title" class="stat-label">Billing</h2>
         <button type="button" class="btn btn-default btn-sm -mt-1" (click)="scrollTo('slo-billing')">Details</button>
       </div>
-      @if (billingLoading()) {
-        <div class="py-6 text-center text-sm text-[color:var(--text-muted)]"><div class="spinner mx-auto mb-3"></div>Reading…</div>
-      } @else if (billingError()) {
-        <div class="py-4"><p class="text-sm text-crit-500">{{ billingError() }}</p>
+      @if (billingLoading() && !billing()) {
+        <app-loading shape="panel" [count]="3" label="Loading the billing figures…" />
+      } @else if (billingError() && !billingLoading()) {
+        <div class="py-4" role="alert"><p class="text-sm text-crit-500">{{ billingError() }}</p>
           <button type="button" class="btn btn-default btn-sm mt-3" (click)="loadBilling()"><app-icon name="refresh" />Try again</button></div>
       } @else if (billing(); as b) {
+        <app-blur-loader [active]="billingLoading()" label="Refreshing…">
+        <div class="flex flex-col gap-3">
         <p class="rel-health" data-testid="health" [class]="'rel-tone-' + billingHealth().tone">
           <app-icon [name]="billingHealth().health === 'healthy' ? 'check' : billingHealth().health === 'unknown' ? 'info' : 'alert'"
             [class]="'icon-' + billingHealth().tone" size="1.1em" />{{ billingHealth().label }}
@@ -164,6 +171,8 @@
         } @else if (!billingFiring().length) {
           <p class="text-xs text-[color:var(--text-muted)]">No alert is firing.</p>
         }
+        </div>
+        </app-blur-loader>
       }
     </article>
   </div>
@@ -183,7 +192,7 @@
         </p>
       </div>
       @if (runs(); as r) {
-        @if (!runsLoading() && !runsError()) {
+        @if (!runsError()) {
           <div class="rel-section-tiles stat-strip stat-row is-md is-start" role="list">
             <app-stat-tile label="Runs counted" [value]="(r.numerator | number) + ' / ' + (r.denominator | number)" icon="play" tone="info"
               foot="completed / ended" />
@@ -192,12 +201,13 @@
         }
       }
     </div>
-    @if (runsLoading()) {
-      <div class="p-8 text-center text-sm text-[color:var(--text-muted)]"><div class="spinner mx-auto mb-3"></div>Reading…</div>
-    } @else if (runsError()) {
-      <div class="p-6 text-center"><p class="text-sm text-crit-500">{{ runsError() }}</p>
+    @if (runsLoading() && !runs()) {
+      <app-loading shape="panel" [count]="5" label="Loading runs by day…" />
+    } @else if (runsError() && !runsLoading()) {
+      <div class="p-6 text-center" role="alert"><p class="text-sm text-crit-500">{{ runsError() }}</p>
         <button type="button" class="btn btn-default btn-sm mt-3" (click)="loadRuns()"><app-icon name="refresh" />Try again</button></div>
     } @else if (runs()) {
+      <app-blur-loader [active]="runsLoading()" label="Refreshing…">
       <h3 class="chart-title mt-4">Runs by day</h3>
       <p class="chart-sub">Completed and failed runs each day. Point at a day for its figures.</p>
       <app-bar-chart [data]="runBars()" [height]="240" [axis]="true" emptyMessage="No run ended in this range." />
@@ -205,9 +215,10 @@
       <h3 id="slo-runs-breakdown" class="chart-title mt-6">Why runs ended</h3>
       <div class="rel-table-wrap">
         <table class="table-modern">
-          <thead><tr><th>Ended</th><th>Why</th><th>Counts as</th><th class="text-right">Runs</th></tr></thead>
+          <thead><tr><th appSort="ended" [sortBy]="runGroupSort">Ended</th><th appSort="why" [sortBy]="runGroupSort">Why</th>
+            <th appSort="countsAs" [sortBy]="runGroupSort">Counts as</th><th class="text-right" appSort="runs" [sortBy]="runGroupSort">Runs</th></tr></thead>
           <tbody>
-            @for (g of runGroups(); track g.outcome + g.reason) {
+            @for (g of sortedRunGroups(); track g.outcome + g.reason) {
               <tr [attr.data-group]="g.outcome + '/' + g.reason">
                 <td>{{ g.outcome }}</td>
                 <td [title]="reasonTitle(g.reason)">{{ reasonLabel(g.reason) }}</td>
@@ -220,6 +231,7 @@
           </tbody>
         </table>
       </div>
+      </app-blur-loader>
     }
   </section>
 
@@ -234,7 +246,7 @@
         </p>
       </div>
       @if (billing(); as b) {
-        @if (!billingLoading() && !billingError()) {
+        @if (!billingError()) {
           <div class="rel-section-tiles stat-strip stat-row is-md is-start" role="list">
             <app-stat-tile label="Events counted" [value]="(b.numerator | number) + ' / ' + (b.denominator | number)" icon="database" tone="info"
               foot="priced / accepted" />
@@ -244,12 +256,13 @@
         }
       }
     </div>
-    @if (billingLoading()) {
-      <div class="p-8 text-center text-sm text-[color:var(--text-muted)]"><div class="spinner mx-auto mb-3"></div>Reading…</div>
-    } @else if (billingError()) {
-      <div class="p-6 text-center"><p class="text-sm text-crit-500">{{ billingError() }}</p>
+    @if (billingLoading() && !billing()) {
+      <app-loading shape="panel" [count]="5" label="Loading events by day…" />
+    } @else if (billingError() && !billingLoading()) {
+      <div class="p-6 text-center" role="alert"><p class="text-sm text-crit-500">{{ billingError() }}</p>
         <button type="button" class="btn btn-default btn-sm mt-3" (click)="loadBilling()"><app-icon name="refresh" />Try again</button></div>
     } @else if (billing()) {
+      <app-blur-loader [active]="billingLoading()" label="Refreshing…">
       <h3 class="chart-title mt-4">Events by day</h3>
       <p class="chart-sub">Usage events priced and not priced each day. Point at a day for its figures.</p>
       <app-bar-chart [data]="billingBars()" [height]="240" [axis]="true" emptyMessage="No usage event arrived in this range." />
@@ -263,7 +276,7 @@
           {{ meterIssues().length }} of {{ meters().length }} meters have events that were not priced or not rolled up.
         </p>
         <div class="rel-table-wrap" data-testid="meters-issues">
-          <ng-container *ngTemplateOutlet="meterTable; context: { $implicit: meterIssues() }" />
+          <ng-container *ngTemplateOutlet="meterTable; context: { $implicit: sortedMeterIssues() }" />
         </div>
       } @else {
         <p class="flex items-center gap-2 text-sm" data-testid="meters-ok">
@@ -275,20 +288,21 @@
         <details class="mt-3" data-testid="meters-all">
           <summary class="cursor-pointer select-none text-sm font-medium">All {{ meters().length }} meters</summary>
           <div class="rel-table-wrap mt-2">
-            <ng-container *ngTemplateOutlet="meterTable; context: { $implicit: meters() }" />
+            <ng-container *ngTemplateOutlet="meterTable; context: { $implicit: sortedMeters() }" />
           </div>
         </details>
       }
+      </app-blur-loader>
     }
   </section>
 
   <ng-template #meterTable let-rows>
     <table class="table-modern rel-meter-table">
       <thead><tr>
-        <th>Meter</th>
-        <th class="text-right" title="Usage events accepted for this meter in the range">Accepted</th>
-        <th class="text-right" title="Accepted events no rate on the rate card prices">No rate</th>
-        <th class="text-right" title="Events the daily rollup has not put into a bill past the five-minute grace">Not rolled up</th>
+        <th appSort="meter" [sortBy]="meterSort">Meter</th>
+        <th class="text-right" appSort="accepted" [sortBy]="meterSort" title="Usage events accepted for this meter in the range">Accepted</th>
+        <th class="text-right" appSort="unpriced" [sortBy]="meterSort" title="Accepted events no rate on the rate card prices">No rate</th>
+        <th class="text-right" appSort="unrolled" [sortBy]="meterSort" title="Events the daily rollup has not put into a bill past the five-minute grace">Not rolled up</th>
       </tr></thead>
       <tbody>
         @for (m of rows; track m.meter) {
@@ -318,12 +332,13 @@
         burn faster than its threshold over at least ten counted operations, and then notifies every platform
         administrator once per long window: a page as an error, a ticket as a warning.
       </p>
-      @if (burnLoading()) {
-        <div class="p-6 text-center text-sm text-[color:var(--text-muted)]"><div class="spinner mx-auto mb-3"></div>Reading…</div>
-      } @else if (burnError()) {
-        <div class="p-6 text-center"><p class="text-sm text-crit-500">{{ burnError() }}</p>
+      @if (burnLoading() && !burn().length) {
+        <app-loading shape="rows" [count]="4" label="Loading the burn rates…" />
+      } @else if (burnError() && !burnLoading()) {
+        <div class="p-6 text-center" role="alert"><p class="text-sm text-crit-500">{{ burnError() }}</p>
           <button type="button" class="btn btn-default btn-sm mt-3" (click)="loadBurn()"><app-icon name="refresh" />Try again</button></div>
       } @else {
+        <app-blur-loader [active]="burnLoading()" label="Refreshing…">
         <div class="rel-table-wrap">
           <table class="table-modern">
             <thead><tr><th>Objective</th><th>Rule</th><th class="text-right">Threshold</th><th class="text-right">Long window</th>
@@ -348,6 +363,7 @@
             </tbody>
           </table>
         </div>
+        </app-blur-loader>
       }
     </details>
   </section>

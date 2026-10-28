@@ -1,4 +1,7 @@
-@if (delegateMode()) {
+@if (delegationLoading()) {
+  <!-- Owner 2026-10-27: a member's delegation decides which face this page shows; say it is coming. -->
+  <div class="page"><app-loading shape="panel" [count]="5" label="Loading your page access…" /></div>
+} @else if (delegateMode()) {
   <div class="page">
     <app-page-header>
       <div class="page-head">
@@ -15,7 +18,8 @@
           · {{ d.scopePeople === 'ALL_MEMBERS' ? 'every member' : d.people.length + ' people' }}.</span>
       </div>
     }
-    <app-access-grants [people]="people()" />
+    <app-access-grants [people]="people()" [peopleLoading]="peopleLoading()" [peopleError]="peopleError()"
+                       [peopleLoaded]="peopleLoaded()" (needPeople)="needPeople()" />
   </div>
 } @else {
 <div class="page">
@@ -38,14 +42,19 @@
     </div>
   </app-page-header>
 
+  <!-- Owner 2026-10-27: placeholders until the profiles answer, "Not available right now" when they could not be read. -->
   <div class="grid grid-cols-2 md:grid-cols-4 stat-strip stat-row is-md is-start" role="list">
     <app-stat-tile label="Profiles" [value]="stats().profiles" icon="layers" tone="info"
-                   [foot]="stats().profiles === 0 ? 'none yet — everyone sees every page' : 'in this workspace'" />
+                   [foot]="stats().profiles === 0 ? 'none yet — everyone sees every page' : 'in this workspace'"
+                   [loading]="tilesLoading()" [failed]="tilesFailed()" />
     <app-stat-tile label="People assigned" [value]="stats().assigned" icon="users" tone="info"
-                   [foot]="stats().onDefault ? stats().onDefault + ' more on the default' : 'hold a profile of their own'" />
+                   [foot]="stats().onDefault ? stats().onDefault + ' more on the default' : 'hold a profile of their own'"
+                   [loading]="tilesLoading()" [failed]="tilesFailed()" />
     <app-stat-tile label="Default" [value]="stats().defaultName || '—'" icon="shield" tone="info"
-                   [foot]="stats().defaultName ? 'for anyone without their own' : 'no default: unassigned users see everything'" />
-    <app-stat-tile label="Pages" [value]="stats().pages" icon="template" tone="info" foot="can be granted or withheld" />
+                   [foot]="stats().defaultName ? 'for anyone without their own' : 'no default: unassigned users see everything'"
+                   [loading]="tilesLoading()" [failed]="tilesFailed()" />
+    <app-stat-tile label="Pages" [value]="stats().pages" icon="template" tone="info" foot="can be granted or withheld"
+                   [loading]="pagesState.pending()" [failed]="!!pagesState.error() && !pagesState.loaded()" />
   </div>
 
   <!-- UX review B8 (AP1): how a role and Page access combine, said once, with a way to check one person. -->
@@ -74,11 +83,17 @@
         } @else {
           <label for="access-preview-person" class="text-sm font-medium">Check a person</label>
           <select id="access-preview-person" class="input input-sm w-auto max-w-72" [disabled]="peopleLoading()" (change)="previewId.set(+$any($event.target).value || null)">
-            <option value="">{{ peopleLoading() ? 'Reading the people…' : 'Choose a member' }}</option>
+            <option value="">{{ peopleLoading() ? 'Loading people…' : 'Choose a member' }}</option>
             @for (p of people(); track p.appUserId) { <option [value]="p.appUserId" [selected]="previewId() === p.appUserId" [title]="p.fullName || p.username">{{ p.fullName || p.username }}</option> }
           </select>
         }
       </div>
+      @if (previewOpen()) {
+        <!-- Owner 2026-10-27: the list's state under the select -- a failed read was silent here and read as nobody. -->
+        <app-inline-status [loading]="peopleLoading()" [error]="peopleError()"
+                           [empty]="peopleLoaded() && !peopleLoading() && !peopleError() && !people().length"
+                           label="Loading people…" emptyText="No member in this workspace yet." (retry)="loadPeople()" />
+      }
       @if (preview(); as v) {
         <div class="rounded-md border border-[color:var(--border-subtle)] p-3 flex flex-col gap-2 text-sm" data-testid="access-preview">
           <p><b>{{ v.name }}</b> is a workspace member on <b>{{ v.profile }}</b>, and opens {{ v.pages.length }} {{ v.pages.length === 1 ? 'page' : 'pages' }}.</p>
@@ -104,16 +119,10 @@
         Access profiles belong to a workspace. Pick one above to see and edit its profiles.
       </p>
     </div>
-  } @else if (error()) {
-    <div class="card p-10 text-center" role="alert">
-      <app-icon name="alert" size="1.5rem" class="icon-crit block mx-auto mb-2" />
-      <p class="text-sm text-crit-500">{{ error() }}</p>
-      <button type="button" class="btn btn-default btn-sm mt-3" (click)="load()">Try again</button>
-    </div>
-  } @else if (loading() && profiles().length === 0) {
-    <div class="card p-12 text-center text-sm text-[color:var(--text-muted)]">
-      <div class="spinner mx-auto mb-3" role="status" aria-label="Loading"></div>Loading…
-    </div>
+  } @else if (error() && !loading()) {
+    <div class="card" role="alert"><app-load-error [message]="error()" (retry)="load()" /></div>
+  } @else if ((loading() || state.pending()) && profiles().length === 0) {
+    <div class="card"><app-loading shape="cards" [count]="3" label="Loading access profiles…" /></div>
   } @else if (!loading() && profiles().length === 0) {
     <div class="card p-10 text-center">
       <app-icon name="shield" size="2rem" class="block mx-auto mb-3 text-[color:var(--text-muted)]" />
@@ -148,15 +157,9 @@
 
     @if (view() === 'people') {
       @if (peopleLoading() && people().length === 0) {
-        <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]">
-          <div class="spinner mx-auto mb-3" role="status" aria-label="Loading people"></div>Loading people…
-        </div>
+        <div class="card"><app-loading shape="rows" [count]="6" label="Loading people…" /></div>
       } @else if (peopleError()) {
-        <div class="card p-8 text-center" role="alert">
-          <app-icon name="alert" size="1.5rem" class="icon-crit block mx-auto mb-2" />
-          <p class="text-sm text-crit-500">{{ peopleError() }}</p>
-          <button type="button" class="btn btn-default btn-sm mt-3" (click)="loadPeople()">Try again</button>
-        </div>
+        <div class="card" role="alert"><app-load-error [message]="peopleError()" (retry)="loadPeople()" /></div>
       } @else {
         <app-access-people-grid [people]="people()" [profiles]="profiles()" [pages]="pages()"
                                 [search]="gridSearch()" [busy]="assigning()" (assign)="assign($event)"
@@ -259,7 +262,8 @@
     <!-- ZT-M16: a person's effective access, delegations and the change log are the workspace's data. -->
     <app-needs-workspace what="Granting pages and tabs to a person is" todo="grant them, delegate granting and read the change log" icon="shield" />
   } @else if (!needsWorkspace()) {
-    <app-access-grants [people]="people()" [tenantId]="tenantId()" (needPeople)="needPeople()" />
+    <app-access-grants [people]="people()" [tenantId]="tenantId()" [peopleLoading]="peopleLoading()" [peopleError]="peopleError()"
+                       [peopleLoaded]="peopleLoaded()" (needPeople)="needPeople()" />
   }
 </div>
 }

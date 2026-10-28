@@ -68,7 +68,12 @@ export const PINNED: Record<string, unknown> = {
     "buttons": [
       "Columns",
       "Copy the key of live-customers.csv",
+      "File",
       "Refresh",
+      "SHA-256",
+      "Size",
+      "Uploaded",
+      "Uploaded by",
       "What the file drop accepts"
     ],
     "columns": [
@@ -126,7 +131,12 @@ export const PINNED: Record<string, unknown> = {
       "Change",
       "Columns",
       "Copy the key of live-customers.csv",
+      "File",
       "Refresh",
+      "SHA-256",
+      "Size",
+      "Uploaded",
+      "Uploaded by",
       "What the file drop accepts"
     ],
     "columns": [

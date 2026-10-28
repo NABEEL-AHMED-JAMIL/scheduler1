@@ -3,7 +3,8 @@ import { TestBed } from '@angular/core/testing';
 import { Dialog } from '@angular/cdk/dialog';
 import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute, Router } from '@angular/router';
-import { of } from 'rxjs';
+import { NEVER, Observable, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { Pipeline } from '../pipelines/pipeline.model';
 import { RegistryTaskEditor } from './registry-task-editor';
 import { ToastService } from '../../../shared/ui/toast.service';
@@ -291,5 +292,66 @@ describe('Registry task page -- its own page', () => {
     expect(dialog.ready()).toBe(true);
     expect(dialog.heading()).toBe('New registry task');
     expect(dialog.hasUnsavedChanges()).toBe(false);
+  });
+});
+
+describe('Registry task page -- loading and errors (owner 2026-10-27)', () => {
+  function editorWith(answers: { get: () => Observable<unknown>; users: () => Observable<unknown> }) {
+    const get = vi.fn((url: string) => url.endsWith('/pipeline.json/steps/tasks/pipelines') ? answers.users() : answers.get());
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: HttpClient, useValue: { post: vi.fn(), get } },
+        { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn(), info: () => {} } },
+        { provide: Router, useValue: { navigate: vi.fn() } },
+        { provide: Dialog, useValue: { open: () => ({ closed: of(false) }) } },
+        { provide: AuthService, useValue: { isPlatformAdmin: () => false, isTenantAdmin: () => true, user: () => null, builderLocked: () => false } },
+        { provide: WorkspaceDirectory, useValue: { names: () => new Map() } },
+        { provide: ActivatedRoute, useValue: { snapshot: {
+          paramMap: { get: (k: string) => (k === 'pipelineKey' ? '7' : null) }, queryParamMap: { get: () => null } } } },
+      ],
+    });
+    const page = TestBed.runInInjectionContext(() => new RegistryTaskEditor());
+    page.ngOnInit();
+    return { page, get };
+  }
+
+  it('is loading until the record answers', () => {
+    const { page } = editorWith({ get: () => NEVER, users: () => NEVER });
+    expect(page.loading()).toBe(true);
+    expect(page.error()).toBe('');
+  });
+
+  it('a failed read says so in plain words and reads again on Try again', () => {
+    let answer: () => Observable<unknown> = () => throwError(() => new HttpErrorResponse({ status: 500, error: 'Internal Server Error' }));
+    const { page, get } = editorWith({ get: () => answer(), users: () => of({ status: API_SUCCESS, data: [] }) });
+    expect(page.loading()).toBe(false);
+    expect(page.error()).toBe('The pipeline could not be read.');
+    expect(page.errorRetryable()).toBe(true);
+    answer = () => of({ status: API_SUCCESS, data: selectForm(null) });
+    page.retry();
+    expect(page.error()).toBe('');
+    expect(page.ready()).toBe(true);
+    expect(get.mock.calls.filter(c => String(c[0]).endsWith('/pipeline.json/get')).length).toBe(2);
+  });
+
+  it('a pipeline that no longer exists offers no Try again', () => {
+    const { page } = editorWith({ get: () => of({ status: 'ERROR', message: 'That pipeline no longer exists.' }), users: () => NEVER });
+    expect(page.error()).toBe('That pipeline no longer exists.');
+    expect(page.errorRetryable()).toBe(false);
+  });
+
+  it('Used by is loading, then empty, or says it could not be read', () => {
+    let users: () => Observable<unknown> = () => NEVER;
+    const { page } = editorWith({ get: () => of({ status: API_SUCCESS, data: selectForm(null) }), users: () => users() });
+    expect(page.usersLoading()).toBe(true);
+    users = () => throwError(() => new HttpErrorResponse({ status: 500 }));
+    page.loadUsers();
+    expect(page.usersLoading()).toBe(false);
+    expect(page.usersError()).toBe('The pipelines that use it could not be read.');
+    users = () => of({ status: API_SUCCESS, data: [] });
+    page.loadUsers();
+    expect(page.usersError()).toBe('');
+    expect(page.users()).toEqual([]);
   });
 });

@@ -3,7 +3,7 @@ import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { HttpErrorResponse } from '@angular/common/http';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
-import { of, throwError } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
 import { ToastService } from '../../shared/ui/toast.service';
 import { DocumentsApi } from './documents.service';
 import { TypePanel, TypePanelData } from './type-panel';
@@ -212,5 +212,52 @@ describe('TypePanel', () => {
     const tables = el.querySelector('section[aria-label="Tables"]')!;
     expect(fields.querySelectorAll('[aria-label$=" key field"]').length).toBe(PO_DEFINITION.fields.length);
     expect(tables.querySelectorAll('[aria-label$=" key field"]').length).toBe(0);
+  });
+});
+
+describe('TypePanel -- loading, error, versions (owner 2026-10-27)', () => {
+  it('shows the shared loader and no form while the type is on the way', async () => {
+    const { fixture, el, panel } = panelWith({}, PO, { type: vi.fn(() => NEVER) });
+    await fixture.whenStable();
+    expect(panel.loading()).toBe(true);
+    expect(el.querySelector('app-loading')).not.toBeNull();
+    expect(el.querySelector('#typeName')).toBeNull();
+  });
+
+  it('says why the type could not be read with Try again, and draws no blank form under it', async () => {
+    const { fixture, el, panel, api } = panelWith({}, PO, { type: vi.fn(() => throwError(() => new HttpErrorResponse({ status: 500 }))) });
+    await fixture.whenStable();
+    expect(panel.loading()).toBe(false);
+    expect(panel.loadError()).toBe('The document type could not be read.');
+    expect(el.querySelector('app-load-error')).not.toBeNull();
+    expect(el.querySelector('#typeName')).toBeNull();
+    (api.type as ReturnType<typeof vi.fn>).mockReturnValue(of({ status: 'SUCCESS', message: '', data: PO }));
+    (el.querySelector('app-load-error button') as HTMLButtonElement).click();
+    await fixture.whenStable();
+    expect(panel.loadError()).toBe('');
+    expect(panel.type()?.name).toBe('Purchase order');
+  });
+
+  it('says an older version could not be read in the panel, not only in a toast, and tries it again', async () => {
+    const { fixture, panel, api, toast } = panelWith({}, PO, { typeVersion: vi.fn(() => throwError(() => new HttpErrorResponse({ status: 500 }))) });
+    await fixture.whenStable();
+    panel.showVersion(1);
+    expect(panel.versionLoading()).toBeNull();
+    expect(panel.versionError()).toBe('That version could not be read.');
+    expect(toast.error).not.toHaveBeenCalled();
+    panel.retryVersion();
+    expect(api.typeVersion).toHaveBeenCalledTimes(2);
+  });
+
+  it('sorts the versions, newest first as listed until a heading is picked', async () => {
+    const { fixture, panel } = panelWith({});
+    await fixture.whenStable();
+    expect(panel.versionsSorted().map(v => v.version)).toEqual([2, 1]);
+    panel.versionSort.toggle('version');
+    expect(panel.versionsSorted().map(v => v.version)).toEqual([2, 1]);
+    panel.versionSort.toggle('version');
+    expect(panel.versionsSorted().map(v => v.version)).toEqual([1, 2]);
+    panel.versionSort.toggle('saved');
+    expect(panel.versionsSorted().map(v => v.version)).toEqual([2, 1]);
   });
 });

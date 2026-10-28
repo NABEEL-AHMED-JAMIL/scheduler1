@@ -56,6 +56,7 @@
                        : ''">
             <app-combobox id="tenantId" formControlName="tenantId" [numeric]="true"
                           placeholder="Search workspaces…" [allowClear]="false" [options]="tenantOptions()" />
+            @if (data.tenantsError) { <app-inline-status [error]="data.tenantsError" [retryable]="false" /> }
           </app-field>
         } @else if (!needsTenant()) {
           <p class="text-sm rounded-md px-3 py-2 bg-sunken">
@@ -73,6 +74,8 @@
                 <option [ngValue]="profile.pageAccessProfileId">{{ profile.profileName }}</option>
               }
             </select>
+            <app-inline-status [loading]="profilesLoading()" [error]="profilesError()" [retryable]="data.canPickTenant"
+                               label="Loading access profiles…" (retry)="loadProfiles()" />
           </app-field>
         }
       </div>

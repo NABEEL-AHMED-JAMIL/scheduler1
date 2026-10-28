@@ -27,6 +27,9 @@ import { matchesWorkspace, workspaceName } from '../../shared/ui/workspace-name'
 import { ManagedBanner } from '../../shared/ui/managed-banner';
 import { PageHeader } from '../../shared/ui/page-header';
 import { RefreshButton } from '../../shared/ui/refresh-button';
+import { createTableSort } from '../../shared/ui/sort';
+import { SortHeader } from '../../shared/ui/sort-header';
+import { AppLoading, InlineStatus, loadErrorText } from '../../shared/ui/loading';
 
 export interface LinkedJob {
   jobId: number;
@@ -76,7 +79,7 @@ interface SourceTask {
 
 @Component({
   selector: 'app-tasks',
-  imports: [WorkspaceSelect, RefreshButton, PageHeader, MineFilter, ViewToggle, Icon, RouterLink, TableShell, StatusPill, CdkMenu, CdkMenuItem, CdkMenuTrigger, Pagination, ServerTimePipe, Combobox, ManagedBanner],
+  imports: [WorkspaceSelect, RefreshButton, PageHeader, MineFilter, ViewToggle, Icon, RouterLink, TableShell, StatusPill, CdkMenu, CdkMenuItem, CdkMenuTrigger, Pagination, ServerTimePipe, Combobox, ManagedBanner, SortHeader, AppLoading, InlineStatus],
   templateUrl: './tasks.html',
 })
 export class Tasks implements OnInit {
@@ -179,8 +182,38 @@ export class Tasks implements OnInit {
       || (workspaces && workspaceName(task).toLowerCase().includes(term)));
   });
 
+  /** Owner 2026-10-27: every column that holds a value sorts, before the paging; the API's order until one is picked. */
+  readonly sort = createTableSort<SourceTask>({
+    id: 'pipelines',
+    columns: {
+      pipeline: t => t.taskName,
+      workspace: t => workspaceName(t),
+      steps: { value: t => t.stepCount, kind: 'number' },
+      schedules: { value: t => t.totalLinksJobs ?? 0, kind: 'number' },
+      lastRun: { value: t => t.lastRun?.at, kind: 'date' },
+      data: t => (t.sensitivity ? sensitivityText(t.sensitivity) : null),
+      createdBy: t => t.createdByName,
+      updatedBy: t => t.updatedByName,
+      status: { value: t => t.taskStatus, kind: 'status' },
+    },
+  });
+  /** The rows in the chosen order: the table and the cards follow it. */
+  readonly sorted = computed(() => this.sort.apply(this.filtered()));
+  /** An expanded row's schedules: one order for every expanded row, kept while rows open and close. */
+  readonly linkedSort = createTableSort<LinkedJob>({
+    id: 'pipelines-linked-schedules',
+    columns: {
+      schedule: j => j.jobName,
+      execution: j => j.execution,
+      lastRun: { value: j => j.lastJobRun, kind: 'date' },
+      runStatus: { value: j => j.jobRunningStatus, kind: 'status' },
+      state: { value: j => j.jobStatus, kind: 'status' },
+    },
+  });
+  sortedLinked(jobs: LinkedJob[]): LinkedJob[] { return this.linkedSort.apply(jobs); }
+
   readonly pager = createPager<any>();
-  readonly paged = computed(() => this.pager.slice(this.filtered()));
+  readonly paged = computed(() => this.pager.slice(this.sorted()));
 
   goToPage(next: number): void { this.pager.goTo(next, this.filtered().length); }
   setPageSize(size: number): void { this.pager.setSize(size); }
@@ -198,8 +231,12 @@ export class Tasks implements OnInit {
     if (opening && !this.linkedJobs()[task.taskDetailId]) this.loadLinkedJobs(task);
   }
 
+  /** Owner 2026-10-27: why an expanded row's schedules could not be read, by pipeline (it read the same as none). */
+  readonly linkedErrors = signal<Record<number, string>>({});
+
   /** The parameter is sourceTaskId, not taskDetailId -- the same id under a different name. */
-  private loadLinkedJobs(task: SourceTask): void {
+  loadLinkedJobs(task: SourceTask): void {
+    this.linkedErrors.update(map => { const next = { ...map }; delete next[task.taskDetailId]; return next; });
     if (!task.totalLinksJobs) {
       this.linkedJobs.update(map => ({ ...map, [task.taskDetailId]: [] }));
       return;
@@ -218,16 +255,20 @@ export class Tasks implements OnInit {
       } }).subscribe({
       next: response => {
         this.linkedLoading.set(null);
-        // A refusal settles the drawer like a failed request does, so it says it could not
-        // read the jobs instead of showing the heading over nothing.
-        const jobs = response.status === API_SUCCESS ? response.data ?? [] : [];
-        this.linkedJobs.update(map => ({ ...map, [task.taskDetailId]: jobs }));
+        // A refusal settles the drawer like a failed request does: it says it could not read the schedules, with Try
+        // again, instead of showing the heading over nothing. Nothing is cached, so opening it again reads again.
+        if (response.status !== API_SUCCESS) { this.linkedFailed(task, response); return; }
+        this.linkedJobs.update(map => ({ ...map, [task.taskDetailId]: response.data ?? [] }));
       },
-      error: () => {
+      error: err => {
         this.linkedLoading.set(null);
-        this.linkedJobs.update(map => ({ ...map, [task.taskDetailId]: [] }));
+        this.linkedFailed(task, err);
       },
     });
+  }
+
+  private linkedFailed(task: SourceTask, err: unknown): void {
+    this.linkedErrors.update(map => ({ ...map, [task.taskDetailId]: loadErrorText(err, 'The schedules for this pipeline could not be read.') }));
   }
 
   readonly busyTask = signal<number | null>(null);
@@ -368,11 +409,11 @@ export class Tasks implements OnInit {
           if (isProbablyTruncated(rows.length)) {
             this.toast.info(`Showing the first ${LIST_LIMIT} pipelines. Narrow the search to see the rest.`);
           }
-        } else this.error.set(response.message);
+        } else this.error.set(loadErrorText(response, 'The pipelines could not be read.'));
       },
       error: err => {
         this.loading.set(false);
-        this.error.set(err?.error?.message || 'Could not load pipelines.');
+        this.error.set(loadErrorText(err, 'The pipelines could not be read.'));
       },
     });
   }

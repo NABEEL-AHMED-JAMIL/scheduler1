@@ -52,6 +52,21 @@ export interface ArchiveEntry {
 export interface BrowseResponse {
   objects: ObjectSummary[];
   nextContinuationToken?: string;
+  /**
+   * Owner 2026-10-27 ("add a sort on each table"): a sorted listing pages by offset -- the next page's offset (absent
+   * on the last page) and how many entries the folder level holds.
+   */
+  nextOffset?: number;
+  total?: number;
+  /** Why the folder could not be sorted (over 10,000 entries): the rows are then in the store's own order. */
+  sortBlocked?: string;
+}
+
+/** A sorted listing's request: an allow-listed column (name, size, modified), its direction, and where the page starts. */
+export interface BrowseSort {
+  sort: string;
+  dir: 'asc' | 'desc';
+  offset?: number;
 }
 
 /** storage.json/findObjects (owner #27): matches newest first, how many objects were looked at, and whether it stopped early. */
@@ -81,10 +96,20 @@ export class StorageService {
     return this.http.get<ApiResponse<FindResponse>>(`${this.base}/findObjects`, { params });
   }
 
-  listObjects(bucket: string, prefix = '', continuationToken?: string, maxKeys = 100)
+  /**
+   * One page of a folder level. Without `order` it is the store's own order paged by its continuation token; with one
+   * (owner 2026-10-27) the server sorts the whole level and pages it by offset, so no token goes with it.
+   */
+  listObjects(bucket: string, prefix = '', continuationToken?: string, maxKeys = 100, order?: BrowseSort)
       : Observable<ApiResponse<BrowseResponse>> {
     const params: Record<string, string> = { bucket, prefix, maxKeys: String(maxKeys) };
-    if (continuationToken) params['continuationToken'] = continuationToken;
+    if (order) {
+      params['sort'] = order.sort;
+      params['dir'] = order.dir;
+      params['offset'] = String(order.offset ?? 0);
+    } else if (continuationToken) {
+      params['continuationToken'] = continuationToken;
+    }
     return this.http.get<ApiResponse<BrowseResponse>>(`${this.base}/listObjects`, { params });
   }
 

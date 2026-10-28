@@ -8,6 +8,7 @@ import { Section } from '../../../shared/ui/section';
 import { SegmentOption, Segmented } from '../../../shared/ui/segmented';
 import { DateRange, DateRangePicker, rangeText } from '../../../shared/ui/date-range';
 import { localIsoDay } from '../../../shared/ui/local-day';
+import { AppLoading, InlineStatus } from '../../../shared/ui/loading';
 import { RunParameterFields } from '../../jobs/run-parameters/run-parameter-fields';
 import { ParameterValues, RunParameter, initialValues, valueProblems, valuesBody } from '../../jobs/run-parameters/run-parameters';
 import {
@@ -32,7 +33,7 @@ const SHOWN_DATES = 120;
  */
 @Component({
   selector: 'app-backfill-panel',
-  imports: [SidePanel, Icon, Section, Segmented, DateRangePicker, RunParameterFields],
+  imports: [SidePanel, Icon, Section, Segmented, DateRangePicker, RunParameterFields, AppLoading, InlineStatus],
   styles: `
     .bf-dates { display: flex; flex-wrap: wrap; gap: 0.25rem; max-height: 9.5rem; overflow-y: auto; padding: 0.125rem 0; }
     .bf-date { font-size: 12px; line-height: 1.375rem; padding: 0 0.45rem; border-radius: 999px; border: 1px solid var(--border-subtle);
@@ -84,8 +85,8 @@ const SHOWN_DATES = 120;
 
         <app-section title="Preview" [level]="3">
           @if (problem()) {
-            <p class="text-sm text-crit-500 m-0 flex items-start gap-1.5" role="alert" data-test="backfill-problem">
-              <app-icon name="alert" class="mt-0.5 shrink-0" />{{ problem() }}</p>
+            <!-- Owner 2026-10-27: the reason, with Try again (it could only be retried by changing an input). -->
+            <app-inline-status data-test="backfill-problem" [error]="problem()" (retry)="retryPreview()" />
           } @else if (preview(); as p) {
             <div class="flex flex-col gap-3" data-test="backfill-preview" [class.opacity-60]="loading()">
               <div class="grid grid-cols-3 gap-3">
@@ -128,7 +129,11 @@ const SHOWN_DATES = 120;
               </div>
             </div>
           } @else {
-            <p class="text-sm text-[color:var(--text-muted)] m-0">{{ loading() ? 'Working out the periods…' : 'Pick the dates.' }}</p>
+            @if (loading()) {
+              <app-loading shape="inline" label="Working out the periods…" />
+            } @else {
+              <p class="text-sm text-[color:var(--text-muted)] m-0">Pick the dates.</p>
+            }
           }
         </app-section>
         @if (startError()) { <p class="text-sm text-crit-500 m-0" role="alert" data-test="backfill-start-error">{{ startError() }}</p> }
@@ -211,6 +216,12 @@ export class BackfillPanel implements OnInit {
         'The backfill could not be worked out just now.') } as ApiResponse<BackfillPreview>)))),
     ).subscribe(answer => this.answered(answer));
     this.destroyRef.onDestroy(() => sub.unsubscribe());
+  }
+
+  /** Try again on a preview that could not be worked out: the same request, asked once more. */
+  retryPreview(): void {
+    this.loading.set(true);
+    this.asks.next(this.request());
   }
 
   /** What the inputs ask for now. */

@@ -15,6 +15,7 @@ import { AccountSecurityApi, PasswordRules } from '../../account/account-securit
 import { PasswordRulesHint } from '../../account/password-rules';
 import { Section } from '../../../shared/ui/section';
 import { FormRow } from '../../../shared/ui/form-row';
+import { InlineStatus, loadErrorText } from '../../../shared/ui/loading';
 
 /**
  * The picker's options, taken from the table that already names every role rather than said a
@@ -44,12 +45,14 @@ export function grantableRoles(current: UserRole | undefined, self: boolean, pla
 
 @Component({
   selector: 'app-user-dialog',
-  imports: [Section, FormRow, PasswordRulesHint, ReactiveFormsModule, Field, FormDialog, PhoneInput, Combobox],
+  imports: [Section, FormRow, PasswordRulesHint, ReactiveFormsModule, Field, FormDialog, PhoneInput, Combobox, InlineStatus],
   templateUrl: './user-dialog.html',
 })
 export class UserDialog {
   readonly ref = inject<DialogRef<boolean>>(DialogRef);
   readonly data = inject<{ user?: any; tenants: any[]; canPickTenant: boolean; accessProfiles?: AccessProfile[];
+    /** Owner 2026-10-27: why the Users page could not read the workspaces or the access profiles, said under the field. */
+    tenantsError?: string; accessProfilesError?: string;
     /** The people the list holds: who may be picked as the manager (MIG-274). */
     people?: { appUserId: number; fullName?: string | null; username: string; tenantId?: number | null; userRole: string;
       status?: string | null; position?: string | null }[] }>(DIALOG_DATA);
@@ -179,10 +182,44 @@ export class UserDialog {
   readonly passwordRules = signal<PasswordRules | null>(null);
   readonly typedPassword = signal('');
 
+  /**
+   * The hint is an aid, not a gate (the server holds the rules and says which one a password misses), so a failed read
+   * stays silent and the hint shows the general rules. A reply for a workspace no longer chosen is dropped.
+   */
+  private rulesSeq = 0;
   private loadRules(tenantId: number | null): void {
+    const seq = ++this.rulesSeq;
     this.security.rulesFor(tenantId).subscribe({
-      next: r => this.passwordRules.set(r.status === API_SUCCESS ? r.data ?? null : null),
-      error: () => this.passwordRules.set(null),
+      next: r => { if (seq === this.rulesSeq) this.passwordRules.set(r.status === API_SUCCESS ? r.data ?? null : null); },
+      error: () => { if (seq === this.rulesSeq) this.passwordRules.set(null); },
+    });
+  }
+
+  /**
+   * Owner 2026-10-27: the chosen workspace's access profiles, read for a platform administrator: "Loading access
+   * profiles…" while they come, the reason with Try again when they could not be read -- not just "Workspace default".
+   */
+  readonly profilesLoading = signal(false);
+  readonly profilesError = signal(this.data.accessProfilesError ?? '');
+  private profilesSeq = 0;
+  loadProfiles(tenantId: number | null = this.form.getRawValue().tenantId ?? null): void {
+    const seq = ++this.profilesSeq;
+    this.profilesError.set('');
+    if (!tenantId) { this.accessProfiles.set([]); this.profilesLoading.set(false); return; }
+    this.profilesLoading.set(true);
+    this.profilesApi.list(tenantId).subscribe({
+      next: r => {
+        if (seq !== this.profilesSeq) return;
+        this.profilesLoading.set(false);
+        if (r.status === API_SUCCESS) this.accessProfiles.set(r.data ?? []);
+        else { this.accessProfiles.set([]); this.profilesError.set(loadErrorText(r, 'The access profiles could not be read.')); }
+      },
+      error: err => {
+        if (seq !== this.profilesSeq) return;
+        this.profilesLoading.set(false);
+        this.accessProfiles.set([]);
+        this.profilesError.set(loadErrorText(err, 'The access profiles could not be read.'));
+      },
     });
   }
 
@@ -194,15 +231,8 @@ export class UserDialog {
     this.form.get('userRole')!.valueChanges.subscribe((value: UserRole) => this.role.set(value));
     this.form.get('tenantId')!.valueChanges.subscribe((value: number | null) => this.tenant.set(value ?? null));
     if (this.data.canPickTenant) {
-      const load = (tenantId: number | null) => {
-        if (!tenantId) { this.accessProfiles.set([]); return; }
-        this.profilesApi.list(tenantId).subscribe({
-          next: r => this.accessProfiles.set(r.status === API_SUCCESS ? (r.data ?? []) : []),
-          error: () => this.accessProfiles.set([]),
-        });
-      };
-      load(this.form.getRawValue().tenantId ?? null);
-      this.form.get('tenantId')!.valueChanges.subscribe(load);
+      this.loadProfiles(this.form.getRawValue().tenantId ?? null);
+      this.form.get('tenantId')!.valueChanges.subscribe((value: number | null) => this.loadProfiles(value ?? null));
     }
   }
 

@@ -127,3 +127,33 @@ describe('Report review card (Report Studio phase 7)', () => {
     expect(fixture.componentInstance.done()).toBe(false);
   });
 });
+
+describe('Report review card -- a failed read (owner 2026-10-27)', () => {
+  it('says the report could not be read, with Try again, and reads it again', async () => {
+    const { fixture, api, el } = mount(card());
+    api.reviewCard.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 500 })) as never);
+    fixture.componentInstance.reload();
+    fixture.detectChanges();
+    expect(fixture.componentInstance.loading()).toBe(false);
+    expect(el.querySelector('[data-test="report-review-error"]')?.textContent).toContain('Try again');
+    api.reviewCard.mockReturnValue(of(card()));
+    (el.querySelector('[data-test="report-review-error"] button') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(fixture.componentInstance.error()).toBe('');
+    expect(fixture.componentInstance.report()?.reportLabel).toBe('RPT-0011');
+  });
+
+  it('offers Try again on a page that could not be drawn', async () => {
+    const { fixture, api, el } = mount(card());
+    await fixture.whenStable();
+    api.reviewPage.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 500 })) as never);
+    fixture.componentInstance.show(2);
+    fixture.detectChanges();
+    expect(el.querySelector('[data-test="review-page-error"]')?.textContent).toContain('Try again');
+    api.reviewPage.mockReturnValue(of(new HttpResponse({ body: new Blob(['png'], { type: 'image/png' }) })));
+    fixture.componentInstance.retryPicture();
+    fixture.detectChanges();
+    expect(fixture.componentInstance.pageError()).toBe('');
+    expect(api.reviewPage).toHaveBeenLastCalledWith(ID, 3, 2, true);
+  });
+});

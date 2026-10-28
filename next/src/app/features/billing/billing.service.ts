@@ -393,14 +393,19 @@ export class BillingApi {
     return this.http.get<ApiResponse<{ rows: SubjectRow[] }>>(`${this.base}/subjects`, { params: { ...this.usageParams(q, 'meter'), meter, limit: String(limit) } });
   }
   /** Cost per run (MIG-308): the month's model-call runs, newest first, a page at a time. */
-  runs(q: UsageQuery, page: number, limit: number): Observable<ApiResponse<{ total: number; page: number; limit: number; rows: RunRow[]; days?: DayTotal[] }>> {
+  /**
+   * Owner 2026-10-27: `order` is the server's sort (time, model, tokensIn, tokensOut, cost; asc or desc), sent only when
+   * the viewer picked one -- without it the calls are newest first, as before.
+   */
+  runs(q: UsageQuery, page: number, limit: number, order: { sort: string; dir: string } | null = null): Observable<ApiResponse<{ total: number; page: number; limit: number; rows: RunRow[]; days?: DayTotal[] }>> {
     return this.http.get<ApiResponse<{ total: number; page: number; limit: number; rows: RunRow[]; days?: DayTotal[] }>>(`${this.base}/runs`, {
-      params: { from: q.from, to: q.to, page: String(page), limit: String(limit), ...this.tenantParam(q.tenantId) } });
+      params: { from: q.from, to: q.to, page: String(page), limit: String(limit), ...(order ?? {}), ...this.tenantParam(q.tenantId) } });
   }
   /** Rolls every workspace's last two days again: the platform administrator's refresh. */
   /** UX review B9: what each pipeline and run cost, shared out of the same priced lines (adds up to the range's total). */
-  pipelineCosts(q: UsageQuery, page = 1, limit = 25, filter: RunFilter = {}): Observable<ApiResponse<PipelineCosts>> {
-    const narrow: Record<string, string> = {};
+  /** Owner 2026-10-27: `order` sorts By run on the server (startedAt, run, pipeline, status, cost; asc or desc); none: newest first. */
+  pipelineCosts(q: UsageQuery, page = 1, limit = 25, filter: RunFilter = {}, order: { sort: string; dir: string } | null = null): Observable<ApiResponse<PipelineCosts>> {
+    const narrow: Record<string, string> = { ...(order ?? {}) };
     if (filter.taskDetailId) narrow['taskDetailId'] = String(filter.taskDetailId);
     if (filter.q?.trim()) narrow['q'] = filter.q.trim();
     if (filter.status) narrow['status'] = filter.status;

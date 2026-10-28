@@ -3,7 +3,8 @@ import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { HttpHeaders, HttpResponse } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
-import { of } from 'rxjs';
+import { NEVER, Observable, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { ToastService } from '../../shared/ui/toast.service';
 import { FormSubmissions, SUBMISSIONS_READ, defaultForm } from './form-submissions';
 import { FormsApi } from './forms.service';
@@ -30,9 +31,10 @@ const SUBMISSIONS: Submission[] = [
     answers: { patient_id: 'P-17', infection_signs: false } },
 ];
 
-function render(formId?: string, submissions: Submission[] = SUBMISSIONS) {
+function render(formId?: string, submissions: Submission[] = SUBMISSIONS, list?: () => Observable<unknown>) {
+  try { localStorage.clear(); } catch { /* none */ }
   const api = {
-    list: vi.fn(() => of({ status: 'SUCCESS', message: '', data: FORMS })),
+    list: vi.fn(list ?? (() => of({ status: 'SUCCESS', message: '', data: FORMS }))),
     fetch: vi.fn(() => of({ status: 'SUCCESS', message: '', data: { ...FORMS[0], fields: FIELDS } })),
     submissionsOf: vi.fn(() => of({ status: 'SUCCESS', message: '', data: submissions })),
     exportCsv: vi.fn(() => of(new HttpResponse({ body: new Blob(['a,b']),
@@ -155,5 +157,60 @@ describe('P2 #30: a capped submissions list says so', () => {
     expect(screen.capped()).toBe(true);
     expect(screen.kpis()[0]).toEqual(expect.objectContaining({ value: 1240, foot: 'the newest 200 below' }));
     expect(screen.kpis()[1].foot).toBe('of the newest 200');
+  });
+});
+
+describe('Form submissions -- sorting (owner 2026-10-27)', () => {
+  it('keeps the newest-first order until a heading is picked, then sorts by it both ways', () => {
+    const { screen } = render();
+    expect(screen.sortedRows().map(s => s.submissionId)).toEqual([5002, 5001]);
+    screen.sort.toggle('id');
+    expect(screen.sortedRows().map(s => s.submissionId)).toEqual([5002, 5001]);
+    screen.sort.toggle('id');
+    expect(screen.sortedRows().map(s => s.submissionId)).toEqual([5001, 5002]);
+    expect(screen.sort.note).toBe(`Sorts the newest ${SUBMISSIONS_READ} shown`);
+  });
+
+  it('sorts a table answer by a column, numbers as numbers', () => {
+    const { screen } = render();
+    const rows = [{ item: 'Gauze', qty: 10 }, { item: 'Tape', qty: 9 }];
+    // A column read from the data sorts A to Z (smallest first) on the first click, then the other way.
+    screen.answerSort.toggle('qty');
+    expect(screen.answerSort.apply(rows).map(r => r['qty'])).toEqual([9, 10]);
+    screen.answerSort.toggle('qty');
+    expect(screen.answerSort.apply(rows).map(r => r['qty'])).toEqual([10, 9]);
+  });
+});
+
+describe('Form submissions -- loading, empty, error (owner 2026-10-27)', () => {
+  it('is loading, with no "No forms yet", until the forms answer', () => {
+    const { screen, el } = render(undefined, SUBMISSIONS, () => NEVER);
+    expect(screen.formsLoading()).toBe(true);
+    expect(el.querySelector('app-loading')).not.toBeNull();
+    expect(el.textContent).not.toContain('No forms yet');
+  });
+
+  it('says there is no form once an empty list answers', () => {
+    const { el } = render(undefined, SUBMISSIONS, () => of({ status: 'SUCCESS', message: '', data: [] }));
+    expect(el.textContent).toContain('No forms yet');
+  });
+
+  it('says why the forms could not be read, and Try again clears it once they are read', () => {
+    const { screen, api, fixture, el } = render(undefined, SUBMISSIONS, () => throwError(() => new HttpErrorResponse({ status: 500 })));
+    expect(screen.formsLoading()).toBe(false);
+    expect(screen.formsError()).toBe('The forms could not be read.');
+    api.list.mockReturnValue(of({ status: 'SUCCESS', message: '', data: FORMS }) as never);
+    (el.querySelector('app-load-error button') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(screen.formsError()).toBe('');
+    expect(screen.forms().length).toBe(2);
+  });
+
+  it('clears the last form\'s rows and loads again when another form is picked', () => {
+    const { screen, api } = render();
+    api.submissionsOf.mockReturnValueOnce(NEVER as never);
+    screen.choose(1001);
+    expect(screen.submissions()).toEqual([]);
+    expect(screen.loading()).toBe(true);
   });
 });

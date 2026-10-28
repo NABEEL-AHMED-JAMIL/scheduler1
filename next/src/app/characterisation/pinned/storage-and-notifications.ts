@@ -73,14 +73,23 @@ export const PINNED: Record<string, unknown> = {
     ],
     "buttons": [
       "Actions for UI-REVIEW LocalStack S3 (fake keys)",
+      "Alias",
       "Cards",
       "Columns",
       "Copy ui-review-2924",
       "Copy ui-review-s3",
+      "Created by",
+      "Credentials",
+      "Last test",
+      "Name",
       "New storage connection",
       "Only mine",
+      "Provider",
       "Refresh",
-      "Table"
+      "State",
+      "Table",
+      "Target",
+      "Updated by"
     ],
     "columns": [
       [

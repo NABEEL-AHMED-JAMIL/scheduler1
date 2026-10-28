@@ -12,6 +12,7 @@ import { isDateType, isNumericType } from '../filter-builder';
 import type { RangePreset } from '../../../shared/ui/date-range';
 import { BoardFilterDef, FilterFamily, MAX_BOARD_FILTERS } from './board-filters';
 import { BOARD_PRESETS } from './board-filter-bar';
+import { InlineStatus, loadErrorText } from '../../../shared/ui/loading';
 
 /** A dataset the board's tiles read: where a filter's values may come from. */
 export interface FilterSourceOption { connection: string; path: string; label: string }
@@ -63,7 +64,7 @@ export function keyOf(label: string, taken: ReadonlySet<string>): string {
  */
 @Component({
   selector: 'app-board-filter-editor',
-  imports: [SidePanel, Icon],
+  imports: [SidePanel, Icon, InlineStatus],
   template: `
     <app-side-panel heading="Edit filters" subtitle="What this board's filter bar offers every reader">
       <div class="flex flex-col gap-3 min-w-0" data-test="bf-editor">
@@ -86,7 +87,9 @@ export function keyOf(label: string, taken: ReadonlySet<string>): string {
                 }
               </select>
               <select class="input min-w-0" [attr.aria-label]="'Filter ' + (i + 1) + ' column'" [disabled]="!draft.source" (change)="pickColumn(i, $any($event.target).value)">
-                <option value="">Column…</option>
+                <option value="">{{ columnsLoading(draft) ? 'Loading columns…' : 'Column…' }}</option>
+                <!-- Owner 2026-10-27: a filter's saved column stays shown while its dataset's columns load (it looked lost). -->
+                @if (columnsLoading(draft) && draft.column) { <option [value]="draft.column" selected>{{ draft.column }}</option> }
                 @for (column of columnsFor(draft); track column.name) {
                   @if (draft.kind !== 'date' || familyOf(column.type) === 'date') {
                     <option [value]="column.name" [selected]="column.name === draft.column">{{ column.name }} · {{ column.type }}</option>
@@ -94,6 +97,11 @@ export function keyOf(label: string, taken: ReadonlySet<string>): string {
                 }
               </select>
             </div>
+            @if (draft.source) {
+              <app-inline-status [loading]="columnsLoading(draft)" [error]="columnsError(draft)"
+                                 [empty]="!columnsLoading(draft) && !columnsError(draft) && !columnsFor(draft).length && schemaRead(draft)"
+                                 label="Loading the dataset's columns…" emptyText="This dataset has no columns." (retry)="retryColumns(draft.source)" />
+            }
             <input class="input min-w-0" [attr.aria-label]="'Filter ' + (i + 1) + ' other column names'" placeholder="Also lands on columns named… (comma separated)"
                    [value]="draft.aliases" (input)="patch(i, { aliases: $any($event.target).value })" />
             @if (draft.kind === 'date') {
@@ -140,6 +148,9 @@ export class BoardFilterEditor {
   })));
   readonly error = signal('');
   private readonly schemas = signal<Record<string, DatasetColumn[]>>({});
+  /** Each dataset's column read: loading, or why it failed (it failed silently, leaving only "Column…"). */
+  private readonly schemaLoading = signal<Record<string, boolean>>({});
+  private readonly schemaErrors = signal<Record<string, string>>({});
 
   constructor() {
     for (const draft of this.drafts()) if (draft.source) this.loadColumns(draft.source);
@@ -148,6 +159,10 @@ export class BoardFilterEditor {
   sourceKey(source: FilterSourceOption): string { return source.connection + '\u0000' + source.path; }
   hasDate(): boolean { return this.drafts().some(d => d.kind === 'date'); }
   columnsFor(draft: Draft): DatasetColumn[] { return this.schemas()[draft.source] ?? []; }
+  columnsLoading(draft: Draft): boolean { return !!this.schemaLoading()[draft.source]; }
+  columnsError(draft: Draft): string { return this.schemaErrors()[draft.source] ?? ''; }
+  schemaRead(draft: Draft): boolean { return !!this.schemas()[draft.source]; }
+  retryColumns(key: string): void { this.loadColumns(key); }
 
   patch(at: number, change: Partial<Draft>): void {
     this.drafts.update(list => list.map((d, i) => i === at ? { ...d, ...change } : d));
@@ -174,15 +189,23 @@ export class BoardFilterEditor {
   }
 
   private loadColumns(key: string): void {
-    if (this.schemas()[key]) return;
+    if (this.schemas()[key] || this.schemaLoading()[key]) return;
     const cut = key.indexOf('\u0000');
+    const set = (loading: boolean, error: string) => {
+      this.schemaLoading.update(all => ({ ...all, [key]: loading }));
+      this.schemaErrors.update(all => ({ ...all, [key]: error }));
+    };
+    set(true, '');
     this.analytics.schema(key.slice(0, cut), key.slice(cut + 1)).subscribe({
       next: response => {
         if (response.status === API_SUCCESS && response.data) {
           this.schemas.update(all => ({ ...all, [key]: response.data!.columns ?? [] }));
+          set(false, '');
+        } else {
+          set(false, loadErrorText(response, 'The dataset\'s columns could not be read.'));
         }
       },
-      error: () => {},
+      error: err => set(false, loadErrorText(err, 'The dataset\'s columns could not be read.')),
     });
   }
 

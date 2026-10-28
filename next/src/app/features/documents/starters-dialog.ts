@@ -4,6 +4,9 @@ import { API_SUCCESS } from '../../core/api/api.config';
 import { FormDialog } from '../../shared/ui/form-dialog';
 import { StarterMarket, StarterRow, StartersAdded, refusalText } from './documents.model';
 import { DocumentsApi } from './documents.service';
+import { AppLoading, InlineStatus } from '../../shared/ui/loading';
+import { LoadError } from '../../shared/ui/load-error';
+import { EmptyState } from '../../shared/ui/empty-state';
 
 /** What the types list does next: read the types again when any was added. */
 export interface StartersDialogResult { changed: boolean; }
@@ -16,7 +19,7 @@ export interface StartersDialogResult { changed: boolean; }
  */
 @Component({
   selector: 'app-starters-dialog',
-  imports: [FormDialog],
+  imports: [FormDialog, AppLoading, InlineStatus, LoadError, EmptyState],
   styles: [`
     .market + .market { margin-top: 1.25rem; }
     .starter { display: grid; grid-template-columns: 1.25rem minmax(0, 1fr) auto; gap: 0.25rem 0.625rem; align-items: start;
@@ -38,10 +41,13 @@ export interface StartersDialogResult { changed: boolean; }
               @for (s of a.skipped; track s.typeKey) { <li class="py-1"><span class="font-medium">{{ s.name }}</span> <span class="text-xs text-[color:var(--text-muted)]">{{ s.reason }}</span></li> }
             </ul>
           }
-        } @else if (loading()) {
-          <p class="text-sm text-[color:var(--text-muted)]" role="status">Reading the starters…</p>
+        } @else if (loading() && !markets().length) {
+          <!-- Owner 2026-10-27: the shared loader, Try again on a failed read, and an empty catalog said as such. -->
+          <app-loading shape="list" label="Reading the starters…" [count]="5" />
         } @else if (error() && !markets().length) {
-          <p class="text-sm text-crit-500" role="alert">{{ error() }}</p>
+          <app-load-error role="alert" [message]="error()" (retry)="load()" />
+        } @else if (!markets().length) {
+          <app-empty-state icon="layers" message="No starter types are available yet." />
         } @else {
           @for (m of markets(); track m.key) {
             <section class="market" [attr.data-market]="m.key" [attr.aria-labelledby]="'market-' + m.key">
@@ -72,7 +78,12 @@ export interface StartersDialogResult { changed: boolean; }
               </ul>
             </section>
           }
-          @if (error()) { <p class="text-xs text-crit-500" role="alert">{{ error() }}</p> }
+          @if (error() && readFailed()) {
+            <!-- A re-read that failed keeps the list it had, says why and offers Try again. -->
+            <app-inline-status [error]="error()" (retry)="load()" />
+          } @else if (error()) {
+            <p class="text-xs text-crit-500" role="alert">{{ error() }}</p>
+          }
         }
       </div>
     </app-form-dialog>
@@ -86,6 +97,8 @@ export class StartersDialog implements OnInit {
   readonly loading = signal(true);
   readonly saving = signal(false);
   readonly error = signal('');
+  /** The error on screen is the catalog's read failing (Try again reads it), not an add being refused. */
+  readonly readFailed = signal(false);
   readonly chosen = signal<Set<string>>(new Set());
   readonly answer = signal<StartersAdded | null>(null);
   readonly message = signal('');
@@ -94,14 +107,19 @@ export class StartersDialog implements OnInit {
     return n ? `Add ${n} type${n === 1 ? '' : 's'}` : 'Add';
   });
 
-  ngOnInit(): void {
+  ngOnInit(): void { this.load(); }
+
+  load(): void {
+    this.loading.set(true);
+    this.error.set('');
+    this.readFailed.set(false);
     this.api.starters().subscribe({
       next: r => {
         this.loading.set(false);
-        if (r.status !== API_SUCCESS) { this.error.set(r.message || 'Could not read the starters.'); return; }
+        if (r.status !== API_SUCCESS) { this.readFailed.set(true); this.error.set(r.message || 'Could not read the starters.'); return; }
         this.markets.set(r.data ?? []);
       },
-      error: err => { this.loading.set(false); this.error.set(refusalText(err, 'Could not read the starters.')); },
+      error: err => { this.loading.set(false); this.readFailed.set(true); this.error.set(refusalText(err, 'Could not read the starters.')); },
     });
   }
 
@@ -142,7 +160,7 @@ export class StartersDialog implements OnInit {
     if (this.answer()) { this.close(); return; }
     const keys = [...this.chosen()];
     if (!keys.length) return;
-    this.saving.set(true); this.error.set('');
+    this.saving.set(true); this.error.set(''); this.readFailed.set(false);
     this.api.addStarters(keys).subscribe({
       next: r => {
         this.saving.set(false);

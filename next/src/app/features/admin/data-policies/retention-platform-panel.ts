@@ -5,6 +5,8 @@ import { Icon } from '../../../shared/ui/icon';
 import { SidePanel } from '../../../shared/ui/side-panel';
 import { refusal } from '../../../shared/ui/bulk/bulk.model';
 import { RetentionApi } from './retention.api';
+import { AppLoading } from '../../../shared/ui/loading';
+import { LoadError } from '../../../shared/ui/load-error';
 
 /**
  * MIG-354: the platform's retention minimums, a platform administrator's alone -- how long audit records are kept at
@@ -13,10 +15,13 @@ import { RetentionApi } from './retention.api';
  */
 @Component({
   selector: 'app-retention-platform-panel',
-  imports: [SidePanel, Icon],
+  imports: [SidePanel, Icon, AppLoading, LoadError],
   template: `
     <app-side-panel heading="Platform minimums" subtitle="For every workspace; platform administrators only" data-test="retention-platform-panel">
-      @if (loaded()) {
+      <!-- Owner 2026-10-27: a failed read was only shown inside the loaded form, so "Reading…" spun for ever. -->
+      @if (loadError()) {
+        <app-load-error [message]="loadError()" (retry)="load()" />
+      } @else if (loaded()) {
         <div class="form-lock flex flex-col gap-4">
           <div>
             <label class="label" for="floor-days">Keep audit records at least (days)</label>
@@ -32,7 +37,7 @@ import { RetentionApi } from './retention.api';
           @if (error()) { <p class="text-sm text-crit-500 m-0" role="alert">{{ error() }}</p> }
         </div>
       } @else {
-        <p class="text-sm text-[color:var(--text-muted)] flex items-center gap-2"><span class="spinner"></span>Reading…</p>
+        <app-loading shape="panel" [count]="3" label="Loading the platform minimums…" />
       }
       <div foot class="flex items-center gap-2 w-full">
         <button type="button" class="btn btn-ghost btn-sm" (click)="ref.close(false)">Cancel</button>
@@ -52,6 +57,8 @@ export class RetentionPlatformPanel implements OnInit {
   readonly loaded = signal(false);
   readonly saving = signal(false);
   readonly error = signal('');
+  /** Why the minimums could not be read (the save's own failure stays in `error`, under the form). */
+  readonly loadError = signal('');
 
   readonly problem = computed(() => {
     const floor = Number(this.floor());
@@ -62,14 +69,19 @@ export class RetentionPlatformPanel implements OnInit {
   });
 
   ngOnInit(): void {
+    this.load();
+  }
+
+  load(): void {
+    this.loadError.set('');
     this.api.platform().subscribe({
       next: r => {
-        if (r?.status !== API_SUCCESS || !r.data) { this.error.set(r?.message || 'The platform minimums could not be read.'); return; }
+        if (r?.status !== API_SUCCESS || !r.data) { this.loadError.set(r?.message || 'The platform minimums could not be read.'); return; }
         this.floor.set(String(r.data.auditFloorDays));
         this.share.set(String(r.data.maxSharePct));
         this.loaded.set(true);
       },
-      error: err => this.error.set(refusal(err, 'The platform minimums could not be read.')),
+      error: err => this.loadError.set(refusal(err, 'The platform minimums could not be read.')),
     });
   }
 

@@ -37,16 +37,22 @@
   }
 
   <div class="grid grid-cols-2 sm:grid-cols-4 stat-strip stat-row is-md is-start" role="list">
+    <!-- Owner 2026-10-27: each tile waits for the read its figure comes from (no 0 before the answer, "Not available"
+         when it failed). In use also needs the counts. -->
     @for (tile of [
-      { label: 'Step tasks', value: taskTiles().total, foot: taskTiles().on + ' on' + (taskTiles().unavailable ? ' · ' + taskTiles().unavailable + ' unavailable' : ''), icon: 'layers', tone: 'info' },
-      { label: 'In use', value: taskTiles().inUse, foot: 'step tasks a pipeline runs', icon: 'activity', tone: 'ok' },
-      { label: 'Blocked', value: taskTiles().blocked, foot: taskTiles().blocked ? 'by a platform administrator' : 'none', icon: 'lock', tone: taskTiles().blocked ? 'crit' : 'muted' },
+      { label: 'Step tasks', value: taskTiles().total, foot: taskTiles().on + ' on' + (taskTiles().unavailable ? ' · ' + taskTiles().unavailable + ' unavailable' : ''), icon: 'layers', tone: 'info',
+        wait: !tasksLoaded() && !tasksError(), failed: !!tasksError() && !tasksLoaded() },
+      { label: 'In use', value: taskTiles().inUse, foot: 'step tasks a pipeline runs', icon: 'activity', tone: 'ok',
+        wait: (!tasksLoaded() && !tasksError()) || (!countsKnown() && !usageError()), failed: (!!tasksError() && !tasksLoaded()) || (!!usageError() && !countsKnown()) },
+      { label: 'Blocked', value: taskTiles().blocked, foot: taskTiles().blocked ? 'by a platform administrator' : 'none', icon: 'lock', tone: taskTiles().blocked ? 'crit' : 'muted',
+        wait: !tasksLoaded() && !tasksError(), failed: !!tasksError() && !tasksLoaded() },
       ownSignIn()
-        ? { label: 'Legacy pipelines', value: '—', foot: 'in Work in this workspace', icon: 'send', tone: 'muted' }
-        : { label: 'Legacy pipelines', value: summary().total, foot: summary().active + ' active' + (summary().untopped ? ' · ' + summary().untopped + ' with no topic' : ''), icon: 'send', tone: summary().untopped ? 'warn' : 'info' }
+        ? { label: 'Legacy pipelines', value: '—', foot: 'in Work in this workspace', icon: 'send', tone: 'muted', wait: false, failed: false }
+        : { label: 'Legacy pipelines', value: summary().total, foot: summary().active + ' active' + (summary().untopped ? ' · ' + summary().untopped + ' with no topic' : ''), icon: 'send', tone: summary().untopped ? 'warn' : 'info',
+            wait: !pipelinesLoaded() && !error(), failed: !!error() && !pipelinesLoaded() }
     ]; track tile.label) {
       <app-stat-tile [label]="tile.label" [value]="tile.value" [icon]="tile.icon"
-                     [tone]="$any(tile.tone)" [foot]="tile.foot" />
+                     [tone]="$any(tile.tone)" [foot]="tile.foot" [loading]="tile.wait" [failed]="tile.failed" />
     }
   </div>
 
@@ -71,7 +77,9 @@
     </div>
   }
 
-  <app-table-shell heading="Tasks" [loading]="loading()" [error]="error()"
+  <!-- Owner 2026-10-27: loading until both the registry and the pipelines have answered, so the empty state never shows
+       while the step tasks are still on their way. -->
+  <app-table-shell heading="Tasks" [loading]="loading() || tasksLoading()" [error]="error()"
                    [isEmpty]="!filtered().length" [shown]="shown().length" [total]="filtered().length"
                    [emptyMessage]="hasFilters()
                       ? 'No task matches the current filters.'
@@ -112,13 +120,13 @@
     <table class="table-modern">
       <thead>
         <tr>
-          <th>Task</th>
-          <th>Kind</th>
-          <th class="hidden xl:table-cell">Service</th>
-          <th class="hidden 2xl:table-cell">Input → output</th>
-          <th class="text-right" title="Pipelines whose latest version runs it (a Legacy row: that name its pipeline id)">Pipelines</th>
-          <th class="text-right" title="Runs of those pipelines since the first of this month">{{ runsHeading() }}</th>
-          <th>{{ canSwitch() ? 'In this workspace' : canControl() ? 'For this workspace' : 'State' }}</th>
+          <th appSort="task" [sortBy]="sort">Task</th>
+          <th appSort="kind" [sortBy]="sort">Kind</th>
+          <th class="hidden xl:table-cell" appSort="service" [sortBy]="sort">Service</th>
+          <th class="hidden 2xl:table-cell" appSort="io" [sortBy]="sort">Input → output</th>
+          <th class="text-right" title="Pipelines whose latest version runs it (a Legacy row: that name its pipeline id)" appSort="pipelines" [sortBy]="sort">Pipelines</th>
+          <th class="text-right" title="Runs of those pipelines since the first of this month" appSort="runs" [sortBy]="sort">{{ runsHeading() }}</th>
+          <th appSort="state" [sortBy]="sort">{{ canSwitch() ? 'In this workspace' : canControl() ? 'For this workspace' : 'State' }}</th>
           <th class="w-12 th-actions">Actions</th>
         </tr>
       </thead>
@@ -129,7 +137,9 @@
               <div class="flex items-center gap-2 min-w-0">
                 <button type="button" class="link-inline font-medium truncate text-left" [attr.aria-label]="'Open ' + row.name"
                         [title]="row.name" (click)="open(row)">{{ row.name }}</button>
-                @if (isFetchingFields(row.pipeline)) { <app-icon name="refresh" class="spin shrink-0" size="0.85em" /> }
+                @if (isFetchingFields(row.pipeline)) {
+                  <app-icon name="refresh" class="spin shrink-0" size="0.85em" /><span class="sr-only" role="status">Loading the fields of {{ row.name }}…</span>
+                }
                 <span class="pipeline-id-chip shrink-0" [title]="row.legacy ? 'Pipeline id — what the worker routes on' : 'Task code — what a step names'">{{ row.code }}</span>
               </div>
               @if (row.description) {
@@ -233,10 +243,11 @@
                     (goTo)="goToPage($event)" (setSize)="setPageSize($event)" />
   </app-table-shell>
 
-  @if (changes().length) {
+  @if (changes().length || changesError()) {
     <!-- Owner #16: who switched, blocked or reset a task here, newest first (task_registry_audit). -->
     <section class="card p-4" aria-labelledby="task-changes-heading" data-test="task-changes">
       <h2 id="task-changes-heading" class="section-title mb-2">Recent changes</h2>
+      @if (changesError()) { <app-inline-status [error]="changesError()" (retry)="loadChanges()" /> }
       <ul class="side-panel-list">
         @for (c of changes(); track $index) {
           <li class="text-sm flex flex-wrap items-baseline gap-x-2">

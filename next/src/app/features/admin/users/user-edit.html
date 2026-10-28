@@ -15,15 +15,15 @@
     }
   </app-page-header>
 
+  <!-- Owner 2026-10-27: a skeleton of the page while the person is read; Try again after a read that failed, and only
+       the way back when they are not on the list. -->
   @if (loading() && !person()) {
-    <div class="card p-12 text-center text-sm text-[color:var(--text-muted)]">
-      <div class="spinner mx-auto mb-3" role="status" aria-label="Loading"></div>Loading…
-    </div>
+    <div class="card"><app-loading shape="panel" [count]="8" label="Loading the person…" /></div>
   } @else if (error()) {
-    <div class="card p-10 text-center" role="alert">
-      <app-icon name="alert" size="1.5rem" class="icon-crit block mx-auto mb-2" />
-      <p class="text-sm text-crit-500">{{ error() }}</p>
-      <a routerLink="/administration/users" class="btn btn-default btn-sm mt-3">Back to Users</a>
+    <div class="card" role="alert">
+      <app-load-error [message]="error()" [retryable]="retryable()" (retry)="load()">
+        <a routerLink="/administration/users" class="btn btn-default btn-sm mt-3 ml-2">Back to Users</a>
+      </app-load-error>
     </div>
   } @else if (person(); as p) {
     @if (readOnly()) {
@@ -123,6 +123,9 @@
                         }
                       </select>
                     </app-field>
+                  } @else if (profilesState.pending() || profilesState.error()) {
+                    <app-inline-status [loading]="profilesState.pending()" [error]="profilesState.error()" label="Loading access profiles…"
+                                       (retry)="retryProfiles()" />
                   } @else {
                     <p class="text-sm rounded-md px-3 py-2 bg-sunken">The workspace has no access profiles yet, so members open every page.</p>
                   }
@@ -155,6 +158,9 @@
                           </li>
                         }
                       </ul>
+                    } @else if (teamsState.pending() || teamsState.error()) {
+                      <app-inline-status [loading]="teamsState.pending()" [error]="teamsState.error()" label="Loading their teams…"
+                                         (retry)="retryTeams()" />
                     } @else {
                       <p class="text-sm text-[color:var(--text-muted)]">In no team.</p>
                     }
@@ -172,10 +178,16 @@
               </div>
               <div class="rounded-lg border border-[color:var(--border-subtle)] p-4" data-test="user-preview" aria-labelledby="ue-preview-title">
                 <h3 id="ue-preview-title" class="section-title">What they can see</h3>
+                @if (catalogueState.pending() || catalogueState.error()) {
+                  <!-- Owner 2026-10-27: not "0 of 0 pages" before the catalogue answers, nor after it failed. -->
+                  <app-inline-status [loading]="catalogueState.pending()" [error]="catalogueState.error()" label="Loading what they can see…"
+                                     (retry)="retryCatalogue()" />
+                } @else {
                 <p class="section-sub">
                   {{ pagesOpen() }} of {{ catalogue().length }} pages, {{ previewPlaces() }} places on the menu.
                   @if (previewUnsaved()) { <span class="pill pill-warn ml-1">After you save</span> }
                 </p>
+                }
                 <div class="grid gap-3 mt-3 sm:grid-cols-2">
                   @for (group of preview(); track group.label) {
                     <div class="min-w-0">
@@ -207,6 +219,13 @@
         <!-- 3. Sign-in security -->
         <app-section id="ue-security" title="Sign-in security" [number]="3" [card]="true" sub="How they sign in, and what is open now.">
           <div class="ue-two">
+            <!-- Owner 2026-10-27: "Off · a password alone", "Never changed" and "Not locked" were shown before the answer as if
+                 real; now a skeleton, or why they could not be read. -->
+            @if (standingState.pending()) {
+              <app-loading shape="panel" [count]="4" label="Loading how they sign in…" />
+            } @else if (standingState.error() && !standing()) {
+              <app-inline-status data-test="security-error" [error]="standingState.error()" (retry)="retryStanding()" />
+            } @else {
             <dl class="ue-facts" data-test="security-facts">
               <dt>Two-factor login</dt>
               <dd>
@@ -233,6 +252,7 @@
                 @if (standing()?.failedSignIns) { <span class="block text-xs text-[color:var(--text-muted)]">{{ standing()!.failedSignIns }} failed sign-ins in a row</span> }
               </dd>
             </dl>
+            }
             @if (!readOnly()) {
               <div class="flex flex-col items-start gap-2">
                 <button type="button" class="btn btn-default btn-sm" (click)="resetPassword()"><app-icon name="key" />Reset password</button>
@@ -259,17 +279,19 @@
             @if (readOnly()) {
               <p class="text-sm text-[color:var(--text-muted)]">Only a platform administrator sees another administrator's sessions.</p>
             } @else if (sessionsError()) {
-              <p class="text-sm text-crit-500" role="alert">{{ sessionsError() }}</p>
+              <app-inline-status data-test="sessions-error" [error]="sessionsError()" (retry)="loadSessions()" />
             } @else if (sessions() === null) {
-              <p class="text-sm text-[color:var(--text-muted)]">Reading their sessions…</p>
+              <app-loading shape="rows" [count]="2" label="Loading their sessions…" />
             } @else if (!sessions()!.length) {
               <p class="text-sm text-[color:var(--text-muted)]" data-test="no-sessions">No session is open: they are signed out everywhere.</p>
             } @else {
               <div class="overflow-x-auto">
                 <table class="table-modern text-sm" data-test="sessions">
-                  <thead><tr><th>Device</th><th>How</th><th>Signed in</th><th>Last active</th><th class="th-actions">End</th></tr></thead>
+                  <thead><tr><th appSort="device" [sortBy]="sessionSort">Device</th><th appSort="how" [sortBy]="sessionSort">How</th>
+                    <th appSort="signedIn" [sortBy]="sessionSort">Signed in</th><th appSort="lastActive" [sortBy]="sessionSort">Last active</th>
+                    <th class="th-actions">End</th></tr></thead>
                   <tbody>
-                    @for (s of sessions(); track s.sessionId) {
+                    @for (s of sortedSessions(); track s.sessionId) {
                       <tr>
                         <td><span [title]="s.userAgent || ''">{{ browserOf(s.userAgent) }}</span>
                           @if (s.ip) { <span class="block text-xs text-[color:var(--text-muted)] mono">{{ s.ip }}</span> }</td>
@@ -294,7 +316,11 @@
           <div class="ue-two">
             <div class="min-w-0">
               <h3 class="text-sm font-semibold mb-2">Recent sign-ins and account changes</h3>
-              @if (!history().length) {
+              @if (historyState.pending()) {
+                <app-loading shape="list" [count]="3" label="Loading their history…" />
+              } @else if (historyState.error() && !history().length) {
+                <app-inline-status [error]="historyState.error()" (retry)="retryHistory()" />
+              } @else if (!history().length) {
                 <p class="text-sm text-[color:var(--text-muted)]">Nothing recorded yet.</p>
               } @else {
                 <ul class="flex flex-col divide-y divide-[color:var(--border-subtle)]" data-test="user-history">

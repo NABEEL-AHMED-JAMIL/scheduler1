@@ -9,7 +9,7 @@ import { EMPTY, catchError, from, mergeMap, of, tap } from 'rxjs';
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { AuthService } from '../../core/auth/auth.service';
-import { BucketSummary, ObjectSummary, StorageService } from './storage.service';
+import { BrowseSort, BucketSummary, ObjectSummary, StorageService } from './storage.service';
 import { API_SUCCESS } from '../../core/api/api.config';
 import { ToastService } from '../../shared/ui/toast.service';
 import { confirmWith } from '../../shared/ui/confirm';
@@ -27,6 +27,9 @@ import { formatSize } from '../../shared/ui/format-size';
 import { BlurLoader } from '../../shared/ui/blur-loader';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { PageHeader } from '../../shared/ui/page-header';
+import { InlineStatus, loadErrorText } from '../../shared/ui/loading';
+import { createTableSort } from '../../shared/ui/sort';
+import { SortHeader } from '../../shared/ui/sort-header';
 
 interface Crumb { name: string; prefix: string; }
 
@@ -35,7 +38,7 @@ const SLOW_PROVIDERS = ['FTP', 'FTPS'];
 
 @Component({
   selector: 'app-objects',
-  imports: [PageHeader, DateField, Icon, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, FileChat, Donut, RankedBar, Combobox, BlurLoader],
+  imports: [PageHeader, InlineStatus, SortHeader, DateField, Icon, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, FileChat, Donut, RankedBar, Combobox, BlurLoader],
   templateUrl: './objects.html',
 })
 export class Objects implements OnInit {
@@ -102,6 +105,56 @@ export class Objects implements OnInit {
   readonly search = signal('');
   readonly selected = signal<Set<string>>(new Set());
   readonly nextToken = signal<string | undefined>(undefined);
+  /** A sorted listing's next page (owner 2026-10-27): it pages by offset, the store's token only walks key order. */
+  readonly nextOffset = signal<number | null>(null);
+  readonly hasMore = computed(() => !!this.nextToken() || this.nextOffset() !== null);
+
+  /**
+   * Owner 2026-10-27 ("add a sort on each table"): the server sorts a folder level by name, size or modified time and
+   * pages it, so the order covers the whole folder and not only the rows loaded so far. Until the viewer picks a
+   * column the rows keep the store's own order (folders first, by key), as before. Type stays plain: the server's
+   * allow-list is name, size and modified.
+   */
+  readonly sort = createTableSort<ObjectSummary>({
+    id: 'objects',
+    server: true,
+    initial: null,
+    columns: {
+      name: { value: r => r.name, kind: 'text', param: 'name', blocked: () => this.sortBlockedFor('name') },
+      modified: { value: r => r.lastModified, kind: 'date', param: 'modified', blocked: () => this.sortBlockedFor('modified') },
+      size: { value: r => r.size, kind: 'number', param: 'size', blocked: () => this.sortBlockedFor('size') },
+    },
+    onChange: () => { if (!this.quietSort) this.load(); },
+  });
+  /** Set while a sort the folder cannot take is put back to the store's order: that listing is already on screen. */
+  private quietSort = false;
+
+  /**
+   * A folder over 10,000 entries cannot be sorted (owner 2026-10-27: S3 lists by key only, and the server sorts at most
+   * 10,000). The server says so in a sentence for the column asked for; the other columns say it in their own words.
+   * Only for the folder it was said about -- another folder may be small enough.
+   */
+  private readonly tooBigToSort = signal<{ scope: string; column: string; reason: string } | null>(null);
+  private static readonly TOO_BIG: Record<string, string> = {
+    name: 'Over 10,000 files here: they stay in name order, A to Z',
+    size: 'Over 10,000 files here: sorting by size needs a smaller folder',
+    modified: 'Over 10,000 files here: sorting by date needs a smaller folder',
+  };
+
+  private listingScope(): string { return this.bucket() + '\n' + this.prefix(); }
+
+  sortBlockedFor(column: string): string {
+    const big = this.tooBigToSort();
+    if (!big || big.scope !== this.listingScope()) return '';
+    return big.column === column ? big.reason : Objects.TOO_BIG[column] ?? big.reason;
+  }
+
+  /** What a listing asks the server for: the viewer's column, unless this folder is known to be too big to sort. */
+  private listingOrder(): BrowseSort | null {
+    const param = this.sort.param();
+    if (!param || this.sortBlockedFor(param.sort)) return null;
+    return { sort: param.sort, dir: param.dir };
+  }
 
   /**
    * Guards removeSelected/newFolder/rename/share against being re-entered while their own
@@ -299,25 +352,55 @@ export class Objects implements OnInit {
     const ticket = ++this.listTicket;
     this.loading.set(true);
     this.error.set('');
-    this.storage.listObjects(this.bucket(), this.prefix(), append ? this.nextToken() : undefined)
+    this.moreError.set('');
+    const order = this.listingOrder();
+    const request = order
+      ? this.storage.listObjects(this.bucket(), this.prefix(), undefined, 100,
+          { ...order, offset: append ? this.nextOffset() ?? 0 : 0 })
+      : this.storage.listObjects(this.bucket(), this.prefix(), append ? this.nextToken() : undefined);
+    request
       .subscribe({
         next: response => {
           if (ticket !== this.listTicket) return;
           this.loading.set(false);
           if (response.status !== API_SUCCESS) {
-            this.error.set(response.message);
+            this.listingFailed(append, loadErrorText(response, 'Could not list this location.'));
             return;
           }
           const page = response.data?.objects ?? [];
           this.objects.update(current => (append ? [...current, ...page] : page));
           this.nextToken.set(response.data?.nextContinuationToken);
+          this.nextOffset.set(response.data?.nextOffset ?? null);
+          if (order && response.data?.sortBlocked) this.sortRefused(order.sort, response.data.sortBlocked);
         },
         error: err => {
           if (ticket !== this.listTicket) return;
           this.loading.set(false);
-          this.error.set(err?.error?.message || 'Could not list this location.');
+          this.listingFailed(append, loadErrorText(err, 'Could not list this location.'));
         },
       });
+  }
+
+  /**
+   * Owner 2026-10-27: a failed Load more keeps the rows already listed and says so under them, with Try again (it
+   * swapped the whole list for the error). Any other failed listing is of a folder the rows may not be from -- a
+   * folder just opened -- so they go and the error takes their place, as before.
+   */
+  readonly moreError = signal('');
+
+  /**
+   * The folder was too big to sort: the rows came in the store's order, so the headers go back to that order (an arrow
+   * on Size over rows in name order would be untrue) and the columns say why they cannot sort here.
+   */
+  private sortRefused(column: string, reason: string): void {
+    this.tooBigToSort.set({ scope: this.listingScope(), column, reason });
+    this.quietSort = true;
+    try { this.sort.set({ key: '', direction: 'asc' }); } finally { this.quietSort = false; }
+  }
+
+  private listingFailed(append: boolean, message: string): void {
+    if (append && this.objects().length) { this.moreError.set(message); return; }
+    this.error.set(message);
   }
 
   openFolder(entry: ObjectSummary): void {

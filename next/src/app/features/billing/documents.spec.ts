@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute } from '@angular/router';
-import { of, Subject } from 'rxjs';
+import { NEVER, Observable, of, Subject, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { BillingDocuments } from './documents';
 import { BillingApi } from './billing.service';
 import { WorkspacePicker } from './workspace-picker';
@@ -94,5 +95,57 @@ describe('BillingDocuments preview of a file that is gone', () => {
     await new Promise(r => setTimeout(r, 0));
     await new Promise(r => setTimeout(r, 0));
     expect(component.previewError()).toBe(said);
+  });
+});
+
+describe('BillingDocuments -- loading, empty, error (owner 2026-10-27)', () => {
+  function screen(answer: () => Observable<unknown>, blobs: Record<number, Observable<Blob>> = {}) {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [
+      { provide: BillingApi, useValue: { documents: vi.fn(answer), documentBlob: vi.fn((id: number) => blobs[id] ?? NEVER) } },
+      { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn() } },
+      { provide: ActivatedRoute, useValue: { queryParamMap: of(new Map()), paramMap: of(new Map()), snapshot: { queryParamMap: new Map() } } },
+      { provide: WorkspacePicker, useValue: { tenantId: () => null, options: () => [], ready: (then: () => void) => then(), isPlatformAdmin: () => false } },
+    ] });
+    const component = TestBed.runInInjectionContext(() => new BillingDocuments());
+    component.ngOnInit();
+    return component;
+  }
+
+  it('is loading, not "No document", until the list answers', () => {
+    const component = screen(() => NEVER);
+    expect(component.loading()).toBe(true);
+    expect(component.firstLoad()).toBe(true);
+    expect(component.error()).toBe('');
+  });
+
+  it('is empty once an empty list answers', () => {
+    const component = screen(() => of({ status: API_SUCCESS, data: [] }));
+    expect(component.firstLoad()).toBe(false);
+    expect(component.visible()).toEqual([]);
+  });
+
+  it('says the documents could not be read, in plain words, and stops loading', () => {
+    const component = screen(() => throwError(() => new HttpErrorResponse({ status: 500, error: 'Internal Server Error' })));
+    expect(component.loading()).toBe(false);
+    expect(component.error()).toBe('The documents could not be read.');
+  });
+
+  it('keeps the newer document\'s preview loading when an older one answers late', async () => {
+    const late = new Subject<Blob>();
+    const year = String(new Date().getFullYear());
+    const rows = [
+      { documentId: 1, kind: 'invoice', fileName: 'a.pdf', contentType: 'application/pdf', issuedAt: `${year}-01-02T00:00:00Z`, tenantId: 1 },
+      { documentId: 2, kind: 'invoice', fileName: 'b.pdf', contentType: 'application/pdf', issuedAt: `${year}-01-03T00:00:00Z`, tenantId: 1 },
+    ];
+    const component = screen(() => of({ status: API_SUCCESS, data: rows }), { 1: late });
+    expect(component.selectedId()).toBe(1);
+    component.pick(2);
+    late.error(new HttpErrorResponse({ status: 404 }));
+    // The error handler reads the refusal's body first (a promise): let it finish.
+    for (let i = 0; i < 5; i++) await Promise.resolve();
+    expect(component.selectedId()).toBe(2);
+    expect(component.previewLoading()).toBe(true);
+    expect(component.previewError()).toBe('');
   });
 });

@@ -25,7 +25,8 @@
       { label: 'Ask first', value: summary().askFirst, foot: 'wait for your confirmation', icon: 'shield', tone: 'warn' },
       { label: 'Blocked', value: summary().blocked, foot: summary().platformBlocked ? summary().platformBlocked + ' by the platform' : summary().blocked ? 'not available to you here' : 'none', icon: 'lock', tone: summary().blocked ? 'crit' : 'muted' }
     ]; track tile.label) {
-      <app-stat-tile [label]="tile.label" [value]="tile.value" [icon]="tile.icon" [tone]="$any(tile.tone)" [foot]="tile.foot" />
+      <app-stat-tile [label]="tile.label" [value]="tile.value" [icon]="tile.icon" [tone]="$any(tile.tone)" [foot]="tile.foot"
+                     [loading]="tilesLoading()" [failed]="tilesFailed()" />
     }
   </div>
 
@@ -58,19 +59,20 @@
     <table class="table-modern">
       <thead>
         <tr>
-          <th>Tool</th>
-          <th class="hidden xl:table-cell">Service</th>
-          <th class="hidden xl:table-cell">Input → output</th>
-          <th>Permission</th>
-          <th class="hidden lg:table-cell">Asks first</th>
-          <th>Enabled</th>
-          <th>Last used</th>
+          <th appSort="tool" [sortBy]="sort">Tool</th>
+          <th class="hidden xl:table-cell" appSort="service" [sortBy]="sort">Service</th>
+          <th class="hidden xl:table-cell" appSort="io" [sortBy]="sort">Input → output</th>
+          <th appSort="permission" [sortBy]="sort">Permission</th>
+          <th class="hidden lg:table-cell" appSort="asksFirst" [sortBy]="sort">Asks first</th>
+          <th appSort="enabled" [sortBy]="sort">Enabled</th>
+          <th appSort="lastUsed" [sortBy]="sort">Last used</th>
         </tr>
       </thead>
       <tbody>
         <!-- UX final TL1: grouped by what a tool does -- Reads, then Writes (the registry's own kind) -- each row led by
              the tool's name in words, its machine name small and mono beneath. -->
-        @for (g of groups(); track g.kind) {
+        <!-- Owner 2026-10-27: a heading sorts the rows inside each group; the groups keep their order. -->
+        @for (g of sortedGroups(); track g.kind) {
           <tr class="tool-group" [attr.data-group]="g.kind">
             <th scope="colgroup" colspan="7">
               <span class="tool-group-title">{{ g.label }}</span>
@@ -142,10 +144,14 @@
     </table>
   </app-table-shell>
 
-  @if (canSwitch() && changes().length) {
-    <!-- Owner item #15: who switched, blocked or unblocked a tool here, newest first (the audit). -->
+  @if (canSwitch() && (changes().length || changesState.error() || changesState.loading())) {
+    <!-- Owner item #15: who switched, blocked or unblocked a tool here, newest first (the audit). Owner 2026-10-27: it
+         says when it is loading or could not be read, instead of disappearing as if nothing had changed. -->
     <section class="card p-4" aria-labelledby="tool-changes-heading" data-test="tool-changes">
       <h2 id="tool-changes-heading" class="section-title mb-2">Recent changes</h2>
+      @if (!changes().length) {
+        <app-inline-status [loading]="changesState.loading()" [error]="changesState.error()" label="Loading recent changes…" (retry)="loadChanges()" />
+      }
       <ul class="side-panel-list">
         @for (c of changes(); track $index) {
           <li class="text-sm flex flex-wrap items-baseline gap-x-2">

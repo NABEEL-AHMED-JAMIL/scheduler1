@@ -7,6 +7,11 @@ import { codeWords } from '../../../shared/ui/plain-words';
 import { PAGE_LABELS, isPageKey } from '../../../core/auth/page-keys';
 import { NAV } from '../../../core/nav/nav-tree';
 import { ToastService } from '../../../shared/ui/toast.service';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
+import { AppLoading, InlineStatus, createLoadState, loadErrorText } from '../../../shared/ui/loading';
+import { LoadError } from '../../../shared/ui/load-error';
+import { BlurLoader } from '../../../shared/ui/blur-loader';
 import { AccessChange, AccessPerson, AccessProfilesService, Delegation, EffectiveAccess } from './access-profiles.service';
 
 type GrantsView = 'person' | 'delegates' | 'changes';
@@ -77,7 +82,7 @@ function stamp(value: string | null | undefined): string {
  */
 @Component({
   selector: 'app-access-grants',
-  imports: [Icon],
+  imports: [Icon, SortHeader, AppLoading, InlineStatus, LoadError, BlurLoader],
   template: `
     <section class="card p-4 flex flex-col gap-4" data-testid="access-grants" aria-labelledby="grants-title">
       <div class="flex flex-wrap items-center gap-3">
@@ -101,11 +106,14 @@ function stamp(value: string | null | undefined): string {
           <label class="flex flex-col gap-1 text-sm">
             <span class="font-medium">Person</span>
             <select class="input input-sm min-w-64" data-testid="grant-person" (focus)="needPeople.emit()" (pointerdown)="needPeople.emit()" (change)="pick(+$any($event.target).value || null)">
-              <option value="">{{ people().length ? 'Choose a member' : 'No member to choose' }}</option>
+              <option value="">{{ peopleLoading() ? 'Loading people…' : peopleEmpty() ? 'No member to choose' : 'Choose a member' }}</option>
               @for (p of people(); track p.appUserId) {
                 <option [value]="p.appUserId" [selected]="personId() === p.appUserId">{{ p.fullName || p.username }}</option>
               }
             </select>
+            <!-- Owner 2026-10-27: the list is the page's read; say it is coming, that it failed, or that it is empty. -->
+            <app-inline-status [loading]="peopleLoading()" [error]="peopleError()" [empty]="peopleEmpty()"
+                               label="Loading people…" emptyText="No member to choose in this workspace yet." (retry)="needPeople.emit()" />
           </label>
           <label class="flex flex-col gap-1 text-sm">
             <span class="font-medium">For</span>
@@ -122,9 +130,17 @@ function stamp(value: string | null | undefined): string {
                    placeholder="Covering month-end close" data-testid="grant-reason" />
           </label>
         </div>
-        @if (loadingAccess()) {
-          <p class="text-sm text-[color:var(--text-muted)]">Reading their access…</p>
-        } @else if (access(); as a) {
+        <!-- Owner 2026-10-27: a skeleton while their access is read the first time; after a grant the tree stays under a
+             blur instead of disappearing and redrawing; a failed read says why and can be tried again. -->
+        @if (personId() && accessError() && !loadingAccess()) {
+          <app-load-error [message]="accessError()" (retry)="pick(personId())" />
+        } @else if (loadingAccess() && !access()) {
+          <app-loading shape="panel" [count]="4" label="Loading their access…" />
+        } @else if (access()) {
+          <app-blur-loader [active]="loadingAccess()" label="Refreshing…">
+          @if (!visiblePages().length) {
+            <p class="text-sm text-[color:var(--text-muted)]" data-testid="grant-none">{{ delegate() ? 'None of their pages is one you may grant.' : 'No page to show for them.' }}</p>
+          }
           <div class="flex flex-col divide-y divide-[color:var(--border-subtle)] border border-[color:var(--border-subtle)] rounded-md" data-testid="grant-tree">
             @for (page of visiblePages(); track page.key) {
               <div class="p-3 flex flex-col gap-2" [attr.data-page]="page.key">
@@ -151,8 +167,7 @@ function stamp(value: string | null | undefined): string {
               </div>
             }
           </div>
-        } @else if (personId()) {
-          <p class="text-sm text-crit-500">{{ accessError() }}</p>
+          </app-blur-loader>
         }
       }
 
@@ -162,9 +177,11 @@ function stamp(value: string | null | undefined): string {
             <label class="flex flex-col gap-1 text-sm">
               <span class="font-medium">Member who may grant</span>
               <select class="input input-sm" (focus)="needPeople.emit()" (pointerdown)="needPeople.emit()" (change)="draftDelegate.set(+$any($event.target).value || null)" data-testid="delegate-person">
-                <option value="">Choose a member</option>
+                <option value="">{{ peopleLoading() ? 'Loading people…' : peopleEmpty() ? 'No member to choose' : 'Choose a member' }}</option>
                 @for (p of people(); track p.appUserId) { <option [value]="p.appUserId">{{ p.fullName || p.username }}</option> }
               </select>
+              <app-inline-status [loading]="peopleLoading()" [error]="peopleError()" [empty]="peopleEmpty()"
+                                 label="Loading people…" emptyText="No member to choose in this workspace yet." (retry)="needPeople.emit()" />
             </label>
             <label class="flex flex-col gap-1 text-sm">
               <span class="font-medium">To whom</span>
@@ -207,10 +224,19 @@ function stamp(value: string | null | undefined): string {
             </button>
           </div>
           <p class="text-xs text-[color:var(--text-muted)]">A delegate grants only pages and tabs they hold themselves, never to an administrator or to themselves, and never creates profiles.</p>
+          <!-- Owner 2026-10-27: loading, then the rows (kept under a blur on a re-read), or why they could not be read. -->
+          @if (delegatesState.error() && !delegatesState.loading()) {
+            <app-load-error [message]="delegatesState.error()" (retry)="show('delegates')" />
+          } @else if (delegatesState.loading() && !delegations().length) {
+            <app-loading shape="rows" [count]="3" label="Loading delegations…" />
+          } @else {
+          <app-blur-loader [active]="delegatesState.loading()" label="Refreshing…">
           <table class="table-modern text-sm" data-testid="delegate-list">
-            <thead><tr><th>Member</th><th>To whom</th><th>Until</th><th>State</th><th>Why</th><th></th></tr></thead>
+            <thead><tr><th appSort="member" [sortBy]="delegatesSort">Member</th><th appSort="toWhom" [sortBy]="delegatesSort">To whom</th>
+              <th appSort="until" [sortBy]="delegatesSort">Until</th><th appSort="state" [sortBy]="delegatesSort">State</th>
+              <th appSort="why" [sortBy]="delegatesSort">Why</th><th></th></tr></thead>
             <tbody>
-              @for (d of delegations(); track d.delegateId) {
+              @for (d of sortedDelegations(); track d.delegateId) {
                 <tr [attr.data-delegation]="d.delegateId">
                   <td class="font-medium">{{ d.delegateName || 'Member ' + d.delegateUserId }}</td>
                   <td>{{ d.scopePeople === 'ALL_MEMBERS' ? 'Every member' : d.people.length + ' people' }}{{ d.canAssignProfiles ? ' · profiles' : '' }}</td>
@@ -226,14 +252,25 @@ function stamp(value: string | null | undefined): string {
               }
             </tbody>
           </table>
+          </app-blur-loader>
+          }
         </div>
       }
 
       @if (view() === 'changes') {
+        @if (changesState.error() && !changesState.loading()) {
+          <app-load-error [message]="changesState.error()" (retry)="show('changes')" />
+        } @else if (changesState.loading() && !changes().length) {
+          <app-loading shape="rows" [count]="4" label="Loading access changes…" />
+        } @else {
+        <app-blur-loader [active]="changesState.loading()" label="Refreshing…">
         <table class="table-modern text-sm" data-testid="change-log">
-          <thead><tr><th>When</th><th>Who</th><th>What</th><th>Person</th><th>Page or tab</th><th>Until</th><th>Why</th></tr></thead>
+          <thead><tr><th appSort="when" [sortBy]="changesSort">When</th><th appSort="who" [sortBy]="changesSort">Who</th>
+            <th appSort="what" [sortBy]="changesSort">What</th><th appSort="person" [sortBy]="changesSort">Person</th>
+            <th appSort="detail" [sortBy]="changesSort">Page or tab</th><th appSort="until" [sortBy]="changesSort">Until</th>
+            <th appSort="why" [sortBy]="changesSort">Why</th></tr></thead>
           <tbody>
-            @for (c of changes(); track c.changeId) {
+            @for (c of sortedChanges(); track c.changeId) {
               <tr>
                 <td class="whitespace-nowrap">{{ when(c.at) }}</td>
                 <td>{{ c.actorName || '—' }}@if (c.delegateId) { <span class="pill pill-neutral ml-1">Delegate</span> }</td>
@@ -248,6 +285,8 @@ function stamp(value: string | null | undefined): string {
             }
           </tbody>
         </table>
+        </app-blur-loader>
+        }
       }
     </section>
   `,
@@ -261,6 +300,15 @@ export class AccessGrants {
   readonly people = input<AccessPerson[]>([]);
   /** A platform administrator's chosen workspace. */
   readonly tenantId = input<number | null>(null);
+  /**
+   * Owner 2026-10-27: the state of the page's people read, so the person lists say "Loading people…", why the read
+   * failed, or that there is nobody -- instead of "No member to choose" while the list is still on its way.
+   * `peopleLoaded` is false until the list first answered (it is read lazily, the first time a person is chosen).
+   */
+  readonly peopleLoading = input(false);
+  readonly peopleError = input('');
+  readonly peopleLoaded = input(true);
+  readonly peopleEmpty = computed(() => this.peopleLoaded() && !this.peopleLoading() && !this.peopleError() && !this.people().length);
   /** Asked the first time a person is to be chosen: the page reads its people then, not before (a big workspace's list). */
   readonly needPeople = output<void>();
 
@@ -275,6 +323,42 @@ export class AccessGrants {
   readonly reason = signal('');
   readonly delegations = signal<Delegation[]>([]);
   readonly changes = signal<AccessChange[]>([]);
+  /** Owner 2026-10-27: both lists are read when their view opens; a failure says so instead of reading as "none". */
+  readonly delegatesState = createLoadState(false);
+  readonly changesState = createLoadState(false);
+  /** Sequence of each read, so an answer for the previous workspace (or an older click) never lands on the new one. */
+  private delegatesSeq = 0;
+  private changesSeq = 0;
+  private accessSeq = 0;
+
+  /** Owner 2026-10-27: every column sorts; the lists keep the server's order until a heading is picked. */
+  readonly delegatesSort = createTableSort<Delegation>({
+    id: 'access-delegates',
+    columns: {
+      member: d => d.delegateName || 'Member ' + d.delegateUserId,
+      // "Every member" reaches more than any list of people, so it sorts as the largest.
+      toWhom: { value: d => (d.scopePeople === 'ALL_MEMBERS' ? Number.MAX_SAFE_INTEGER : d.people.length), kind: 'number' },
+      until: { value: d => d.expiresAt, kind: 'date' },
+      state: { value: d => (d.status === 'ACTIVE' ? 'Active' : d.status === 'EXPIRED' ? 'Expired' : 'Ended'), kind: 'status', order: ['Active', 'Expired', 'Ended'] },
+      why: d => d.reason,
+    },
+  });
+  readonly sortedDelegations = computed(() => this.delegatesSort.apply(this.delegations()));
+  /** The log holds the newest 100 changes (AccessProfilesService.changes' default limit), so a sort covers those. */
+  readonly changesSort = createTableSort<AccessChange>({
+    id: 'access-changes',
+    note: 'Sorts the newest 100 shown',
+    columns: {
+      when: { value: c => c.at, kind: 'date' },
+      who: c => c.actorName,
+      what: c => actionLabel(c.action),
+      person: c => c.targetName,
+      detail: c => changeDetail(c),
+      until: { value: c => c.expiresAt, kind: 'date' },
+      why: c => c.reason,
+    },
+  });
+  readonly sortedChanges = computed(() => this.changesSort.apply(this.changes()));
 
   readonly draftDelegate = signal<number | null>(null);
   readonly draftScope = signal<'ALL_MEMBERS' | 'LISTED'>('ALL_MEMBERS');
@@ -295,7 +379,11 @@ export class AccessGrants {
   constructor() {
     effect(() => {
       this.tenantId();
-      untracked(() => { this.access.set(null); this.personId.set(null); if (this.view() !== 'person') this.show(this.view()); });
+      // Another workspace: its lists are not the old one's, so they read from empty (loading again is right).
+      untracked(() => {
+        this.access.set(null); this.personId.set(null); this.delegations.set([]); this.changes.set([]);
+        if (this.view() !== 'person') this.show(this.view());
+      });
     });
   }
 
@@ -316,26 +404,57 @@ export class AccessGrants {
     this.view.set(view);
     if (view === 'delegates') {
       this.needPeople.emit();
-      this.api.delegates(this.tenantId()).subscribe({ next: r => this.delegations.set(r.status === API_SUCCESS ? r.data ?? [] : []) });
+      const seq = ++this.delegatesSeq;
+      this.delegatesState.start();
+      this.api.delegates(this.tenantId()).subscribe({
+        next: r => {
+          if (seq !== this.delegatesSeq) return;
+          if (r.status !== API_SUCCESS) { this.delegatesState.fail(r, 'The delegations could not be read.'); return; }
+          this.delegations.set(r.data ?? []);
+          this.delegatesState.done();
+        },
+        error: err => { if (seq === this.delegatesSeq) this.delegatesState.fail(err, 'The delegations could not be read.'); },
+      });
     }
     if (view === 'changes') {
-      this.api.changes({ tenantId: this.tenantId() }).subscribe({ next: r => this.changes.set(r.status === API_SUCCESS ? r.data ?? [] : []) });
+      const seq = ++this.changesSeq;
+      this.changesState.start();
+      this.api.changes({ tenantId: this.tenantId() }).subscribe({
+        next: r => {
+          if (seq !== this.changesSeq) return;
+          if (r.status !== API_SUCCESS) { this.changesState.fail(r, 'The access changes could not be read.'); return; }
+          this.changes.set(r.data ?? []);
+          this.changesState.done();
+        },
+        error: err => { if (seq === this.changesSeq) this.changesState.fail(err, 'The access changes could not be read.'); },
+      });
     }
   }
 
-  pick(appUserId: number | null): void {
+  /**
+   * Reads one person's access. `keep` (after a grant): the tree stays on screen under a blur while it is read again,
+   * rather than vanishing and redrawing. An answer for a person no longer chosen is dropped.
+   */
+  pick(appUserId: number | null, keep = false): void {
     this.personId.set(appUserId);
-    this.access.set(null);
-    if (!appUserId) return;
+    if (!keep) this.access.set(null);
+    const seq = ++this.accessSeq;
+    if (!appUserId) { this.loadingAccess.set(false); this.accessError.set(''); return; }
     this.loadingAccess.set(true);
     this.accessError.set('');
     this.api.effective(appUserId).subscribe({
       next: r => {
+        if (seq !== this.accessSeq) return;
         this.loadingAccess.set(false);
-        if (r.status === API_SUCCESS) this.access.set(r.data ?? null);
-        else this.accessError.set(r.message || 'Their access could not be read.');
+        if (r.status === API_SUCCESS && r.data) this.access.set(r.data);
+        else { this.access.set(null); this.accessError.set(loadErrorText(r, 'Their access could not be read.')); }
       },
-      error: err => { this.loadingAccess.set(false); this.accessError.set(err?.error?.message || 'Their access could not be read.'); },
+      error: err => {
+        if (seq !== this.accessSeq) return;
+        this.loadingAccess.set(false);
+        this.access.set(null);
+        this.accessError.set(loadErrorText(err, 'Their access could not be read.'));
+      },
     });
   }
 
@@ -347,7 +466,7 @@ export class AccessGrants {
     this.api.grant(person, key, allowed, this.days(), this.reason()).subscribe({
       next: r => {
         this.busy.set(false);
-        if (r.status === API_SUCCESS) { this.toast.success(r.message || 'Access changed.'); this.pick(person); }
+        if (r.status === API_SUCCESS) { this.toast.success(r.message || 'Access changed.'); this.pick(person, true); }
         else this.toast.error(r.message || 'Access could not be changed.');
       },
       error: err => { this.busy.set(false); this.toast.error(err?.error?.message || 'Access could not be changed.'); },

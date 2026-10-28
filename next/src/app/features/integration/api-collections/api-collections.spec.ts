@@ -70,7 +70,7 @@ describe('API Collections list -- reading', () => {
     const { api } = screenWith();
     const screen = TestBed.runInInjectionContext(() => new ApiCollections());
     screen.ngOnInit();
-    expect(api.list).toHaveBeenCalledWith('', 1, 50, null);
+    expect(api.list).toHaveBeenCalledWith('', 1, 50, null, { status: null });
     expect(screen.rows().map(r => r.collectionId)).toEqual([1000, 1001]);
     expect(screen.total()).toBe(2);
     const tiles = Object.fromEntries(screen.kpis().map(k => [k.label, k.value]));
@@ -86,16 +86,42 @@ describe('API Collections list -- reading', () => {
     screen.onSearch('cli');
     screen.onSearch('clinic');
     vi.advanceTimersByTime(400);
-    expect(api.list).toHaveBeenLastCalledWith('clinic', 1, 50, null);
+    expect(api.list).toHaveBeenLastCalledWith('clinic', 1, 50, null, { status: null });
     expect(api.list).toHaveBeenCalledTimes(3);
   });
 
-  it('filters the page by state', () => {
-    screenWith();
+  it('filters by state on the service, from the first page (owner 2026-10-27: it narrowed only the page read)', () => {
+    try { localStorage.clear(); } catch { /* none */ }
+    const { api } = screenWith();
     const screen = TestBed.runInInjectionContext(() => new ApiCollections());
     screen.ngOnInit();
-    screen.statusFilter.set('Inactive');
-    expect(screen.filtered().map(r => r.name)).toEqual(['Clinic API']);
+    screen.goTo(2);
+    screen.setStatusFilter('Inactive');
+    expect(screen.page()).toBe(1);
+    expect(api.list).toHaveBeenLastCalledWith('', 1, 50, null, { status: 'Inactive' });
+    // What the service sent is what is shown: no second filter over the page.
+    expect(screen.filtered().map(r => r.name)).toEqual(['LIVE-CHECK 0928 httpbin', 'Clinic API']);
+    screen.clearFilters();
+    expect(api.list).toHaveBeenLastCalledWith('', 1, 50, null, { status: null });
+  });
+
+  it('sorts on the service: no sort before a heading is picked, then the column and direction from the first page', () => {
+    try { localStorage.clear(); } catch { /* none */ }
+    const { api } = screenWith();
+    const screen = TestBed.runInInjectionContext(() => new ApiCollections());
+    screen.ngOnInit();
+    screen.goTo(3);
+    screen.sort.toggle('apis');
+    expect(screen.page()).toBe(1);
+    expect(api.list).toHaveBeenLastCalledWith('', 1, 50, null, { status: null, sort: 'apis', dir: 'desc' });
+    screen.sort.toggle('apis');
+    expect(api.list).toHaveBeenLastCalledWith('', 1, 50, null, { status: null, sort: 'apis', dir: 'asc' });
+    screen.setStatusFilter('Active');
+    screen.sort.toggle('name');
+    expect(api.list).toHaveBeenLastCalledWith('', 1, 50, null, { status: 'Active', sort: 'name', dir: 'asc' });
+    screen.goTo(2);
+    expect(api.list).toHaveBeenLastCalledWith('', 2, 50, null, { status: 'Active', sort: 'name', dir: 'asc' });
+    try { localStorage.clear(); } catch { /* none */ }
   });
 
   it('shows the service\'s refusal as the table\'s error', () => {
@@ -123,7 +149,7 @@ describe('API Collections list -- a platform administrator', () => {
     let screen = TestBed.runInInjectionContext(() => new ApiCollections());
     screen.ngOnInit();
     screen.pickWorkspace(2960);
-    expect(first.api.list).toHaveBeenCalledWith('', 1, 50, 2960);
+    expect(first.api.list).toHaveBeenCalledWith('', 1, 50, 2960, { status: null });
     screen.create();
     screen.importFiles();
     screen.edit(ROWS[0] as never);
@@ -142,7 +168,7 @@ describe('API Collections list -- a platform administrator', () => {
     const screen = TestBed.runInInjectionContext(() => new ApiCollections());
     screen.ngOnInit();
     expect(screen.needsWorkspace()).toBe(false);
-    expect(api.list).toHaveBeenCalledWith('', 1, 50, 2960);
+    expect(api.list).toHaveBeenCalledWith('', 1, 50, 2960, { status: null });
   });
 });
 
@@ -221,7 +247,8 @@ describe('API Collections list -- the page', () => {
     const fixture = TestBed.createComponent(ApiCollections);
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
-    expect(el.querySelector('app-table-shell [role="status"]')?.getAttribute('aria-label')).toBe('Loading');
+    // Owner 2026-10-27: the shared loader -- busy at once, skeleton rows after 150 ms.
+    expect(el.querySelector('app-table-shell app-loading')?.getAttribute('aria-busy')).toBe('true');
   });
 
   it('says how to start when the workspace has none', () => {

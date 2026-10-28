@@ -44,7 +44,8 @@ export interface ManagedAction {
 }
 
 export interface ActionsPage extends ApiResponse<ManagedAction[]> {
-  paging?: { limit?: number; nextBeforeId?: number | null };
+  /** nextBeforeId pages the newest-first audit; a sorted one pages by offset (nextOffset, owner 2026-10-27). */
+  paging?: { limit?: number; nextBeforeId?: number | null; offset?: number; nextOffset?: number | null; sort?: string; dir?: 'asc' | 'desc' };
 }
 
 export interface ActionsQuery {
@@ -54,6 +55,11 @@ export interface ActionsQuery {
   limit?: number;
   /** Only the data reads, or only the changes; both when left out (Identity's `kind`). */
   kind?: ActivityKind | null;
+  /** Owner 2026-10-27: the column Identity sorts by (createdAt, staff, workspace, service) and which way; none is newest first. */
+  sort?: string | null;
+  dir?: 'asc' | 'desc' | null;
+  /** A sorted audit's page: how many rows in (paging.nextOffset). */
+  offset?: number | null;
 }
 
 /** Identity's `?kind=` on the managed-service activity: `reads` or `changes` (both by default). */
@@ -110,6 +116,9 @@ export class ManagedServiceApi {
     if (query.beforeId) params = params.set('beforeId', query.beforeId);
     if (query.limit) params = params.set('limit', query.limit);
     if (query.kind) params = params.set('kind', query.kind);
+    if (query.sort) params = params.set('sort', query.sort);
+    if (query.sort && query.dir) params = params.set('dir', query.dir);
+    if (query.offset) params = params.set('offset', query.offset);
     return this.http.get<ActionsPage>(`${this.base}/actions`, { params });
   }
 

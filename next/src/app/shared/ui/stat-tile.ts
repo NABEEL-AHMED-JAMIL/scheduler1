@@ -23,7 +23,7 @@ export function figure(value: string | number | null | undefined): string {
 @Component({
   selector: 'app-stat-tile',
   imports: [Icon, RouterLink, NgTemplateOutlet],
-  host: { class: 'stat-strip-cell stat-tile-cell', role: 'listitem' },
+  host: { class: 'stat-strip-cell stat-tile-cell', role: 'listitem', '[attr.aria-busy]': "loading() ? 'true' : null" },
   // Global: the rules style the row the page lays its tiles in.
   encapsulation: ViewEncapsulation.None,
   styles: `
@@ -47,9 +47,17 @@ export function figure(value: string | number | null | undefined): string {
       }
       <span class="stat-strip-text">
         <span class="stat-strip-label">{{ label() }}</span>
-        <span class="stat-strip-value">{{ shown() }}</span>
-        <!-- Two lines before an ellipsis: a narrow tile cut "forecast $0.03 · Aug $0.02" at "Aug $…". -->
-        @if (foot()) { <span class="stat-strip-foot line-clamp-2" [title]="foot()">{{ foot() }}</span> }
+        @if (loading()) {
+          <!-- Owner 2026-10-27: a figure that has not arrived is not a zero (or $0.00). -->
+          <span class="stat-strip-value"><span class="stat-skel" aria-hidden="true"></span><span class="sr-only">loading</span></span>
+        } @else if (failed()) {
+          <span class="stat-strip-value is-quiet">—</span>
+          <span class="stat-strip-foot">Not available right now</span>
+        } @else {
+          <span class="stat-strip-value">{{ shown() }}</span>
+          <!-- Two lines before an ellipsis: a narrow tile cut "forecast $0.03 · Aug $0.02" at "Aug $…". -->
+          @if (foot()) { <span class="stat-strip-foot line-clamp-2" [title]="foot()">{{ foot() }}</span> }
+        }
       </span>
     </ng-template>
   `,
@@ -68,6 +76,13 @@ export class StatTile {
   readonly queryParams = input<Params | null>(null);
   /** Tooltip, and part of the accessible name when the tile is a link. */
   readonly hint = input('');
-  protected readonly name = computed(() =>
-    [`${this.label()}: ${this.shown()}`, this.foot(), this.hint()].filter(Boolean).join(', '));
+  /** The figure is still being read: a placeholder bar instead of a 0 that looks real. The first load only. */
+  readonly loading = input(false);
+  /** The read behind the figure failed: — and "Not available right now" instead of a false 0. */
+  readonly failed = input(false);
+  protected readonly name = computed(() => {
+    if (this.loading()) return `${this.label()}: loading`;
+    if (this.failed()) return `${this.label()}: not available right now`;
+    return [`${this.label()}: ${this.shown()}`, this.foot(), this.hint()].filter(Boolean).join(', ');
+  });
 }

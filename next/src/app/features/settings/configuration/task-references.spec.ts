@@ -31,6 +31,7 @@ function screen(kind: TaskReferenceKind, platform = false) {
   const toast = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
   const open = vi.fn(() => ({ closed: of(true) }));
   TestBed.resetTestingModule();
+  try { localStorage.clear(); } catch { /* none: the sort remembers its choice there */ }
   TestBed.configureTestingModule({
     imports: [TaskReferences],
     providers: [
@@ -192,5 +193,36 @@ describe('Home pages and task groups -- adding and editing', () => {
     component.form.patchValue({ tenantId: 2901 });
     component.save();
     expect(http.expectOne(r => r.method === 'POST').request.body.tenantId).toBe(2901);
+  });
+});
+
+describe('Home pages and task groups -- sorting, loading, empty, error (owner 2026-10-27)', () => {
+  it('keeps the API order until a heading is picked, then sorts by it both ways', () => {
+    const { component, http } = screen('HOME_PAGE');
+    http.expectOne(r => r.url === ENDPOINT && r.method === 'GET').flush({ status: API_SUCCESS, data: HOME_PAGES });
+    expect(component.sorted().map(r => r.id)).toEqual([2101, 2102]);
+    component.sort.toggle('name');
+    expect(component.sorted().map(r => r.name)).toEqual(['Claims portal', 'Status page']);
+    component.sort.toggle('name');
+    expect(component.sorted().map(r => r.name)).toEqual(['Status page', 'Claims portal']);
+    component.sort.toggle('usedBy');
+    expect(component.sorted().map(r => r.usedByTasks)).toEqual([3, 0]);
+  });
+
+  it('is loading until the list answers, then empty when it answers empty', () => {
+    const { component, http } = screen('TASK_GROUP');
+    expect(component.loading()).toBe(true);
+    expect(component.state.pending()).toBe(true);
+    http.expectOne(r => r.url === ENDPOINT && r.method === 'GET').flush({ status: API_SUCCESS, data: [] });
+    expect(component.loading()).toBe(false);
+    expect(component.state.pending()).toBe(false);
+    expect(component.sorted()).toEqual([]);
+  });
+
+  it('says the list could not be read, in plain words', () => {
+    const { component, http } = screen('TASK_GROUP');
+    http.expectOne(r => r.url === ENDPOINT && r.method === 'GET').flush('Internal Server Error', { status: 500, statusText: 'Server Error' });
+    expect(component.loading()).toBe(false);
+    expect(component.error()).toBe('The task groups could not be read.');
   });
 });

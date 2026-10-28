@@ -37,10 +37,11 @@
   }
 
   <!-- Live run counts. Driven by the same rows the socket patches, so they move on their own. -->
+  <!-- Owner 2026-10-27: placeholders until the list answers, "Not available" when it failed, never five false zeros. -->
   <app-stat-strip [items]="liveTiles()" [cols]="2" [smCols]="3" [lgCols]="5" align="start" size="md"
-                  label="Live run counts" />
+                  label="Live run counts" [loading]="state.pending()" [failed]="!!error() && !state.loaded()" />
 
-  <app-table-shell heading="Schedules" [scrollRows]="false" [loading]="loading()" [error]="error()"
+  <app-table-shell heading="Schedules" [scrollRows]="false" [loading]="loading()" [error]="error()" loadingLabel="Loading schedules…"
                    [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="jobs().length"
                    [emptyMessage]="emptyMessage()"
                    emptyIcon="briefcase"
@@ -106,27 +107,27 @@
           </th>
           <th class="w-8"></th>
           <!-- UX review 2026-10-12 (G12, S1): one word per thing -- a schedule runs a pipeline. -->
-          <th>Schedule</th>
+          <th appSort="schedule" [sortBy]="sort">Schedule</th>
           <!-- Whose job it is, beside its name, for the one role whose list mixes workspaces. It waits
                for xl like Task and Execution; on a narrower screen the Workspace filter still narrows. -->
           @if (seesWorkspaces()) {
-            <th class="hidden xl:table-cell">Workspace</th>
+            <th class="hidden xl:table-cell" appSort="workspace" [sortBy]="sort">Workspace</th>
           }
           <!-- Task, Execution and Created wait for xl, as the metadata columns wait for 2xl: at 1024
                they pushed Run status and the row's menu past the card edge. None is lost -- the
                task is in the row's panel, and Schedule already reads "On demand" for Manual. -->
-          <th class="hidden xl:table-cell">Pipeline</th>
-          <th class="hidden xl:table-cell">Mode</th>
+          <th class="hidden xl:table-cell" appSort="pipeline" [sortBy]="sort">Pipeline</th>
+          <th class="hidden xl:table-cell" appSort="mode" [sortBy]="sort">Mode</th>
           <!-- A floor so "Ends 2026-12-31" is not broken at its hyphens. -->
-          <th class="min-w-40 xl:min-w-52">When</th>
-          <th class="hidden xl:table-cell">Created</th>
+          <th class="min-w-40 xl:min-w-52" appSort="when" [sortBy]="sort">When</th>
+          <th class="hidden xl:table-cell" appSort="created" [sortBy]="sort">Created</th>
           <!-- Metadata columns wait for a wide screen, as on Tasks; the detail row still spans them. -->
-          <th class="hidden 2xl:table-cell">Created by</th>
-          <th class="hidden 2xl:table-cell">Updated by</th>
+          <th class="hidden 2xl:table-cell" appSort="createdBy" [sortBy]="sort">Created by</th>
+          <th class="hidden 2xl:table-cell" appSort="updatedBy" [sortBy]="sort">Updated by</th>
           <!-- S1: the runs and the schedule's own state side by side at the right, not two pills far apart. -->
-          <th>Next / last run</th>
-          <th>Run status</th>
-          <th class="text-right">State</th>
+          <th appSort="nextLast" [sortBy]="sort">Next / last run</th>
+          <th appSort="runStatus" [sortBy]="sort">Run status</th>
+          <th class="text-right" appSort="state" [sortBy]="sort">State</th>
           <th class="w-12 col-pin-right th-actions">Actions</th>
         </tr>
       </thead>
@@ -401,15 +402,15 @@
                         </button>
                       }
                     </div>
-                    @if (payloadFor(job); as payload) {
+                    @if (payloadError(job); as reason) {
+                      <app-inline-status [error]="reason" (retry)="retryPayload(job)" />
+                    } @else if (payloadFor(job); as payload) {
                       <pre class="mono text-xs leading-relaxed rounded p-2.5 overflow-y-auto max-h-64 whitespace-pre-wrap break-words bg-code border border-subtle"
                           >{{ payload }}</pre>
                     } @else if (payloadFor(job) === '') {
                       <p class="text-xs text-[color:var(--text-muted)]">This pipeline has no payload configured.</p>
                     } @else {
-                      <p class="flex items-center gap-1.5 text-xs text-[color:var(--text-muted)]">
-                        <app-icon name="refresh" size="0.85em" class="spin" />Reading the task…
-                      </p>
+                      <app-loading shape="inline" label="Reading the pipeline's payload…" />
                     }
                   </div>
                 }
@@ -428,10 +429,10 @@
                     </a>
                   </div>
 
-                  @if (runsLoading() === job.jobId) {
-                    <p class="text-xs text-[color:var(--text-muted)] py-6 text-center">
-                      <app-icon name="refresh" class="spin" size="0.9em" /> Loading run history…
-                    </p>
+                  @if (runsLoadingFor().has(job.jobId)) {
+                    <app-loading shape="spinner" label="Loading run history…" />
+                  } @else if (runsErrorFor()[job.jobId]; as reason) {
+                    <app-inline-status [error]="reason" (retry)="loadRuns(job.jobId)" />
                   } @else if (runsByJob()[job.jobId]?.length) {
                     <app-bar-chart [data]="runsByJob()[job.jobId]!" [height]="120" [clickable]="true" unit="duration"
                                    (barClicked)="openRunLogs(job, $event)" />

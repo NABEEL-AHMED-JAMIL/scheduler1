@@ -92,7 +92,7 @@ export const PINNED: Record<string, unknown> = {
     "fields": [
       "Covering month-end close",
       "ForUntil removed7 days30 days90 days",
-      "PersonNo member to choose",
+      "PersonChoose a member",
       "Reason (kept in the change log)"
     ],
     "links": [
@@ -193,6 +193,7 @@ export const PINNED: Record<string, unknown> = {
     "buttons": [
       "Actions for Claude Demo 75a611b4",
       "Actions for Default",
+      "Admin",
       "Alerts",
       "Cards",
       "Columns",
@@ -202,8 +203,10 @@ export const PINNED: Record<string, unknown> = {
       "New workspace",
       "Only mine",
       "Pipelines",
+      "Plan",
       "Refresh",
       "Runs",
+      "State",
       "Storage",
       "Table",
       "Users",

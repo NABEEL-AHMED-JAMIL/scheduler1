@@ -2,7 +2,8 @@ import { describe, it, expect, vi } from 'vitest';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { DIALOG_DATA, Dialog, DialogRef } from '@angular/cdk/dialog';
-import { of, throwError } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { InboxApi } from './inbox.service';
 import { InboxSettings } from './inbox.model';
@@ -123,5 +124,43 @@ describe('Inbox settings dialog', () => {
     await form.turnOff();
     expect(api.turnOff).not.toHaveBeenCalled();
     expect(ref.close).not.toHaveBeenCalled();
+  });
+});
+
+describe('Inbox settings dialog -- the connections list (owner 2026-10-27)', () => {
+  it('is loading, not empty, until the connections answer', () => {
+    const { api, form } = dialogWith();
+    api.buckets.mockReturnValue(NEVER as never);
+    form.loadBuckets();
+    expect(form.loadingBuckets()).toBe(true);
+    expect(form.bucketsState.pending()).toBe(false);
+    expect(form.bucketsError()).toBe('');
+  });
+
+  it('is empty once no connection answers', () => {
+    const { api, form } = dialogWith();
+    api.buckets.mockReturnValue(of({ status: 'SUCCESS', message: '', data: [] }));
+    form.loadBuckets();
+    expect(form.loadingBuckets()).toBe(false);
+    expect(form.options()).toEqual([]);
+  });
+
+  it('says in plain words why the connections could not be read, and reads again on Try again', () => {
+    const { api, form } = dialogWith();
+    api.buckets.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 500 })) as never);
+    form.loadBuckets();
+    expect(form.loadingBuckets()).toBe(false);
+    expect(form.bucketsError()).toBe('The storage connections could not be read.');
+    api.buckets.mockReturnValue(of({ status: 'SUCCESS', message: '', data: BUCKETS }));
+    form.loadBuckets();
+    expect(form.bucketsError()).toBe('');
+    expect(form.options().length).toBe(2);
+  });
+
+  it('says something when a refusal carries no message', () => {
+    const { api, form } = dialogWith();
+    api.buckets.mockReturnValue(of({ status: 'ERROR', message: '' }) as never);
+    form.loadBuckets();
+    expect(form.bucketsError()).toBe('The storage connections could not be read.');
   });
 });

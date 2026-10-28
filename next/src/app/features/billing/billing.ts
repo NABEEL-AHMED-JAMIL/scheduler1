@@ -17,6 +17,9 @@ import { WorkspacePicker } from './workspace-picker';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { PageHeader } from '../../shared/ui/page-header';
 import { RefreshButton } from '../../shared/ui/refresh-button';
+import { createTableSort } from '../../shared/ui/sort';
+import { SortHeader } from '../../shared/ui/sort-header';
+import { AppLoading, InlineStatus, createLoadState, loadErrorText } from '../../shared/ui/loading';
 
 /** How many subjects a line unfolds to: the top buckets, prompts or objects behind it. */
 const SUBJECTS_SHOWN = 25;
@@ -36,7 +39,7 @@ function isTiny(amount: number): boolean {
  */
 @Component({
   selector: 'app-billing',
-  imports: [RefreshButton, PageHeader, Icon, StatTile, WorkspaceSelect, TableShell, CostByDay, DecimalPipe, ServerTimePipe, RouterLink, PipelineCosts, ModelCalls],
+  imports: [RefreshButton, PageHeader, SortHeader, AppLoading, InlineStatus, Icon, StatTile, WorkspaceSelect, TableShell, CostByDay, DecimalPipe, ServerTimePipe, RouterLink, PipelineCosts, ModelCalls],
   templateUrl: './billing.html',
   styleUrl: './day-table.css',
 })
@@ -64,8 +67,18 @@ export class Billing implements OnInit {
   private followBillingMonth = true;
   readonly isCurrentMonth = computed(() => this.month().slice(0, 7) === (this.billingMonth() ?? firstOfMonth(new Date()).slice(0, 7)));
 
-  readonly loading = signal(false);
-  readonly error = signal('');
+  /**
+   * Owner 2026-10-27: the month's read, loading from the start -- for a platform administrator the workspace list is read
+   * first, and in that wait the tiles read $0.00 and the table "Nothing metered" as if they were the answer.
+   */
+  readonly state = createLoadState();
+  readonly loading = this.state.loading;
+  readonly error = this.state.error;
+  /** Which month and workspace the figures on screen belong to; another one being read shows placeholders, not the old figures. */
+  private readonly shownScope = signal('');
+  private scopeKey(): string { return `${this.month()}|${this.isPlatformAdmin() ? this.workspaces.effective() ?? '' : ''}`; }
+  /** The tiles, the chart and By service wait for the first answer, and for a new month or workspace (owner 2026-10-27). */
+  readonly figuresLoading = computed(() => this.state.pending() || (this.loading() && this.shownScope() !== this.scopeKey()));
   readonly notConfigured = signal(false);
   readonly lines = signal<MeterLine[]>([]);
   /**
@@ -103,6 +116,22 @@ export class Billing implements OnInit {
   readonly tinyLines = computed(() => this.tableLines().filter(l => isTiny(l.amount)));
   readonly tinyTotal = computed(() => this.tinyLines().reduce((n, l) => n + l.amount, 0));
   readonly shownLines = computed(() => this.showTinyLines() ? this.tableLines() : this.tableLines().filter(l => !isTiny(l.amount)));
+  /**
+   * Owner 2026-10-27: every column sorts. The month's lines keep the meter's order and a day's lines their largest-first
+   * order until a heading is picked, so the initial order is the table's own (null). The rate sorts per unit, so
+   * "$0.01 per GB" and "$0.005 per 1,000 ops" compare as prices; a tiered or unpriced rate sorts after the prices.
+   */
+  readonly sort = createTableSort<MeterLine>({
+    id: 'billing-lines',
+    columns: {
+      meter: l => l.label || l.meter,
+      service: l => l.service,
+      quantity: { value: l => l.quantity, kind: 'number' },
+      rate: { value: l => (l.unpriced ? null : l.hasTiers ? 'Tiered' : l.unitPrice / (l.per || 1)), kind: 'number' },
+      amount: { value: l => l.amount, kind: 'number' },
+    },
+  });
+  readonly sortedLines = computed(() => this.sort.apply(this.shownLines()));
   readonly days = signal<DayRow[]>([]);
   /** Last month's days, for the cumulative view's comparison line. */
   readonly previousDays = signal<DayRow[] | null>(null);
@@ -196,6 +225,19 @@ export class Billing implements OnInit {
   readonly subjectsLoading = signal(false);
   /** A drill-down that could not be read says so, rather than "No subject recorded". */
   readonly subjectsError = signal('');
+  /** Owner 2026-10-27: the subjects behind a line sort too -- over the top SUBJECTS_SHOWN the meter sends, and the header says so. */
+  readonly subjectSort = createTableSort<SubjectRow>({
+    id: 'billing-line-subjects',
+    note: `Sorts the top ${SUBJECTS_SHOWN} shown`,
+    columns: {
+      subject: s => s.subject_id || s.subject_type,
+      quantity: { value: s => s.quantity, kind: 'number' },
+      events: { value: s => s.events, kind: 'number' },
+      last: { value: s => s.last, kind: 'date' },
+      by: s => this.actorLabel(s),
+    },
+  });
+  readonly sortedSubjects = computed(() => this.subjectSort.apply(this.subjects()));
 
   readonly Math = Math;
   /** Owner #7: a service's share, "<1%" for a real amount that rounds to nothing. */
@@ -226,7 +268,7 @@ export class Billing implements OnInit {
   }
 
   load(): void {
-    this.loading.set(true); this.error.set(''); this.openLine.set(null); this.previousTotal.set(null); this.previousDays.set(null);
+    this.state.start(); this.openLine.set(null); this.previousTotal.set(null); this.previousDays.set(null);
     this.selectedDay.set(null);
     const before = this.previousMonth();
     this.api.usageByMeter(this.query(before)).subscribe({
@@ -240,7 +282,7 @@ export class Billing implements OnInit {
     });
     this.api.usageByMeter(this.query()).subscribe({
       next: r => {
-        if (r.status !== API_SUCCESS) { this.loading.set(false); this.failed(r.message); return; }
+        if (r.status !== API_SUCCESS) { this.failed(r, r.message); return; }
         // H9: the workspace's billing calendar. On the first answer, show the workspace's own month (its zone may already
         // be in the next, or still in the last, while the browser's is not).
         this.timeZone.set(r.data?.timeZone ?? null);
@@ -267,20 +309,22 @@ export class Billing implements OnInit {
         })));
         this.api.usageByDay(this.query()).subscribe({
           next: d => {
-            this.loading.set(false);
-            if (d.status !== API_SUCCESS) { this.failed(d.message); return; }
+            if (d.status !== API_SUCCESS) { this.failed(d, d.message); return; }
             this.days.set(dayRows(d.data?.rows));
+            this.shownScope.set(this.scopeKey());
+            this.state.done();
           },
-          error: err => { this.loading.set(false); this.failed(err?.error?.message); },
+          error: err => this.failed(err, err?.error?.message),
         });
       },
-      error: err => { this.loading.set(false); this.failed(err?.error?.message); },
+      error: err => this.failed(err, err?.error?.message),
     });
   }
 
-  private failed(message?: string): void {
-    if ((message || '').includes('not configured')) { this.notConfigured.set(true); return; }
-    this.error.set(message || 'The metering service did not answer.');
+  /** A read that failed: "not configured" is its own state (no meter at all); anything else in plain words (owner 2026-10-27). */
+  private failed(err: unknown, message?: string): void {
+    if ((message || '').includes('not configured')) { this.notConfigured.set(true); this.state.done(); return; }
+    this.state.fail(err, 'The metering service did not answer.');
   }
 
   /** The lines as a CSV -- the same figures, for a spreadsheet or the finance system. */
@@ -299,23 +343,34 @@ export class Billing implements OnInit {
    * platform administrator re-prices every workspace; a workspace administrator only their own.
    */
   refresh(): void {
-    this.loading.set(true);
+    this.state.start();
     const roll = this.isPlatformAdmin() ? this.api.refreshUsage() : this.api.refreshWorkspace();
     roll.subscribe({ next: () => this.load(), error: () => this.load() });
   }
 
   toggleLine(line: MeterLine): void {
     if (this.openLine()?.meter === line.meter) { this.openLine.set(null); return; }
-    this.openLine.set(line); this.subjects.set([]); this.subjectsError.set(''); this.subjectsLoading.set(true);
+    this.openLine.set(line);
+    this.readSubjects(line);
+  }
+
+  /** The subjects behind the open line; Try again reads them once more. A reply for a line closed since is dropped. */
+  readSubjects(line: MeterLine): void {
+    this.subjects.set([]); this.subjectsError.set(''); this.subjectsLoading.set(true);
     // A picked day's line opens to that day's subjects.
     const day = this.selectedDay();
     const range = day ? { ...this.query(), from: day, to: day } : this.query();
+    const fallback = 'The events behind this line could not be read.';
     this.api.subjects(range, line.meter, SUBJECTS_SHOWN).subscribe({
       next: r => {
+        if (this.openLine()?.meter !== line.meter) return;
         this.subjectsLoading.set(false);
-        if (r.status !== API_SUCCESS) { this.subjectsError.set(r.message || 'The events behind this line could not be read.'); return; }
+        if (r.status !== API_SUCCESS) { this.subjectsError.set(loadErrorText(r, fallback)); return; }
         this.subjects.set((r.data?.rows ?? []).map(s => ({ ...s, quantity: Number(s.quantity), events: Number(s.events) }))); },
-      error: err => { this.subjectsLoading.set(false); this.subjectsError.set(err?.error?.message || 'The events behind this line could not be read.'); },
+      error: err => {
+        if (this.openLine()?.meter !== line.meter) return;
+        this.subjectsLoading.set(false); this.subjectsError.set(loadErrorText(err, fallback));
+      },
     });
   }
 

@@ -1,10 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
 import { provideZonelessChangeDetection, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { provideRouter } from '@angular/router';
-import { of } from 'rxjs';
+import { NEVER, Observable, of, throwError } from 'rxjs';
 import { ConversationApi } from './conversation.api';
 import { CreatePipeline, CreatePipelineData } from './create-pipeline';
 import { PipelineFlowArtifact } from './flow.model';
@@ -188,5 +188,43 @@ describe('the Create pipeline dialog', () => {
     expect(el.textContent).toContain('Work in this workspace');
     expect(fixture.componentInstance.topics()).toEqual([]);
     expect(fixture.componentInstance.canCreate()).toBe(false);
+  });
+});
+
+describe('the Create pipeline dialog -- the topic field loads, is empty, or failed (owner 2026-10-27)', () => {
+  function withTopics(answer: () => Observable<unknown>) {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [CreatePipeline],
+      providers: [provideZonelessChangeDetection(), provideRouter([]),
+        { provide: DIALOG_DATA, useValue: { flow: flow({ type: 'manual' }), definition: flow({ type: 'manual' }).definition } },
+        { provide: DialogRef, useValue: { close: vi.fn() } },
+        { provide: AuthService, useValue: { user: signal({ appUserId: 4640, tenantId: 2960 }) } },
+        { provide: ConversationApi, useValue: { pipelineCreated: vi.fn(() => of({ status: 'SUCCESS' })) } },
+        { provide: HttpClient, useValue: { get: answer, post: () => of({ status: 'SUCCESS' }) } }],
+    });
+    const fixture = TestBed.createComponent(CreatePipeline);
+    fixture.detectChanges();
+    return { fixture, el: fixture.nativeElement as HTMLElement };
+  }
+
+  it('says the topics are loading, not that there is none', () => {
+    const { fixture } = withTopics(() => NEVER);
+    expect(fixture.componentInstance.topicsState.loading()).toBe(true);
+    expect(fixture.componentInstance.topicsState.loaded()).toBe(false);
+  });
+
+  it('says there is no active topic once an empty list answers', () => {
+    const { fixture, el } = withTopics(() => of({ status: 'SUCCESS', data: [] }));
+    fixture.detectChanges();
+    expect(fixture.componentInstance.topicsState.loaded()).toBe(true);
+    expect(el.textContent).toContain('This workspace has no active topic');
+  });
+
+  it('says the topics could not be read, with Try again', () => {
+    const { fixture, el } = withTopics(() => throwError(() => new HttpErrorResponse({ status: 500 })));
+    fixture.detectChanges();
+    expect(fixture.componentInstance.topicsState.error()).toBe('The topics could not be read.');
+    expect(el.textContent).toContain('Try again');
   });
 });

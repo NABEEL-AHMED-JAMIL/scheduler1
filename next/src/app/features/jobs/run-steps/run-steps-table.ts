@@ -15,6 +15,11 @@ import { OutputChip, StepRow, stepRows } from './run-page.model';
 import { RunApprovalStore } from './run-approval.store';
 import { RunTimelineStore } from './run-timeline.store';
 import { RunStepLogData, RunStepLogPanel } from './run-step-log-panel';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
+import { AppLoading, InlineStatus } from '../../../shared/ui/loading';
+import { LoadError } from '../../../shared/ui/load-error';
+import { BlurLoader } from '../../../shared/ui/blur-loader';
 
 /**
  * The run page's Steps tab (UX review 2026-10-12, run page fix): every step in one compact row, in the plan map's
@@ -25,7 +30,7 @@ import { RunStepLogData, RunStepLogPanel } from './run-step-log-panel';
  */
 @Component({
   selector: 'app-run-steps-table',
-  imports: [Icon, StatusPill, Segmented, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, Avatar, RouterLink],
+  imports: [Icon, StatusPill, Segmented, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, Avatar, RouterLink, SortHeader, AppLoading, InlineStatus, LoadError, BlurLoader],
   styles: `
     :host { display: block; }
     .rs-table { width: 100%; border-spacing: 0; font-size: 0.8125rem; }
@@ -115,22 +120,30 @@ import { RunStepLogData, RunStepLogPanel } from './run-step-log-panel';
           </p>
         }
 
+        <!-- Owner 2026-10-27: the outputs are their own read; a failure says so once, with Try again, rather than "—" on
+             every row as if no step had made anything. -->
+        @if (store.outputs() === 'error') {
+          <div class="px-4 py-2 border-b border-subtle" data-test="outputs-error">
+            <app-inline-status error="The steps' outputs could not be read." (retry)="store.retryOutputs()" />
+          </div>
+        }
+        <app-blur-loader [active]="store.switching()" label="Reading the attempt…">
         <div class="overflow-x-auto">
           <table class="rs-table" aria-describedby="run-steps-heading">
             <thead>
               <tr>
-                <th class="rs-no" scope="col">#</th>
-                <th scope="col" class="rs-step-col">Step</th>
-                <th scope="col">Status</th>
-                <th scope="col">Started</th>
-                <th scope="col">Duration</th>
-                <th scope="col" class="num">Rows in → out</th>
+                <th class="rs-no" scope="col" appSort="no" [sortBy]="sort">#</th>
+                <th scope="col" class="rs-step-col" appSort="step" [sortBy]="sort">Step</th>
+                <th scope="col" appSort="status" [sortBy]="sort">Status</th>
+                <th scope="col" appSort="started" [sortBy]="sort">Started</th>
+                <th scope="col" appSort="duration" [sortBy]="sort">Duration</th>
+                <th scope="col" class="num" appSort="rows" [sortBy]="sort">Rows in → out</th>
                 <th scope="col" class="rs-out-col">Output</th>
                 <th scope="col" class="w-12"><span class="sr-only">Log</span></th>
               </tr>
             </thead>
             <tbody>
-              @for (r of rows(); track r.step.index) {
+              @for (r of sortedRows(); track r.step.index) {
                 <tr class="rs-row exec-step" [class.is-crit]="r.tone === 'crit'" [class.is-warn]="r.tone === 'warn'" [class.is-slowest]="r.slowest"
                     [attr.data-step]="r.step.key" [attr.data-tone]="r.tone">
                   <td class="rs-no tabular">{{ r.no }}</td>
@@ -204,7 +217,15 @@ import { RunStepLogData, RunStepLogPanel } from './run-step-log-panel';
                             </ng-template>
                           }
                         </span>
-                      } @empty { <span class="text-[color:var(--text-muted)]">—</span> }
+                      } @empty {
+                        @if (store.outputs() === null) {
+                          <span class="text-[color:var(--text-muted)]" title="Reading the outputs…">…<span class="sr-only">Reading the outputs</span></span>
+                        } @else if (store.outputs() === 'error') {
+                          <span class="text-[color:var(--text-muted)]" title="The outputs could not be read">?<span class="sr-only">The outputs could not be read</span></span>
+                        } @else {
+                          <span class="text-[color:var(--text-muted)]">—</span>
+                        }
+                      }
                     </div>
                   </td>
                   <td class="text-right">
@@ -214,17 +235,21 @@ import { RunStepLogData, RunStepLogPanel } from './run-step-log-panel';
                     }
                   </td>
                 </tr>
+              } @empty {
+                <tr><td colspan="8" class="px-4 py-6 text-center text-sm text-[color:var(--text-muted)]" data-test="no-steps">This run has no steps yet.</td></tr>
               }
             </tbody>
           </table>
         </div>
+        </app-blur-loader>
       </section>
     } @else if (store.readError()) {
-      <p class="card p-4 text-sm text-[color:var(--text-muted)]">The run's steps could not be read. Refresh to try again.</p>
+      <!-- Owner 2026-10-27: the reason with Try again here, not "Refresh to try again". -->
+      <div class="card" data-test="steps-error"><app-load-error message="The run's steps could not be read." (retry)="store.retry()" /></div>
     } @else if (store.legacy()) {
       <p class="card p-4 text-sm text-[color:var(--text-muted)]" data-test="legacy-steps">This run was not taken by the step engine, so it has no steps to list. Its entries are on the Log tab.</p>
     } @else {
-      <p class="card p-4 text-sm text-[color:var(--text-muted)]">Reading the run's steps…</p>
+      <div class="card"><app-loading shape="rows" label="Reading the run's steps…" /></div>
     }
   `,
 })
@@ -248,6 +273,23 @@ export class RunStepsTable {
   readonly attemptSentence = attemptSentence;
 
   readonly rows = computed<StepRow[]>(() => stepRows(this.store.timeline(), this.store.outputList()));
+  /**
+   * Owner 2026-10-27: the columns sort, but the steps keep their pipeline order until one is picked (the order is what
+   * the run did). Rows in -> out sorts by the rows out, the figure a reader compares.
+   */
+  readonly sort = createTableSort<StepRow>({
+    id: 'run-steps',
+    columns: {
+      no: { value: r => r.no, kind: 'number', first: 'asc' },
+      step: r => r.name,
+      status: { value: r => r.step.status, kind: 'status' },
+      started: { value: r => r.step.startedAt, kind: 'date' },
+      duration: { value: r => r.step.durationMs, kind: 'number' },
+      rows: { value: r => r.step.recordsOut ?? r.step.recordsIn, kind: 'number' },
+    },
+    initial: null,
+  });
+  readonly sortedRows = computed(() => this.sort.apply(this.rows()));
   readonly completed = computed(() => (this.store.timeline()?.steps ?? []).filter(s => s.status === 'Completed').length);
   readonly slowest = computed(() => this.rows().find(r => r.slowest) ?? null);
   readonly attemptOptions = computed<SegmentOption<string>[]>(() =>

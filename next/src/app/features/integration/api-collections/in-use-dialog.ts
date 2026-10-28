@@ -1,8 +1,10 @@
-import { Component, inject } from '@angular/core';
+import { Component, computed, inject } from '@angular/core';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { FormDialog } from '../../../shared/ui/form-dialog';
 import { DataText } from '../../../shared/ui/data-text';
 import { UsageRow } from './api-collections.model';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
 
 export interface InUseData { heading: string; message: string; users: UsageRow[]; }
 
@@ -14,15 +16,20 @@ const KINDS: Record<string, string> = { PIPELINE: 'Pipeline', SOURCE: 'Source', 
  */
 @Component({
   selector: 'app-in-use-dialog',
-  imports: [FormDialog, DataText],
+  imports: [FormDialog, DataText, SortHeader],
   template: `
     <app-form-dialog [heading]="data.heading" [subtitle]="data.message" [showConfirm]="false" cancelLabel="Close" size="wide"
                      (cancelled)="ref.close()">
       <div class="overflow-x-auto">
       <table class="table-modern min-w-[32rem]">
-        <thead><tr><th>Used by</th><th>Name</th><th>API</th><th class="text-right">Pinned version</th></tr></thead>
+        <thead><tr>
+          <th appSort="kind" [sortBy]="sort">Used by</th>
+          <th appSort="name" [sortBy]="sort">Name</th>
+          <th appSort="api" [sortBy]="sort">API</th>
+          <th class="text-right" appSort="pinned" [sortBy]="sort">Pinned version</th>
+        </tr></thead>
         <tbody>
-          @for (u of data.users; track $index) {
+          @for (u of sorted(); track $index) {
             <tr>
               <td class="whitespace-nowrap">{{ kind(u.userType) }}</td>
               <td class="max-w-64"><app-data-text [value]="u.userName || u.userRef" label="Used by" /></td>
@@ -42,4 +49,17 @@ export class InUseDialog {
   readonly data = inject<InUseData>(DIALOG_DATA);
 
   kind(type: string): string { return KINDS[type] ?? type; }
+
+  /** Owner 2026-10-27: the list sorts by its columns; the service's order until a heading is picked, fresh each time. */
+  readonly sort = createTableSort<UsageRow>({
+    id: 'api-collection-in-use',
+    remember: false,
+    columns: {
+      kind: u => this.kind(u.userType),
+      name: u => u.userName || u.userRef,
+      api: u => u.requestName,
+      pinned: { value: u => u.pinnedVersion, kind: 'number' },
+    },
+  });
+  readonly sorted = computed(() => this.sort.apply(this.data.users));
 }

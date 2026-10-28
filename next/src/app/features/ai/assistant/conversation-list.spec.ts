@@ -261,4 +261,29 @@ describe('ConversationList (the component)', () => {
     expect(opened).toEqual([7]);
     expect(removed).toEqual([7]);
   });
+  it('is loading, not empty, until the list answers; then says none yet (owner 2026-10-27)', () => {
+    const { fixture, list, el, c } = make();
+    fixture.detectChanges();
+    expect(c.loading()).toBe(true);
+    expect(el.querySelector('[data-empty]')).toBeNull();
+    expect(el.querySelector('app-loading')).toBeTruthy();
+    list().flush(page([]));
+    fixture.detectChanges();
+    expect(c.loaded()).toBe(true);
+    expect(el.querySelector('[data-empty]')!.textContent).toContain('None yet');
+  });
+
+  it('says the list could not be read in plain words, and a failed Load more says so too (owner 2026-10-27)', () => {
+    const { fixture, list, el, c } = make();
+    list().flush('boom', { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+    expect(c.loading()).toBe(false);
+    expect(c.error()).toBe('The conversations could not be read.');
+    expect(el.querySelector('[data-empty]')).toBeNull();
+    c.load();
+    list().flush(page([row(1, '2026-10-01T10:00:00')], 80));
+    c.loadMore();
+    list().flush('boom', { status: 500, statusText: 'Server Error' });
+    expect(c.moreError()).toBe('The next conversations could not be read.');
+  });
 });

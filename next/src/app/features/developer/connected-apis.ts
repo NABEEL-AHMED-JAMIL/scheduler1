@@ -6,6 +6,7 @@ import { API_SUCCESS } from '../../core/api/api.config';
 import { PageHeader } from '../../shared/ui/page-header';
 import { Icon } from '../../shared/ui/icon';
 import { LoadError } from '../../shared/ui/load-error';
+import { AppLoading, loadErrorText } from '../../shared/ui/loading';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { ApiCollectionsApi } from '../integration/api-collections/api-collections.service';
 import { RequestRow, RequestSample } from '../integration/api-collections/api-collections.model';
@@ -25,7 +26,7 @@ interface CollectionView { collectionId: number; name: string; description: stri
  */
 @Component({
   selector: 'app-developer-connected',
-  imports: [PageHeader, RouterLink, Icon, LoadError, ServerTimePipe, DevCode, WorkspaceSelect],
+  imports: [PageHeader, RouterLink, Icon, LoadError, AppLoading, ServerTimePipe, DevCode, WorkspaceSelect],
   template: `
     <div class="page" data-developer-connected>
       <app-page-header title="APIs this workspace calls"
@@ -39,11 +40,18 @@ interface CollectionView { collectionId: number; name: string; description: stri
       } @else if (error()) {
         <app-load-error [message]="error()" (retry)="load()" />
       } @else if (loading()) {
-        <p class="text-sm text-[color:var(--text-muted)]"><span class="spinner inline-block align-middle mr-2"></span>Reading the collections…</p>
-      } @else if (!collections().length) {
+        <app-loading shape="cards" label="Loading API collections…" [count]="2" />
+      } @else if (!collections().length && !unread()) {
         <section class="card p-4 text-sm text-[color:var(--text-secondary)]">
           No API collection yet. <a class="link-inline" routerLink="/connections/api-collections">Add one</a> to call an API from a pipeline.
         </section>
+      }
+      @if (!loading() && !error() && unread()) {
+        <!-- Owner 2026-10-27: a collection whose detail would not load used to just disappear; say so, with Try again. -->
+        <p class="card px-4 py-2.5 text-sm text-crit-500 flex flex-wrap items-center gap-2" role="alert" data-collections-unread>
+          <app-icon name="alert" />{{ unread() === 1 ? '1 collection' : unread() + ' collections' }} could not be read.
+          <button type="button" class="btn btn-default btn-sm" (click)="load()"><app-icon name="refresh" />Try again</button>
+        </p>
       }
       @for (c of collections(); track c.collectionId) {
         <section class="card overflow-hidden" [attr.data-collection]="c.collectionId">
@@ -65,8 +73,13 @@ interface CollectionView { collectionId: number; name: string; description: stri
                 </div>
                 @if (open() === r.requestId) {
                   <div class="mt-2" data-sample>
-                    @if (samples()[r.requestId] === undefined) {
-                      <p class="text-sm text-[color:var(--text-muted)]"><span class="spinner inline-block align-middle mr-2"></span>Reading…</p>
+                    @if (sampleErrors()[r.requestId]; as why) {
+                      <p class="text-sm text-crit-500 flex flex-wrap items-center gap-2" role="alert">
+                        <app-icon name="alert" />{{ why }}
+                        <button type="button" class="btn btn-default btn-xs" (click)="readSample(r.requestId)"><app-icon name="refresh" />Try again</button>
+                      </p>
+                    } @else if (samples()[r.requestId] === undefined) {
+                      <app-loading shape="inline" label="Loading the last answer…" />
                     } @else if (samples()[r.requestId] === null) {
                       <p class="text-sm text-[color:var(--text-muted)]">No answer kept yet: none was called, or every call failed before an answer.</p>
                     } @else {
@@ -101,6 +114,10 @@ export class DeveloperConnected {
   readonly error = signal('');
   readonly open = signal<number | null>(null);
   readonly samples = signal<Record<number, RequestSample | null | undefined>>({});
+  /** Owner 2026-10-27: a sample read that failed says so (it used to read as "No answer kept yet"). */
+  readonly sampleErrors = signal<Record<number, string>>({});
+  /** How many collections were listed but whose detail could not be read (they would otherwise just be missing). */
+  readonly unread = signal(0);
 
   constructor() {
     if (!this.needsWorkspace()) this.load();
@@ -111,6 +128,8 @@ export class DeveloperConnected {
     this.collections.set([]);
     this.open.set(null);
     this.samples.set({});
+    this.sampleErrors.set({});
+    this.unread.set(0);
     if (id !== null) this.load();
   }
 
@@ -121,13 +140,20 @@ export class DeveloperConnected {
     this.api.list('', 1, 50, asked).subscribe({
       next: list => {
         if (asked !== this.tenantId()) return;
+        // A refusal is an error, not "no collection yet".
+        if (list && list.status && list.status !== API_SUCCESS) {
+          this.loading.set(false);
+          this.error.set(loadErrorText(list, 'The API collections could not be read.'));
+          return;
+        }
         const rows = Array.isArray(list?.data) ? list.data : [];
-        if (!rows.length) { this.loading.set(false); this.collections.set([]); return; }
+        if (!rows.length) { this.loading.set(false); this.unread.set(0); this.collections.set([]); return; }
         forkJoin(rows.map(c => this.api.get(c.collectionId, asked).pipe(map(r => r.status === API_SUCCESS ? r.data : null),
           catchError(() => of(null)))))
           .subscribe(details => {
             if (asked !== this.tenantId()) return;
             this.loading.set(false);
+            this.unread.set(details.filter(d => !d).length);
             this.collections.set(details.filter(d => !!d).map(d => ({
               collectionId: d!.collection.collectionId, name: d!.collection.name, description: d!.collection.description ?? null,
               requests: d!.requests ?? [],
@@ -137,7 +163,7 @@ export class DeveloperConnected {
       error: err => {
         if (asked !== this.tenantId()) return;
         this.loading.set(false);
-        this.error.set(err?.error?.message || 'Could not read the API collections.');
+        this.error.set(loadErrorText(err, 'The API collections could not be read.'));
       },
     });
   }
@@ -145,10 +171,20 @@ export class DeveloperConnected {
   toggle(requestId: number): void {
     if (this.open() === requestId) { this.open.set(null); return; }
     this.open.set(requestId);
-    if (this.samples()[requestId] !== undefined) return;
+    if (this.samples()[requestId] !== undefined && !this.sampleErrors()[requestId]) return;
+    this.readSample(requestId);
+  }
+
+  readSample(requestId: number): void {
+    this.samples.update(s => ({ ...s, [requestId]: undefined }));
+    this.sampleErrors.update(e => { const next = { ...e }; delete next[requestId]; return next; });
+    const fail = (err: unknown) => this.sampleErrors.update(e => ({ ...e, [requestId]: loadErrorText(err, 'The last answer could not be read.') }));
     this.api.sample(requestId, this.tenantId()).subscribe({
-      next: r => this.samples.update(s => ({ ...s, [requestId]: r.status === API_SUCCESS ? r.data ?? null : null })),
-      error: () => this.samples.update(s => ({ ...s, [requestId]: null })),
+      next: r => {
+        if (r.status !== API_SUCCESS) { fail(r); return; }
+        this.samples.update(s => ({ ...s, [requestId]: r.data ?? null }));
+      },
+      error: fail,
     });
   }
 

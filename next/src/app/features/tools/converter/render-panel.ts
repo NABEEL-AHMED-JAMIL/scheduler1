@@ -13,6 +13,7 @@ import { BucketSummary, StorageService } from '../../objects/storage.service';
 import { RunOutput } from '../../jobs/run-steps/run-steps.model';
 import { RunRow } from '../../tasks/steps/steps.model';
 import { GeneratedService } from '../../documents/generated/generated.service';
+import { AppLoading, InlineStatus, createLoadState, loadErrorText } from '../../../shared/ui/loading';
 import {
   DEFAULT_OPTIONS, Orientation, PAGE_SIZES, PageSize, RenderFormat, RenderResult, ReportTemplateSummary, TemplateOptions,
   base64ToBlob, datasetOf, parseDatasetText, recentJobs, renderBody,
@@ -43,7 +44,7 @@ interface ScheduleRow { jobId: number; jobName?: string | null; lastJobRun?: str
  */
 @Component({
   selector: 'app-render-panel',
-  imports: [Icon, Combobox, Segmented, PdfViewer, RouterLink, ServerTimePipe],
+  imports: [Icon, Combobox, Segmented, PdfViewer, RouterLink, ServerTimePipe, AppLoading, InlineStatus],
   templateUrl: './render-panel.html',
 })
 export class RenderPanel implements OnInit {
@@ -57,6 +58,16 @@ export class RenderPanel implements OnInit {
   readonly formats = signal<RenderFormat[]>([]);
   readonly formatsError = signal('');
   readonly templates = signal<ReportTemplateSummary[]>([]);
+  /**
+   * Owner 2026-10-27: every list this panel reads says it is loading and why it failed, under its own field, with Try
+   * again -- not a toast, and never as "No runs yet" or "This run kept no dataset" before (or instead of) the answer.
+   */
+  readonly formatsState = createLoadState();
+  readonly templatesState = createLoadState();
+  readonly schedulesState = createLoadState(false);
+  readonly runsState = createLoadState(false);
+  readonly outputsState = createLoadState(false);
+  readonly rowsError = signal('');
   readonly outputFormat = signal('pdf');
   readonly options = signal<TemplateOptions>({ ...DEFAULT_OPTIONS });
   readonly pageSizes = PAGE_SIZES;
@@ -143,22 +154,53 @@ export class RenderPanel implements OnInit {
   }
 
   ngOnInit(): void {
-    this.service.formats().subscribe({
-      next: r => r.status === 'SUCCESS' ? this.formats.set(r.data?.formats ?? []) : this.formatsError.set(r.message),
-      error: e => this.formatsError.set(e?.error?.message || 'Could not read the formats a dataset renders to.'),
-    });
-    this.service.templates().subscribe({
-      next: r => { if (r.status === 'SUCCESS') this.templates.set(r.data ?? []); },
-      error: () => { /* the default layout still works with no template list */ },
-    });
+    this.loadFormats();
+    this.loadTemplates();
     if (this.source() === 'execution') this.loadSchedules();
+  }
+
+  loadFormats(): void {
+    this.formatsError.set('');
+    this.formatsState.start();
+    this.service.formats().subscribe({
+      next: r => {
+        if (r.status !== 'SUCCESS') {
+          this.formatsState.fail(r, 'The formats a dataset renders to could not be read.');
+          this.formatsError.set(this.formatsState.error());
+          return;
+        }
+        this.formats.set(r.data?.formats ?? []);
+        this.formatsState.done();
+      },
+      error: e => {
+        this.formatsState.fail(e, 'The formats a dataset renders to could not be read.');
+        this.formatsError.set(this.formatsState.error());
+      },
+    });
+  }
+
+  /** The saved templates; without them the default layout still renders, and the field says the list is missing. */
+  loadTemplates(): void {
+    this.templatesState.start();
+    this.service.templates().subscribe({
+      next: r => {
+        if (r.status !== 'SUCCESS') { this.templatesState.fail(r, 'The saved templates could not be read.'); return; }
+        this.templates.set(r.data ?? []);
+        this.templatesState.done();
+      },
+      error: e => this.templatesState.fail(e, 'The saved templates could not be read.'),
+    });
   }
 
   loadSchedules(): void {
     this.schedulesError.set('');
+    this.schedulesState.start();
     this.service.schedules().subscribe({
-      next: list => this.schedules.set(list),
-      error: e => this.schedulesError.set(e?.error?.message || e?.message || 'Could not read the schedules.'),
+      next: list => { this.schedules.set(list); this.schedulesState.done(); },
+      error: e => {
+        this.schedulesState.fail(e, 'The schedules could not be read.');
+        this.schedulesError.set(this.schedulesState.error());
+      },
     });
   }
 
@@ -167,10 +209,21 @@ export class RenderPanel implements OnInit {
     this.jobId.set(jobId);
     this.runList.set([]);
     this.pickRun('');
-    if (jobId == null) return;
+    this.loadRuns();
+  }
+
+  /** The picked schedule's newest runs; also Try again under the Run field. A late answer for another schedule is dropped. */
+  loadRuns(): void {
+    const jobId = this.jobId();
+    if (jobId == null) { this.runsState.start(); this.runsState.done(); return; }
+    this.runsState.start();
     this.service.runs(jobId, RUN_CHOICES).subscribe({
-      next: runs => this.runList.set(runs.slice(0, RUN_CHOICES)),
-      error: () => this.toast.error('Could not read this schedule\'s runs.'),
+      next: runs => {
+        if (this.jobId() !== jobId) return;
+        this.runList.set(runs.slice(0, RUN_CHOICES));
+        this.runsState.done();
+      },
+      error: e => { if (this.jobId() === jobId) this.runsState.fail(e, 'This schedule\'s runs could not be read.'); },
     });
   }
 
@@ -179,14 +232,23 @@ export class RenderPanel implements OnInit {
     this.jobQueueId.set(jobQueueId);
     this.outputs.set(null);
     this.pickDataset('');
-    if (jobQueueId == null) return;
+    this.loadOutputs();
+  }
+
+  /** What the picked run put out; a failure is said (it read as "This run kept no dataset"). */
+  loadOutputs(): void {
+    const jobQueueId = this.jobQueueId();
+    if (jobQueueId == null) { this.outputsState.start(); this.outputsState.done(); return; }
+    this.outputsState.start();
     this.service.runOutputs(jobQueueId).subscribe({
       next: list => {
+        if (this.jobQueueId() !== jobQueueId) return;
         this.outputs.set(list ?? []);
+        this.outputsState.done();
         const only = this.datasets();
         if (only.length === 1) this.pickDataset(String(only[0].runDatasetId));
       },
-      error: () => { this.outputs.set([]); this.toast.error('Could not read what this run put out.'); },
+      error: e => { if (this.jobQueueId() === jobQueueId) this.outputsState.fail(e, 'What this run put out could not be read.'); },
     });
   }
 
@@ -194,13 +256,24 @@ export class RenderPanel implements OnInit {
     const id = value ? Number(value) : null;
     this.datasetId.set(id);
     this.runRows.set(null);
+    this.rowsError.set('');
     this.clearOutput();
     if (id == null) return;
     this.readingRun.set(true);
     this.service.runDataset(id).subscribe({
-      next: rows => { this.readingRun.set(false); this.runRows.set(rows); },
-      error: () => { this.readingRun.set(false); this.toast.error('Could not read that dataset; it may have expired.'); },
+      next: rows => { if (this.datasetId() !== id) return; this.readingRun.set(false); this.runRows.set(rows); },
+      error: e => {
+        if (this.datasetId() !== id) return;
+        this.readingRun.set(false);
+        this.rowsError.set(loadErrorText(e, 'That dataset could not be read; it may have expired.'));
+      },
     });
+  }
+
+  /** Try again under the dataset's line. */
+  retryRows(): void {
+    const id = this.datasetId();
+    if (id != null) this.pickDataset(String(id));
   }
 
   /** The row count of what the run kept, for the line under the picker. */

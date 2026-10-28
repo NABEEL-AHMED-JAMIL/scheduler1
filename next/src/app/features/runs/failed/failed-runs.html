@@ -32,7 +32,8 @@
               <span class="facet-count">{{ v.count | number }}</span>
             </label>
           } @empty {
-            <p class="text-xs text-[color:var(--text-muted)] px-1.5 m-0">{{ loading() ? 'Counting…' : 'None in these dates' }}</p>
+            <!-- Owner 2026-10-27: a first read that failed is "not available", not "none". -->
+            <p class="text-xs text-[color:var(--text-muted)] px-1.5 m-0">{{ answer() ? 'None in these dates' : error() ? 'Not available right now' : 'Counting…' }}</p>
           }
           @if (more(section) > 0) {
             <button type="button" class="facet-more" (click)="expand(section.name)">Show all {{ section.values.length }}</button>
@@ -76,15 +77,21 @@
           @if (groups().length > 8) {
             <p class="text-xs text-[color:var(--text-muted)] mt-2 mb-0">{{ groups().length - 8 }} rarer patterns are counted in the list below.</p>
           }
+        } @else if (answer()) {
+          <p class="text-sm text-[color:var(--text-muted)] m-0">No failed runs in these dates.</p>
+        } @else if (error()) {
+          <!-- Owner 2026-10-27: a failed read said "No failed runs in these dates." here while the list said why. -->
+          <app-inline-status [error]="error()" (retry)="load()" />
         } @else {
-          <p class="text-sm text-[color:var(--text-muted)] m-0">{{ loading() ? 'Grouping the errors…' : 'No failed runs in these dates.' }}</p>
+          <app-loading shape="list" [count]="3" label="Grouping the errors…" />
         }
       </section>
 
       <section class="card overflow-hidden" aria-labelledby="failed-list-title" data-test="failed-list">
         <div class="flex flex-wrap items-center gap-2 px-4 pt-4 pb-2">
           <h3 class="chart-title m-0" id="failed-list-title">Runs</h3>
-          <span class="chart-sub" data-test="failed-total">{{ total() | number }} {{ total() === 1 ? 'failed run' : 'failed runs' }}
+          <!-- Owner 2026-10-27: no count before the answer ("0 failed runs" while it loaded). -->
+          <span class="chart-sub" data-test="failed-total">@if (answer()) { {{ total() | number }} {{ total() === 1 ? 'failed run' : 'failed runs' }} } @else if (!error()) { Counting… }
             @if (pickedGroup(); as g) { <span>with the pattern “{{ g.pattern }}”</span> }</span>
         </div>
         @if (error()) {
@@ -92,11 +99,14 @@
             <p class="text-sm text-crit-500 m-0 flex items-center gap-1.5"><app-icon name="alert" />{{ error() }}</p>
             <button type="button" class="btn btn-default btn-sm" (click)="load()"><app-icon name="refresh" />Try again</button>
           </div>
+        } @else if (!answer()) {
+          <app-loading shape="rows" label="Loading failed runs…" />
         } @else if (!items().length && !loading()) {
           <p class="px-4 pb-6 text-sm text-[color:var(--text-muted)]" data-test="failed-empty">
             {{ anyFilter() ? 'No failed runs match these filters.' : 'No run failed in these dates.' }}
           </p>
         } @else {
+          <app-blur-loader [active]="loading()" label="Refreshing…">
           <div class="overflow-x-auto">
             <table class="table-modern">
               <thead>
@@ -109,13 +119,14 @@
                              (change)="togglePage($any($event.target).checked)" />
                     </th>
                   }
-                  <th>Run</th>
-                  @if (platform()) { <th>Workspace</th> }
-                  <th>Pipeline</th>
+                  <!-- Owner 2026-10-27: Run, Workspace, Pipeline, Kind and Ended sort on the server; the step and error stay plain. -->
+                  <th appSort="run" [sortBy]="sort">Run</th>
+                  @if (platform()) { <th appSort="workspace" [sortBy]="sort">Workspace</th> }
+                  <th appSort="pipeline" [sortBy]="sort">Pipeline</th>
                   <th>Failing step</th>
                   <th>Error</th>
-                  <th>Kind</th>
-                  <th class="whitespace-nowrap">Ended</th>
+                  <th appSort="kind" [sortBy]="sort">Kind</th>
+                  <th appSort="ended" [sortBy]="sort" class="whitespace-nowrap">Ended</th>
                 </tr>
               </thead>
               <tbody>
@@ -152,13 +163,14 @@
               </tbody>
             </table>
           </div>
+          </app-blur-loader>
           @if (pages() > 1) {
             <div class="flex items-center justify-end gap-2 px-4 py-3 text-sm" data-test="failed-pages">
               <span class="text-[color:var(--text-muted)]">Page {{ page() + 1 }} of {{ pages() }}</span>
               <button type="button" class="btn btn-default btn-sm" [disabled]="page() === 0" (click)="goTo(page() - 1)">
-                <app-icon name="chevronLeft" />Newer</button>
+                <app-icon name="chevronLeft" />{{ sorted() ? 'Previous' : 'Newer' }}</button>
               <button type="button" class="btn btn-default btn-sm" [disabled]="page() + 1 >= pages()" (click)="goTo(page() + 1)">
-                Older<app-icon name="chevronRight" /></button>
+                {{ sorted() ? 'Next' : 'Older' }}<app-icon name="chevronRight" /></button>
             </div>
           }
         }

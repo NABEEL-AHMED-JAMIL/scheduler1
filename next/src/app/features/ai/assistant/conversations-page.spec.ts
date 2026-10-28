@@ -74,4 +74,64 @@ describe('ConversationsPage', () => {
     (detail.querySelector('[data-open]') as HTMLButtonElement).click();
     expect(to).toEqual({ commands: ['/ai/assistant'], extras: { queryParams: { c: 11 } } });
   });
+  describe('sorted on the server (owner 2026-10-27)', () => {
+    it('sends no sort before a heading is picked, then the column and direction from the start, and Load more pages on in it', () => {
+      try { localStorage.clear(); } catch { /* none */ }
+      const { fixture, list, el } = make();
+      const first = list();
+      expect(first.request.params.has('sort')).toBe(false);
+      first.flush({ ...answer, data: { ...answer.data, total: 80 } });
+      fixture.detectChanges();
+      const sortable = [...el.querySelectorAll('thead th')].filter(th => th.querySelector('button.th-sort')).map(th => th.textContent?.trim());
+      expect(sortable).toEqual(['Conversation', 'Kind', 'Status', 'Messages', 'Updated']);
+      const page = fixture.componentInstance;
+      page.sort.toggle('messages');
+      const sorted = list();
+      expect(sorted.request.params.get('sort')).toBe('messages');
+      expect(sorted.request.params.get('dir')).toBe('desc');
+      expect(sorted.request.params.has('offset')).toBe(false);
+      sorted.flush({ ...answer, data: { ...answer.data, total: 80 } });
+      page.loadMore();
+      const more = list();
+      expect(more.request.params.get('offset')).toBe('2');
+      expect(more.request.params.get('sort')).toBe('messages');
+      expect(more.request.params.get('dir')).toBe('desc');
+      more.flush({ ...answer, data: { ...answer.data, total: 80, rows: [] } });
+      page.sort.toggle('title');
+      const byTitle = list();
+      expect(byTitle.request.params.get('sort')).toBe('title');
+      expect(byTitle.request.params.get('dir')).toBe('asc');
+      byTitle.flush(answer);
+      try { localStorage.clear(); } catch { /* none */ }
+    });
+  });
+
+  describe('loading, empty, error (owner 2026-10-27)', () => {
+    it('is loading, not empty, and counts nothing, until the list answers', () => {
+      const { fixture, el, list } = make();
+      fixture.detectChanges();
+      expect(fixture.componentInstance.state.pending()).toBe(true);
+      expect(el.textContent).not.toContain('No conversations yet');
+      expect(el.querySelector('[data-facets] .cp-count')).toBeNull();
+      list();
+    });
+
+    it('says there is none yet once an empty list answers', () => {
+      const { fixture, el, list } = make();
+      list().flush({ status: 'SUCCESS', message: '', data: { total: 0, facets: {}, rows: [] } });
+      fixture.detectChanges();
+      expect(fixture.componentInstance.state.pending()).toBe(false);
+      expect(el.textContent).toContain('No conversations yet');
+    });
+
+    it('says the list could not be read, in plain words, and not that there is none', () => {
+      const { fixture, el, list } = make();
+      list().flush('boom', { status: 500, statusText: 'Server Error' });
+      fixture.detectChanges();
+      expect(fixture.componentInstance.loading()).toBe(false);
+      expect(fixture.componentInstance.error()).toBe('The conversations could not be read.');
+      expect(el.textContent).toContain('Try again');
+      expect(el.textContent).not.toContain('No conversations yet');
+    });
+  });
 });

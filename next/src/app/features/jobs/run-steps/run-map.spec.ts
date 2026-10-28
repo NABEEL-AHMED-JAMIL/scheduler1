@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { byTask, durationText, runMap, stepKind } from './run-map';
+import { TestBed } from '@angular/core/testing';
+import { RunMap, byTask, durationText, runMap, stepKind } from './run-map';
 import { StepTimeline } from './run-steps.model';
 
 /** AI workflow review: a run's steps as a plan map -- time and rows per step, the failed or slowest step marked. */
@@ -51,5 +52,23 @@ describe('the run plan map', () => {
   it('says durations and kinds in a few words', () => {
     expect([durationText(450), durationText(4600), durationText(125_000), durationText(null)]).toEqual(['450 ms', '4.6 sec', '2 min 5 sec', '—']);
     expect([stepKind('ai_prompt'), stepKind('sample'), stepKind('send_notification'), stepKind('legacy')]).toEqual(['ai', 'read', 'output', 'legacy']);
+  });
+});
+
+describe('the run plan map -- the Overview sorts (owner 2026-10-27)', () => {
+  it('starts ranked by cost and sorts by task name both ways', () => {
+    try { localStorage.clear(); } catch { /* none */ }
+    TestBed.resetTestingModule();
+    const fixture = TestBed.createComponent(RunMap);
+    fixture.componentRef.setInput('timeline', run([step('read', 'read_file', 'Completed', 2600, 0, 10),
+      step('agg', 'aggregate', 'Completed', 400, 10, 2), step('save', 'save_file', 'Completed', 60, 2, 2)]));
+    const map = fixture.componentInstance;
+    expect(map.sortedOverview().map(r => r.task)).toEqual(['read_file', 'aggregate', 'save_file']);
+    map.sort.toggle('task');
+    expect(map.sortedOverview().map(r => r.task)).toEqual(['aggregate', 'read_file', 'save_file']);
+    map.sort.toggle('task');
+    expect(map.sortedOverview().map(r => r.task)).toEqual(['save_file', 'read_file', 'aggregate']);
+    map.sort.toggle('value');
+    expect(map.sortedOverview().map(r => r.value)).toEqual([2600, 400, 60]);
   });
 });

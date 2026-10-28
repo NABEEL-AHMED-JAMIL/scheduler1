@@ -282,8 +282,15 @@ export const PINNED: Record<string, unknown> = {
       "Tools (6 of 6)"
     ],
     "buttons": [
+      "Asks first",
       "Columns",
-      "Refresh"
+      "Enabled",
+      "Input → output",
+      "Last used",
+      "Permission",
+      "Refresh",
+      "Service",
+      "Tool"
     ],
     "columns": [
       [
@@ -328,8 +335,15 @@ export const PINNED: Record<string, unknown> = {
       "Tools (6 of 6)"
     ],
     "buttons": [
+      "Asks first",
       "Columns",
-      "Refresh"
+      "Enabled",
+      "Input → output",
+      "Last used",
+      "Permission",
+      "Refresh",
+      "Service",
+      "Tool"
     ],
     "columns": [
       [

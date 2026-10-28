@@ -31,24 +31,25 @@
   <div class="rsdt-kinds">
     <button type="button" class="card rsdt-kind" [class.is-active]="kind() === 'run'" (click)="pickKind('run')" [attr.aria-pressed]="kind() === 'run'">
       <span class="rsdt-kind-icon"><app-icon name="list" /></span>
-      <span class="min-w-0 text-left"><b>Pipeline outputs</b><br><span class="text-xs text-[color:var(--text-muted)]">{{ schedules() }} schedule{{ schedules() === 1 ? '' : 's' }} you can open · {{ runSources().length }} kept</span></span>
+      <span class="min-w-0 text-left"><b>Pipeline outputs</b><br><span class="text-xs text-[color:var(--text-muted)]">@if (schedulesState.error()) { Schedules not available right now } @else if (schedulesState.pending()) { Counting schedules… } @else { {{ schedules() }} schedule{{ schedules() === 1 ? '' : 's' }} you can open }@if (sourcesState.loaded() && !switching()) { · {{ runSources().length }} kept }</span></span>
       <span class="pill pill-ok">Allowed</span>
     </button>
     <button type="button" class="card rsdt-kind" [class.is-active]="kind() === 'bucket'" (click)="pickKind('bucket')" [attr.aria-pressed]="kind() === 'bucket'">
       <span class="rsdt-kind-icon"><app-icon name="database" /></span>
-      <span class="min-w-0 text-left"><b>Storage buckets</b><br><span class="text-xs text-[color:var(--text-muted)]">{{ buckets().length }} bucket{{ buckets().length === 1 ? '' : 's' }} · read only</span></span>
-      <span class="pill" [class]="buckets().length ? 'pill-ok' : 'pill-neutral'">{{ buckets().length ? 'Allowed' : 'None yet' }}</span>
+      <span class="min-w-0 text-left"><b>Storage buckets</b><br><span class="text-xs text-[color:var(--text-muted)]">@if (bucketsState.error()) { Buckets not available right now } @else if (bucketsState.pending()) { Counting buckets… } @else { {{ buckets().length }} bucket{{ buckets().length === 1 ? '' : 's' }} · read only }</span></span>
+      @if (bucketsState.error()) { <span class="pill pill-warn">Not available</span> }
+      @else if (bucketsState.loaded()) { <span class="pill" [class]="buckets().length ? 'pill-ok' : 'pill-neutral'">{{ buckets().length ? 'Allowed' : 'None yet' }}</span> }
     </button>
     <button type="button" class="card rsdt-kind" [class.is-active]="kind() === 'upload'" (click)="pickKind('upload')" [attr.aria-pressed]="kind() === 'upload'">
       <span class="rsdt-kind-icon"><app-icon name="file" /></span>
-      <span class="min-w-0 text-left"><b>Documents and uploads</b><br><span class="text-xs text-[color:var(--text-muted)]">{{ uploads().length }} uploaded file{{ uploads().length === 1 ? '' : 's' }}</span></span>
+      <span class="min-w-0 text-left"><b>Documents and uploads</b><br><span class="text-xs text-[color:var(--text-muted)]">@if (sourcesState.loaded() && !switching()) { {{ uploads().length }} uploaded file{{ uploads().length === 1 ? '' : 's' }} } @else if (sourcesState.error()) { Not available right now } @else { Counting uploads… }</span></span>
       <span class="pill pill-ok">Allowed</span>
     </button>
   </div>
 
   <div class="rsdt-split">
     <section class="card min-w-0">
-      <div class="rs-head"><h2 class="section-title">Sources</h2><span class="pill pill-neutral">{{ shownCount() }} shown</span></div>
+      <div class="rs-head"><h2 class="section-title">Sources</h2>@if (sourcesState.loaded() && !switching()) { <span class="pill pill-neutral">{{ shownCount() }} shown</span> }</div>
       <div class="p-4 flex flex-col gap-3">
         <div class="search-field">
           <app-icon name="search" size="0.95em" />
@@ -58,10 +59,16 @@
           <div class="rsdt-pick">
             <h3 class="rsd-eyebrow m-0">{{ kind() === 'run' ? 'Pick a run' : 'Pick a file' }}</h3>
             <app-report-source-picker [(source)]="picked" [mode]="pickMode()" [tenantId]="isPlatformAdmin() ? tenantId() : null" [only]="kind() === 'run' ? ['run'] : ['bucket']" />
-            <button type="button" class="btn btn-default btn-sm self-start" [disabled]="busy() || !picked()" (click)="inspectPicked()"><app-icon name="eye" />Inspect</button>
+            <button type="button" class="btn btn-default btn-sm self-start" [disabled]="busy() || uploading() || !picked()" (click)="inspectPicked()"><app-icon name="eye" />Inspect</button>
           </div>
         }
-        @if (error()) { <p class="field-note text-[color:var(--crit-text)]" role="alert">{{ error() }}</p> }
+        @if (error()) {
+          <app-load-error [message]="error()" (retry)="load()" />
+        } @else if (sourcesState.pending() || switching()) {
+          <app-loading shape="list" label="Loading sources…" [count]="4" />
+        } @else {
+        <app-blur-loader [active]="loading()" label="Refreshing…">
+        <div class="flex flex-col gap-3">
         @if (runSources().length) {
           <h3 class="rsd-eyebrow m-0">Pipeline outputs</h3>
           <ng-container *ngTemplateOutlet="list; context: { $implicit: runSources() }" />
@@ -72,7 +79,10 @@
         }
         <h3 class="rsd-eyebrow m-0">Uploads</h3>
         @if (uploads().length) { <ng-container *ngTemplateOutlet="list; context: { $implicit: uploads() }" /> }
-        @else { <p class="text-xs text-[color:var(--text-muted)]">Nothing uploaded yet: Upload a file (JSON or CSV) at the top.</p> }
+        @else { <p class="text-xs text-[color:var(--text-muted)]">{{ search().trim() ? 'No upload matches the search.' : 'Nothing uploaded yet: Upload a file (JSON or CSV) at the top.' }}</p> }
+        </div>
+        </app-blur-loader>
+        }
         <ng-template #list let-rows>
           <ul class="rsdt-sources">
             @for (s of $any(rows); track s.sourceId) {
@@ -90,11 +100,12 @@
     </section>
 
     <div class="flex flex-col gap-4 min-w-0" aria-live="polite">
-      @if (busy()) {
-        <section class="card"><div class="flex justify-center py-16"><span class="spinner" role="status" aria-label="Reading"></span></div></section>
-      } @else if (inspectError()) {
-        <section class="card"><p class="p-4 text-sm text-[color:var(--crit-text)]" role="alert">{{ inspectError() }}</p></section>
+      @if (inspectError()) {
+        <section class="card"><app-load-error [message]="inspectError()" (retry)="retryInspect()" /></section>
       } @else if (result(); as r) {
+        <!-- Owner 2026-10-27: a new root path keeps the data on screen under a blur while it is read again. -->
+        <app-blur-loader [active]="busy()" label="Reading…">
+        <div class="flex flex-col gap-4 min-w-0">
         <section class="card p-4 flex flex-col gap-3">
           <div class="flex flex-wrap items-start justify-between gap-2">
             <div class="min-w-0"><b class="text-base break-words">{{ r.label }}</b><br><span class="text-sm text-[color:var(--text-muted)]">{{ kindWord(r) }}</span></div>
@@ -109,7 +120,9 @@
           </div>
           <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-[color:var(--text-muted)] border-t pt-2 border-subtle">
             <span>
-              @if (fits().fits.length) { {{ fits().fits.length }} template{{ fits().fits.length === 1 ? '' : 's' }} can read it ({{ fits().fits.join(', ') }}). }
+              @if (contractsState.error()) { {{ contractsState.error() }} <button type="button" class="btn btn-default btn-xs" (click)="loadContracts()"><app-icon name="refresh" />Try again</button> }
+              @else if (!contractsState.loaded()) { Checking which templates can read it… }
+              @else if (fits().fits.length) { {{ fits().fits.length }} template{{ fits().fits.length === 1 ? '' : 's' }} can read it ({{ fits().fits.join(', ') }}). }
               @else { No template's required fields are all here yet. }
               Change the data in the pipeline, not here.
             </span>
@@ -148,9 +161,10 @@
             <div class="rs-head"><h2 class="section-title">Schema</h2><span class="pill pill-neutral">{{ r.schema.length }} field{{ r.schema.length === 1 ? '' : 's' }}</span></div>
             <div class="rsdt-scroll">
               <table class="table-modern">
-                <thead><tr><th>Field</th><th>Type</th><th>Can be empty</th></tr></thead>
+                <thead><tr><th appSort="field" [sortBy]="schemaSort">Field</th><th appSort="type" [sortBy]="schemaSort">Type</th>
+                  <th appSort="nullable" [sortBy]="schemaSort">Can be empty</th></tr></thead>
                 <tbody>
-                  @for (f of r.schema; track f.path) {
+                  @for (f of sortedSchema(); track f.path) {
                     <tr><td class="mono text-xs">{{ f.path }}</td><td class="text-xs">{{ f.type }}</td><td class="text-xs">{{ f.nullable ? 'Yes' : 'No' }}</td></tr>
                   }
                 </tbody>
@@ -174,8 +188,8 @@
           @if (sampleTable(); as tbl) {
             <div class="rsdt-scroll">
               <table class="table-modern rsdt-sample">
-                <thead><tr>@for (c of tbl.cols; track c) { <th>{{ c }}</th> }</tr></thead>
-                <tbody>@for (row of tbl.rows; track $index) { <tr>@for (v of row; track $index) { <td class="whitespace-nowrap" [class.rsdt-num]="isNumber(v)">{{ v }}</td> }</tr> }</tbody>
+                <thead><tr>@for (c of tbl.cols; track c) { <th [appSort]="c" [sortBy]="sampleSort">{{ c }}</th> }</tr></thead>
+                <tbody>@for (row of sortedSample(); track $index) { <tr>@for (v of row.cells; track $index) { <td class="whitespace-nowrap" [class.rsdt-num]="isNumber(v)">{{ v }}</td> }</tr> }</tbody>
               </table>
             </div>
           } @else {
@@ -191,6 +205,10 @@
               then pick the new run in Data and mapping. Browsing here never changes a report.</div>
           </div>
         }
+        </div>
+        </app-blur-loader>
+      } @else if (busy()) {
+        <section class="card"><app-loading shape="panel" label="Reading the data…" [count]="6" /></section>
       } @else {
         <section class="card"><div class="p-8 text-center text-sm text-[color:var(--text-muted)]">Pick a pipeline output, a bucket file or an upload to see its schema and its first rows.</div></section>
       }

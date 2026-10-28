@@ -65,3 +65,18 @@ describe('ResponseViewer', () => {
     expect(el.textContent).toContain('stopped at the page cap');
   });
 });
+
+describe('ResponseViewer -- sorting the assertions (owner 2026-10-27)', () => {
+  it('keeps the rules\' order, puts Failed first on Result, and sorts the rule both ways', () => {
+    try { localStorage.clear(); } catch { /* none */ }
+    const { fixture } = render(OK);
+    const viewer = fixture.componentInstance;
+    expect(viewer.sortedAssertions().map(a => a.rule)).toEqual(['status == 200', '$.data notEmpty']);
+    viewer.assertionSort.toggle('result');
+    expect(viewer.sortedAssertions().map(a => a.passed)).toEqual([false, true]);
+    viewer.assertionSort.toggle('rule');
+    expect(viewer.sortedAssertions().map(a => a.rule)).toEqual(['$.data notEmpty', 'status == 200']);
+    viewer.assertionSort.toggle('rule');
+    expect(viewer.sortedAssertions().map(a => a.rule)).toEqual(['status == 200', '$.data notEmpty']);
+  });
+});

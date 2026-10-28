@@ -37,10 +37,17 @@
   </div>
 
   <div class="grid grid-cols-3 stat-strip stat-row is-md is-start" role="list">
-    <app-stat-tile label="Values" [value]="stats().values" icon="settings" tone="info" foot="readable here" />
-    <app-stat-tile label="Secrets" [value]="stats().secrets" icon="lock" tone="info" foot="write-only" />
-    <app-stat-tile label="In use" [value]="stats().inUse" icon="list" tone="muted" foot="referenced by a live task" />
+    <!-- Owner 2026-10-27: the tiles wait for the list (no 0 before it answers, "Not available" when it failed). -->
+    <app-stat-tile label="Values" [value]="stats().values" icon="settings" tone="info" foot="readable here"
+                   [loading]="state.pending()" [failed]="!!error() && !state.loaded()" />
+    <app-stat-tile label="Secrets" [value]="stats().secrets" icon="lock" tone="info" foot="write-only"
+                   [loading]="state.pending()" [failed]="!!error() && !state.loaded()" />
+    <app-stat-tile label="In use" [value]="stats().inUse" icon="list" tone="muted" foot="referenced by a live task"
+                   [loading]="state.pending()" [failed]="!!error() && !state.loaded()" />
   </div>
+  @if (tenantsState.error()) {
+    <app-inline-status [error]="tenantsState.error()" (retry)="loadTenants()" />
+  }
 
   <app-table-shell heading="Configuration values" [loading]="loading()" [error]="error()"
                    [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="rows().length"
@@ -66,16 +73,16 @@
     <table class="table-modern">
       <thead>
         <tr>
-          <th>Key</th>
-          @if (showWorkspace()) { <th>Workspace</th> }
-          <th>Kind</th>
-          <th>Value</th>
-          <th>Used by</th>
+          <th appSort="key" [sortBy]="sort">Key</th>
+          @if (showWorkspace()) { <th appSort="workspace" [sortBy]="sort">Workspace</th> }
+          <th appSort="kind" [sortBy]="sort">Kind</th>
+          <th appSort="value" [sortBy]="sort">Value</th>
+          <th appSort="usedBy" [sortBy]="sort">Used by</th>
           <th class="w-32 th-actions">Actions</th>
         </tr>
       </thead>
       <tbody>
-        @for (row of filtered(); track row.id) {
+        @for (row of sorted(); track row.id) {
           <tr [attr.data-key]="row.key">
             <td class="max-w-72">
               <div class="mono font-medium truncate" [title]="row.key">{{ row.key }}</div>

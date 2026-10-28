@@ -24,6 +24,8 @@ import { copyText } from '../../../shared/ui/clipboard.util';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
 
 /** One file on its way to the inbox. */
 export interface QueuedUpload {
@@ -51,7 +53,7 @@ const LIST_LIMIT = 50;
  */
 @Component({
   selector: 'app-inbox',
-  imports: [RefreshButton, PageHeader, Icon, TableShell, LoadError, StatusPill, DataText, FileDropzone, ServerTimePipe, RouterLink, ManagedBanner, CopyButton, NeedsWorkspace],
+  imports: [RefreshButton, PageHeader, SortHeader, Icon, TableShell, LoadError, StatusPill, DataText, FileDropzone, ServerTimePipe, RouterLink, ManagedBanner, CopyButton, NeedsWorkspace],
   templateUrl: './inbox.html',
 })
 export class Inbox implements OnInit {
@@ -90,6 +92,23 @@ export class Inbox implements OnInit {
   readonly formatSize = formatSize;
   readonly shortSha = shortSha;
   readonly listLimit = LIST_LIMIT;
+
+  /**
+   * Owner 2026-10-27: every column sorts, over the newest LIST_LIMIT the list holds (the header says so); the list keeps
+   * the service's newest-first order until one is picked.
+   */
+  readonly sort = createTableSort<InboxFile>({
+    id: 'inbox-arrivals',
+    columns: {
+      file: f => f.fileName,
+      size: { value: f => f.bytes, kind: 'number' },
+      uploadedBy: f => this.uploader(f),
+      uploaded: { value: f => f.uploadedAt, kind: 'date' },
+      sha: f => f.sha256,
+    },
+    note: `Sorts the newest ${LIST_LIMIT} shown`,
+  });
+  readonly sortedFiles = computed(() => this.sort.apply(this.files()));
 
   /** A sign-in with no workspace (a platform administrator's own): the inbox is a workspace's, so nothing is read (review L6). */
   readonly noWorkspace = computed(() => !this.auth.user()?.tenantId);

@@ -15,6 +15,9 @@
     </div>
   </app-page-header>
 
+  @if (tenantsState.error()) {
+    <app-inline-status [error]="tenantsState.error()" (retry)="loadTenants()" />
+  }
   <app-table-shell [heading]="copy().title" [loading]="loading()" [error]="error()"
                    [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="rows().length"
                    [emptyMessage]="search().trim() ? 'Nothing matches the search.' : copy().empty"
@@ -37,16 +40,16 @@
     <table class="table-modern">
       <thead>
         <tr>
-          <th>Name</th>
-          @if (showWorkspace()) { <th>Workspace</th> }
-          <th>{{ isHomePage() ? 'Address' : 'Value' }}</th>
-          <th>Used by</th>
-          <th>Last changed</th>
+          <th appSort="name" [sortBy]="sort">Name</th>
+          @if (showWorkspace()) { <th appSort="workspace" [sortBy]="sort">Workspace</th> }
+          <th appSort="value" [sortBy]="sort">{{ isHomePage() ? 'Address' : 'Value' }}</th>
+          <th appSort="usedBy" [sortBy]="sort">Used by</th>
+          <th appSort="changed" [sortBy]="sort">Last changed</th>
           <th class="w-24 th-actions">Actions</th>
         </tr>
       </thead>
       <tbody>
-        @for (row of filtered(); track row.id) {
+        @for (row of sorted(); track row.id) {
           <tr [attr.data-id]="row.id">
             <td class="max-w-72">
               <div class="font-medium truncate" [title]="row.name">{{ row.name }}</div>

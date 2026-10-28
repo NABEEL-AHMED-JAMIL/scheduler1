@@ -17,7 +17,7 @@
         Every recorded run of schedule <span class="mono">#{{ jobId() }}</span>.
       } @else {
         <!-- Reached without a schedule (Runs in the menu): the explorer -- facets, a histogram and the list (B3). -->
-        Every schedule's runs: narrow them on the left; the bars show when they ran@if (recentCut()) { (the list holds the latest {{ runs().length }})}.
+        Every schedule's runs: narrow them on the left; the bars show when they ran@if (recentCut()) { (the list holds the {{ sortedByServer() ? 'first ' + runs().length + ' in the order picked' : 'latest ' + runs().length }})}.
       }
     </p>
   </app-page-header>
@@ -244,7 +244,9 @@
                  much over 300px -- half the card from md, a quarter from xl -- and four across broke
                  "COMPLETED" and "INTERRUPT" mid-word. A status with no runs shows 0, muted --
                  "none yet" is information; a blank square is not. -->
+            <!-- Owner 2026-10-27: placeholders until the runs answer, not eight zeros. -->
             <app-stat-strip [items]="runTiles()" [cols]="2" [summary]="runTotal()"
+                            [loading]="loading() && !runsAnswered()" [failed]="!!error() && !runsAnswered()"
                             label="Runs in this view by status" />
           </div>
 
@@ -288,6 +290,15 @@
         </div>
       }
     </div>
+  } @else if (jobId() && detailState.error()) {
+    <!-- Owner 2026-10-27: the details card says why it is missing, with Try again, instead of never appearing. -->
+    <div class="card px-4 py-2.5" data-test="schedule-detail-error">
+      <app-inline-status [error]="detailState.error()" (retry)="loadDetail()" />
+    </div>
+  } @else if (jobId() && detailState.loading()) {
+    <div class="card px-4 py-2.5" data-test="schedule-detail-loading">
+      <app-loading shape="inline" label="Loading the schedule's details…" />
+    </div>
   }
 
   <!-- UX review 2026-10-12 (B3, E1): opened from the menu, Runs is an explorer -- facets on the left with the server's
@@ -296,7 +307,7 @@
   @if (explorer()) {
     <aside class="card p-4 runs-explorer-rail" data-test="run-facets">
       <app-run-facets-rail [facets]="facets()" [filter]="explorerFilter()" [unavailable]="facetsUnavailable()" [loading]="facetsLoading()"
-                           (filterChange)="setExplorerFilter($event)" />
+                           [retryable]="facetsRetryable()" (retry)="reloadFacets()" (filterChange)="setExplorerFilter($event)" />
     </aside>
   }
   <div class="min-w-0 flex flex-col gap-4">
@@ -306,8 +317,11 @@
         <h3 class="chart-title" id="run-histogram-title">Runs over time</h3>
         <span class="chart-sub">{{ histogramSub() }}</span>
       </div>
-      <app-bar-chart [data]="histogram()" [height]="96" [clickable]="false" [hideValues]="true"
-                     [emptyMessage]="facetsUnavailable() ? 'The counts could not be read.' : 'No runs in this window.'" />
+      <!-- Owner 2026-10-27: a re-read keeps the bars, dimmed, rather than showing the old window as the new one. -->
+      <app-blur-loader [active]="facetsLoading()" label="Refreshing…">
+        <app-bar-chart [data]="histogram()" [height]="96" [clickable]="false" [hideValues]="true"
+                       [emptyMessage]="facetsUnavailable() ? 'The counts could not be read.' : 'No runs in this window.'" />
+      </app-blur-loader>
     </section>
   }
   @if (showInsights() && hasInsights()) {
@@ -388,17 +402,18 @@
     <table class="table-modern">
       <thead>
         <tr>
-          <th>Run</th>
+          <!-- Owner 2026-10-27: these six sort on the server (a drill-down's hour, on screen); the rest stay plain. -->
+          <th appSort="run" [sortBy]="sort">Run</th>
           @if (isAllJobs()) { <th>Schedule</th> }
           <!-- Queued waits for xl: at 1024 it pushed Status and Logs past the card edge, and
                Started is the time that matters. -->
-          <th class="hidden xl:table-cell">Queued</th>
-          <th>Started</th>
-          <th>Ended</th>
-          <th class="text-right">Duration</th>
+          <th appSort="queued" [sortBy]="sort" class="hidden xl:table-cell">Queued</th>
+          <th appSort="started" [sortBy]="sort">Started</th>
+          <th appSort="ended" [sortBy]="sort">Ended</th>
+          <th appSort="duration" [sortBy]="sort" class="text-right">Duration</th>
           <!-- Owner 2026-10-12: the status sits right before the message it explains, a fixed width so the badges line
                up; the pinned column keeps only the actions. -->
-          <th class="w-32">Status</th>
+          <th appSort="status" [sortBy]="sort" class="w-32">Status</th>
           <!-- MIG-420: a pipeline that works item by item says how its items went; the column is there only for such runs. -->
           @if (hasItems()) { <th>Items</th> }
           <th>Message</th>
@@ -566,9 +581,13 @@
     @if (hasMore() && !isDrillDown()) {
       <!-- The newest runs come first; a long-lived job's older history is read a window at a time. -->
       <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-2 text-xs text-[color:var(--text-muted)]">
-        <span>The newest {{ runs().length }} runs. The figures above describe these; older runs load on request.</span>
+        @if (sortedByServer()) {
+          <span>The first {{ runs().length }} runs in this order. The figures above describe these; more load on request.</span>
+        } @else {
+          <span>The newest {{ runs().length }} runs. The figures above describe these; older runs load on request.</span>
+        }
         <button type="button" class="btn btn-default btn-sm" (click)="loadOlder()" [disabled]="loadingOlder()">
-          <app-icon name="clock" />{{ loadingOlder() ? 'Loading…' : 'Load ' + historyWindow + ' older runs' }}
+          <app-icon name="clock" />{{ loadingOlder() ? 'Loading…' : 'Load ' + historyWindow + (sortedByServer() ? ' more runs' : ' older runs') }}
         </button>
       </div>
     }

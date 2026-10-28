@@ -11,6 +11,9 @@ import { Segmented, SegmentOption } from './segmented';
 import { ServerTimePipe } from './server-time.pipe';
 import { Pagination } from './pagination';
 import { createPager } from './pager';
+import { createTableSort, sortRows } from './sort';
+import { SortHeader } from './sort-header';
+import { AppLoading, InlineStatus, loadErrorText } from './loading';
 
 export interface ObjectPickerOptions {
   /** What the pick is for -- shown as the panel's title. */
@@ -35,7 +38,6 @@ export interface PickedObject {
 
 /** A row of the list: a folder or file of the open folder, or a match of a search (which names its folder). */
 type Row = ObjectSummary & { folderPath?: string };
-type SortKey = 'name' | 'modified' | 'size';
 
 /** The type filter: the caller's types, one of them, or everything (the rest greyed). */
 const OFFERED = 'offered';
@@ -58,7 +60,7 @@ const PAGE = 50;
  */
 @Component({
   selector: 'app-object-picker',
-  imports: [SidePanel, Combobox, Icon, LoadError, Segmented, ServerTimePipe, Pagination],
+  imports: [SidePanel, Combobox, Icon, LoadError, Segmented, ServerTimePipe, Pagination, SortHeader, AppLoading, InlineStatus],
   styles: `
     .op-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
     .op-toolbar .search-field { flex: 1 1 16rem; min-width: 12rem; }
@@ -69,8 +71,6 @@ const PAGE = 50;
     .op-table tbody tr.is-selected > td { background: var(--pill-brand-bg); }
     .op-table tbody tr.is-off { cursor: not-allowed; color: var(--text-muted); }
     .op-table tbody tr:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
-    .op-sort { display: inline-flex; align-items: center; gap: 0.25rem; font: inherit; color: inherit; text-transform: inherit;
-               letter-spacing: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
     .op-name { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
     .op-name > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   `,
@@ -84,12 +84,16 @@ const PAGE = 50;
           <div class="min-w-56 flex-1 max-w-80">
             <label class="label" for="opBucket">Bucket</label>
             <app-combobox id="opBucket" [selected]="bucket()" (selectedChange)="openBucket($event)"
-                          placeholder="Choose a bucket" [allowClear]="false" [options]="bucketOptions()" />
+                          [placeholder]="bucketsLoading() ? 'Loading buckets…' : 'Choose a bucket'" [allowClear]="false"
+                          [options]="bucketOptions()" [searching]="bucketsLoading()" />
           </div>
         </div>
 
         @if (!bucket()) {
-          @if (buckets().length) {
+          <!-- Owner 2026-10-27: loading until the bucket list answers, and a plain line when there is none. -->
+          @if (bucketsLoading()) {
+            <app-loading shape="list" label="Loading buckets…" [count]="3" />
+          } @else if (buckets().length) {
             <ul class="object-picker-list" aria-label="Buckets">
               @for (b of buckets(); track b.bucket) {
                 <li>
@@ -101,6 +105,10 @@ const PAGE = 50;
                 </li>
               }
             </ul>
+          } @else if (!error()) {
+            <p class="text-sm text-[color:var(--text-muted)] rounded-md px-3 py-4 bg-sunken text-center" data-test="picker-no-bucket">
+              No bucket you can open yet. A storage connection added under Connections makes one appear here.
+            </p>
           }
         } @else {
           <nav class="flex items-center gap-1 flex-wrap text-xs" aria-label="Folder path">
@@ -142,7 +150,7 @@ const PAGE = 50;
           }
 
           @if (loading() || searchLoading()) {
-            <p class="text-sm text-[color:var(--text-muted)] px-1 py-4 text-center"><span class="spinner inline-block align-middle mr-2"></span>{{ searchLoading() ? 'Searching…' : 'Reading the folder…' }}</p>
+            <app-loading shape="rows" [label]="searchLoading() ? 'Searching…' : 'Reading the folder…'" [count]="5" />
           } @else if (error()) {
             <app-load-error [message]="error()" (retry)="retry()" />
           } @else if (!rows().length) {
@@ -157,10 +165,10 @@ const PAGE = 50;
               <table class="table-modern op-table" aria-label="Files" data-test="picker-table">
                 <thead>
                   <tr>
-                    <th [attr.aria-sort]="ariaSort('name')"><button type="button" class="op-sort" (click)="sortOn('name')">Name<app-icon [name]="arrowOf('name')" size="0.8em" /></button></th>
-                    <th class="w-24">Type</th>
-                    <th class="w-24 text-right" [attr.aria-sort]="ariaSort('size')"><button type="button" class="op-sort" (click)="sortOn('size')">Size<app-icon [name]="arrowOf('size')" size="0.8em" /></button></th>
-                    <th class="w-40" [attr.aria-sort]="ariaSort('modified')"><button type="button" class="op-sort" (click)="sortOn('modified')">Modified<app-icon [name]="arrowOf('modified')" size="0.8em" /></button></th>
+                    <th appSort="name" [sortBy]="sort">Name</th>
+                    <th class="w-24" appSort="type" [sortBy]="sort">Type</th>
+                    <th class="w-24 text-right" appSort="size" [sortBy]="sort">Size</th>
+                    <th class="w-40" appSort="modified" [sortBy]="sort">Modified</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -199,9 +207,12 @@ const PAGE = 50;
                               (goTo)="pager.goTo($event, rows().length)" (setSize)="pager.setSize($event)" />
             }
             @if (nextToken() && !searching()) {
-              <button type="button" class="btn btn-default btn-sm self-start" (click)="browse(prefix(), true)" data-test="picker-more">
-                <app-icon name="chevronDown" />This folder has more — load the next {{ batch }}
+              <button type="button" class="btn btn-default btn-sm self-start" (click)="browse(prefix(), true)" data-test="picker-more"
+                      [disabled]="loadingMore()">
+                <app-icon name="chevronDown" [busy]="loadingMore()" />This folder has more — load the next {{ batch }}
               </button>
+              <!-- Owner 2026-10-27: a failed next batch is said here; the files already shown stay. -->
+              <app-inline-status [error]="moreError()" (retry)="browse(prefix(), true)" />
             }
           }
         }
@@ -236,15 +247,34 @@ export class ObjectPicker {
   readonly objects = signal<ObjectSummary[]>([]);
   readonly nextToken = signal<string | undefined>(undefined);
   readonly loading = signal(false);
+  /** The next batch of a long folder: busy on its button, and why it failed beside it. */
+  readonly loadingMore = signal(false);
+  readonly moreError = signal('');
+  /** The bucket list's first read: until it answers the picker says it is loading, not that there is no bucket. */
+  readonly bucketsLoading = signal(true);
   readonly filter = signal('');
   /** Why the bucket list or this folder could not be read; shown with Try again in place of the rows. */
   readonly error = signal('');
 
   /** The type filter: the caller's types (OFFERED), one extension, or ALL. */
   readonly typeFilter = signal<string>(this.data.extensions?.length ? OFFERED : ALL);
-  readonly sortKey = signal<SortKey>('name');
-  readonly sortDesc = signal(false);
   readonly pager = createPager<Row>(PAGE);
+  /**
+   * Owner 2026-10-27: the shared column sort -- Name A to Z first as before, Size and Modified largest / newest first,
+   * and Type now too. Folders stay above files whatever the order: each group sorts on its own. A new order goes back
+   * to the first page.
+   */
+  readonly sort = createTableSort<Row>({
+    id: 'object-picker',
+    columns: {
+      name: r => r.name,
+      type: r => (r.folder ? 'Folder' : this.typeOf(r)),
+      size: { value: r => r.size, kind: 'number' },
+      modified: { value: r => r.lastModified, kind: 'date' },
+    },
+    initial: { key: 'name', direction: 'asc' },
+    onChange: () => this.pager.reset(),
+  });
 
   /** The row chosen, kept while the folder, search, filter or page changes; reopening hands it back in. */
   readonly selected = signal<PickedObject | null>(this.data.bucket && this.data.selectedKey
@@ -279,15 +309,10 @@ export class ObjectPicker {
   readonly rows = computed<Row[]>(() => {
     const source: Row[] = this.searching() ? this.found() : this.objects();
     const q = this.searching() ? '' : this.filter().trim().toLowerCase();
-    const all = source.filter(o => (!q || o.name.toLowerCase().includes(q)) && (o.folder || this.passesType(o)));
-    const dir = this.sortDesc() ? -1 : 1;
-    const by = this.sortKey();
-    const compare = (a: Row, b: Row): number => {
-      if (by === 'size') return dir * ((a.size ?? 0) - (b.size ?? 0)) || a.name.localeCompare(b.name);
-      if (by === 'modified') return dir * (a.lastModified ?? '').localeCompare(b.lastModified ?? '') || a.name.localeCompare(b.name);
-      return dir * a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
-    };
-    return [...all.filter(o => o.folder).sort(compare), ...all.filter(o => !o.folder).sort(compare)];
+    // A to Z first, so rows that tie on the chosen column (folders have no size) stay in name order.
+    const all = sortRows(source.filter(o => (!q || o.name.toLowerCase().includes(q)) && (o.folder || this.passesType(o))),
+      o => o.name, 'asc', 'text');
+    return [...this.sort.apply(all.filter(o => o.folder)), ...this.sort.apply(all.filter(o => !o.folder))];
   });
   readonly pagedRows = computed(() => this.pager.slice(this.rows()));
 
@@ -313,8 +338,10 @@ export class ObjectPicker {
   }
 
   private loadBuckets(): void {
+    this.bucketsLoading.set(true);
     this.storage.buckets().subscribe({
       next: r => {
+        this.bucketsLoading.set(false);
         if (r.status === API_SUCCESS) {
           const list = r.data ?? [];
           this.buckets.set(list);
@@ -322,9 +349,9 @@ export class ObjectPicker {
           if (!this.bucket() && list.length === 1) this.openBucket(list[0].bucket);
           return;
         }
-        this.error.set(r.message || 'Could not read the buckets.');
+        this.error.set(loadErrorText(r, 'The buckets could not be read.'));
       },
-      error: err => this.error.set(err?.error?.message || 'Could not read the buckets.'),
+      error: err => { this.bucketsLoading.set(false); this.error.set(loadErrorText(err, 'The buckets could not be read.')); },
     });
   }
 
@@ -347,13 +374,21 @@ export class ObjectPicker {
     this.prefix.set(prefix);
     if (!append) { this.filter.set(''); this.searchedFor.set(''); this.found.set([]); this.pager.reset(); }
     this.loading.set(!append);
-    this.error.set('');
+    this.loadingMore.set(append);
+    this.moreError.set('');
+    if (!append) this.error.set('');
     const ticket = ++this.ticket;
+    // A failed next batch keeps the rows already shown and says so by its button; a failed folder replaces them.
+    const failed = (err: unknown) => {
+      const words = loadErrorText(err, 'This folder could not be read.');
+      if (append) this.moreError.set(words); else this.error.set(words);
+    };
     this.storage.listObjects(this.bucket(), prefix, append ? this.nextToken() : undefined, this.batch).subscribe({
       next: r => {
         if (ticket !== this.ticket) return;
         this.loading.set(false);
-        if (r.status !== API_SUCCESS) { this.error.set(r.message || 'Could not read this folder.'); return; }
+        this.loadingMore.set(false);
+        if (r.status !== API_SUCCESS) { failed(r); return; }
         const page = r.data?.objects ?? [];
         this.objects.update(current => append ? [...current, ...page] : page);
         this.nextToken.set(r.data?.nextContinuationToken);
@@ -361,7 +396,8 @@ export class ObjectPicker {
       error: err => {
         if (ticket !== this.ticket) return;
         this.loading.set(false);
-        this.error.set(err?.error?.message || 'Could not read this folder.');
+        this.loadingMore.set(false);
+        failed(err);
       },
     });
   }
@@ -388,14 +424,14 @@ export class ObjectPicker {
       next: r => {
         if (ticket !== this.searchTicket) return;
         this.searchLoading.set(false);
-        if (r.status !== API_SUCCESS) { this.error.set(r.message || 'Could not search this bucket.'); return; }
+        if (r.status !== API_SUCCESS) { this.error.set(loadErrorText(r, 'This bucket could not be searched.')); return; }
         this.found.set((r.data?.objects ?? []).map(o => ({ ...o, folderPath: folderOf(o.key) || '/' })));
         this.searchTruncated.set(!!r.data?.truncated);
       },
       error: err => {
         if (ticket !== this.searchTicket) return;
         this.searchLoading.set(false);
-        this.error.set(err?.error?.message || 'Could not search this bucket.');
+        this.error.set(loadErrorText(err, 'This bucket could not be searched.'));
       },
     });
   }
@@ -412,22 +448,6 @@ export class ObjectPicker {
   setType(id: string): void {
     this.typeFilter.set(id);
     this.pager.reset();
-  }
-
-  sortOn(key: SortKey): void {
-    if (this.sortKey() === key) this.sortDesc.set(!this.sortDesc());
-    else { this.sortKey.set(key); this.sortDesc.set(key !== 'name'); }
-    this.pager.reset();
-  }
-
-  arrowOf(key: SortKey): string {
-    if (this.sortKey() !== key) return 'sort';
-    return this.sortDesc() ? 'arrowDown' : 'arrowUp';
-  }
-
-  ariaSort(key: SortKey): string | null {
-    if (this.sortKey() !== key) return null;
-    return this.sortDesc() ? 'descending' : 'ascending';
   }
 
   offered(row: ObjectSummary): boolean {

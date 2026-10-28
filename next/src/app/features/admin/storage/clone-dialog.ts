@@ -8,6 +8,7 @@ import { Field } from '../../../shared/ui/field';
 import { FormDialog } from '../../../shared/ui/form-dialog';
 import { Icon } from '../../../shared/ui/icon';
 import { ALIAS_PATTERN } from './connection-dialog';
+import { InlineStatus, loadErrorText } from '../../../shared/ui/loading';
 
 /**
  * Copies a connection so only the bucket has to change.
@@ -22,7 +23,7 @@ import { ALIAS_PATTERN } from './connection-dialog';
  */
 @Component({
   selector: 'app-clone-dialog',
-  imports: [FormsModule, Field, FormDialog, Icon],
+  imports: [FormsModule, Field, FormDialog, Icon, InlineStatus],
   template: `
     <app-form-dialog heading="Clone connection"
         [subtitle]="'Copies everything from &quot;' + data.connection.connectionName + '&quot; except the bucket.'"
@@ -70,6 +71,10 @@ import { ALIAS_PATTERN } from './connection-dialog';
           @if (discovering()) { <app-icon name="refresh" class="spin" /> }
           {{ discovering() ? 'Looking…' : 'List buckets on this server' }}
         </button>
+        <!-- Owner 2026-10-27: the listing's answer under its button -- a failure in red with Try again, an empty but
+             working server in plain words (it read as a failure in red before) -- instead of a toast at the screen's edge. -->
+        <app-inline-status [loading]="discovering()" [error]="discoverError()" [empty]="!!discoverNote()" [emptyText]="discoverNote()"
+                           label="Listing buckets…" (retry)="discover()" />
         }
 
         <p class="field-note text-[color:var(--text-muted)]">
@@ -90,6 +95,8 @@ export class CloneDialog {
   readonly submitted = signal(false);
   readonly discovering = signal(false);
   readonly discovered = signal<string[]>([]);
+  readonly discoverError = signal('');
+  readonly discoverNote = signal('');
   readonly aliasPattern = ALIAS_PATTERN;
 
   /** FTP and FTPS have no bucket; the connection dialog gates the same field on the provider. */
@@ -103,20 +110,22 @@ export class CloneDialog {
 
   discover(): void {
     this.discovering.set(true);
+    this.discoverError.set('');
+    this.discoverNote.set('');
     this.http.post<ApiResponse<string[]>>(
       `${API_BASE}/storageConnection.json/discoverBuckets`,
       { storageConnectionId: this.data.connection.storageConnectionId }).subscribe({
       next: response => {
         this.discovering.set(false);
         if (response.status !== API_SUCCESS) {
-          this.toast.error(response.message || 'Could not list buckets.');
+          this.discoverError.set(loadErrorText(response, 'Could not list buckets.'));
           return;
         }
         const buckets = response.data ?? [];
         if (!buckets.length) {
           // The server treats "the credentials work, there is just nothing to list" as a
-          // success. Reported in red it read as the connection itself having failed.
-          this.toast.info(response.message || 'No buckets came back.');
+          // success. Reported in red it read as the connection itself having failed: plain words instead.
+          this.discoverNote.set(response.message || 'No buckets came back.');
           return;
         }
         this.discovered.set(buckets);
@@ -126,7 +135,7 @@ export class CloneDialog {
       },
       error: err => {
         this.discovering.set(false);
-        this.toast.error(err?.error?.message || 'Could not list buckets.');
+        this.discoverError.set(loadErrorText(err, 'Could not list buckets.'));
       },
     });
   }

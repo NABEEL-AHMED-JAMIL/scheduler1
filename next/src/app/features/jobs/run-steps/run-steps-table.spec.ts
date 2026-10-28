@@ -229,3 +229,56 @@ describe('RunStepsTable at a tablet\'s width (ZT-P14)', () => {
   });
 });
 
+describe('Run page: the Steps tab -- sorting and states (owner 2026-10-27)', () => {
+  it('keeps the pipeline order until a heading is picked, then sorts by duration both ways', () => {
+    try { localStorage.clear(); } catch { /* none */ }
+    const { component } = mountTable(ENGINE);
+    expect(component.sortedRows().map(r => r.step.key)).toEqual(['read', 'check', 'shape', 'out', 'report']);
+    component.sort.toggle('duration');
+    expect(component.sortedRows().map(r => r.step.key)).toEqual(['shape', 'report', 'out', 'check', 'read']);
+    component.sort.toggle('duration');
+    expect(component.sortedRows().map(r => r.step.key)).toEqual(['read', 'check', 'out', 'report', 'shape']);
+  });
+
+  it('is loading, not empty, until the steps answer', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ imports: [RunStepsTable], providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting(), RunTimelineStore] });
+    const fixture = TestBed.createComponent(RunStepsTable);
+    TestBed.inject(RunTimelineStore).load('7396');
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('app-loading')).not.toBeNull();
+    expect(el.querySelector('[data-test="steps-error"]')).toBeNull();
+  });
+
+  it('says the steps could not be read, with Try again that reads them again', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ imports: [RunStepsTable], providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting(), RunTimelineStore] });
+    const fixture = TestBed.createComponent(RunStepsTable);
+    const store = TestBed.inject(RunTimelineStore);
+    const http = TestBed.inject(HttpTestingController);
+    store.load('7396');
+    http.expectOne(r => r.url.endsWith('/sourceJob.json/stepExecutions')).flush('boom', { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('[data-test="steps-error"]')?.textContent).toContain("The run's steps could not be read.");
+    [...el.querySelectorAll('button')].find(b => b.textContent!.trim() === 'Try again')!.click();
+    expect(store.readError()).toBe(false);
+    http.expectOne(r => r.url.endsWith('/sourceJob.json/stepExecutions')).flush({ status: API_SUCCESS, data: ENGINE });
+    expect(store.timeline()?.steps.length).toBe(5);
+  });
+
+  it('says once that the outputs could not be read, instead of "—" on every row', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ imports: [RunStepsTable], providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting(), RunTimelineStore] });
+    const fixture = TestBed.createComponent(RunStepsTable);
+    const store = TestBed.inject(RunTimelineStore);
+    const http = TestBed.inject(HttpTestingController);
+    store.load('7396');
+    http.expectOne(r => r.url.endsWith('/sourceJob.json/stepExecutions')).flush({ status: API_SUCCESS, data: ENGINE });
+    http.expectOne(r => r.url.endsWith('/sourceJob.json/runOutputs')).flush('boom', { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('[data-test="outputs-error"]')?.textContent).toContain("The steps' outputs could not be read.");
+  });
+});

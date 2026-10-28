@@ -16,6 +16,7 @@ import { Subscription, finalize } from 'rxjs';
 import { StorageService } from '../storage.service';
 import { DictationService } from '../../../shared/ui/dictation.service';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
+import { AppLoading, InlineStatus, loadErrorText } from '../../../shared/ui/loading';
 
 interface ChatMessage {
   role: 'user' | 'assistant' | 'error';
@@ -77,7 +78,7 @@ export function agentAcceptsFile(agent: Agent, fileName: string): boolean {
 
 @Component({
   selector: 'app-file-chat',
-  imports: [Icon, Markdown, Avatar, DecimalPipe],
+  imports: [Icon, Markdown, Avatar, DecimalPipe, AppLoading, InlineStatus],
   templateUrl: './file-chat.html',
 })
 export class FileChat implements OnInit, OnDestroy {
@@ -95,6 +96,9 @@ export class FileChat implements OnInit, OnDestroy {
   private readonly dialog = inject(Dialog);
 
   readonly agents = signal<Agent[]>([]);
+  /** Owner 2026-10-27: the agent list's own read -- the select said "No usable agents" while it was still coming. */
+  readonly agentsLoading = signal(true);
+  readonly agentsError = signal('');
   readonly agentId = signal<number | null>(null);
   readonly messages = signal<ChatMessage[]>([]);
   readonly draft = signal('');
@@ -371,13 +375,23 @@ export class FileChat implements OnInit, OnDestroy {
     this.loadAgents();
   }
 
+  /** Reads the agents again after a failure; the file is read again once they answer. */
+  retryAgents(): void { this.loadAgents(); }
+
+  /** Reads the file again for the chosen agent, after a failure. */
+  retryPrepare(): void { this.prepare(); }
+
   private loadAgents(): void {
+    this.agentsLoading.set(true);
+    this.agentsError.set('');
     this.http.get<ApiResponse<Agent[]>>(`${API_BASE}/aiAgent.json/fetchAllAgents`).subscribe({
       next: response => {
+        this.agentsLoading.set(false);
         if (response.status !== API_SUCCESS) {
           // Returning here left "Reading the file..." up for good with the composer disabled.
-          // Said once, then the file is still read -- the same as when the request fails outright.
-          this.toast.error(response.message || 'The list of agents could not be read.');
+          // Said under the agent field (owner 2026-10-27: not a toast for a read), then the file is still read --
+          // the same as when the request fails outright.
+          this.agentsError.set(loadErrorText(response, 'The list of agents could not be read.'));
           this.prepare();
           return;
         }
@@ -397,7 +411,11 @@ export class FileChat implements OnInit, OnDestroy {
           // answers, so preparing before an agent is chosen reports a limit that may not apply.
           this.prepare();
         },
-        error: () => { this.prepare(); },
+        error: err => {
+          this.agentsLoading.set(false);
+          this.agentsError.set(loadErrorText(err, 'The list of agents could not be read.'));
+          this.prepare();
+        },
     });
   }
 
@@ -422,12 +440,12 @@ export class FileChat implements OnInit, OnDestroy {
       { bucket: this.bucket(), key: this.fileKey(), aiAgentId: this.agentId() }).subscribe({
       next: response => {
         this.preparing.set(false);
-        if (response.status !== API_SUCCESS) { this.prepareError.set(response.message); return; }
+        if (response.status !== API_SUCCESS) { this.prepareError.set(loadErrorText(response, 'Could not read this file.')); return; }
         this.coverage.set(response.data as any ?? null);
       },
       error: err => {
         this.preparing.set(false);
-        this.prepareError.set(err?.error?.message || 'Could not read this file.');
+        this.prepareError.set(loadErrorText(err, 'Could not read this file.'));
       },
     });
   }

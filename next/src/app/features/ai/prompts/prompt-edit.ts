@@ -22,6 +22,7 @@ import { Section } from '../../../shared/ui/section';
 import { FormRow } from '../../../shared/ui/form-row';
 import { ActionsBar } from '../../../shared/ui/actions-bar';
 import { formatDuration } from '../../../shared/ui/time-format';
+import { InlineStatus, createLoadState } from '../../../shared/ui/loading';
 
 /**
  * The prompt editor, with Try it beside it: the template and its variables on the left, the
@@ -30,7 +31,7 @@ import { formatDuration } from '../../../shared/ui/time-format';
  */
 @Component({
   selector: 'app-prompt-edit',
-  imports: [ActionsBar, Section, FormRow, PageHeader, ReactiveFormsModule, RouterLink, Field, Icon, Combobox, ServerTimePipe, DecimalPipe, ManagedBanner],
+  imports: [ActionsBar, Section, FormRow, PageHeader, ReactiveFormsModule, RouterLink, Field, Icon, Combobox, ServerTimePipe, DecimalPipe, ManagedBanner, InlineStatus],
   templateUrl: './prompt-edit.html',
 })
 export class PromptEdit implements OnInit {
@@ -60,6 +61,14 @@ export class PromptEdit implements OnInit {
   readonly loaded = signal<Prompt | null>(null);
   readonly connections = signal<ModelConnection[]>([]);
   readonly tenants = signal<{ tenantId: number; tenantName: string }[]>([]);
+  /**
+   * Owner 2026-10-27: the connection and workspace pickers say they are loading, why they are empty, or why the list
+   * could not be read -- a silent failure left "Workspace default" as the only choice, which read as "no connection".
+   */
+  readonly connectionsState = createLoadState();
+  readonly tenantsState = createLoadState(false);
+  /** The Recent runs list's read: it was hidden until runs arrived and said nothing when the read failed. */
+  readonly runsState = createLoadState(false);
   readonly isPlatformAdmin = computed(() => this.auth.isPlatformAdmin());
 
   /** MIG-243: the level of the data a prompt is sent -- the workspace's data policy for it decides the models and tools. */
@@ -204,14 +213,33 @@ export class PromptEdit implements OnInit {
   }
 
   ngOnInit(): void {
-    this.http.get<ApiResponse<ModelConnection[]>>(`${API_BASE}/aiConnection.json/list`).subscribe({
-      next: r => { if (r.status === API_SUCCESS) this.connections.set(r.data ?? []); },
-      error: () => {},
-    });
-    if (this.isPlatformAdmin()) {
-      this.http.get<ApiResponse<any[]>>(`${API_BASE}/tenant.json/listTenants`).subscribe({ next: r => { if (r.status === API_SUCCESS) this.tenants.set(r.data ?? []); }, error: () => {} });
-    }
+    this.loadConnections();
+    if (this.isPlatformAdmin()) this.loadTenants();
     if (this.isEdit()) this.load();
+  }
+
+  loadConnections(): void {
+    this.connectionsState.start();
+    this.http.get<ApiResponse<ModelConnection[]>>(`${API_BASE}/aiConnection.json/list`).subscribe({
+      next: r => {
+        if (r.status !== API_SUCCESS) { this.connectionsState.fail(r, 'The connections could not be read.'); return; }
+        this.connections.set(r.data ?? []);
+        this.connectionsState.done();
+      },
+      error: err => this.connectionsState.fail(err, 'The connections could not be read.'),
+    });
+  }
+
+  loadTenants(): void {
+    this.tenantsState.start();
+    this.http.get<ApiResponse<any[]>>(`${API_BASE}/tenant.json/listTenants`).subscribe({
+      next: r => {
+        if (r.status !== API_SUCCESS) { this.tenantsState.fail(r, 'The workspaces could not be read.'); return; }
+        this.tenants.set(r.data ?? []);
+        this.tenantsState.done();
+      },
+      error: err => this.tenantsState.fail(err, 'The workspaces could not be read.'),
+    });
   }
 
   load(): void {
@@ -236,11 +264,16 @@ export class PromptEdit implements OnInit {
     });
   }
 
-  private loadRuns(): void {
+  loadRuns(): void {
     if (!this.promptId()) return;
+    this.runsState.start();
     this.http.get<ApiResponse<PromptRun[]>>(`${API_BASE}/aiPrompt.json/runs`, { params: { promptId: this.promptId()!, limit: 10 } }).subscribe({
-      next: r => { if (r.status === API_SUCCESS) this.runs.set(r.data ?? []); },
-      error: () => {},
+      next: r => {
+        if (r.status !== API_SUCCESS) { this.runsState.fail(r, 'The recent runs could not be read.'); return; }
+        this.runs.set(r.data ?? []);
+        this.runsState.done();
+      },
+      error: err => this.runsState.fail(err, 'The recent runs could not be read.'),
     });
   }
 

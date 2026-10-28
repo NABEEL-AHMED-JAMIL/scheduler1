@@ -20,6 +20,9 @@ export interface QueueFilters {
   claimed?: string;
   page: number;
   size: number;
+  /** Owner 2026-10-27: the server's sort and asc or desc; none: the queue's own order, oldest first. */
+  sort?: string;
+  dir?: string;
 }
 
 export interface TypeSave {
@@ -172,8 +175,12 @@ export class DocumentsApi {
   }
 
   /** The type's dataset: one row per approved document. Pages from 0. */
-  dataset(documentTypeId: number, page: number, size: number): Observable<ApiResponse<DatasetPage>> {
-    return this.http.get<ApiResponse<DatasetPage>>(`${EXTRACTION}/dataset`, { params: { documentTypeId, page, size } });
+  /**
+   * Owner 2026-10-27: `order` sorts the approved data on the server -- document, approved, fields.<key> or tables.<key>,
+   * asc or desc -- sent only once the viewer picked one.
+   */
+  dataset(documentTypeId: number, page: number, size: number, order: { sort: string; dir: string } | null = null): Observable<ApiResponse<DatasetPage>> {
+    return this.http.get<ApiResponse<DatasetPage>>(`${EXTRACTION}/dataset`, { params: { documentTypeId, page, size, ...(order ?? {}) } });
   }
 
   /** The same as a file; the response keeps its headers for the name the service gave it. */
@@ -191,6 +198,8 @@ export class DocumentsApi {
     if (f.maxConfidence != null) params['maxConfidence'] = f.maxConfidence;
     if (f.olderThanMinutes != null) params['olderThanMinutes'] = f.olderThanMinutes;
     if (f.claimed) params['claimed'] = f.claimed;
+    // Owner 2026-10-27: the server's order (document, type, toCheck, leastSure, waitingSince, claimed, state), once picked.
+    if (f.sort) { params['sort'] = f.sort; params['dir'] = f.dir ?? 'asc'; }
     return this.http.get<ApiResponse<QueuePage>>(`${REVIEW}/queue`, { params });
   }
 

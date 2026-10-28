@@ -4,6 +4,7 @@ import { BlurLoader } from './blur-loader';
 import { LoadError } from './load-error';
 import { RowSnap } from './row-snap';
 import { EmptyState } from './empty-state';
+import { AppLoading } from './loading';
 
 /**
  * A cell that reads as a quantity: a count (1,204), an amount ($12.50, €3), a percentage (82%), a size (3.4 MB), a
@@ -57,7 +58,7 @@ export function markNumberColumns(table: HTMLTableElement, labels: string[]): vo
  */
 @Component({
   selector: 'app-table-shell',
-  imports: [Icon, BlurLoader, LoadError, RowSnap, EmptyState],
+  imports: [Icon, BlurLoader, LoadError, RowSnap, EmptyState, AppLoading],
   styles: `
     /* UX review 2026-10-12 (A6, G7): the filters start straight after the heading (or at the left edge when the heading
        takes its own line), and Columns keeps the far right. Pushed right, they left 50-95px of nothing on the left. */
@@ -145,10 +146,9 @@ export function markNumberColumns(table: HTMLTableElement, labels: string[]): vo
       @if (loading() && isEmpty()) {
         <!-- Nothing to show yet: a plain spinner. Once rows exist, a reload keeps them under
              a blur (see the last branch) rather than swapping them for this block. -->
-        <div class="px-6 py-14 text-center text-sm text-[color:var(--text-muted)]">
-          <div class="spinner mx-auto mb-3" role="status" aria-label="Loading"></div>
-          Loading…
-        </div>
+        <!-- Owner 2026-10-27: skeleton rows in the table's place (after 150 ms, "Still loading…" after 10 s), with a
+             screen-reader line naming the list, instead of a bare spinner. -->
+        <app-loading shape="rows" [count]="5" [label]="loadingText()" />
       } @else if (error() && !loading()) {
         <app-load-error [message]="error()" [retryable]="errorRetryable()" (retry)="retry.emit()">
           <ng-content select="[error-action]" />
@@ -204,6 +204,13 @@ export class TableShell implements AfterViewInit {
   readonly shown = input<number | null>(null);
   readonly total = input<number | null>(null);
   readonly retry = output<void>();
+  /** What the first load says to a screen reader and after 10 s: "Loading runs…". Defaults to the heading. */
+  readonly loadingLabel = input('');
+  protected readonly loadingText = computed(() => {
+    if (this.loadingLabel()) return this.loadingLabel();
+    const heading = this.heading().trim();
+    return heading ? `Loading ${heading.charAt(0).toLowerCase()}${heading.slice(1)}…` : 'Loading…';
+  });
   /** Where the column choice is remembered; the heading when not given. */
   readonly columnsKey = input('');
 

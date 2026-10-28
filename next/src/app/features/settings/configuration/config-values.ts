@@ -15,6 +15,9 @@ import { ConfigValueDialog, ConfigValueDialogData } from './config-value-dialog'
 import { PipelineConfig, TenantOption, configReference, workspaceLabel } from './configuration.models';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
+import { InlineStatus, createLoadState } from '../../../shared/ui/loading';
 
 const ENDPOINT = () => `${API_BASE}/setting.json/pipelineConfig`;
 
@@ -25,7 +28,7 @@ const ENDPOINT = () => `${API_BASE}/setting.json/pipelineConfig`;
  */
 @Component({
   selector: 'app-config-values',
-  imports: [WorkspaceSelect, RefreshButton, PageHeader, TableShell, StatTile, Icon, ServerTimePipe],
+  imports: [WorkspaceSelect, RefreshButton, PageHeader, TableShell, StatTile, Icon, ServerTimePipe, SortHeader, InlineStatus],
   templateUrl: './config-values.html',
 })
 export class ConfigValues implements OnInit {
@@ -39,8 +42,12 @@ export class ConfigValues implements OnInit {
   readonly secretRef = configReference('SECRET', 'KEY');
 
   readonly rows = signal<PipelineConfig[]>([]);
-  readonly loading = signal(true);
-  readonly error = signal('');
+  /** Owner 2026-10-27: the list's read; the tiles wait for it instead of showing 0 as if real. */
+  readonly state = createLoadState();
+  readonly loading = this.state.loading;
+  readonly error = this.state.error;
+  /** The workspace names (platform administrators): the New value dialog's workspace choices come from here too. */
+  readonly tenantsState = createLoadState(false);
   readonly search = signal('');
 
   readonly isPlatformAdmin = computed(() => this.auth.isPlatformAdmin());
@@ -58,6 +65,19 @@ export class ConfigValues implements OnInit {
       || (r.kind === 'VALUE' && (r.value ?? '').toLowerCase().includes(term)));
   });
 
+  /** Owner 2026-10-27: every column that holds a value sorts; the API's order until one is picked. */
+  readonly sort = createTableSort<PipelineConfig>({
+    id: 'config-values',
+    columns: {
+      key: r => r.key,
+      workspace: r => this.workspaceName(r.tenantId),
+      kind: { value: r => (r.kind === 'SECRET' ? 'Secret' : 'Value'), kind: 'text' },
+      value: { value: r => (r.kind === 'SECRET' ? null : r.value), kind: 'text' },
+      usedBy: { value: r => r.usedByTasks, kind: 'number' },
+    },
+  });
+  readonly sorted = computed(() => this.sort.apply(this.filtered()));
+
   readonly stats = computed(() => {
     const rows = this.rows();
     return {
@@ -68,13 +88,20 @@ export class ConfigValues implements OnInit {
   });
 
   ngOnInit(): void {
-    if (this.isPlatformAdmin()) {
-      this.http.get<ApiResponse<TenantOption[]>>(`${API_BASE}/tenant.json/listTenants`).subscribe({
-        next: r => { if (r.status === API_SUCCESS) this.tenants.set(r.data ?? []); },
-        error: () => {},
-      });
-    }
+    if (this.isPlatformAdmin()) this.loadTenants();
     this.load();
+  }
+
+  loadTenants(): void {
+    this.tenantsState.start();
+    this.http.get<ApiResponse<TenantOption[]>>(`${API_BASE}/tenant.json/listTenants`).subscribe({
+      next: r => {
+        if (r.status !== API_SUCCESS) { this.tenantsState.fail(r, 'The workspace names could not be read.'); return; }
+        this.tenants.set(r.data ?? []);
+        this.tenantsState.done();
+      },
+      error: err => this.tenantsState.fail(err, 'The workspace names could not be read.'),
+    });
   }
 
   setTenant(value: string | null | undefined): void {
@@ -85,21 +112,19 @@ export class ConfigValues implements OnInit {
   private ticket = 0;
   load(): void {
     const ticket = ++this.ticket;
-    this.loading.set(true);
-    this.error.set('');
+    this.state.start();
     const params: Record<string, string> = {};
     if (this.tenantFilter()) params['tenantId'] = this.tenantFilter();
     this.http.get<ApiResponse<PipelineConfig[]>>(ENDPOINT(), { params }).subscribe({
       next: response => {
         if (ticket !== this.ticket) return;
-        this.loading.set(false);
-        if (response.status !== API_SUCCESS) { this.error.set(response.message); return; }
+        if (response.status !== API_SUCCESS) { this.state.fail(response, 'The configuration values could not be read.'); return; }
         this.rows.set(withoutSecrets(response.data ?? []));
+        this.state.done();
       },
       error: err => {
         if (ticket !== this.ticket) return;
-        this.loading.set(false);
-        this.error.set(err?.error?.message || 'Could not load the configuration values.');
+        this.state.fail(err, 'The configuration values could not be read.');
       },
     });
   }

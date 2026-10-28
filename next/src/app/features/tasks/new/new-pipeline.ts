@@ -6,6 +6,7 @@ import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config
 import { AuthService } from '../../../core/auth/auth.service';
 import { Icon } from '../../../shared/ui/icon';
 import { PageHeader } from '../../../shared/ui/page-header';
+import { InlineStatus, createLoadState } from '../../../shared/ui/loading';
 import { PIPELINE_FIELDS, Topic } from '../../ai/assistant/create-pipeline';
 import { pipelineIdOf } from '../../ai/assistant/flow.model';
 
@@ -30,7 +31,7 @@ export const STEP_PAYLOAD = '<data></data>';
  */
 @Component({
   selector: 'app-new-pipeline',
-  imports: [Icon, RouterLink, PageHeader],
+  imports: [Icon, RouterLink, PageHeader, InlineStatus],
   template: `
     <div class="page">
       <app-page-header title="New pipeline" subtitle="Start from what it should do. A schedule, triggers and a review come after it is made." />
@@ -88,9 +89,15 @@ export const STEP_PAYLOAD = '<data></data>';
             <summary class="cursor-pointer select-none text-[color:var(--text-secondary)] w-fit">Advanced: event source</summary>
             <div class="mt-2 flex flex-col gap-1">
               <label class="label" for="newPipelineTopic">Topic (optional)</label>
+              <!-- Owner 2026-10-27: the list says it is loading, empty or could not be read, instead of an empty select. -->
               <select id="newPipelineTopic" class="input" [value]="topicId() ?? ''" (change)="topicId.set(+$any($event.target).value || null)">
+                @if (topicsState.pending()) { <option value="">Loading topics…</option> }
+                @else if (!topics().length) { <option value="">The workspace's own topic</option> }
                 @for (t of topics(); track t.sourceTaskTypeId) { <option [value]="'' + t.sourceTaskTypeId">{{ t.serviceName }}</option> }
               </select>
+              <app-inline-status [loading]="topicsState.loading()" [error]="topicsState.error()" label="Loading topics…"
+                                 [empty]="topicsState.loaded() && !topics().length" emptyText="No topic yet: the workspace's own is used."
+                                 (retry)="loadTopics()" />
               <p class="field-note text-[color:var(--text-muted)]">Only for a pipeline a Kafka message starts. Left as it is, the workspace's own topic is used.</p>
             </div>
           </details>
@@ -112,9 +119,12 @@ export const STEP_PAYLOAD = '<data></data>';
             <span class="label">Pipeline to copy</span>
             <select id="newPipelineCopyFrom" class="input" data-test="copy-from" [value]="copyFrom() ?? ''" (focus)="chosen.set('copy')"
                     (change)="pickCopy(+$any($event.target).value || null)">
-              <option value="">Choose…</option>
+              <option value="">{{ sourcesState.pending() ? 'Loading pipelines…' : 'Choose…' }}</option>
               @for (p of copyable(); track p.taskDetailId) { <option [value]="'' + p.taskDetailId">{{ p.taskName }}</option> }
             </select>
+            <app-inline-status [loading]="sourcesState.loading()" [error]="sourcesState.error()" label="Loading pipelines…"
+                               [empty]="sourcesState.loaded() && !copyable().length" emptyText="No pipeline with steps to copy yet."
+                               (retry)="loadSources()" />
           </label>
           <label class="flex flex-col gap-1">
             <span class="label">Name of the copy</span>
@@ -150,6 +160,9 @@ export class NewPipeline implements OnInit {
   readonly copyName = signal('');
   readonly busy = signal(false);
   readonly error = signal('');
+  /** Owner 2026-10-27: the two choice lists' reads (a failure used to read as an empty list). */
+  readonly topicsState = createLoadState();
+  readonly sourcesState = createLoadState();
 
   readonly canAssistant = computed(() => this.auth.canOpen('ai-prompts'));
   /** A pipeline with steps of its own (a registry pipeline) can be copied; an XML-only task has none to copy. */
@@ -160,17 +173,33 @@ export class NewPipeline implements OnInit {
 
   ngOnInit(): void {
     if (this.noWorkspace()) return;
+    this.loadTopics();
+    this.loadSources();
+  }
+
+  loadTopics(): void {
+    this.topicsState.start();
     this.http.get<ApiResponse<Topic[]>>(`${API_BASE}/setting.json/topics`, { params: { q: '', limit: 50 } }).subscribe({
       next: r => {
-        const list = (r.status === API_SUCCESS ? r.data ?? [] : []).filter(t => (t.status ?? 'Active') === 'Active');
+        if (r.status !== API_SUCCESS) { this.topicsState.fail(r, 'The topics could not be read.'); return; }
+        const list = (r.data ?? []).filter(t => (t.status ?? 'Active') === 'Active');
         this.topics.set(list);
         this.topicId.set(list[0]?.sourceTaskTypeId ?? null);
+        this.topicsState.done();
       },
-      error: () => this.topics.set([]),
+      error: err => this.topicsState.fail(err, 'The topics could not be read.'),
     });
+  }
+
+  loadSources(): void {
+    this.sourcesState.start();
     this.http.post<ApiResponse<CopySource[]>>(`${API_BASE}/sourceTask.json/listSourceTask`, {}, { params: { page: 1, limit: 1000 } }).subscribe({
-      next: r => this.sources.set(r.status === API_SUCCESS ? (r.data ?? []).slice().sort((a, b) => a.taskName.localeCompare(b.taskName)) : []),
-      error: () => this.sources.set([]),
+      next: r => {
+        if (r.status !== API_SUCCESS) { this.sourcesState.fail(r, 'The pipelines could not be read.'); return; }
+        this.sources.set((r.data ?? []).slice().sort((a, b) => a.taskName.localeCompare(b.taskName)));
+        this.sourcesState.done();
+      },
+      error: err => this.sourcesState.fail(err, 'The pipelines could not be read.'),
     });
   }
 

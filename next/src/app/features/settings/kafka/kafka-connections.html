@@ -19,6 +19,9 @@
     </div>
   </app-page-header>
   <app-managed-banner what="Kafka connections and topics" still="You can still test them." />
+  @if (tenantsState.error()) {
+    <app-inline-status [error]="tenantsState.error()" (retry)="loadTenants()" />
+  }
 
   @if (!loading() && !error() && profiles().length && !defaultProfile()) {
     <div class="card flex flex-wrap items-center gap-2 px-4 py-2.5 text-sm">
@@ -195,7 +198,7 @@
           <div class="kafka-health-head">
             <span class="kafka-strip-dot" [class]="'kafka-strip-dot ' + (currentHealth()?.reachable ? 'ok' : currentHealth() ? 'crit' : '')"></span>
             <span class="font-medium">
-              @if (currentHealth(); as h) { {{ h.reachable ? 'Brokers answering' : 'Brokers not answering' }} } @else if (healthError()) { Health unknown } @else { Checking the brokers… }
+              @if (currentHealth(); as h) { {{ h.reachable ? 'Brokers answering' : 'Brokers not answering' }} } @else if (healthError()) { Health unknown } @else { <app-loading shape="inline" label="Checking the brokers…" /> }
             </span>
             @if (currentHealth(); as h) {
               <span class="text-xs text-[color:var(--text-muted)]">checked {{ h.checkedAt | serverTime: 'recentSec' }} · every minute</span>
@@ -306,7 +309,16 @@
 
           @case ('groups') {
             <section class="kafka-topics" data-groups>
-              @if (!groups().length) {
+              <!-- Owner 2026-10-27: loading says loading, and a failed read says so with Recheck, before any "none". -->
+              @if (!currentHealth() && !healthError()) {
+                <app-loading shape="rows" label="Loading consumer groups…" [count]="3" />
+              } @else if (!currentHealth() && healthError()) {
+                <div class="lookup-entries-empty text-crit-500" role="alert">
+                  <app-icon name="alert" size="1.5rem" />
+                  <p>{{ healthError() }}</p>
+                  <button type="button" class="btn btn-default btn-sm" (click)="loadHealth(true)"><app-icon name="refresh" />Try again</button>
+                </div>
+              } @else if (!groups().length) {
                 <div class="lookup-entries-empty">
                   <app-icon name="users" size="1.5rem" class="icon-muted" />
                   <p>{{ currentHealth()?.reachable ? 'No consumer group reads your topics on this connection.' : 'Groups show once the brokers answer.' }}</p>
@@ -318,10 +330,13 @@
                 <div class="kafka-table-wrap">
                   <table class="table-modern lookup-entry-table kafka-table">
                     <thead>
-                      <tr><th>Group</th><th class="kc-state">State</th><th class="kc-members text-right">Members</th><th class="kc-topics hidden lg:table-cell">Topics</th><th class="kc-lag text-right">Lag</th></tr>
+                      <tr><th appSort="group" [sortBy]="groupSort">Group</th><th class="kc-state" appSort="state" [sortBy]="groupSort">State</th>
+                        <th class="kc-members text-right" appSort="members" [sortBy]="groupSort">Members</th>
+                        <th class="kc-topics hidden lg:table-cell" appSort="topics" [sortBy]="groupSort">Topics</th>
+                        <th class="kc-lag text-right" appSort="lag" [sortBy]="groupSort">Lag</th></tr>
                     </thead>
                     <tbody>
-                      @for (g of groups(); track g.group) {
+                      @for (g of sortedGroups(); track g.group) {
                         <tr>
                           <td class="kafka-cell-name"><span class="mono text-xs" [title]="g.group">{{ g.group }}</span>
                             @if (!g.members && g.lag) { <div class="text-[11px] text-warn-500">No member is reading: the lag grows until one joins.</div> }
@@ -360,7 +375,7 @@
             }
           </div>
           @if (topicsLoading() && !topicsHere().length) {
-            <div class="lookup-entries-empty"><div class="spinner" role="status" aria-label="Loading topics"></div> Loading topics…</div>
+            <app-loading shape="rows" label="Loading topics…" [count]="4" />
           } @else if (topicsError()) {
             <div class="lookup-entries-empty text-crit-500" role="alert">
               <app-icon name="alert" size="1.5rem" />
@@ -381,12 +396,12 @@
               <table class="table-modern lookup-entry-table kafka-table">
                 <thead>
                   <tr>
-                    <th>Topic</th>
-                    <th class="kc-parts hidden xl:table-cell text-right">Partitions</th>
-                    <th class="kc-read">Read by</th>
-                    <th class="kc-lag text-right">Lag</th>
-                    <th class="kc-pipes hidden xl:table-cell">Pipelines</th>
-                    <th class="kc-state">State</th>
+                    <th appSort="topic" [sortBy]="topicSort">Topic</th>
+                    <th class="kc-parts hidden xl:table-cell text-right" appSort="partitions" [sortBy]="topicSort">Partitions</th>
+                    <th class="kc-read" appSort="readBy" [sortBy]="topicSort">Read by</th>
+                    <th class="kc-lag text-right" appSort="lag" [sortBy]="topicSort">Lag</th>
+                    <th class="kc-pipes hidden xl:table-cell" appSort="pipelines" [sortBy]="topicSort">Pipelines</th>
+                    <th class="kc-state" appSort="state" [sortBy]="topicSort">State</th>
                     <th class="kc-act th-actions">Actions</th>
                   </tr>
                 </thead>

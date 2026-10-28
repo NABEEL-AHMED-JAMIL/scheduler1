@@ -312,3 +312,74 @@ describe('the Failed tile', () => {
     expect(reports.failedFoot()).toBe('');
   });
 });
+
+describe('Run analytics -- sorting (owner 2026-10-27)', () => {
+  const twoTasks: RunData = {
+    ...empty,
+    task: ['nightly-load', 'billing-export'],
+    status: ['Completed', 'Failed'],
+    owner: ['Ada'],
+    day: ['2026-08-01', '2026-08-02'],
+    rows: [
+      [0, 0, 0, 0, 44, 'job a', 1, 0, 3],
+      [0, 0, 0, 0, 40, 'job a', 2, 0, 3],
+      [1, 1, 0, 1, 10, 'job b', 3, 0, 1],
+    ] as RunRow[],
+  };
+
+  it('keeps the worst-first order until a heading is picked, then sorts by it both ways', () => {
+    try { localStorage.clear(); } catch { /* none */ }
+    const reports = reportsFor();
+    reports.rawData.set(twoTasks);
+    expect(reports.healthPage().map(t => t.task)).toEqual(['billing-export', 'nightly-load']);
+    reports.healthSort.toggle('runs');
+    expect(reports.healthPage().map(t => t.task)).toEqual(['nightly-load', 'billing-export']);
+    reports.healthSort.toggle('runs');
+    expect(reports.healthPage().map(t => t.task)).toEqual(['billing-export', 'nightly-load']);
+    reports.healthSort.toggle('o-Failed');
+    expect(reports.healthPage().map(t => t.task)).toEqual(['billing-export', 'nightly-load']);
+  });
+
+  it('sorts the failed runs by schedule, A to Z first', () => {
+    try { localStorage.clear(); } catch { /* none */ }
+    const reports = reportsFor();
+    reports.rawData.set(twoTasks);
+    reports.failures.set([
+      { jobQueueId: 9, jobId: 1, job: 'zeta job', task: 't', status: 'Failed', message: 'x', when: '2026-08-01T10:00:00', seconds: 5 },
+      { jobQueueId: 8, jobId: 2, job: 'alpha job', task: 't', status: 'Failed', message: 'y', when: '2026-08-02T10:00:00', seconds: 50 },
+    ]);
+    expect(reports.failurePage().map(f => f.jobQueueId)).toEqual([9, 8]);
+    reports.failureSort.toggle('schedule');
+    expect(reports.failurePage().map(f => f.jobQueueId)).toEqual([8, 9]);
+    reports.failureSort.toggle('took');
+    expect(reports.failurePage().map(f => f.seconds)).toEqual([50, 5]);
+  });
+});
+
+describe('Run analytics -- a reload keeps the page (owner 2026-10-27)', () => {
+  it('shows the loading card only before the first runs arrive', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [
+      provideRouter([]),
+      { provide: HttpClient, useValue: { get: () => of({ status: 'ERROR', message: '' }), post: () => of({ status: 'ERROR', message: '' }) } },
+      { provide: ToastService, useValue: { success: () => {}, error: () => {}, info: () => {} } },
+      { provide: AuthService, useValue: { isTenantAdmin: () => false, isPlatformAdmin: () => false, canOpen: () => true } },
+      { provide: BillingApi, useValue: { usageByMeter: () => of({ status: 'ERROR', message: '' }) } },
+    ] });
+    const fixture = TestBed.createComponent(Reports);
+    fixture.detectChanges();
+    const reports = fixture.componentInstance;
+    reports.error.set('');
+    reports.loading.set(true);
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Reading your runs');
+    reports.rawData.set(inFlight);
+    reports.loading.set(false);
+    fixture.detectChanges();
+    reports.loading.set(true);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.textContent).not.toContain('Reading your runs');
+    expect(el.querySelector('app-blur-loader .blur-loader')?.getAttribute('aria-busy')).toBe('true');
+  });
+});

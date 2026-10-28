@@ -18,6 +18,9 @@ import { SsoStarted, rememberFlow } from '../../login/sign-in.api';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
 import { ActionsBar } from '../../../shared/ui/actions-bar';
+import { AppLoading, InlineStatus, createLoadState, loadErrorText } from '../../../shared/ui/loading';
+import { LoadError } from '../../../shared/ui/load-error';
+import { BlurLoader } from '../../../shared/ui/blur-loader';
 
 /** A workspace's single sign-on, as the server answers it (never the secret). */
 export interface SsoSettings {
@@ -131,7 +134,8 @@ const RULE_FIELDS: { key: keyof RulesDraft; label: string; hint: string; flag?: 
  */
 @Component({
   selector: 'app-workspace-security',
-  imports: [WorkspaceSelect, ActionsBar, RefreshButton, PageHeader, Icon, CopyButton, ServerTimePipe, SignInHistory],
+  imports: [WorkspaceSelect, ActionsBar, RefreshButton, PageHeader, Icon, CopyButton, ServerTimePipe, SignInHistory, AppLoading,
+    InlineStatus, LoadError, BlurLoader],
   templateUrl: './workspace-security.html',
 })
 export class WorkspaceSecurity implements OnInit {
@@ -153,6 +157,14 @@ export class WorkspaceSecurity implements OnInit {
   readonly draft = signal<RulesDraft>(draftOf(null));
   readonly loading = signal(false);
   readonly error = signal('');
+  /**
+   * Owner 2026-10-27: the rules have answered for the workspace shown. Until then the card is a skeleton, not a form of
+   * empty fields with "Platform default" placeholders; a workspace switch starts it again.
+   */
+  readonly rulesLoaded = signal(false);
+  /** The access profiles for SSO's "Their access profile" (a failure was silent and left only the default). */
+  readonly profilesState = createLoadState(false);
+  private seq = 0;
   readonly saving = signal(false);
   readonly saveError = signal('');
   readonly problem = computed(() => draftProblem(this.draft()));
@@ -176,6 +188,9 @@ export class WorkspaceSecurity implements OnInit {
 
   pickWorkspace(id: number | null): void {
     this.tenantId.set(id);
+    // Another workspace: its rules and its SSO are not the old one's.
+    this.rulesLoaded.set(false);
+    this.sso.set(null);
     this.load();
   }
 
@@ -205,36 +220,52 @@ export class WorkspaceSecurity implements OnInit {
   }
 
   load(): void {
+    const seq = ++this.seq;
     this.loading.set(true);
     this.error.set('');
     if (this.platformMode()) {
       this.api.platformPolicy().subscribe({
         next: r => {
+          if (seq !== this.seq) return;
           this.loading.set(false);
-          if (r.status !== API_SUCCESS || !r.data) { this.error.set(r.message || 'The rules could not be read.'); return; }
+          if (r.status !== API_SUCCESS || !r.data) { this.error.set(loadErrorText(r, 'The rules could not be read.')); return; }
           this.platform.set(r.data);
           this.policy.set(null);
           this.draft.set(draftOf(r.data));
+          this.rulesLoaded.set(true);
         },
-        error: err => { this.loading.set(false); this.error.set(err?.error?.message || 'The rules could not be read.'); },
+        error: err => { if (seq !== this.seq) return; this.loading.set(false); this.error.set(loadErrorText(err, 'The rules could not be read.')); },
       });
       this.sso.set(null);
       return;
     }
     this.api.policy(this.tenantId()).subscribe({
       next: r => {
+        if (seq !== this.seq) return;
         this.loading.set(false);
-        if (r.status !== API_SUCCESS || !r.data) { this.error.set(r.message || 'The rules could not be read.'); return; }
+        if (r.status !== API_SUCCESS || !r.data) { this.error.set(loadErrorText(r, 'The rules could not be read.')); return; }
         this.policy.set(r.data);
         this.platform.set(r.data.platform);
         this.draft.set(draftOf(r.data.workspace));
+        this.rulesLoaded.set(true);
       },
-      error: err => { this.loading.set(false); this.error.set(err?.error?.message || 'The rules could not be read.'); },
+      error: err => { if (seq !== this.seq) return; this.loading.set(false); this.error.set(loadErrorText(err, 'The rules could not be read.')); },
     });
     this.loadSso();
-    this.profilesApi.list(this.tenantId()).subscribe({
-      next: r => { if (r.status === API_SUCCESS) this.profiles.set(r.data ?? []); },
-      error: () => {},
+    this.loadProfiles();
+  }
+
+  loadProfiles(): void {
+    const tenant = this.tenantId();
+    this.profilesState.start();
+    this.profilesApi.list(tenant).subscribe({
+      next: r => {
+        if (tenant !== this.tenantId()) return;
+        if (r.status !== API_SUCCESS) { this.profilesState.fail(r, 'The access profiles could not be read.'); return; }
+        this.profiles.set(r.data ?? []);
+        this.profilesState.done();
+      },
+      error: err => { if (tenant === this.tenantId()) this.profilesState.fail(err, 'The access profiles could not be read.'); },
     });
   }
 
@@ -270,17 +301,19 @@ export class WorkspaceSecurity implements OnInit {
   loadSso(): void {
     this.ssoError.set('');
     this.ssoTest.set('');
-    const params = this.tenantId() ? `?tenantId=${this.tenantId()}` : '';
+    const tenant = this.tenantId();
+    const params = tenant ? `?tenantId=${tenant}` : '';
     this.http.get<ApiResponse<SsoSettings>>(`${API_BASE}/tenant.json/security/sso${params}`).subscribe({
       next: r => {
+        if (tenant !== this.tenantId()) return;
         if (r.status === API_SUCCESS && r.data) {
           this.sso.set(r.data);
           this.ssoDraft.set(ssoDraftOf(r.data));
         } else {
-          this.ssoError.set(r.message);
+          this.ssoError.set(loadErrorText(r, 'Single sign-on could not be read.'));
         }
       },
-      error: err => this.ssoError.set(err?.error?.message || 'Single sign-on could not be read.'),
+      error: err => { if (tenant === this.tenantId()) this.ssoError.set(loadErrorText(err, 'Single sign-on could not be read.')); },
     });
   }
 

@@ -20,6 +20,9 @@ import { ReportPreviewDialog } from './report-preview-dialog';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
+import { InlineStatus, createLoadState, loadErrorText } from '../../../shared/ui/loading';
 
 /** Subfolders of the reports folder listed too (one level), at most this many. */
 export const SUBFOLDER_CAP = 10;
@@ -46,7 +49,7 @@ const isPdf = (r: GeneratedReport) => r.type.toLowerCase() === 'pdf';
  */
 @Component({
   selector: 'app-generated-reports',
-  imports: [PageHeader, RefreshButton, CdkMenu, CdkMenuItem, CdkMenuTrigger, Icon, Combobox, RouterLink, ServerTimePipe, TableShell, Pagination],
+  imports: [PageHeader, RefreshButton, SortHeader, InlineStatus, CdkMenu, CdkMenuItem, CdkMenuTrigger, Icon, Combobox, RouterLink, ServerTimePipe, TableShell, Pagination],
   templateUrl: './generated-reports.html',
 })
 export class GeneratedReports implements OnInit {
@@ -59,9 +62,15 @@ export class GeneratedReports implements OnInit {
   readonly buckets = signal<BucketSummary[]>([]);
   readonly bucket = signal('');
   readonly folder = signal('reports/');
-  readonly loadingRuns = signal(false);
-  readonly loadingObjects = signal(false);
-  readonly loading = computed(() => this.loadingRuns() || this.loadingObjects());
+  /**
+   * Owner 2026-10-27: the bucket list is read before anything else, so it counts as the list loading -- the table
+   * showed "Nothing generated yet" while the buckets were still on the way. Both reads start as loading for the same
+   * reason; every path clears them.
+   */
+  readonly bucketsState = createLoadState();
+  readonly loadingRuns = signal(true);
+  readonly loadingObjects = signal(true);
+  readonly loading = computed(() => this.bucketsState.loading() || this.loadingRuns() || this.loadingObjects());
   readonly objectsError = signal('');
   readonly runsError = signal('');
   readonly objects = signal<GeneratedReport[]>([]);
@@ -75,6 +84,9 @@ export class GeneratedReports implements OnInit {
   private findTimer: ReturnType<typeof setTimeout> | null = null;
   /** The newest Find asked; an older answer that comes back late is dropped. */
   private findSeq = 0;
+  /** Owner 2026-10-27: Find's own read, said while it runs and when it fails (it read as "no other schedule"). */
+  readonly finding = signal(false);
+  readonly findError = signal('');
 
   readonly reports = computed(() => mergeReports(this.objects(), [...this.runs()?.reports ?? [], ...this.found()?.reports ?? []]));
   readonly filtered = computed(() => {
@@ -83,8 +95,24 @@ export class GeneratedReports implements OnInit {
     return this.reports().filter(r => [r.name, r.type, r.pipeline, r.jobName, r.owner]
       .some(v => (v ?? '').toLowerCase().includes(q)));
   });
+  /** Owner 2026-10-27: every column sorts; the list starts as mergeReports orders it, newest first. */
+  readonly sort = createTableSort<GeneratedReport>({
+    id: 'generated-outputs',
+    columns: {
+      name: r => r.name,
+      type: r => r.type,
+      pipeline: r => r.pipeline || r.jobName,
+      created: { value: r => r.created, kind: 'date' },
+      size: { value: r => r.size, kind: 'number' },
+      status: { value: r => r.status, kind: 'status' },
+      owner: r => r.owner,
+    },
+    initial: { key: 'created', direction: 'desc' },
+  });
+  readonly sorted = computed(() => this.sort.apply(this.filtered()));
   readonly pager = createPager<GeneratedReport>();
-  readonly paged = computed(() => this.pager.slice(this.filtered()));
+  /** Sorted before the page is cut, so a sort covers every row and not just this page. */
+  readonly paged = computed(() => this.pager.slice(this.sorted()));
 
   readonly bucketOptions = computed<ComboboxOption[]>(() =>
     this.buckets().map(b => ({ value: b.bucket, label: b.label || b.bucket, hint: b.provider })));
@@ -114,14 +142,34 @@ export class GeneratedReports implements OnInit {
 
   ngOnInit(): void {
     this.destroyRef.onDestroy(() => { if (this.findTimer) clearTimeout(this.findTimer); });
+    this.loadBuckets(true);
+  }
+
+  /**
+   * The bucket choices. A failure is said under the bucket field with Try again (it was silent, and the list then
+   * just had no files); the recent runs are still read without a bucket.
+   */
+  loadBuckets(thenLoad = false): void {
+    this.bucketsState.start();
     this.storage.buckets().subscribe({
       next: r => {
-        const list = r.status === API_SUCCESS ? (r.data ?? []) : [];
-        this.buckets.set(list);
-        if (!this.bucket() && list.length) this.bucket.set(list[0].bucket);
-        this.load();
+        if (r.status !== API_SUCCESS) {
+          this.bucketsState.fail(r, 'The storage connections could not be read.');
+        } else {
+          const list = r.data ?? [];
+          this.buckets.set(list);
+          this.bucketsState.done();
+          if (!this.bucket() && list.length) {
+            this.bucket.set(list[0].bucket);
+            if (!thenLoad) this.loadObjects();
+          }
+        }
+        if (thenLoad) this.load();
       },
-      error: () => this.load(),
+      error: err => {
+        this.bucketsState.fail(err, 'The storage connections could not be read.');
+        if (thenLoad) this.load();
+      },
     });
   }
 
@@ -132,7 +180,7 @@ export class GeneratedReports implements OnInit {
       next: r => { this.runs.set(r); this.loadingRuns.set(false); },
       error: e => {
         this.runs.set(null);
-        this.runsError.set(e?.error?.message || e?.message || 'Could not read recent runs\' outputs.');
+        this.runsError.set(loadErrorText(e, 'Could not read recent runs\' outputs.'));
         this.loadingRuns.set(false);
       },
     });
@@ -153,6 +201,8 @@ export class GeneratedReports implements OnInit {
     if (q.length < FIND_MIN_CHARS) {
       this.findSeq++;
       this.found.set(null);
+      this.finding.set(false);
+      this.findError.set('');
       return;
     }
     this.findTimer = setTimeout(() => { this.findTimer = null; this.findBeyond(q); }, FIND_DELAY_MS);
@@ -160,9 +210,17 @@ export class GeneratedReports implements OnInit {
 
   findBeyond(q: string): void {
     const seq = ++this.findSeq;
+    this.finding.set(true);
+    this.findError.set('');
     this.service.matchingOutputs(q).subscribe({
-      next: r => { if (seq === this.findSeq) this.found.set({ ...r, query: q }); },
-      error: () => { if (seq === this.findSeq) this.found.set({ reports: [], runsRead: 0, jobsRead: 0, failed: 0, query: q }); },
+      next: r => { if (seq === this.findSeq) { this.found.set({ ...r, query: q }); this.finding.set(false); } },
+      // Owner 2026-10-27: a failed Find said "no other schedule has it", which is not what happened.
+      error: e => {
+        if (seq !== this.findSeq) return;
+        this.found.set(null);
+        this.finding.set(false);
+        this.findError.set(loadErrorText(e, `The other schedules could not be searched for "${q}".`));
+      },
     });
   }
 
@@ -186,11 +244,12 @@ export class GeneratedReports implements OnInit {
     this.objectsError.set('');
     this.subfoldersRead.set(0);
     this.folderCut.set(false);
-    if (!bucket) { this.objects.set([]); return; }
+    if (!bucket) { this.objects.set([]); this.loadingObjects.set(false); return; }
     this.loadingObjects.set(true);
     // Each folder's pages, one after another, until the listing ends or FOLDER_FILE_CAP files are in.
     const page = (prefix: string, token?: string) => this.storage.listObjects(bucket, prefix, token).pipe(
-      map(r => { if (r.status !== API_SUCCESS) throw new Error(r.message); return r.data ?? { objects: [] }; }));
+      // The answer itself is thrown, so its own words (when plain) reach loadErrorText; a JS Error's would not.
+      map(r => { if (r.status !== API_SUCCESS) throw r; return r.data ?? { objects: [] }; }));
     const list = (prefix: string): Observable<ObjectSummary[]> => page(prefix).pipe(
       expand((r, i) => r.nextContinuationToken && (i + 1) * 100 < FOLDER_FILE_CAP ? page(prefix, r.nextContinuationToken) : EMPTY),
       reduce((all, r) => {
@@ -213,7 +272,7 @@ export class GeneratedReports implements OnInit {
       },
       error: e => {
         this.objects.set([]);
-        this.objectsError.set(e?.error?.message || e?.message || `Could not read ${bucket}/${this.folder()}.`);
+        this.objectsError.set(loadErrorText(e, `Could not read ${bucket}/${this.folder()}.`));
         this.loadingObjects.set(false);
       },
     });

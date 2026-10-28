@@ -81,10 +81,12 @@ describe('CloneDialog bucket discovery', () => {
    * it read as the source connection having failed.
    */
   it('does not report an empty but successful listing as a failure', () => {
-    const { dialog, errors, infos } = dialogFor();
+    const { dialog, errors } = dialogFor();
     dialog.discover();
     expect(errors).toEqual([]);
-    expect(infos).toHaveLength(1);
+    // Owner 2026-10-27: said under the button in plain words, not in a toast.
+    expect(dialog.discoverError()).toBe('');
+    expect(dialog.discoverNote()).toBe('Copied.');
     expect(dialog.discovered()).toEqual([]);
   });
 });

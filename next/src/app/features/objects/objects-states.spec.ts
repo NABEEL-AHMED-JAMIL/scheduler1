@@ -178,3 +178,20 @@ describe('Object Browser listing', () => {
     expect(v.http.post).not.toHaveBeenCalled();
   });
 });
+
+describe('Object Browser -- a failed Load more (owner 2026-10-27)', () => {
+  it('keeps the rows listed so far and offers Try again under them', () => {
+    let calls = 0;
+    const v = view({ list: () => (calls++ === 0 ? of(OK({ objects: [SALES], nextContinuationToken: 'more' }))
+      : of({ status: 'ERROR', message: 'Storage timed out.' })) });
+    v.objects.onBucketChange(MINIO.bucket);
+    v.fixture.detectChanges();
+    v.objects.load(true);
+    v.fixture.detectChanges();
+    expect(v.objects.error()).toBe('');
+    expect(v.objects.moreError()).toBe('Storage timed out.');
+    expect(v.objects.objects().length).toBe(1);
+    expect(v.text()).toContain('sales.csv');
+    expect(v.el.querySelector('app-inline-status')?.textContent).toContain('Try again');
+  });
+});

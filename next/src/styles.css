@@ -679,6 +679,12 @@
   }
   .stat-strip.is-md .stat-strip-value { font-size: 1.125rem; }
   .stat-strip-value.is-quiet { color: var(--text-muted); }
+  /* Owner 2026-10-27: a figure still on its way is a placeholder bar, never a 0 that reads as real. */
+  .stat-skel {
+    display: inline-block; width: 3.25rem; height: 0.9em; vertical-align: middle; border-radius: var(--radius-sm);
+    background: var(--surface-sunken); animation: pulse-soft 1.4s ease-in-out infinite;
+  }
+  @media (prefers-reduced-motion: reduce) { .stat-skel { animation: none; } }
   /* ZT-M13: a long word in a narrow cell is hyphenated ("ADMINIS-TRATORS"), not cut mid-word ("ADMINISTRATOR / S"). */
   .stat-strip-label {
     font-size: 11px; line-height: 1.25; text-transform: uppercase; letter-spacing: 0.025em;
@@ -826,7 +832,6 @@
      paused -- the mark alone disappears at both. Kept faint: it is a place-keeper, not a
      second highlight competing with the first. */
   .ts-reading, tr.ts-reading > td { background: var(--highlight-passage); }
-
 
   /* Inline instructions: a short procedure, not a wall of prose. */
   .guide {
@@ -1953,7 +1958,6 @@ html[data-theme="contrast"]:not(.dark) {
   --swatch-midnight-page: #06101f; --swatch-midnight-card: #0a1729; --swatch-midnight-accent: #2bb8a8; --swatch-midnight-text: #f2f6fb;
   --swatch-contrast-page: #ffffff; --swatch-contrast-card: #ffffff; --swatch-contrast-accent: #000000; --swatch-contrast-text: #000000;
 }
-
 
 @layer components {
   .input-invalid,

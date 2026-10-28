@@ -15,6 +15,11 @@ import {
   kindOf, relativeTime, titleOf, viewerZone,
 } from './conversation.model';
 import { PageHeader } from '../../../shared/ui/page-header';
+import { AppLoading, InlineStatus, createLoadState, loadErrorText } from '../../../shared/ui/loading';
+import { LoadError } from '../../../shared/ui/load-error';
+import { BlurLoader } from '../../../shared/ui/blur-loader';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
 
 const PAGE = 50;
 const KINDS: ConversationKind[] = ['pipeline', 'question', 'run'];
@@ -30,7 +35,7 @@ const DAYS: DayGroup[] = ['today', 'yesterday', 'week', 'older'];
  */
 @Component({
   selector: 'app-conversations-page',
-  imports: [PageHeader, RefreshButton, Icon, RouterLink, ServerTimePipe],
+  imports: [PageHeader, RefreshButton, Icon, RouterLink, ServerTimePipe, AppLoading, InlineStatus, LoadError, BlurLoader, SortHeader],
   templateUrl: './conversations-page.html',
   styles: [`
     .cp-grid { display: grid; gap: 1rem; align-items: start; }
@@ -91,11 +96,36 @@ export class ConversationsPage {
   readonly rows = signal<ConversationRow[]>([]);
   readonly total = signal(0);
   readonly facets = signal<ConversationPage['facets']>({});
-  readonly loading = signal(true);
+  /**
+   * The list's read (owner 2026-10-27): skeleton rows until the first answer, the rows kept under a blur on a re-read,
+   * and the facet counts left out until the server has counted (they read 0 before).
+   */
+  readonly state = createLoadState();
+  readonly loading = this.state.loading;
+  readonly error = this.state.error;
   readonly loadingMore = signal(false);
-  readonly error = signal('');
+  /** Why the next page could not be read: the button used to just do nothing. */
+  readonly moreError = signal('');
   readonly selectedId = signal<number | null>(null);
   readonly now = signal(new Date());
+
+  /**
+   * Owner 2026-10-27 ("add a sort on each table"): the list is read a page at a time (Load more), so it sorts on the server
+   * (conversationList sort/dir); a new order reads it again from the start and Load more pages on through it by offset.
+   * No order picked: pinned first, then the most recently used, as before, and no sort is sent. Pipeline does not sort.
+   */
+  readonly sort = createTableSort<ConversationRow>({
+    id: 'ai-conversations',
+    server: true,
+    columns: {
+      title: { value: c => titleOf(c), param: 'title' },
+      kind: { value: c => KIND_LABEL[kindOf(c)], param: 'kind' },
+      status: { value: c => c.outcome ?? 'working', param: 'status' },
+      messages: { value: c => c.messageCount, kind: 'number', param: 'messages' },
+      updated: { value: c => c.dateUpdated, kind: 'date', param: 'updated' },
+    },
+    onChange: () => this.load(),
+  });
 
   readonly selected = computed(() => this.rows().find(r => r.conversationId === this.selectedId()) ?? null);
   readonly more = computed(() => this.rows().length < this.total());
@@ -116,41 +146,40 @@ export class ConversationsPage {
 
   load(): void {
     this.request?.unsubscribe();
-    this.loading.set(true);
-    this.error.set('');
+    this.state.start();
+    this.moreError.set('');
     this.request = this.api.list(this.filter(0)).subscribe({
       next: r => {
-        this.loading.set(false);
-        if (r.status !== API_SUCCESS || !r.data) { this.error.set(r.message || 'The conversations could not be read.'); return; }
+        if (r.status !== API_SUCCESS || !r.data) { this.state.fail(r, 'The conversations could not be read.'); return; }
         this.rows.set(r.data.rows ?? []);
         this.total.set(r.data.total ?? 0);
         this.facets.set(r.data.facets ?? {});
+        this.state.done();
         if (this.selectedId() != null && !this.rows().some(x => x.conversationId === this.selectedId())) this.selectedId.set(null);
       },
-      error: err => {
-        this.loading.set(false);
-        this.error.set(err?.error?.message || 'The conversations could not be read.');
-      },
+      error: err => this.state.fail(err, 'The conversations could not be read.'),
     });
   }
 
   loadMore(): void {
     if (this.loadingMore() || !this.more()) return;
     this.loadingMore.set(true);
+    this.moreError.set('');
     this.api.list(this.filter(this.rows().length)).subscribe({
       next: r => {
         this.loadingMore.set(false);
-        if (r.status !== API_SUCCESS || !r.data) return;
+        if (r.status !== API_SUCCESS || !r.data) { this.moreError.set(loadErrorText(r, 'The next conversations could not be read.')); return; }
         const have = new Set(this.rows().map(x => x.conversationId));
         this.rows.update(list => [...list, ...(r.data!.rows ?? []).filter(x => !have.has(x.conversationId))]);
         this.total.set(r.data.total ?? this.total());
       },
-      error: () => this.loadingMore.set(false),
+      error: err => { this.loadingMore.set(false); this.moreError.set(loadErrorText(err, 'The next conversations could not be read.')); },
     });
   }
 
   private filter(offset: number) {
-    return { q: this.q(), kind: this.kind(), outcome: this.outcome(), updated: this.updated(), pinned: this.pinnedOnly(), offset, limit: PAGE };
+    return { q: this.q(), kind: this.kind(), outcome: this.outcome(), updated: this.updated(), pinned: this.pinnedOnly(), offset, limit: PAGE,
+      ...(this.sort.param() ?? {}) };
   }
 
   search(text: string): void {

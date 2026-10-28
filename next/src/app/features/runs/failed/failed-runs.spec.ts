@@ -171,3 +171,55 @@ describe('Runs › Failed: a backfill\'s run in the detail (UX review 2026-10-13
     TestBed.inject(HttpTestingController).expectNone(r => r.url.endsWith('/sourceJob.json/retryPlan'));
   });
 });
+
+describe('Runs › Failed -- loading, empty, error (owner 2026-10-27)', () => {
+  it('shows no count and no "none" while the first read is out', () => {
+    const s = screen('TENANT_ADMIN');
+    expect(s.el.querySelector('[data-test="failed-total"]')?.textContent).toContain('Counting…');
+    expect(s.el.textContent).not.toContain('No failed runs in these dates.');
+    expect(s.el.querySelector('[data-test="failed-empty"]')).toBeNull();
+    expect(s.el.querySelector('[data-test="failed-list"] app-loading')).not.toBeNull();
+  });
+
+  it('says none once an empty answer arrives', () => {
+    const s = screen('TENANT_ADMIN');
+    answer(s, { ...ANSWER, total: 0, scanned: 0, groups: [], items: [],
+      facets: { pipelines: [], schedules: [], steps: [], kinds: [], days: [] } });
+    expect(s.el.querySelector('[data-test="failed-empty"]')?.textContent).toContain('No run failed in these dates.');
+    expect(s.el.querySelector('[data-test="failed-patterns"]')?.textContent).toContain('No failed runs in these dates.');
+  });
+
+  it('says the read failed in the patterns and the facets too, never "none"', () => {
+    const s = screen('TENANT_ADMIN');
+    s.http.expectOne(r => r.url === URL).flush('boom', { status: 500, statusText: 'Server Error' });
+    s.fixture.detectChanges();
+    expect(s.component.error()).toBe('The failed runs could not be read.');
+    expect(s.el.querySelector('[data-test="failed-patterns"]')?.textContent).not.toContain('No failed runs in these dates.');
+    expect(s.el.querySelector('[data-test="failed-patterns"]')?.textContent).toContain('The failed runs could not be read.');
+    expect(s.el.querySelector('[data-test="failed-facets"]')?.textContent).not.toContain('None in these dates');
+  });
+});
+
+describe('Runs › Failed: the retry plan in the detail (owner 2026-10-27)', () => {
+  it('is loading, then says why the plan could not be read, and reads it again on Try again', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [FailedRunPanel],
+      providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting(),
+        { provide: DIALOG_DATA, useValue: { run: run(8001), canRetry: true, canRestart: true } },
+        { provide: DialogRef, useValue: { close: () => {} } }],
+    });
+    const fixture = TestBed.createComponent(FailedRunPanel);
+    fixture.detectChanges();
+    const http = TestBed.inject(HttpTestingController);
+    expect(fixture.componentInstance.planLoading()).toBe(true);
+    http.expectOne(r => r.url.endsWith('/sourceJob.json/retryPlan')).flush('boom', { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+    expect(fixture.componentInstance.planLoading()).toBe(false);
+    expect(fixture.componentInstance.planError()).toBe('What a retry would do could not be read.');
+    const el = fixture.nativeElement as HTMLElement;
+    ([...el.querySelectorAll('[data-test="failed-retry"] button')].find(b => b.textContent!.trim() === 'Try again') as HTMLButtonElement).click();
+    expect(fixture.componentInstance.planLoading()).toBe(true);
+    http.expectOne(r => r.url.endsWith('/sourceJob.json/retryPlan'));
+  });
+});

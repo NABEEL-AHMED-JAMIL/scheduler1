@@ -36,7 +36,7 @@
                      emptyIcon="code" (retry)="load()">
       <ng-container toolbar>
         <app-view-toggle [(value)]="view" key="api-collections" cardsIcon="code" />
-        <select class="input max-w-32" [value]="statusFilter()" aria-label="State" (change)="statusFilter.set($any($event.target).value)">
+        <select class="input max-w-32" [value]="statusFilter()" aria-label="State" (change)="setStatusFilter($any($event.target).value)">
           <option value="">All states</option>
           <option value="Active">Active</option>
           <option value="Inactive">Inactive</option>
@@ -101,14 +101,14 @@
         <table class="table-modern">
           <thead>
             <tr>
-              <th>Collection</th>
-              <th>Source</th>
-              <th>Sensitivity</th>
-              <th class="text-right">APIs</th>
-              <th class="text-right">Folders</th>
-              <th class="text-right">Version</th>
-              <th>Updated</th>
-              <th class="text-right">State</th>
+              <th appSort="name" [sortBy]="sort">Collection</th>
+              <th appSort="source" [sortBy]="sort">Source</th>
+              <th appSort="sensitivity" [sortBy]="sort">Sensitivity</th>
+              <th class="text-right" appSort="apis" [sortBy]="sort">APIs</th>
+              <th class="text-right" appSort="folders" [sortBy]="sort">Folders</th>
+              <th class="text-right" appSort="version" [sortBy]="sort">Version</th>
+              <th appSort="updated" [sortBy]="sort">Updated</th>
+              <th class="text-right" appSort="state" [sortBy]="sort">State</th>
               @if (canManage()) { <th class="w-12 th-actions">Actions</th> }
             </tr>
           </thead>

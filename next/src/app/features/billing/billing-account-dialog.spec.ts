@@ -50,6 +50,15 @@ describe('BillingAccountDialog', () => {
     view.dialog.save();
 
     expect(view.saveAccount).not.toHaveBeenCalled();
+    // Owner 2026-10-27: the shared loader stands where the form will be.
+    expect(view.dialog.loading()).toBe(true);
+    expect((view.fixture.nativeElement as HTMLElement).querySelector('app-loading')).not.toBeNull();
+  });
+
+  it('says the profile could not be read in plain words, never the raw failure', () => {
+    const view = dialogWith(() => throwError(() => ({ status: 500, error: 'Internal Server Error' })));
+    expect(view.dialog.loading()).toBe(false);
+    expect(view.dialog.loadError()).toBe('The billing profile could not be read.');
   });
 
   it('saves a first profile for a workspace that has none yet', () => {

@@ -18,6 +18,9 @@ import { ConnectionPanel, ConnectionPanelData } from './connection-panel';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
 import { RouterLink } from '@angular/router';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
+import { AppLoading, InlineStatus, createLoadState } from '../../../shared/ui/loading';
 
 type Chip = '' | Category | 'connected';
 type StateFilter = '' | 'Active' | 'Syncing' | 'Error' | 'Needs you' | 'Paused' | 'Not connected';
@@ -34,7 +37,7 @@ type StateFilter = '' | 'Active' | 'Syncing' | 'Error' | 'Needs you' | 'Paused' 
  */
 @Component({
   selector: 'app-connectors',
-  imports: [RouterLink, RefreshButton, PageHeader, Icon, TableShell, ManagedBanner, Segmented, StatStrip],
+  imports: [RouterLink, RefreshButton, PageHeader, Icon, TableShell, ManagedBanner, Segmented, StatStrip, SortHeader, AppLoading, InlineStatus],
   templateUrl: './connectors.html',
 })
 export class Connectors implements OnInit {
@@ -52,9 +55,16 @@ export class Connectors implements OnInit {
 
   readonly cards = signal<ConnectorCard[]>([]);
   readonly connections = signal<Connection[]>([]);
-  readonly loading = signal(true);
-  readonly error = signal('');
-  readonly galleryError = signal('');
+  /** The connections' read: loading until the first answer, so the table never says "No connections yet" before it. */
+  readonly listState = createLoadState();
+  readonly loading = this.listState.loading;
+  readonly error = this.listState.error;
+  /**
+   * Owner 2026-10-27: the gallery's own read. It said "No connector matches." with every chip at (0) while it was still
+   * coming; now cards are drawn as placeholders until it answers, and a failure offers Try again.
+   */
+  readonly galleryState = createLoadState();
+  readonly galleryError = this.galleryState.error;
   readonly chip = signal<Chip>('');
   readonly search = signal('');
   readonly stateFilter = signal<StateFilter>('');
@@ -65,7 +75,8 @@ export class Connectors implements OnInit {
     return CATEGORIES.map(c => {
       const n = c.id === '' ? cards.length : c.id === 'connected' ? cards.filter(x => this.isConnected(x)).length
         : cards.filter(x => x.spec.category === c.id).length;
-      return { id: c.id, label: `${c.label} (${n})` };
+      // No count before the gallery has answered: "(0)" would read as an empty category.
+      return { id: c.id, label: this.galleryState.loaded() ? `${c.label} (${n})` : c.label };
     });
   });
 
@@ -85,6 +96,21 @@ export class Connectors implements OnInit {
     const state = this.stateFilter();
     return state ? this.connections().filter(c => connectionState(c) === state) : this.connections();
   });
+
+  /** Owner 2026-10-27: every column sorts; the list keeps the service's order until a heading is picked. */
+  readonly sort = createTableSort<Connection>({
+    id: 'connector-hub-connections',
+    columns: {
+      name: c => c.name,
+      connector: c => c.connectorLabel,
+      mode: c => (!c.health?.streams ? '' : c.health.modes?.includes('CDC') ? 'CDC' : c.health.modes?.includes('INCREMENTAL') ? 'Incremental' : 'Full refresh'),
+      lastSync: { value: c => c.health?.lastSyncAt, kind: 'date' },
+      rows: { value: c => (c.health?.streams ? c.health.rows : null), kind: 'number' },
+      lag: { value: c => c.health?.lagSeconds, kind: 'number' },
+      status: { value: c => connectionState(c), kind: 'status' },
+    },
+  });
+  readonly sortedConnections = computed(() => this.sort.apply(this.shownConnections()));
 
   readonly kpis = computed<StatStripItem[]>(() => {
     const all = this.connections();
@@ -125,29 +151,27 @@ export class Connectors implements OnInit {
 
   load(): void {
     this.now.set(Date.now());
-    this.api.connectors().subscribe({
-      next: res => {
-        if (res.status !== API_SUCCESS) {
-          this.galleryError.set(res.message || 'The connectors could not be read.');
-          return;
-        }
-        this.galleryError.set('');
-        this.cards.set(res.data ?? []);
-      },
-      error: () => this.galleryError.set('Connector Hub could not be reached.'),
-    });
-    this.loading.set(true);
-    this.error.set('');
+    this.loadGallery();
+    this.listState.start();
     this.api.connections().subscribe({
       next: res => {
-        this.loading.set(false);
-        if (res.status !== API_SUCCESS) {
-          this.error.set(res.message || 'The connections could not be read.');
-          return;
-        }
+        if (res.status !== API_SUCCESS) { this.listState.fail(res, 'The connections could not be read.'); return; }
         this.connections.set(res.data ?? []);
+        this.listState.done();
       },
-      error: () => { this.loading.set(false); this.error.set('Connector Hub could not be reached.'); },
+      error: err => this.listState.fail(err, 'The connections could not be read.'),
+    });
+  }
+
+  loadGallery(): void {
+    this.galleryState.start();
+    this.api.connectors().subscribe({
+      next: res => {
+        if (res.status !== API_SUCCESS) { this.galleryState.fail(res, 'The connectors could not be read.'); return; }
+        this.cards.set(res.data ?? []);
+        this.galleryState.done();
+      },
+      error: err => this.galleryState.fail(err, 'The connectors could not be read.'),
     });
   }
 

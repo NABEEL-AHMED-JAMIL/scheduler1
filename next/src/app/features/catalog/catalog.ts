@@ -17,6 +17,9 @@ import { CatalogAsset, CatalogSummary, freshnessText, kindText, sensitivityTone,
 import { CatalogPanel, CatalogPanelData } from './catalog-panel';
 import { PageHeader } from '../../shared/ui/page-header';
 import { RefreshButton } from '../../shared/ui/refresh-button';
+import { createLoadState, loadErrorText } from '../../shared/ui/loading';
+import { createTableSort } from '../../shared/ui/sort';
+import { SortHeader } from '../../shared/ui/sort-header';
 
 type KindFilter = '' | 'dataset' | 'file' | 'document_type';
 
@@ -32,7 +35,7 @@ type KindFilter = '' | 'dataset' | 'file' | 'document_type';
  */
 @Component({
   selector: 'app-catalog',
-  imports: [RefreshButton, PageHeader, NeedsWorkspace, StatStrip, TableShell, Icon, Segmented, Pagination, RouterLink],
+  imports: [RefreshButton, PageHeader, NeedsWorkspace, StatStrip, TableShell, Icon, Segmented, Pagination, RouterLink, SortHeader],
   templateUrl: './catalog.html',
 })
 export class Catalog implements OnInit {
@@ -53,6 +56,8 @@ export class Catalog implements OnInit {
 
   readonly assets = signal<CatalogAsset[]>([]);
   readonly summary = signal<CatalogSummary | null>(null);
+  /** Owner 2026-10-27: the strip's read -- placeholders until it answers, "Not available right now" when it fails. */
+  readonly summaryState = createLoadState();
   readonly loading = signal(true);
   readonly error = signal('');
   readonly kind = signal<KindFilter>('');
@@ -84,12 +89,37 @@ export class Catalog implements OnInit {
   readonly tone = sensitivityTone;
   readonly fresh = (at: string | null) => freshnessText(at);
 
-  /** The rows shown: one page, filtered by kind, flag and text on the server. */
+  /**
+   * Owner 2026-10-27 ("add a sort on each table"): the catalog is paged, so it sorts on the server
+   * (analyticsCatalog.json/list sort/dir) and a new order goes back to the first page. No order picked: newest change
+   * first, as before, and no sort is sent. Sensitive fields (a list of tags) does not sort.
+   */
+  readonly sort = createTableSort<CatalogAsset>({
+    id: 'data-catalog',
+    server: true,
+    columns: {
+      name: { value: a => a.name, param: 'name' },
+      kind: { value: a => kindText(a.kind), param: 'kind' },
+      owner: { value: a => a.ownerName, param: 'owner' },
+      freshness: { value: a => a.lastChangedAt, kind: 'date', param: 'freshness' },
+      sensitivity: { value: a => a.sensitivity, kind: 'status', param: 'sensitivity' },
+      quality: { value: a => a.qualityScore, kind: 'number', param: 'quality' },
+    },
+    onChange: () => { this.page.set(1); this.load(); },
+  });
+
+  /** The rows shown: one page, filtered by kind, flag and text and sorted on the server. */
   readonly shown = this.assets.asReadonly();
 
   readonly kpis = computed<StatStripItem[]>(() => {
     const s = this.summary();
-    if (!s) return [];
+    // Before the first answer (or after a failed one) the strip keeps its four tiles, drawn as placeholders or "—".
+    if (!s) {
+      return [
+        { label: 'Assets', value: 0, icon: 'database' }, { label: 'With sensitive fields', value: 0, icon: 'shield' },
+        { label: 'Stale', value: 0, icon: 'clock' }, { label: 'Without an owner', value: 0, icon: 'user' },
+      ];
+    }
     const link = (flag: string) => ({ link: '/data/catalog', queryParams: { flag } });
     return [
       { label: 'Assets', value: s.assets, icon: 'database', foot: `${s.datasets} datasets · ${s.files} files`, link: '/data/catalog', queryParams: {} },
@@ -126,7 +156,14 @@ export class Catalog implements OnInit {
   }
 
   loadSummary(): void {
-    this.api.summary(this.withSystem()).subscribe({ next: res => this.summary.set(res.status === API_SUCCESS ? res.data ?? null : null) });
+    this.summaryState.start();
+    this.api.summary(this.withSystem()).subscribe({
+      next: res => {
+        if (res.status === API_SUCCESS && res.data) { this.summary.set(res.data); this.summaryState.done(); }
+        else this.summaryState.fail(res, 'The catalog figures could not be read.');
+      },
+      error: err => this.summaryState.fail(err, 'The catalog figures could not be read.'),
+    });
   }
 
   load(): void {
@@ -134,11 +171,11 @@ export class Catalog implements OnInit {
     this.loading.set(true);
     this.error.set('');
     this.inFlight = this.api.list({ q: this.search().trim() || undefined, kind: this.kind() || undefined, flag: this.flag() || undefined,
-      withDeleted: this.withDeleted(), withSystem: this.withSystem(), page: this.page() - 1, size: this.size() }).subscribe({
+      withDeleted: this.withDeleted(), withSystem: this.withSystem(), page: this.page() - 1, size: this.size(), ...(this.sort.param() ?? {}) }).subscribe({
       next: res => {
         this.loading.set(false);
         if (res.status !== API_SUCCESS) {
-          this.error.set(res.message || 'The catalog could not be read.');
+          this.error.set(loadErrorText(res, 'The catalog could not be read.'));
           return;
         }
         const rows = res.data ?? [];
@@ -148,7 +185,7 @@ export class Catalog implements OnInit {
         const last = Math.max(1, Math.ceil((this.total() ?? 0) / this.size()));
         if (!rows.length && this.page() > last) this.goTo(last);
       },
-      error: () => { this.loading.set(false); this.error.set('The catalog could not be reached.'); },
+      error: err => { this.loading.set(false); this.error.set(loadErrorText(err, 'The catalog could not be read.')); },
     });
   }
 

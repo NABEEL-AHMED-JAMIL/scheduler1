@@ -20,6 +20,11 @@ import { WorkspaceSelect } from '../../shared/ui/workspace-select';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { PageHeader } from '../../shared/ui/page-header';
 import { RefreshButton } from '../../shared/ui/refresh-button';
+import { AppLoading, InlineStatus, createLoadState } from '../../shared/ui/loading';
+import { LoadError } from '../../shared/ui/load-error';
+import { BlurLoader } from '../../shared/ui/blur-loader';
+
+const DOCUMENTS_UNREAD = 'The documents could not be read.';
 
 /**
  * Every billing document -- invoices, receipts, credit notes, statements, payment slips -- as a
@@ -28,7 +33,7 @@ import { RefreshButton } from '../../shared/ui/refresh-button';
  */
 @Component({
   selector: 'app-billing-documents',
-  imports: [WorkspaceSelect, RefreshButton, PageHeader, Icon, StatTile, RouterLink, ServerTimePipe, PdfViewer, CdkMenu, CdkMenuItem, CdkMenuTrigger],
+  imports: [WorkspaceSelect, RefreshButton, PageHeader, Icon, StatTile, RouterLink, ServerTimePipe, PdfViewer, CdkMenu, CdkMenuItem, CdkMenuTrigger, AppLoading, InlineStatus, LoadError, BlurLoader],
   templateUrl: './documents.html',
 })
 export class BillingDocuments implements OnInit, OnDestroy {
@@ -41,9 +46,16 @@ export class BillingDocuments implements OnInit, OnDestroy {
   readonly workspaces = inject(WorkspacePicker);
   readonly isPlatformAdmin = this.workspaces.isPlatformAdmin;
 
-  readonly loading = signal(false);
-  readonly error = signal('');
+  /**
+   * Owner 2026-10-27: the list's read, loading from the start -- a platform administrator's workspace list is read first,
+   * and in that wait the tiles read 0 and the rail "No document in 2026" as if that were the answer.
+   */
+  readonly listState = createLoadState();
+  readonly loading = this.listState.loading;
+  readonly error = this.listState.error;
   readonly rows = signal<DocumentRow[]>([]);
+  /** The first read, or another workspace's list on its way (its rows are cleared): placeholders, not zeros. */
+  readonly firstLoad = computed(() => this.listState.pending() || (this.loading() && !this.rows().length));
   readonly kind = signal('');
   readonly year = signal(String(new Date().getFullYear()));
   readonly search = signal('');
@@ -130,27 +142,31 @@ export class BillingDocuments implements OnInit, OnDestroy {
     this.sideBySide.set(on);
     this.revokeCopy();
     if (!on) return;
+    this.readCopy(d);
+  }
+  /** Report Studio's copy beside the issued one; Try again draws it once more. */
+  readCopy(d: DocumentRow): void {
     this.copyError.set('');
     this.api.studioCopy(d.documentId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: b => { if (this.selectedId() === d.documentId) this.copyUrl.set(URL.createObjectURL(b)); },
-      error: () => this.copyError.set('Report Studio\'s copy could not be drawn just now.'),
+      error: () => { if (this.selectedId() === d.documentId) this.copyError.set('Report Studio\'s copy could not be drawn just now.'); },
     });
   }
   private revokeCopy(): void { const u = this.copyUrl(); if (u) URL.revokeObjectURL(u); this.copyUrl.set(null); }
 
   load(): void {
-    this.loading.set(true); this.error.set('');
+    this.listState.start();
     this.loadVerdicts();
     this.api.documents(this.workspaces.tenantId()).subscribe({
       next: r => {
-        this.loading.set(false);
-        if (r.status !== API_SUCCESS) { this.error.set(r.message); return; }
+        if (r.status !== API_SUCCESS) { this.listState.fail(r, DOCUMENTS_UNREAD); return; }
         this.rows.set(r.data ?? []);
+        this.listState.done();
         const want = this.wanted && this.rows().find(x => x.documentId === this.wanted) ? this.wanted : null;
         if (want) { this.year.set(this.rows().find(x => x.documentId === want)!.issuedAt.slice(0, 4)); this.pick(want); }
         else if (!this.selectedId() || !this.rows().some(x => x.documentId === this.selectedId())) { const first = this.visible()[0]; if (first) this.pick(first.documentId); else this.selectedId.set(null); }
       },
-      error: err => { this.loading.set(false); this.error.set(err?.error?.message || 'Could not read the documents.'); },
+      error: err => this.listState.fail(err, DOCUMENTS_UNREAD),
     });
   }
 
@@ -160,14 +176,21 @@ export class BillingDocuments implements OnInit, OnDestroy {
     this.sideBySide.set(false); this.revokeCopy();
     this.revoke(); this.previewLoading.set(true); this.previewError.set('');
     this.api.documentBlob(documentId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: b => { this.previewLoading.set(false); if (this.selectedId() !== documentId) return; this.previewUrl.set(URL.createObjectURL(b)); },
+      // Owner 2026-10-27: a reply for a document picked before this one changes nothing -- it used to stop the newer one's
+      // spinner (flashing "Download it to read it") or put its error under the newer document.
+      next: b => { if (this.selectedId() !== documentId) return; this.previewLoading.set(false); this.previewUrl.set(URL.createObjectURL(b)); },
       // ZT-B6: Billing's reason (a file gone from storage says so and what to do) arrives as a blob body; read it.
-      error: async err => { const why = await refusalOf(err); this.previewLoading.set(false); this.previewError.set(why || 'The document could not be read.'); },
+      error: async err => {
+        const why = await refusalOf(err);
+        if (this.selectedId() !== documentId) return;
+        this.previewLoading.set(false); this.previewError.set(why || 'The document could not be read.');
+      },
     });
   }
   private revoke(): void { const u = this.previewUrl(); if (u) URL.revokeObjectURL(u); this.previewUrl.set(null); }
 
-  pickWorkspace(id: string): void { this.workspaces.tenantId.set(id); this.selectedId.set(null); this.revoke(); this.load(); }
+  /** Another workspace is another list: the last one's rows go, so its documents never pass as this one's (owner 2026-10-27). */
+  pickWorkspace(id: string): void { this.workspaces.tenantId.set(id); this.selectedId.set(null); this.revoke(); this.rows.set([]); this.load(); }
   setKind(k: string): void { this.kind.set(this.kind() === k ? '' : k); }
   clearFilters(): void { this.search.set(''); this.kind.set(''); }
   money(v: number, currency?: string): string { return formatMoney(v, currency || 'USD'); }

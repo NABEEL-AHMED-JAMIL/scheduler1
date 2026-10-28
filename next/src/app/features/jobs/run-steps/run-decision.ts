@@ -11,6 +11,7 @@ import { Icon } from '../../../shared/ui/icon';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { InboxTask, WorkflowsApi } from '../../workflows/workflows.api';
 import { RunReviewView } from './run-review';
+import { AppLoading, InlineStatus, loadErrorText } from '../../../shared/ui/loading';
 
 const PARTY: Record<string, string> = { internal: 'Our team', customer: 'The customer' };
 const STATUS: Record<string, { label: string; tone: string; icon: string }> = {
@@ -37,9 +38,17 @@ export type DecisionRoute =
  */
 @Component({
   selector: 'app-run-decision',
-  imports: [Icon, ServerTimePipe, RouterLink, Avatar],
+  imports: [Icon, ServerTimePipe, RouterLink, Avatar, AppLoading, InlineStatus],
   host: { class: 'contents' },
   template: `
+    <!-- Owner 2026-10-27: a review that could not be read says so, with Try again: a run waiting for review otherwise
+         showed no box at all and its header lost "waiting for review". -->
+    @if (error() && !review()) {
+      <section class="card p-4 flex flex-col gap-2 h-full run-next" data-test="review-error" aria-label="Review">
+        <h2 class="text-sm font-semibold">Review</h2>
+        <app-inline-status [error]="error()" (retry)="load()" />
+      </section>
+    }
     @if (review(); as r) {
       @if (r.reviewStatus !== 'NOT_REQUIRED' && r.reviewStatus !== 'NOT_APPLICABLE') {
         <section class="card p-4 flex flex-col gap-3 h-full run-next" data-test="next-steps" aria-labelledby="next-steps-heading">
@@ -77,6 +86,11 @@ export type DecisionRoute =
             <p class="text-sm">Run again as <a class="link" [routerLink]="['/pipelines/schedules', r.jobId, 'runs', r.rerunJobQueueId]">run #{{ r.rerunJobQueueId }}</a>.</p>
           }
           @if (r.reviewStatus === 'PENDING') {
+            @if (taskLoading()) {
+              <app-loading class="mt-auto" shape="inline" label="Checking whether you decide this…" />
+            } @else if (taskError()) {
+              <app-inline-status class="mt-auto" [error]="taskError()" (retry)="findTask()" />
+            } @else {
             @switch (route().by) {
               @case ('none') {
                 <p class="text-sm text-[color:var(--text-secondary)]" data-test="who-decides">{{ noneWhy() }}</p>
@@ -109,6 +123,7 @@ export type DecisionRoute =
                 </div>
               }
             }
+            }
           }
         </section>
       }
@@ -130,7 +145,13 @@ export class RunDecision {
   private readonly destroyRef = inject(DestroyRef);
 
   readonly review = signal<RunReviewView | null>(null);
+  /** Why the review could not be read, or '' (owner 2026-10-27). */
+  readonly error = signal('');
   readonly task = signal<InboxTask | null>(null);
+  /** Owner 2026-10-27: the reader's task is being looked up: the box says so rather than "The pipeline's reviewers decide this". */
+  readonly taskLoading = signal(false);
+  readonly taskError = signal('');
+  private loadTicket = 0;
   readonly busy = signal(false);
   readonly rejecting = signal(false);
   readonly comment = signal('');
@@ -168,19 +189,30 @@ export class RunDecision {
   }
 
   load(): void {
+    // Only the newest read may land: a reply for the run the reader left must not fill this one's box.
+    const ticket = ++this.loadTicket;
     this.http.get<ApiResponse<RunReviewView>>(`${API_BASE}/sourceJob.json/review`, { params: { jobQueueId: this.jobQueueId() } })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: r => {
+          if (ticket !== this.loadTicket) return;
+          this.error.set('');
           const review = r.status === API_SUCCESS ? r.data ?? null : null;
           this.review.set(review);
           this.reviewChange.emit(review);
           if (review?.reviewStatus === 'PENDING' && review.reviewers?.kind === 'team') this.nameTeam(review.reviewers.value ?? null);
           if (review?.reviewStatus === 'PENDING' && !review.you?.canDecide) this.findTask();
-          else this.task.set(null);
+          else { this.task.set(null); this.taskLoading.set(false); this.taskError.set(''); }
         },
-        // A run whose review cannot be read shows no box: the run page is about the run.
-        error: () => { this.review.set(null); this.reviewChange.emit(null); },
+        // The page still draws (the run is its point), and the box says the review could not be read. A refusal (403/404:
+        // not this reader's to see) is "no review", as before.
+        error: err => {
+          if (ticket !== this.loadTicket) return;
+          const refused = [403, 404].includes(Number((err as { status?: unknown })?.status));
+          this.review.set(null);
+          this.error.set(refused ? '' : loadErrorText(err, "This run's review could not be read."));
+          this.reviewChange.emit(null);
+        },
       });
   }
 
@@ -212,11 +244,18 @@ export class RunDecision {
   });
 
   /** The reader's open Task inbox task about this run, if they have one (a reviewer the pipeline names). */
-  private findTask(): void {
-    if (!this.canOpenInbox()) { this.task.set(null); return; }
+  findTask(): void {
+    this.taskError.set('');
+    if (!this.canOpenInbox()) { this.task.set(null); this.taskLoading.set(false); return; }
+    this.taskLoading.set(true);
+    const fallback = 'Whether you decide this could not be checked.';
     this.inbox.forSubject(`pipeline-run:${this.jobQueueId()}`).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: r => this.task.set(r.status === API_SUCCESS ? (r.data ?? []).find(t => t.stepType === 'approval') ?? null : null),
-      error: () => this.task.set(null),
+      next: r => {
+        this.taskLoading.set(false);
+        if (r.status !== API_SUCCESS) { this.task.set(null); this.taskError.set(loadErrorText(r, fallback)); return; }
+        this.task.set((r.data ?? []).find(t => t.stepType === 'approval') ?? null);
+      },
+      error: err => { this.taskLoading.set(false); this.task.set(null); this.taskError.set(loadErrorText(err, fallback)); },
     });
   }
 

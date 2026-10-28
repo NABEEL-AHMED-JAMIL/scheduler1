@@ -26,7 +26,8 @@
       { label: 'Runs', value: summary().runs, foot: 'tries and pipeline steps', icon: 'play', tone: 'info' },
       { label: 'Last run failed', value: summary().failing, foot: summary().failing ? 'open one to see why' : 'all answering', icon: 'alert', tone: summary().failing ? 'warn' : 'muted' }
     ]; track tile.label) {
-      <app-stat-tile [label]="tile.label" [value]="tile.value" [icon]="tile.icon" [tone]="$any(tile.tone)" [foot]="tile.foot" />
+      <app-stat-tile [label]="tile.label" [value]="tile.value" [icon]="tile.icon" [tone]="$any(tile.tone)" [foot]="tile.foot"
+                     [loading]="state.pending()" [failed]="!!error() && !state.loaded()" />
     }
   </div>
 
@@ -67,7 +68,7 @@
 
     @if (view() === 'cards') {
       <div class="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
-        @for (p of filtered(); track p.promptId) {
+        @for (p of sorted(); track p.promptId) {
           <article class="card p-4 flex flex-col gap-3">
             <div class="flex items-start gap-2.5">
               <span class="stat-glyph shrink-0"><app-icon name="sparkle" /></span>
@@ -108,20 +109,20 @@
       <table class="table-modern">
         <thead>
           <tr>
-            <th>Prompt</th>
-            <th>Connection · model</th>
+            <th appSort="name" [sortBy]="sort">Prompt</th>
+            <th appSort="connection" [sortBy]="sort">Connection · model</th>
             <th class="hidden xl:table-cell">Variables</th>
-            <th class="hidden xl:table-cell">Output</th>
-            <th class="hidden lg:table-cell">Used by</th>
-            <th class="hidden xl:table-cell text-right">Runs</th>
-            <th>Last run</th>
-            @if (isPlatformAdmin()) { <th class="hidden xl:table-cell">Workspace</th> }
-            <th class="text-right">State</th>
+            <th class="hidden xl:table-cell" appSort="output" [sortBy]="sort">Output</th>
+            <th class="hidden lg:table-cell" appSort="usedBy" [sortBy]="sort">Used by</th>
+            <th class="hidden xl:table-cell text-right" appSort="runs" [sortBy]="sort">Runs</th>
+            <th appSort="lastRun" [sortBy]="sort">Last run</th>
+            @if (isPlatformAdmin()) { <th class="hidden xl:table-cell" appSort="workspace" [sortBy]="sort">Workspace</th> }
+            <th class="text-right" appSort="state" [sortBy]="sort">State</th>
             @if (canManage()) { <th class="w-12 th-actions">Actions</th> }
           </tr>
         </thead>
         <tbody>
-          @for (p of filtered(); track p.promptId) {
+          @for (p of sorted(); track p.promptId) {
             <tr>
               <td class="max-w-72">
                 <div class="flex items-center gap-2 min-w-0">

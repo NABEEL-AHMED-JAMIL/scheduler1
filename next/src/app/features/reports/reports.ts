@@ -32,6 +32,9 @@ import {
 } from './pivot';
 import { PageHeader } from '../../shared/ui/page-header';
 import { RefreshButton } from '../../shared/ui/refresh-button';
+import { createTableSort } from '../../shared/ui/sort';
+import { SortHeader } from '../../shared/ui/sort-header';
+import { BlurLoader } from '../../shared/ui/blur-loader';
 
 const EMPTY: RunData = { task: [], status: [], owner: [], day: [], job: [], tenant: [], rows: [] };
 
@@ -176,7 +179,7 @@ interface QueueLog {
  */
 @Component({
   selector: 'app-reports',
-  imports: [RefreshButton, PageHeader, DateRangePicker, Icon, StatTile, StatusPill, TableShell, Donut, BarChart, Histogram, ReportPivot, Combobox, WorkspaceSelect, Pagination, DecimalPipe, RouterLink, ServerTimePipe],
+  imports: [RefreshButton, PageHeader, SortHeader, BlurLoader, DateRangePicker, Icon, StatTile, StatusPill, TableShell, Donut, BarChart, Histogram, ReportPivot, Combobox, WorkspaceSelect, Pagination, DecimalPipe, RouterLink, ServerTimePipe],
   templateUrl: './reports.html',
 })
 export class Reports implements OnInit {
@@ -320,6 +323,21 @@ export class Reports implements OnInit {
   readonly failurePager = createPager<FailureRow>(25);
   // ---- Model calls in the range, per prompt.
   readonly aiUsage = signal<AiUsageRow[]>([]);
+  /** Owner 2026-10-27: the prompts' model calls sort by any column; the service's order until one is picked. */
+  readonly aiUsageSort = createTableSort<AiUsageRow>({
+    id: 'run-analytics-prompts',
+    columns: {
+      prompt: r => (r.promptName === 'deleted prompt' ? 'Prompts since deleted' : r.promptName),
+      calls: { value: r => r.calls, kind: 'number' },
+      failed: { value: r => r.failed, kind: 'number' },
+      tries: { value: r => r.tries, kind: 'number' },
+      tokensIn: { value: r => r.tokensIn, kind: 'number' },
+      tokensOut: { value: r => r.tokensOut, kind: 'number' },
+      median: { value: r => r.medianMs, kind: 'number' },
+      lastCall: { value: r => r.lastAt, kind: 'date' },
+    },
+  });
+  readonly aiUsageSorted = computed(() => this.aiUsageSort.apply(this.aiUsage()));
   readonly aiUsageLoading = signal(false);
   /** The usage read failed: shown as such, not as a page without AI calls. */
   readonly aiUsageError = signal('');
@@ -727,7 +745,30 @@ export class Reports implements OnInit {
       (!q || t.task.toLowerCase().includes(q))
       && (state === '' || (state === 'failing' ? t.failures > 0 : state === 'inflight' ? (t.tone === 'warn' && t.failures === 0) : t.failures === 0 && t.tone === 'ok')));
   });
-  readonly healthPage = computed(() => this.healthPager.slice(this.healthRows()));
+  /**
+   * Owner 2026-10-27: every column sorts; until one is picked the table keeps its worst-first order (most failures,
+   * then the lowest success rate, then the most runs), which is no single column. An outcome column is "o-" and its
+   * status; an unsettled rate and an unmeasured duration are no value, so they sort last both ways.
+   */
+  readonly healthSort = createTableSort<TaskHealth>({
+    id: 'run-analytics-pipelines',
+    columns: {
+      task: t => t.task,
+      jobs: { value: t => t.jobs, kind: 'number' },
+      runs: { value: t => t.runs, kind: 'number' },
+      ...Object.fromEntries(OUTCOME_COLUMNS.map(c => [`o-${c.status}`,
+        { value: (t: TaskHealth) => t.outcomes[c.status] || 0, kind: 'number' as const }])),
+      other: { value: t => this.rareOutcomes(t), kind: 'number' },
+      success: { value: t => (t.successRate >= 0 ? t.successRate : null), kind: 'number' },
+      median: { value: t => (t.median >= 0 ? t.median : null), kind: 'number' },
+      slowest: { value: t => (t.slowest >= 0 ? t.slowest : null), kind: 'number' },
+      lastRun: { value: t => t.lastDay || null, kind: 'date' },
+      state: { value: t => t.state, kind: 'status', order: ['Failing', 'Unreliable', 'In flight', 'Not run', 'Healthy'] },
+    },
+  });
+  readonly healthSorted = computed(() => this.healthSort.apply(this.healthRows()));
+  /** Sorted before the page is cut. */
+  readonly healthPage = computed(() => this.healthPager.slice(this.healthSorted()));
   setHealthState(state: '' | 'failing' | 'inflight' | 'healthy'): void {
     this.healthState.set(this.healthState() === state ? '' : state);
     this.healthPager.reset();
@@ -761,7 +802,19 @@ export class Reports implements OnInit {
       (!reason || reasonKey(f.message) === reason)
       && (!q || `${f.job} ${f.task} ${f.message}`.toLowerCase().includes(q)));
   });
-  readonly failurePage = computed(() => this.failurePager.slice(this.failureRows()));
+  /** Owner 2026-10-27: the failed runs sort by any column; newest run first (by its number) until one is picked. */
+  readonly failureSort = createTableSort<FailureRow>({
+    id: 'run-analytics-failures',
+    columns: {
+      schedule: f => f.job,
+      when: { value: f => f.when || null, kind: 'date' },
+      took: { value: f => (f.seconds >= 0 ? f.seconds : null), kind: 'number' },
+      status: { value: f => f.status, kind: 'status' },
+      error: f => f.message,
+    },
+  });
+  readonly failureSorted = computed(() => this.failureSort.apply(this.failureRows()));
+  readonly failurePage = computed(() => this.failurePager.slice(this.failureSorted()));
   setFailureReason(key: string): void { this.failureReason.set(this.failureReason() === key ? '' : key); this.failurePager.reset(); }
   setFailureSearch(text: string): void { this.failureSearch.set(text); this.failurePager.reset(); }
 

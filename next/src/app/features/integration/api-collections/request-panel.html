@@ -1,10 +1,9 @@
 <app-side-panel [heading]="heading()" [subtitle]="data.collection.name">
+  <!-- Owner 2026-10-27: the shared loader, and a failed read offers Try again instead of a dead end. -->
   @if (loading()) {
-    <div class="py-14 text-center text-sm text-[color:var(--text-muted)]">
-      <div class="spinner mx-auto mb-3" role="status" aria-label="Loading"></div>Loading…
-    </div>
+    <app-loading shape="panel" label="Loading the API…" [count]="6" />
   } @else if (loadError()) {
-    <p class="text-sm text-crit-500" role="alert">{{ loadError() }}</p>
+    <app-load-error [message]="loadError()" (retry)="readRequest()" />
   } @else if (edit(); as e) {
     <div class="flex flex-col gap-4 min-w-0">
       <fieldset class="flex flex-col gap-3 min-w-0" [disabled]="!data.canManage">

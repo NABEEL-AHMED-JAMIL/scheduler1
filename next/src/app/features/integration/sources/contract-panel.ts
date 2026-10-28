@@ -8,12 +8,17 @@ import { Field } from '../../../shared/ui/field';
 import { DataText } from '../../../shared/ui/data-text';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import {
-  ContractRow, ContractVersionDetail, ContractVersionRow, ValidationResult, directionLabel, isSchemaReadOnly, parsePayload,
+  ContractRow, ContractVersionDetail, ContractVersionRow, FieldError, ValidationResult, directionLabel, isSchemaReadOnly, parsePayload,
 } from './sources.model';
 import { SourcesApi } from './sources.service';
 import { SchemaView } from './schema-view';
 import { ContractSampleDialog, ContractSampleData } from './contract-sample-dialog';
 import { sensitivityText, typedWord } from '../../../shared/ui/sensitivity';
+import { AppLoading, InlineStatus, createLoadState, loadErrorText } from '../../../shared/ui/loading';
+import { LoadError } from '../../../shared/ui/load-error';
+import { BlurLoader } from '../../../shared/ui/blur-loader';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
 
 export interface ContractPanelData {
   contract: ContractRow;
@@ -28,7 +33,7 @@ export interface ContractPanelData {
  */
 @Component({
   selector: 'app-contract-panel',
-  imports: [SidePanel, Icon, Field, DataText, ServerTimePipe, SchemaView],
+  imports: [SidePanel, Icon, Field, DataText, ServerTimePipe, SchemaView, AppLoading, InlineStatus, LoadError, BlurLoader, SortHeader],
   template: `
     <app-side-panel [heading]="heading()" [subtitle]="subtitle()">
       <div class="flex flex-col gap-4 min-w-0">
@@ -37,7 +42,9 @@ export interface ContractPanelData {
             <app-icon name="lock" size="0.95em" class="mt-0.5 shrink-0" />A shared system contract: every workspace reads it and checks payloads against it; no one changes it.
           </p>
         }
-        @if (loadError()) { <p class="text-sm text-crit-500" role="alert">{{ loadError() }}</p> }
+        <!-- Owner 2026-10-27: a failed read says so with Try again (it also drew "No versions." under the alert), the first
+             read is a skeleton, and a reload after Activate keeps the versions on screen. -->
+        @if (loadError()) { <app-load-error [message]="loadError()" (retry)="load()" /> }
 
         <section class="flex flex-col gap-2" aria-label="Versions">
           <div class="flex items-center gap-2">
@@ -46,11 +53,20 @@ export interface ContractPanelData {
               <button type="button" class="btn btn-default btn-sm" (click)="newVersion()"><app-icon name="plus" />New version from sample</button>
             }
           </div>
+          @if (state.pending()) {
+            <app-loading shape="rows" label="Loading versions…" [count]="3" />
+          } @else if (!loadError()) {
+          <app-blur-loader [active]="loading()" label="Refreshing…">
           <div class="overflow-x-auto">
             <table class="table-modern">
-              <thead><tr><th>Version</th><th>State</th><th>Saved</th><th class="text-right th-actions">Actions</th></tr></thead>
+              <thead><tr>
+                <th appSort="version" [sortBy]="versionSort">Version</th>
+                <th appSort="state" [sortBy]="versionSort">State</th>
+                <th appSort="saved" [sortBy]="versionSort">Saved</th>
+                <th class="text-right th-actions">Actions</th>
+              </tr></thead>
               <tbody>
-                @for (v of versions(); track v.version) {
+                @for (v of sortedVersions(); track v.version) {
                   <tr [class.bg-sunken]="v.version === selected()">
                     <td><button type="button" class="link-inline mono" [attr.aria-pressed]="v.version === selected()" (click)="pick(v.version)">v{{ v.version }}</button></td>
                     <td>@if (v.status === 'ACTIVE') { <span class="pill pill-brand">Active</span> } @else { <span class="text-xs text-[color:var(--text-muted)]">{{ statusText(v.status) }}</span> }</td>
@@ -62,21 +78,32 @@ export interface ContractPanelData {
                     </td>
                   </tr>
                 } @empty {
-                  <tr><td colspan="4" class="text-sm text-[color:var(--text-muted)]">{{ loading() ? 'Loading…' : 'No versions.' }}</td></tr>
+                  <tr><td colspan="4" class="text-sm text-[color:var(--text-muted)]" data-no-versions>
+                    No version yet.{{ canChange() ? ' Make one with New version from sample.' : '' }}</td></tr>
                 }
               </tbody>
             </table>
           </div>
+          </app-blur-loader>
+          }
         </section>
 
         <section class="flex flex-col gap-2 border-t border-subtle pt-4" aria-label="Schema">
           <h3 class="text-sm font-semibold">Schema @if (selected()) { <span class="mono text-[color:var(--text-muted)]">v{{ selected() }}</span> }</h3>
+          <!-- Owner 2026-10-27: "Loading…" here stayed forever for a contract with no version, or when the contract could
+               not be read; each case now says what it is. -->
           @if (versionDetail(); as v) {
             <app-schema-view [schema]="v.schema" [fields]="v.fields" />
           } @else if (versionError()) {
-            <p class="text-sm text-crit-500" role="alert">{{ versionError() }}</p>
+            <app-inline-status [error]="versionError()" (retry)="retryVersion()" data-version-error />
+          } @else if (versionLoading() || state.pending()) {
+            <app-loading shape="panel" label="Loading the schema…" [count]="4" />
+          } @else if (loadError()) {
+            <p class="text-sm text-[color:var(--text-muted)]">The schema shows once the contract can be read.</p>
+          } @else if (!versions().length) {
+            <p class="text-sm text-[color:var(--text-muted)]" data-no-schema>No version yet, so there is no schema to show.</p>
           } @else {
-            <p class="text-sm text-[color:var(--text-muted)]">Loading…</p>
+            <p class="text-sm text-[color:var(--text-muted)]">Pick a version to see its schema.</p>
           }
         </section>
 
@@ -108,9 +135,13 @@ export interface ContractPanelData {
               @if (r.errors.length) {
                 <div class="overflow-x-auto">
                   <table class="table-modern" data-test="validation-errors">
-                    <thead><tr><th>Path</th><th>Rule</th><th>Message</th></tr></thead>
+                    <thead><tr>
+                      <th appSort="path" [sortBy]="errorSort">Path</th>
+                      <th appSort="rule" [sortBy]="errorSort">Rule</th>
+                      <th appSort="message" [sortBy]="errorSort">Message</th>
+                    </tr></thead>
                     <tbody>
-                      @for (e of r.errors; track $index) {
+                      @for (e of sortedErrors(); track $index) {
                         <tr>
                           <td class="mono text-xs max-w-64"><app-data-text [value]="e.path" label="Path" /></td>
                           <td class="mono text-xs whitespace-nowrap">{{ e.keyword }}</td>
@@ -147,8 +178,12 @@ export class ContractPanel {
   readonly selected = signal<number | null>(null);
   readonly versionDetail = signal<ContractVersionDetail | null>(null);
   readonly versionError = signal('');
-  readonly loading = signal(false);
-  readonly loadError = signal('');
+  /** The contract's read: loading until the first answer. */
+  readonly state = createLoadState();
+  readonly loading = this.state.loading;
+  readonly loadError = this.state.error;
+  /** The picked version's schema is on its way. */
+  readonly versionLoading = signal(false);
   readonly busy = signal(false);
   readonly error = signal('');
   private changed = false;
@@ -159,6 +194,26 @@ export class ContractPanel {
   readonly validateError = signal('');
   readonly validation = signal<ValidationResult | null>(null);
   readonly validationMessage = signal('');
+
+  /**
+   * Owner 2026-10-27: the versions sort by any column; newest first, as the panel always showed them. The errors of a
+   * check keep the service's order until a heading is picked.
+   */
+  readonly versionSort = createTableSort<ContractVersionRow>({
+    id: 'contract-versions',
+    columns: {
+      version: { value: v => v.version, kind: 'number' },
+      state: { value: v => this.statusText(v.status), kind: 'status' },
+      saved: { value: v => v.dateCreated, kind: 'date' },
+    },
+    initial: { key: 'version', direction: 'desc' },
+  });
+  readonly sortedVersions = computed(() => this.versionSort.apply(this.versions()));
+  readonly errorSort = createTableSort<FieldError>({
+    id: 'contract-validation-errors',
+    columns: { path: e => e.path, rule: e => e.keyword, message: e => e.message },
+  });
+  readonly sortedErrors = computed(() => this.errorSort.apply(this.validation()?.errors ?? []));
 
   readonly system = computed(() => isSchemaReadOnly(this.contract()));
   /** A workspace administrator changes the workspace's own contracts; no one changes a system one. */
@@ -174,12 +229,11 @@ export class ContractPanel {
   constructor() { this.load(); }
 
   load(): void {
-    this.loading.set(true);
-    this.loadError.set('');
+    this.state.start();
     this.api.contract(this.data.contract.id).subscribe({
       next: r => {
-        this.loading.set(false);
-        if (r.status !== API_SUCCESS || !r.data) { this.loadError.set(r.message); return; }
+        if (r.status !== API_SUCCESS || !r.data) { this.state.fail(r, 'The contract could not be read.'); return; }
+        this.state.done();
         this.contract.set(r.data.contract);
         this.versions.set([...(r.data.versions ?? [])].sort((a, b) => b.version - a.version));
         const current = this.selected();
@@ -187,18 +241,34 @@ export class ContractPanel {
           : r.data.contract.activeVersion ?? r.data.contract.currentVersion ?? this.versions()[0]?.version ?? null;
         if (start && start !== current) this.pick(start);
       },
-      error: err => { this.loading.set(false); this.loadError.set(err?.error?.message || 'Could not read the contract.'); },
+      error: err => this.state.fail(err, 'The contract could not be read.'),
     });
   }
 
+  /** A version's schema; a reply for a version picked away from is dropped. */
   pick(version: number): void {
     this.selected.set(version);
     this.versionDetail.set(null);
     this.versionError.set('');
+    this.versionLoading.set(true);
     this.api.contractVersion(this.data.contract.id, version).subscribe({
-      next: r => { if (r.status === API_SUCCESS && r.data) this.versionDetail.set(r.data); else this.versionError.set(r.message); },
-      error: err => this.versionError.set(err?.error?.message || 'Could not read the version.'),
+      next: r => {
+        if (this.selected() !== version) return;
+        this.versionLoading.set(false);
+        if (r.status === API_SUCCESS && r.data) this.versionDetail.set(r.data);
+        else this.versionError.set(loadErrorText(r, 'The version could not be read.'));
+      },
+      error: err => {
+        if (this.selected() !== version) return;
+        this.versionLoading.set(false);
+        this.versionError.set(loadErrorText(err, 'The version could not be read.'));
+      },
     });
+  }
+
+  retryVersion(): void {
+    const v = this.selected();
+    if (v) this.pick(v);
   }
 
   verdict(r: ValidationResult): string { return r.valid ? 'Holds' : `${r.errorCount} error${r.errorCount === 1 ? '' : 's'}`; }

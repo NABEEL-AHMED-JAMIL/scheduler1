@@ -3,7 +3,8 @@ import { TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
 import { Dialog } from '@angular/cdk/dialog';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
-import { NEVER, Observable, of } from 'rxjs';
+import { NEVER, Observable, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { Converter } from './converter';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { StorageService } from '../../objects/storage.service';
@@ -106,5 +107,40 @@ describe('Converter and Generated reports, one job in one wording (UX final CV1)
   it('opens on PDF from a dataset when the link asks for it, and ignores a mode it does not know', () => {
     expect(converter(empty, { mode: 'dataset' }).c.mode()).toBe('dataset');
     expect(converter(empty, { mode: 'nonsense' }).c.mode()).toBe('upload');
+  });
+});
+
+describe('Converter -- the formats, limits and buckets say they are loading (owner 2026-10-27)', () => {
+  it('does not call a file unconvertible, nor the limits unreadable, while they are still being read', () => {
+    const { c, fixture, text } = converter(url => (url.includes('supportedFormats') || url.includes('limits') ? NEVER : of({ status: 'SUCCESS', data: [] })));
+    c.onFile(new File(['x'], 'letter.docx'));
+    fixture.detectChanges();
+    expect(c.formatsState.pending()).toBe(true);
+    expect(c.limitsState.pending()).toBe(true);
+    expect(text()).not.toContain("isn't a format this can convert");
+    expect(text()).not.toContain('The limits could not be read');
+  });
+
+  it('says the limits could not be read only once they failed', () => {
+    const { c, fixture, text } = converter(url => (url.includes('limits')
+      ? throwError(() => new HttpErrorResponse({ status: 500 })) : of({ status: 'SUCCESS', data: FAMILIES })));
+    fixture.detectChanges();
+    expect(c.limitsState.error()).toBe('The limits could not be read.');
+    expect(text()).toContain('The limits could not be read; the converter still checks every file.');
+  });
+
+  it('says the buckets could not be read', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [
+      provideRouter([]),
+      { provide: HttpClient, useValue: { get: vi.fn(() => of({ status: 'SUCCESS', data: [] })), post: vi.fn(() => NEVER) } },
+      { provide: Dialog, useValue: { open: () => ({ closed: of(undefined) }) } },
+      { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn(), info: vi.fn() } },
+      { provide: StorageService, useValue: { buckets: () => throwError(() => new HttpErrorResponse({ status: 500 })), listObjects: () => NEVER } },
+      { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({}) } } },
+    ] });
+    const fixture = TestBed.createComponent(Converter);
+    fixture.detectChanges();
+    expect(fixture.componentInstance.bucketsState.error()).toBe('The buckets could not be read.');
   });
 });

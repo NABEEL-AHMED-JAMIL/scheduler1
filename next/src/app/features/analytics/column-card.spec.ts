@@ -177,3 +177,24 @@ describe('which drawings a column can carry', () => {
     expect(card.kinds().every(kind => !!kind.reason)).toBe(true);
   });
 });
+
+describe('the value table sorts (owner 2026-10-27)', () => {
+  it('keeps the server order, then sorts by rows both ways', () => {
+    try { localStorage.clear(); } catch { /* none */ }
+    const card = cardWith(BINNED);
+    expect(card.sortedBars().map(bar => bar.rows)).toEqual([4, 7, 2]);
+    card.barSort.toggle('rows');
+    expect(card.sortedBars().map(bar => bar.rows)).toEqual([7, 4, 2]);
+    card.barSort.toggle('rows');
+    expect(card.sortedBars().map(bar => bar.rows)).toEqual([2, 4, 7]);
+    // The other drawings keep the range order.
+    expect(card.bars().map(bar => bar.rows)).toEqual([4, 7, 2]);
+  });
+
+  it('sorts binned lower bounds as numbers', () => {
+    try { localStorage.clear(); } catch { /* none */ }
+    const card = cardWith({ ...BINNED, bins: [{ from: '10', to: '20', rows: 1 }, { from: '9', to: '10', rows: 1 }] });
+    card.barSort.toggle('value');
+    expect(card.sortedBars().map(bar => bar.label)).toEqual(['9', '10']);
+  });
+});

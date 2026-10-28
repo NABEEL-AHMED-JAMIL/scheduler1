@@ -5,6 +5,8 @@ import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config
 import { ToastService } from '../../../shared/ui/toast.service';
 import { FormDialog } from '../../../shared/ui/form-dialog';
 import { Icon } from '../../../shared/ui/icon';
+import { AppLoading, loadErrorText } from '../../../shared/ui/loading';
+import { LoadError } from '../../../shared/ui/load-error';
 import { AiModelPicks } from './ai-model-picks';
 import { AiStepChoice, ModelPicks, choiceBody, picksOf, stepsOf } from './ai-model-choice';
 import { RunParameterFields } from '../run-parameters/run-parameter-fields';
@@ -29,7 +31,7 @@ export interface RunWithData {
  */
 @Component({
   selector: 'app-run-with-dialog',
-  imports: [FormDialog, Icon, AiModelPicks, RunParameterFields],
+  imports: [FormDialog, Icon, AppLoading, LoadError, AiModelPicks, RunParameterFields],
   template: `
     <app-form-dialog
         [heading]="parameters().length ? 'Run with…' : 'Run with a different AI model'"
@@ -41,13 +43,10 @@ export interface RunWithData {
         [saving]="running()"
         (cancelled)="ref.close(false)" (confirmed)="run()">
       @if (loading()) {
-        <p class="flex items-center gap-2 text-sm text-[color:var(--text-muted)]" role="status">
-          <app-icon name="refresh" class="spin" />Reading this schedule's AI steps…
-        </p>
+        <app-loading shape="panel" [count]="3" label="Reading this schedule's AI steps…" />
       } @else if (problem()) {
-        <p class="flex items-start gap-2 text-sm text-crit-500" role="alert">
-          <app-icon name="alert" class="mt-0.5 shrink-0" />{{ problem() }}
-        </p>
+        <!-- Owner 2026-10-27: a failed read offers Try again rather than only Close. -->
+        <app-load-error [message]="problem()" (retry)="load()" />
       } @else if (!hasChoice()) {
         <p class="flex items-start gap-2 text-sm text-[color:var(--text-secondary)]">
           <app-icon name="info" class="mt-0.5 shrink-0 icon-info" />
@@ -90,13 +89,17 @@ export class RunWithDialog {
     ? `Run ${this.data.jobName} now with the values${this.steps().length ? ' and models' : ''} below, for this run only.`
     : `Run ${this.data.jobName} now, choosing the model each AI step runs on for this run only.`);
 
-  constructor() {
+  constructor() { this.load(); }
+
+  load(): void {
+    this.loading.set(true);
+    this.problem.set('');
     this.http.get<ApiResponse<unknown>>(`${API_BASE}/sourceJob.json/aiModelChoice`, { params: { jobId: String(this.data.jobId) } })
       .subscribe({
         next: response => {
           this.loading.set(false);
           if (response.status !== API_SUCCESS) {
-            this.problem.set(response.message || 'This schedule\'s AI steps could not be read.');
+            this.problem.set(loadErrorText(response, 'This schedule\'s AI steps could not be read.'));
             return;
           }
           const steps = stepsOf(response.data);
@@ -108,7 +111,7 @@ export class RunWithDialog {
         },
         error: err => {
           this.loading.set(false);
-          this.problem.set(err?.error?.message || 'This schedule\'s AI steps could not be read.');
+          this.problem.set(loadErrorText(err, 'This schedule\'s AI steps could not be read.'));
         },
       });
   }

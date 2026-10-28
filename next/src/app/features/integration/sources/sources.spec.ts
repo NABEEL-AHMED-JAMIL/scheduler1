@@ -4,7 +4,8 @@ import { TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
 import { Dialog } from '@angular/cdk/dialog';
 import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
-import { of, Subject } from 'rxjs';
+import { NEVER, of, Subject, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { AuthService } from '../../../core/auth/auth.service';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { Sources } from './sources';
@@ -91,7 +92,7 @@ describe('Sources -- the sources tab', () => {
     const { api } = screenWith();
     const screen = TestBed.runInInjectionContext(() => new Sources());
     screen.ngOnInit();
-    expect(api.list).toHaveBeenCalledWith('', 1, 50, null);
+    expect(api.list).toHaveBeenCalledWith('', 1, 50, null, null);
     expect(screen.rows().map(r => r.id)).toEqual([1001, 1000, 1002]);
     const tiles = Object.fromEntries(screen.kpis().map(k => [k.label, k.value]));
     expect(tiles).toEqual({ Sources: 3, Answered: 1, Failing: 1, 'Not tested': 1 });
@@ -106,7 +107,7 @@ describe('Sources -- the sources tab', () => {
     screen.onSearch('live');
     screen.onSearch('live-check');
     vi.advanceTimersByTime(400);
-    expect(api.list).toHaveBeenLastCalledWith('live-check', 1, 50, null);
+    expect(api.list).toHaveBeenLastCalledWith('live-check', 1, 50, null, null);
     expect(api.list).toHaveBeenCalledTimes(3);
   });
 
@@ -258,7 +259,8 @@ describe('Sources -- the page', () => {
     screenWith({ api: stubApi({ list: vi.fn(() => pending) }) });
     const fixture = TestBed.createComponent(Sources);
     fixture.detectChanges();
-    expect((fixture.nativeElement as HTMLElement).querySelector('app-table-shell[data-test="sources"] [role="status"]')?.getAttribute('aria-label')).toBe('Loading');
+    // Owner 2026-10-27: the shared loader -- busy at once, skeleton rows after 150 ms.
+    expect((fixture.nativeElement as HTMLElement).querySelector('app-table-shell[data-test="sources"] app-loading')?.getAttribute('aria-busy')).toBe('true');
   });
 });
 
@@ -359,9 +361,9 @@ describe('Sources -- the one workspace selector (owner #5)', () => {
     const { api, opened } = screenWith({ platform: true });
     const screen = TestBed.runInInjectionContext(() => new Sources());
     screen.ngOnInit();
-    expect(api.list).toHaveBeenLastCalledWith('', 1, 50, null);
+    expect(api.list).toHaveBeenLastCalledWith('', 1, 50, null, null);
     screen.pickWorkspace(2961);
-    expect(api.list).toHaveBeenLastCalledWith('', 1, 50, 2961);
+    expect(api.list).toHaveBeenLastCalledWith('', 1, 50, 2961, null);
     screen.tab.set('connections');
     screen.refresh();
     expect(api.connections).toHaveBeenLastCalledWith(2961);
@@ -382,6 +384,92 @@ describe('Sources -- the one workspace selector (owner #5)', () => {
     screen.ngOnInit();
     screen.workspaceFilter.set(2961);
     screen.refresh();
-    expect(api.list).toHaveBeenLastCalledWith('', 1, 50, null);
+    expect(api.list).toHaveBeenLastCalledWith('', 1, 50, null, null);
+  });
+});
+
+describe('Sources -- sorting (owner 2026-10-27)', () => {
+  const TWO: ConnectionRow[] = [CONNECTIONS[0], { ...CONNECTIONS[0], id: 6, name: 'Analytics', passwordSet: false, host: 'a.internal' }];
+
+  it('sorts the database connections by name both ways, keeping the service\'s order first', () => {
+    try { localStorage.clear(); } catch { /* none */ }
+    screenWith({ api: stubApi({ connections: vi.fn(() => of({ status: 'SUCCESS', message: '', data: TWO })) }), tab: 'connections' });
+    const screen = TestBed.runInInjectionContext(() => new Sources());
+    screen.ngOnInit();
+    expect(screen.sortedConnections().map(c => c.name)).toEqual(['Warehouse', 'Analytics']);
+    screen.connectionSort.toggle('name');
+    expect(screen.sortedConnections().map(c => c.name)).toEqual(['Analytics', 'Warehouse']);
+    screen.connectionSort.toggle('name');
+    expect(screen.sortedConnections().map(c => c.name)).toEqual(['Warehouse', 'Analytics']);
+  });
+
+  it('sorts the contracts by their latest version, the highest first', () => {
+    try { localStorage.clear(); } catch { /* none */ }
+    screenWith({ tab: 'contracts' });
+    const screen = TestBed.runInInjectionContext(() => new Sources());
+    screen.ngOnInit();
+    screen.contractSort.toggle('latest');
+    expect(screen.sortedContracts().map(c => c.currentVersion)).toEqual([2, 1]);
+  });
+});
+
+describe('Sources -- sorted on the server (owner 2026-10-27)', () => {
+  it('sends no sort before a heading is picked, then the column and direction from the first page, and pages on in it', () => {
+    try { localStorage.clear(); } catch { /* none */ }
+    const { api } = screenWith();
+    const screen = TestBed.runInInjectionContext(() => new Sources());
+    screen.ngOnInit();
+    expect(api.list).toHaveBeenLastCalledWith('', 1, 50, null, null);
+    screen.goTo(2);
+    screen.sourceSort.toggle('created');
+    expect(screen.page()).toBe(1);
+    expect(api.list).toHaveBeenLastCalledWith('', 1, 50, null, { sort: 'created', dir: 'desc' });
+    screen.sourceSort.toggle('created');
+    expect(api.list).toHaveBeenLastCalledWith('', 1, 50, null, { sort: 'created', dir: 'asc' });
+    screen.sourceSort.toggle('name');
+    expect(api.list).toHaveBeenLastCalledWith('', 1, 50, null, { sort: 'name', dir: 'asc' });
+    screen.goTo(2);
+    expect(api.list).toHaveBeenLastCalledWith('', 2, 50, null, { sort: 'name', dir: 'asc' });
+    // The rows stay in the order the service sent them (no sort over the page read).
+    expect(screen.filtered().map(r => r.id)).toEqual([1001, 1000, 1002]);
+    try { localStorage.clear(); } catch { /* none */ }
+  });
+
+  it('puts the sort on the headings it can sort, and leaves Last test plain', async () => {
+    try { localStorage.clear(); } catch { /* none */ }
+    screenWith();
+    const fixture = TestBed.createComponent(Sources);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const heads = [...(fixture.nativeElement as HTMLElement).querySelectorAll('[data-test="sources"] thead th')];
+    const sortable = heads.filter(th => th.querySelector('button.th-sort')).map(th => th.textContent?.trim());
+    expect(sortable).toEqual(['Source', 'Kind', 'Format', 'Created', 'State']);
+  });
+});
+
+describe('Sources -- loading, empty, error (owner 2026-10-27)', () => {
+  it('is loading, and the figures are placeholders, until the sources answer', () => {
+    screenWith({ api: stubApi({ list: vi.fn(() => NEVER) }) });
+    const screen = TestBed.runInInjectionContext(() => new Sources());
+    screen.ngOnInit();
+    expect(screen.loading()).toBe(true);
+    expect(screen.sourcesState.pending()).toBe(true);
+  });
+
+  it('is empty once an empty page answers', () => {
+    screenWith({ api: stubApi({ list: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [], paging: { totalRecord: 0 } })) }) });
+    const screen = TestBed.runInInjectionContext(() => new Sources());
+    screen.ngOnInit();
+    expect(screen.sourcesState.pending()).toBe(false);
+    expect(screen.filtered()).toEqual([]);
+  });
+
+  it('says the sources could not be read, in plain words, and the figures are not claimed', () => {
+    screenWith({ api: stubApi({ list: vi.fn(() => throwError(() => new HttpErrorResponse({ status: 500 }))) }) });
+    const screen = TestBed.runInInjectionContext(() => new Sources());
+    screen.ngOnInit();
+    expect(screen.loading()).toBe(false);
+    expect(screen.error()).toBe('The sources could not be read.');
+    expect(screen.sourcesState.loaded()).toBe(false);
   });
 });

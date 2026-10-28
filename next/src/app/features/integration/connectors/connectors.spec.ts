@@ -3,7 +3,8 @@ import { provideZonelessChangeDetection, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { Dialog, DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
-import { of } from 'rxjs';
+import { NEVER, Observable, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { AuthService } from '../../../core/auth/auth.service';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { Connectors } from './connectors';
@@ -286,5 +287,124 @@ describe('Connector Hub model', () => {
     expect(connectionState({ ...CONNECTION, authKind: 'OAUTH', oauthStatus: 'PENDING' })).toBe('Not connected');
     expect(connectionState({ ...CONNECTION, status: 'Inactive' })).toBe('Paused');
     expect(suggestedMode(POSTGRES, undefined)).toBe('FULL');
+  });
+});
+
+// ------------------------------------------------------------------------------------------- owner 2026-10-27
+const FAILS = () => throwError(() => new HttpErrorResponse({ status: 500 }));
+
+function pageWith(overrides: Partial<Record<keyof ReturnType<typeof api>, () => Observable<unknown>>>) {
+  try { localStorage.clear(); } catch { /* none */ }
+  const fake = { ...api(), ...Object.fromEntries(Object.entries(overrides).map(([k, f]) => [k, vi.fn(f)])) };
+  TestBed.resetTestingModule();
+  TestBed.configureTestingModule({
+    providers: [provideZonelessChangeDetection(), provideRouter([]), { provide: ConnectorsApi, useValue: fake },
+      { provide: Dialog, useValue: { open: vi.fn() } }, { provide: AuthService, useValue: auth(true) }],
+  });
+  const fixture = TestBed.createComponent(Connectors);
+  fixture.detectChanges();
+  return { fixture, screen: fixture.componentInstance, el: fixture.nativeElement as HTMLElement };
+}
+
+describe('Connector Hub -- sorting (owner 2026-10-27)', () => {
+  it('keeps the service\'s order, then sorts the connections by name both ways', () => {
+    const { screen } = pageWith({});
+    expect(screen.sortedConnections().map(c => c.name)).toEqual(['Shop DB (demo)', 'Broken']);
+    screen.sort.toggle('name');
+    expect(screen.sortedConnections().map(c => c.name)).toEqual(['Broken', 'Shop DB (demo)']);
+    screen.sort.toggle('name');
+    expect(screen.sortedConnections().map(c => c.name)).toEqual(['Shop DB (demo)', 'Broken']);
+  });
+
+  it('puts an Error first on Status', () => {
+    const { screen } = pageWith({});
+    screen.sort.toggle('status');
+    expect(screen.sortedConnections().map(c => c.id)).toEqual([1001, 1000]);
+  });
+});
+
+describe('Connector Hub -- loading, empty, error (owner 2026-10-27)', () => {
+  it('draws placeholders, not "No connector matches." or "(0)", until the gallery answers', () => {
+    const { screen, el } = pageWith({ connectors: () => NEVER });
+    expect(screen.galleryState.pending()).toBe(true);
+    expect(el.querySelector('[data-no-connector]')).toBeNull();
+    expect(screen.chips().every(c => !c.label.includes('('))).toBe(true);
+  });
+
+  it('says the gallery could not be read, with Try again', () => {
+    const { screen, el } = pageWith({ connectors: FAILS });
+    expect(screen.galleryError()).toBe('The connectors could not be read.');
+    expect(el.querySelector('[data-gallery-error]')?.textContent).toContain('Try again');
+    expect(el.querySelector('[data-no-connector]')).toBeNull();
+  });
+
+  it('the connections are loading until they answer, then empty, and a failure is said in plain words', () => {
+    expect(pageWith({ connections: () => NEVER }).screen.listState.pending()).toBe(true);
+    const empty = pageWith({ connections: () => of({ status: 'SUCCESS', message: '', data: [] }) }).screen;
+    expect(empty.listState.pending()).toBe(false);
+    expect(empty.sortedConnections()).toEqual([]);
+    const failed = pageWith({ connections: FAILS }).screen;
+    expect(failed.loading()).toBe(false);
+    expect(failed.error()).toBe('The connections could not be read.');
+  });
+});
+
+describe('Connect stepper -- loading and errors (owner 2026-10-27)', () => {
+  function stepper(overrides: Partial<Record<keyof ReturnType<typeof api>, () => Observable<unknown>>>, connection: Connection | null = null) {
+    const fake = { ...api(), ...Object.fromEntries(Object.entries(overrides).map(([k, f]) => [k, vi.fn(f)])) };
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [provideZonelessChangeDetection(), { provide: ConnectorsApi, useValue: fake },
+        { provide: DIALOG_DATA, useValue: { cards: CARDS, card: CARDS[0], connection, changed: vi.fn() } as ConnectPanelData },
+        { provide: DialogRef, useValue: { close: vi.fn() } }, { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn() } }],
+    });
+    const fixture = TestBed.createComponent(ConnectPanel);
+    fixture.detectChanges();
+    return { screen: fixture.componentInstance, el: fixture.nativeElement as HTMLElement };
+  }
+
+  it('the storage list says it is loading, then empty, then why it failed', () => {
+    expect(stepper({ storageTargets: () => NEVER }).screen.targetsState.loading()).toBe(true);
+    const empty = stepper({ storageTargets: () => of({ status: 'SUCCESS', message: '', data: [] }) });
+    expect(empty.screen.targetsState.loaded()).toBe(true);
+    expect(empty.el.textContent).toContain('No active storage connection yet.');
+    const failed = stepper({ storageTargets: FAILS });
+    expect(failed.screen.targetsState.loading()).toBe(false);
+    expect(failed.screen.targetsState.error()).toBe('The storage connections could not be read.');
+  });
+
+  it('a failed discovery says why with Try again, and not also "nothing to sync"', () => {
+    const { screen, el } = stepper({ discover: FAILS }, CONNECTION);
+    expect(screen.discovering()).toBe(false);
+    expect(screen.discoverError()).toContain('could not be read');
+    expect(el.querySelector('[data-discover-error]')?.textContent).toContain('Try again');
+    expect(el.textContent).not.toContain('The connection has nothing to sync');
+  });
+});
+
+describe('Connection panel -- sorting (owner 2026-10-27)', () => {
+  it('sorts the streams by rows and the runs by status, both keeping the service\'s order first', () => {
+    try { localStorage.clear(); } catch { /* none */ }
+    const second = { ...DETAIL.streams[0], id: 2, name: 'public.orders', rowsTotal: 900, pendingSchema: null };
+    const detail: ConnectionDetail = { ...DETAIL, streams: [DETAIL.streams[0], second],
+      runs: [{ ...DETAIL.runs[0], id: 10, syncId: 's10', status: 'Succeeded' }, DETAIL.runs[0]] };
+    const fake = { ...api(), connection: vi.fn(() => of({ status: 'SUCCESS', message: '', data: detail })) };
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [provideZonelessChangeDetection(), { provide: ConnectorsApi, useValue: fake },
+        { provide: DIALOG_DATA, useValue: { connectionId: 1000, name: 'Shop DB (demo)', cards: CARDS, changed: vi.fn() } },
+        { provide: DialogRef, useValue: { close: vi.fn() } }, { provide: Dialog, useValue: { open: vi.fn() } },
+        { provide: AuthService, useValue: auth(true) }, { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn() } }],
+    });
+    const fixture = TestBed.createComponent(ConnectionPanel);
+    fixture.detectChanges();
+    const p = fixture.componentInstance;
+    expect(p.sortedStreams().map(s => s.id)).toEqual([1, 2]);
+    p.streamSort.toggle('rows');
+    expect(p.sortedStreams().map(s => s.rowsTotal)).toEqual([900, 42]);
+    p.streamSort.toggle('rows');
+    expect(p.sortedStreams().map(s => s.rowsTotal)).toEqual([42, 900]);
+    p.runSort.toggle('status');
+    expect(p.sortedRuns().map(r => r.status)).toEqual(['Failed', 'Succeeded']);
   });
 });

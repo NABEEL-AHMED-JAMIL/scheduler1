@@ -12,6 +12,11 @@ import { PasswordRulesHint, newPasswordPlaceholder } from './password-rules';
 import { SignInHistory } from './sign-in-history';
 import { TwoFactorCard } from './two-factor-card';
 import { PageHeader } from '../../shared/ui/page-header';
+import { createTableSort } from '../../shared/ui/sort';
+import { SortHeader } from '../../shared/ui/sort-header';
+import { AppLoading, InlineStatus, createLoadState } from '../../shared/ui/loading';
+import { LoadError } from '../../shared/ui/load-error';
+import { BlurLoader } from '../../shared/ui/blur-loader';
 
 /**
  * MIG-353: My account › Security -- the person's own sign-in security, in one place: their password (the workspace's
@@ -20,7 +25,7 @@ import { PageHeader } from '../../shared/ui/page-header';
  */
 @Component({
   selector: 'app-account-security',
-  imports: [PageHeader, Icon, Field, ServerTimePipe, RouterLink, PasswordRulesHint, SignInHistory, TwoFactorCard],
+  imports: [PageHeader, Icon, Field, ServerTimePipe, RouterLink, PasswordRulesHint, SignInHistory, TwoFactorCard, SortHeader, AppLoading, InlineStatus, LoadError, BlurLoader],
   templateUrl: './account-security.html',
 })
 export class AccountSecurity implements OnInit {
@@ -30,10 +35,29 @@ export class AccountSecurity implements OnInit {
   private readonly toast = inject(ToastService);
 
   readonly rules = signal<PasswordRules | null>(null);
+  /**
+   * Owner 2026-10-27: the rules' read is said under the field -- loading, or why it failed with Try again -- instead of
+   * the hint silently falling back to "8 characters" as if that were the workspace's rule. The server still checks.
+   */
+  readonly rulesState = createLoadState();
   readonly newPasswordHint = computed(() => newPasswordPlaceholder(this.rules()));
   readonly sessions = signal<SessionRow[]>([]);
-  readonly sessionsLoading = signal(false);
-  readonly sessionsError = signal('');
+  /** The sessions' read: pending until the first answer, so "no session" never shows before it. */
+  readonly sessionsState = createLoadState();
+  readonly sessionsLoading = this.sessionsState.loading;
+  readonly sessionsError = this.sessionsState.error;
+  /** Owner 2026-10-27: every column sorts; the list keeps the API's order until one is picked. */
+  readonly sessionSort = createTableSort<SessionRow>({
+    id: 'account-sessions',
+    columns: {
+      device: s => deviceOf(s.userAgent),
+      address: s => s.ip,
+      signedIn: { value: s => s.signedInAt, kind: 'date' },
+      lastActive: { value: s => s.lastActiveAt, kind: 'date' },
+      how: s => METHOD_LABEL[s.method] ?? s.method,
+    },
+  });
+  readonly sortedSessions = computed(() => this.sessionSort.apply(this.sessions()));
   readonly ending = signal<string | null>(null);
 
   readonly currentPassword = signal('');
@@ -47,11 +71,19 @@ export class AccountSecurity implements OnInit {
   readonly otherSessions = computed(() => this.sessions().filter(s => !s.current).length);
 
   ngOnInit(): void {
-    this.api.myRules().subscribe({
-      next: r => { if (r.status === API_SUCCESS && r.data) this.rules.set(r.data); },
-      error: () => {},
-    });
+    this.loadRules();
     this.loadSessions();
+  }
+
+  loadRules(): void {
+    this.rulesState.start();
+    this.api.myRules().subscribe({
+      next: r => {
+        if (r.status === API_SUCCESS && r.data) { this.rules.set(r.data); this.rulesState.done(); }
+        else this.rulesState.fail(r, 'Your workspace\'s password rules could not be read. They are still checked when you save.');
+      },
+      error: err => this.rulesState.fail(err, 'Your workspace\'s password rules could not be read. They are still checked when you save.'),
+    });
   }
 
   device(userAgent: string | null): string {
@@ -63,18 +95,13 @@ export class AccountSecurity implements OnInit {
   }
 
   loadSessions(): void {
-    this.sessionsLoading.set(true);
-    this.sessionsError.set('');
+    this.sessionsState.start();
     this.api.sessions().subscribe({
       next: r => {
-        this.sessionsLoading.set(false);
-        if (r.status === API_SUCCESS) this.sessions.set(r.data ?? []);
-        else this.sessionsError.set(r.message || 'Your sessions could not be read.');
+        if (r.status === API_SUCCESS) { this.sessions.set(r.data ?? []); this.sessionsState.done(); }
+        else this.sessionsState.fail(r, 'Your sessions could not be read.');
       },
-      error: err => {
-        this.sessionsLoading.set(false);
-        this.sessionsError.set(err?.error?.message || 'Your sessions could not be read.');
-      },
+      error: err => this.sessionsState.fail(err, 'Your sessions could not be read.'),
     });
   }
 

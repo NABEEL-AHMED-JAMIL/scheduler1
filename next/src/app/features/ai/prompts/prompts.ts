@@ -19,6 +19,9 @@ import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { ManagedBanner } from '../../../shared/ui/managed-banner';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
+import { createLoadState } from '../../../shared/ui/loading';
 
 /**
  * Prompts: what a step says to a model. Readable by everyone who can open the page (a
@@ -27,7 +30,7 @@ import { RefreshButton } from '../../../shared/ui/refresh-button';
  */
 @Component({
   selector: 'app-prompts',
-  imports: [RefreshButton, PageHeader, Icon, TableShell, StatusPill, StatTile, ViewToggle, MineFilter, CdkMenu, CdkMenuItem, CdkMenuTrigger, RouterLink, ServerTimePipe, ManagedBanner],
+  imports: [RefreshButton, PageHeader, SortHeader, Icon, TableShell, StatusPill, StatTile, ViewToggle, MineFilter, CdkMenu, CdkMenuItem, CdkMenuTrigger, RouterLink, ServerTimePipe, ManagedBanner],
   templateUrl: './prompts.html',
 })
 export class Prompts implements OnInit {
@@ -39,8 +42,10 @@ export class Prompts implements OnInit {
 
   readonly view = signal<'table' | 'cards'>('table');
   readonly prompts = signal<Prompt[]>([]);
-  readonly loading = signal(true);
-  readonly error = signal('');
+  /** The list's read: loading until the first answer, so the tiles and the table never show "none" before it. */
+  readonly state = createLoadState();
+  readonly loading = this.state.loading;
+  readonly error = this.state.error;
   readonly search = signal('');
   readonly statusFilter = signal('');
   readonly outputFilter = signal('');
@@ -59,6 +64,22 @@ export class Prompts implements OnInit {
       && (!this.onlyMine() || isMine(p, myId))
       && (!q || `${p.name} ${p.description ?? ''} ${p.connectionName ?? ''} ${p.effectiveModel ?? ''} ${p.variables.map(v => v.name).join(' ')}`.toLowerCase().includes(q)));
   });
+  /** Owner 2026-10-27: every column that holds a value sorts; the list keeps the API's order until one is picked. */
+  readonly sort = createTableSort<Prompt>({
+    id: 'prompts',
+    columns: {
+      name: p => p.name,
+      connection: p => p.connectionName,
+      output: { value: p => (p.outputMode === 'json' ? 'JSON' : 'Text'), kind: 'text' },
+      usedBy: { value: p => p.pipelineCount, kind: 'number' },
+      runs: { value: p => p.runCount ?? 0, kind: 'number' },
+      lastRun: { value: p => p.lastRunAt, kind: 'date' },
+      workspace: p => p.tenantName,
+      state: { value: p => p.status || 'Inactive', kind: 'status' },
+    },
+  });
+  /** The rows on screen, in the chosen order -- the cards follow it too. */
+  readonly sorted = computed(() => this.sort.apply(this.filtered()));
   readonly hasFilters = computed(() => !!this.search().trim() || !!this.statusFilter() || !!this.outputFilter() || !!this.connectionFilter() || this.onlyMine());
 
   /**
@@ -89,15 +110,14 @@ export class Prompts implements OnInit {
   }
 
   load(): void {
-    this.loading.set(true);
-    this.error.set('');
+    this.state.start();
     this.http.get<ApiResponse<Prompt[]>>(`${API_BASE}/aiPrompt.json/list`).subscribe({
       next: r => {
-        this.loading.set(false);
-        if (r.status !== API_SUCCESS) { this.error.set(r.message); return; }
+        if (r.status !== API_SUCCESS) { this.state.fail(r, 'The prompts could not be read.'); return; }
         this.prompts.set((r.data ?? []).map(p => ({ ...p, variables: p.variables ?? [] })));
+        this.state.done();
       },
-      error: err => { this.loading.set(false); this.error.set(err?.error?.message || 'Could not load the prompts.'); },
+      error: err => this.state.fail(err, 'The prompts could not be read.'),
     });
   }
 

@@ -16,7 +16,7 @@ import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { confirmWith } from '../../../shared/ui/confirm';
 import { sidePanelConfig } from '../../../shared/ui/side-panel';
 import {
-  CollectionDetail, EnvironmentRow, RequestRow, UsageRow, authLabel, effectiveAuthMode, sourceLabel,
+  CollectionDetail, EnvironmentRow, RequestRow, UsageRow, VersionRow, authLabel, effectiveAuthMode, sourceLabel,
 } from './api-collections.model';
 import { ApiCollectionsApi, usersOf } from './api-collections.service';
 import { CollectionDialog, CollectionDialogData } from './collection-dialog';
@@ -32,6 +32,9 @@ import { RefreshButton } from '../../../shared/ui/refresh-button';
 import { WorkspaceSelect } from '../../../shared/ui/workspace-select';
 import { WorkspaceDirectory } from '../../../core/workspaces/workspace-directory';
 import { formatDuration } from '../../../shared/ui/time-format';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
+import { createLoadState, loadErrorText } from '../../../shared/ui/loading';
 
 const USER_KINDS: Record<string, string> = { PIPELINE: 'Pipeline', SOURCE: 'Source', AI_TOOL: 'AI tool' };
 
@@ -46,7 +49,7 @@ const USER_KINDS: Record<string, string> = { PIPELINE: 'Pipeline', SOURCE: 'Sour
  */
 @Component({
   selector: 'app-api-collection',
-  imports: [RefreshButton, PageHeader, Icon, SensitivityTag, TableShell, StatusPill, StatStrip, ViewToggle, DataText, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, RouterLink, ManagedBanner, WorkspaceSelect],
+  imports: [RefreshButton, PageHeader, Icon, SensitivityTag, TableShell, StatusPill, StatStrip, ViewToggle, DataText, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, RouterLink, ManagedBanner, WorkspaceSelect, SortHeader],
   templateUrl: './collection.html',
 })
 export class Collection implements OnChanges {
@@ -74,6 +77,11 @@ export class Collection implements OnChanges {
   readonly detail = signal<CollectionDetail | null>(null);
   readonly defaultAuth = signal<unknown>(null);
   readonly usage = signal<UsageRow[]>([]);
+  /**
+   * Owner 2026-10-27: "Used by" is its own read. It showed "No pipeline ... uses these APIs yet" while it was still on
+   * the way, and the same words when it failed -- now loading until it answers and the reason with Try again.
+   */
+  readonly usageState = createLoadState();
   readonly loading = signal(true);
   readonly error = signal('');
   readonly missing = signal(false);
@@ -100,6 +108,49 @@ export class Collection implements OnChanges {
   });
   readonly hasFilters = computed(() => !!this.search().trim() || !!this.folderFilter() || !!this.stateFilter());
 
+  /**
+   * Owner 2026-10-27: every table on the page sorts by its columns. Each keeps the order the service sends (the APIs in
+   * their saved order, the versions newest first) until a heading is picked.
+   */
+  readonly requestSort = createTableSort<RequestRow>({
+    id: 'api-collection-requests',
+    columns: {
+      name: r => r.name,
+      endpoint: r => r.urlTemplate,
+      auth: r => this.authText(r),
+      folder: r => this.folderName(r.folderId),
+      timeout: { value: r => r.timeoutMs, kind: 'number' },
+      lastTest: { value: r => this.lastTest(r)?.statusCode, kind: 'number' },
+      state: { value: r => (r.enabled ? 'Active' : 'Inactive'), kind: 'status' },
+    },
+  });
+  /** The APIs on screen in the chosen order; the cards follow it too. */
+  readonly sortedRequests = computed(() => this.requestSort.apply(this.visibleRequests()));
+  readonly environmentSort = createTableSort<EnvironmentRow>({
+    id: 'api-collection-environments',
+    columns: { name: e => e.name },
+  });
+  readonly sortedEnvironments = computed(() => this.environmentSort.apply(this.environments()));
+  readonly usageSort = createTableSort<UsageRow>({
+    id: 'api-collection-usage',
+    columns: {
+      kind: u => this.userKind(u.userType),
+      name: u => u.userName || u.userRef,
+      api: u => u.requestName,
+      // "Latest" (no pin) is not a number: it sorts after the pinned versions both ways.
+      pinned: { value: u => u.pinnedVersion, kind: 'number' },
+    },
+  });
+  readonly sortedUsage = computed(() => this.usageSort.apply(this.usage()));
+  readonly versionSort = createTableSort<VersionRow>({
+    id: 'api-collection-versions',
+    columns: {
+      version: { value: v => v.version, kind: 'number' },
+      saved: { value: v => v.dateCreated, kind: 'date' },
+    },
+  });
+  readonly sortedVersions = computed(() => this.versionSort.apply(this.versions()));
+
   readonly kpis = computed((): StatStripItem[] => {
     const d = this.detail();
     const requests = d?.requests ?? [];
@@ -124,6 +175,26 @@ export class Collection implements OnChanges {
     this.detail.set(null);
     this.usage.set([]);
     this.load();
+  }
+
+  /** Who uses the collection's APIs; a reply for another workspace or collection than the one shown is dropped. */
+  loadUsage(): void {
+    const id = this.id();
+    if (id === null || this.needsWorkspace()) return;
+    const asked = this.tenantId();
+    this.usageState.start();
+    this.api.usage(id, asked).subscribe({
+      next: r => {
+        if (asked !== this.tenantId() || id !== this.id()) return;
+        if (r.status !== API_SUCCESS) { this.usageState.fail(r, 'Who uses these APIs could not be read.'); return; }
+        this.usage.set(r.data ?? []);
+        this.usageState.done();
+      },
+      error: err => {
+        if (asked !== this.tenantId() || id !== this.id()) return;
+        this.usageState.fail(err, 'Who uses these APIs could not be read.');
+      },
+    });
   }
 
   private id(): number | null {
@@ -156,13 +227,10 @@ export class Collection implements OnChanges {
         if (asked !== this.tenantId()) return;
         this.loading.set(false);
         this.missing.set(isMissingRecord({ status: err?.status }));
-        this.error.set(err?.error?.message || 'Could not load the collection.');
+        this.error.set(loadErrorText(err, 'The collection could not be read.'));
       },
     });
-    this.api.usage(id, asked).subscribe({
-      next: r => { if (asked === this.tenantId()) this.usage.set(r.status === API_SUCCESS ? r.data ?? [] : []); },
-      error: () => { if (asked === this.tenantId()) this.usage.set([]); },
-    });
+    this.loadUsage();
   }
 
   folderName(id: number | null): string { return id == null ? '' : this.folderNames().get(id) ?? `Folder ${id}`; }

@@ -3,7 +3,8 @@ import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { provideRouter } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { AnalyticsService } from '../analytics.service';
 import { ChartAnswer } from './chart-answer';
 import { PinChartData, PinChartPanel } from './pin-chart-panel';
@@ -92,5 +93,27 @@ describe('Visualise -- a run\'s kept file read as rows', () => {
     expect(rowsOf([1, 2])).toBeNull();
     expect(rowsOf('text')).toBeNull();
     expect(rowsOf([])).toBeNull();
+  });
+});
+
+describe('Pin to dashboard -- the dashboard list loads, is empty, or failed (owner 2026-10-27)', () => {
+  it('is loading until the dashboards answer', () => {
+    const { panel } = render({ fetchAllDashboards: () => NEVER });
+    expect(panel.loading()).toBe(true);
+    expect(panel.boardsError()).toBe('');
+  });
+
+  it('offers a new dashboard when there is none', () => {
+    const { panel } = render({ fetchAllDashboards: () => of({ status: 'SUCCESS', data: [] }) });
+    expect(panel.loading()).toBe(false);
+    expect(panel.mode()).toBe('new');
+    expect(panel.boardsError()).toBe('');
+  });
+
+  it('says the dashboards could not be read, rather than that there are none', () => {
+    const { panel, el } = render({ fetchAllDashboards: () => throwError(() => new HttpErrorResponse({ status: 500 })) });
+    expect(panel.loading()).toBe(false);
+    expect(panel.boardsError()).toBe('Your dashboards could not be read; you can still pin to a new one.');
+    expect(el.textContent).toContain('Try again');
   });
 });

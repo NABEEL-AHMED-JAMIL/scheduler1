@@ -15,6 +15,7 @@ import { PageHeader } from '../../../shared/ui/page-header';
 import { Section } from '../../../shared/ui/section';
 import { sidePanelConfig } from '../../../shared/ui/side-panel';
 import { StatusPill } from '../../../shared/ui/status-pill';
+import { AppLoading, InlineStatus, loadErrorText } from '../../../shared/ui/loading';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { createTopicSearch } from '../../../shared/ui/topic-search';
 import { HasUnsavedChanges } from '../../../shared/ui/unsaved-changes.guard';
@@ -36,7 +37,7 @@ import {
  */
 @Component({
   selector: 'app-registry-task-editor',
-  imports: [ReactiveFormsModule, RouterLink, PageHeader, Section, FormRow, Field, Combobox, Icon, ActionsBar, StatusPill],
+  imports: [ReactiveFormsModule, RouterLink, PageHeader, Section, FormRow, Field, Combobox, Icon, ActionsBar, StatusPill, AppLoading, InlineStatus],
   templateUrl: './registry-task-editor.html',
   styles: `
     .rte-layout { display: grid; gap: 1.25rem; }
@@ -72,6 +73,9 @@ export class RegistryTaskEditor implements OnInit, HasUnsavedChanges {
   readonly copyOf = signal<string>('');
   readonly loading = signal(true);
   readonly error = signal('');
+  /** Owner 2026-10-27: a failed read can be tried again; a pipeline that no longer exists cannot. */
+  readonly errorRetryable = signal(true);
+  private lastRead: { key: number; copy: boolean } | null = null;
   readonly ready = signal(false);
   readonly saving = signal(false);
   readonly submitted = signal(false);
@@ -87,6 +91,10 @@ export class RegistryTaskEditor implements OnInit, HasUnsavedChanges {
 
   /** Owner #17: the pipelines that use this registry task (edit only). */
   readonly users = signal<UsagePipeline[] | null>(null);
+  /** Owner 2026-10-27: null meant both "still loading" and "could not be read"; these say which. */
+  readonly usersLoading = signal(false);
+  readonly usersError = signal('');
+  private usersFor: { key: number; tenantId: number | null } | null = null;
 
   /** Bumped on every edit so the preview, the parent lists and the change state recompute. */
   private readonly revision = signal(0);
@@ -118,10 +126,23 @@ export class RegistryTaskEditor implements OnInit, HasUnsavedChanges {
     }
   }
 
+  /** Reads the record again after a failure. */
+  retry(): void {
+    if (this.lastRead) this.read(this.lastRead.key, this.lastRead.copy);
+  }
+
   private read(key: number, copy: boolean): void {
+    this.lastRead = { key, copy };
+    this.loading.set(true);
+    this.error.set('');
     this.http.get<ApiResponse<Pipeline>>(`${API_BASE}/pipeline.json/get`, { params: { pipelineKey: key } }).subscribe({
       next: r => {
-        if (r.status !== API_SUCCESS || !r.data) { this.loading.set(false); this.error.set(r.message || 'That pipeline no longer exists.'); return; }
+        if (r.status !== API_SUCCESS || !r.data) {
+          this.loading.set(false);
+          this.errorRetryable.set(false);
+          this.error.set(r.message || 'That pipeline no longer exists.');
+          return;
+        }
         const p = r.data;
         if (copy) {
           // A copy has to claim a different pipeline: one live form per pipeline is a unique index.
@@ -132,11 +153,35 @@ export class RegistryTaskEditor implements OnInit, HasUnsavedChanges {
           });
         } else {
           this.start(p);
-          this.steps.taskPipelines({ pipelineKey: key }, this.isPlatformAdmin() ? (p as Pipeline & { tenantId?: number }).tenantId ?? null : null)
-            .subscribe({ next: u => this.users.set(u.status === API_SUCCESS ? u.data ?? [] : null), error: () => this.users.set(null) });
+          this.usersFor = { key, tenantId: this.isPlatformAdmin() ? (p as Pipeline & { tenantId?: number }).tenantId ?? null : null };
+          this.loadUsers();
         }
       },
-      error: err => { this.loading.set(false); this.error.set(err?.error?.message || 'The pipeline could not be read.'); },
+      error: err => {
+        this.loading.set(false);
+        this.errorRetryable.set(true);
+        this.error.set(loadErrorText(err, 'The pipeline could not be read.'));
+      },
+    });
+  }
+
+  /** Owner #17: the pipelines that name this registry task. */
+  loadUsers(): void {
+    const at = this.usersFor;
+    if (!at) return;
+    this.usersLoading.set(true);
+    this.usersError.set('');
+    this.steps.taskPipelines({ pipelineKey: at.key }, at.tenantId).subscribe({
+      next: u => {
+        this.usersLoading.set(false);
+        if (u.status !== API_SUCCESS) { this.users.set(null); this.usersError.set(loadErrorText(u, 'The pipelines that use it could not be read.')); return; }
+        this.users.set(u.data ?? []);
+      },
+      error: err => {
+        this.usersLoading.set(false);
+        this.users.set(null);
+        this.usersError.set(loadErrorText(err, 'The pipelines that use it could not be read.'));
+      },
     });
   }
 

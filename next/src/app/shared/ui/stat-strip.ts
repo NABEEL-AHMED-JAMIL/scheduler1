@@ -81,6 +81,7 @@ const lastSpan = (count: number, cols: number): number => count % cols === 0 ? 1
     '[class.is-start]': "align() === 'start'",
     '[class.is-md]': "size() === 'md'",
     '[attr.aria-label]': 'label() || null',
+    '[attr.aria-busy]': "loading() ? 'true' : null",
   },
   template: `
     @for (item of items(); track item.label; let last = $last) {
@@ -121,8 +122,16 @@ const lastSpan = (count: number, cols: number): number => count % cols === 0 ? 1
       }
       <span class="stat-strip-text">
         <span class="stat-strip-label">{{ item.label }}</span>
-        <span class="stat-strip-value" [class.is-quiet]="item.quiet">{{ figure(item.value) }}</span>
-        @if (item.foot) { <span class="stat-strip-foot">{{ item.foot }}</span> }
+        @if (loading()) {
+          <!-- Owner 2026-10-27: a count that has not arrived is not a zero. -->
+          <span class="stat-strip-value"><span class="stat-skel" aria-hidden="true"></span><span class="sr-only">loading</span></span>
+        } @else if (failed()) {
+          <span class="stat-strip-value is-quiet">—</span>
+          <span class="stat-strip-foot">Not available right now</span>
+        } @else {
+          <span class="stat-strip-value" [class.is-quiet]="item.quiet">{{ figure(item.value) }}</span>
+          @if (item.foot) { <span class="stat-strip-foot">{{ item.foot }}</span> }
+        }
       </span>
       @if (item.live) {
         <span class="live-dot live-on stat-strip-live" [attr.title]="item.live" aria-hidden="true"></span>
@@ -149,6 +158,13 @@ export class StatStrip {
   readonly summary = input<StatStripSummary | null>(null);
   /** The list's accessible name. */
   readonly label = input('');
+  /**
+   * The counts are still being read (owner 2026-10-27): each value is a placeholder bar, not a 0 that looks real.
+   * Pass the first load only; a reload keeps the figures on screen.
+   */
+  readonly loading = input(false);
+  /** The read behind the counts failed: each value says — and "Not available right now" instead of a false 0. */
+  readonly failed = input(false);
 
   readonly itemClick = output<StatStripItem>();
 
@@ -169,6 +185,8 @@ export class StatStrip {
 
   /** "Failed: 3, of 42 -- Runs that ended in an error": everything the tile shows, in reading order. */
   nameOf(item: StatStripItem): string {
+    if (this.loading()) return `${item.label}: loading`;
+    if (this.failed()) return `${item.label}: not available right now`;
     return [`${item.label}: ${item.value}`, item.foot, item.hint].filter(Boolean).join(', ');
   }
 }

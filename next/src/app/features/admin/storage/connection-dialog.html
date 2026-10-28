@@ -48,10 +48,12 @@
                    [placeholder]="isAzure() ? 'documents' : 'my-company-data'" />
             <button type="button" class="btn btn-default btn-sm whitespace-nowrap"
                     [disabled]="discovering()" (click)="discover()">
-              {{ discovering() ? 'Looking…' : 'Discover' }}
+              <app-icon name="search" [busy]="discovering()" />{{ discovering() ? 'Looking…' : 'Discover' }}
             </button>
           }
         </div>
+        <app-inline-status [loading]="discovering()" [error]="discoverError()" [empty]="!!discoverNote()" [emptyText]="discoverNote()"
+                           label="Listing buckets…" (retry)="discover()" />
       </app-field>
     }
 

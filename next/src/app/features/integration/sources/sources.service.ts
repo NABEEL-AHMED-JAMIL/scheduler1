@@ -29,8 +29,10 @@ export class SourcesApi {
   // ------------------------------------------------------------------------------------------ sources
 
   /** tenantId (owner #5): a platform administrator's one workspace; the service ignores it for anyone else. */
-  list(search: string, page: number, limit: number, tenantId?: number | null): Observable<PagedResponse<SourceRow[]>> {
-    const params: Record<string, string | number> = { page, limit };
+  /** Owner 2026-10-27: `order` is the server's sort (name, kind, format, created, state; asc or desc), sent once one is picked. */
+  list(search: string, page: number, limit: number, tenantId?: number | null,
+       order: { sort: string; dir: string } | null = null): Observable<PagedResponse<SourceRow[]>> {
+    const params: Record<string, string | number> = { page, limit, ...(order ?? {}) };
     if (search.trim()) params['search'] = search.trim();
     if (tenantId) params['tenantId'] = tenantId;
     return this.http.get<PagedResponse<SourceRow[]>>(`${SOURCES}/list`, { params });

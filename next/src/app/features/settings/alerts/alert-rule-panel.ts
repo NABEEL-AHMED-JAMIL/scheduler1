@@ -5,6 +5,7 @@ import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config
 import { Icon } from '../../../shared/ui/icon';
 import { SidePanel } from '../../../shared/ui/side-panel';
 import { refusal } from '../../../shared/ui/bulk/bulk.model';
+import { InlineStatus, createLoadState } from '../../../shared/ui/loading';
 import { Team, TeamsApi } from '../../../core/teams/teams.api';
 import { AlertKindInfo, AlertRule, AlertScope, AlertsApi, ruleSentence } from './alerts.api';
 import { AuthService } from '../../../core/auth/auth.service';
@@ -25,7 +26,7 @@ interface Schedule { jobId: number; jobName: string; }
  */
 @Component({
   selector: 'app-alert-rule-panel',
-  imports: [SidePanel, Icon],
+  imports: [SidePanel, Icon, InlineStatus],
   template: `
     <app-side-panel [heading]="draft().id ? 'Change the alert rule' : 'New alert rule'" [subtitle]="sentence()" data-test="alert-rule-panel">
       <div class="form-lock flex flex-col gap-4">
@@ -75,10 +76,14 @@ interface Schedule { jobId: number; jobName: string; }
         @if (data.scope === 'workspace') {
           <div>
             <label class="label" for="rule-job">Schedule</label>
-            <select id="rule-job" class="input" [value]="draft().jobId ?? ''" (change)="setJob($any($event.target).value)" data-test="rule-job">
-              <option value="">Every schedule of the workspace</option>
-              @for (s of schedules(); track s.jobId) { <option [value]="s.jobId">{{ s.jobName }}</option> }
+            <!-- Owner 2026-10-27: each option says whether it is the rule's own, so a schedule read after the select drew
+                 is still picked (a [value] on the select set before its options existed fell back to "Every schedule"). -->
+            <select id="rule-job" class="input" (change)="setJob($any($event.target).value)" data-test="rule-job">
+              <option value="" [selected]="draft().jobId == null">{{ schedulesState.pending() && draft().jobId != null ? 'Loading schedules…' : 'Every schedule of the workspace' }}</option>
+              @for (s of schedules(); track s.jobId) { <option [value]="s.jobId" [selected]="s.jobId === draft().jobId">{{ s.jobName }}</option> }
             </select>
+            <app-inline-status [loading]="schedulesState.loading()" [error]="schedulesState.error()" label="Loading schedules…"
+                               (retry)="loadSchedules()" />
           </div>
         }
 
@@ -119,6 +124,7 @@ interface Schedule { jobId: number; jobName: string; }
               <label class="flex items-center gap-2"><input type="checkbox" class="checkbox" [checked]="draft().roles.includes('TENANT_USER')"
                      (change)="role('TENANT_USER', $any($event.target).checked)" />Every other member</label>
             </div>
+            <app-inline-status [loading]="teamsState.loading()" [error]="teamsState.error()" label="Loading teams…" (retry)="loadTeams()" />
             @if (teams().length) {
               <p class="field-note text-[color:var(--text-muted)] mt-2 mb-1">And these teams:</p>
               <div class="flex flex-wrap gap-x-4 gap-y-1 text-sm" data-testid="alert-teams">
@@ -171,6 +177,9 @@ export class AlertRulePanel implements OnInit {
   readonly draft = signal<AlertRule>(this.data.rule ? structuredClone(this.data.rule) : this.fresh(this.data.kinds[0]));
   readonly schedules = signal<Schedule[]>([]);
   readonly teams = signal<Team[]>([]);
+  /** Owner 2026-10-27: a failed read of either list says so (it read as "no schedule" / "no team"). */
+  readonly schedulesState = createLoadState(false);
+  readonly teamsState = createLoadState(false);
   readonly saving = signal(false);
   readonly error = signal('');
 
@@ -188,11 +197,32 @@ export class AlertRulePanel implements OnInit {
     // A workspace's schedules and teams; the platform's rules (and the platform administrator's own sign-in,
     // ZT-A12 follow-up) name neither, and Core answers the own sign-in 403 on the schedules.
     if (this.data.scope !== 'workspace' || isOwnPlatformSignIn(this.auth)) return;
+    this.loadSchedules();
+    this.loadTeams();
+  }
+
+  loadSchedules(): void {
+    this.schedulesState.start();
     this.http.get<ApiResponse<Schedule[]>>(`${API_BASE}/sourceJob.json/listSourceJob`).subscribe({
-      next: r => this.schedules.set((r?.data ?? []).map(j => ({ jobId: j.jobId, jobName: j.jobName }))),
-      error: () => this.schedules.set([]),
+      next: r => {
+        if (r?.status !== API_SUCCESS) { this.schedulesState.fail(r, 'The schedules could not be read.'); return; }
+        this.schedules.set((r.data ?? []).map(j => ({ jobId: j.jobId, jobName: j.jobName })));
+        this.schedulesState.done();
+      },
+      error: err => this.schedulesState.fail(err, 'The schedules could not be read.'),
     });
-    this.teamsApi.list().subscribe({ next: r => this.teams.set(r?.data ?? []), error: () => this.teams.set([]) });
+  }
+
+  loadTeams(): void {
+    this.teamsState.start();
+    this.teamsApi.list().subscribe({
+      next: r => {
+        if (r?.status !== API_SUCCESS) { this.teamsState.fail(r, 'The teams could not be read.'); return; }
+        this.teams.set(r.data ?? []);
+        this.teamsState.done();
+      },
+      error: err => this.teamsState.fail(err, 'The teams could not be read.'),
+    });
   }
 
   private fresh(kind: AlertKindInfo): AlertRule {

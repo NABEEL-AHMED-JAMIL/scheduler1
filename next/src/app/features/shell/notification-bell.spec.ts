@@ -3,7 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { ElementRef, provideZonelessChangeDetection } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router, provideRouter } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
 import { NotificationBell } from './notification-bell';
 import { UnreadCountService } from '../../core/notifications/unread-count.service';
 import { AuthService } from '../../core/auth/auth.service';
@@ -353,5 +353,37 @@ describe('Notification bell for a tenant user without the page a link names', ()
 
     expect(post).toHaveBeenCalled();
     expect(navigateByUrl).not.toHaveBeenCalled();
+  });
+});
+
+/** Owner 2026-10-27: opened before the list answers, the panel says it is loading, not "all caught up". */
+describe('Notification bell before the first answer', () => {
+  it('is loading, not caught up, until the list answers; a failure offers Try again', async () => {
+    let answer: () => unknown = () => NEVER;
+    const get = vi.fn((url: string) => (url.endsWith('/unreadCount') ? of({ status: 'SUCCESS', data: 0 }) : answer()));
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [provideZonelessChangeDetection(), provideRouter([]), { provide: HttpClient, useValue: { get, post: vi.fn() } }],
+    });
+    const fixture = TestBed.createComponent(NotificationBell);
+    fixture.autoDetectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    el.querySelector<HTMLElement>('button')!.click();
+    await fixture.whenStable();
+    expect(fixture.componentInstance.loaded()).toBe(false);
+    expect(el.textContent).not.toContain('all caught up');
+
+    answer = () => throwError(() => ({ status: 503 }));
+    fixture.componentInstance.reload();
+    await fixture.whenStable();
+    const retry = Array.from(el.querySelectorAll('button')).find(b => b.textContent?.includes('Try again'));
+    expect(retry).toBeTruthy();
+
+    answer = () => of({ status: 'SUCCESS', data: [] });
+    retry!.click();
+    await fixture.whenStable();
+    expect(fixture.componentInstance.loaded()).toBe(true);
+    expect(el.textContent).toContain('all caught up');
+    TestBed.resetTestingModule();
   });
 });

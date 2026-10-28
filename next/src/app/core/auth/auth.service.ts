@@ -81,6 +81,20 @@ function readStorage(key: string): string | null {
   }
 }
 
+/**
+ * Who is signed in on this browser, as the id kept with the session: what a per-viewer preference (a table's sort)
+ * is stored under, so two people sharing a machine do not inherit each other's choices. '' when nobody is signed in
+ * or the entry cannot be read. Read from storage rather than the service so a helper can use it outside injection.
+ */
+export function storedViewerId(): string {
+  try {
+    const id = (JSON.parse(readStorage(STORAGE_KEY) ?? 'null') as AuthUser | null)?.appUserId;
+    return id === undefined || id === null ? '' : String(id);
+  } catch {
+    return '';
+  }
+}
+
 /** Where Exit returns a staff member: Platform › Workspaces, where "Work in this workspace" opened it (owner #20). */
 export const WORK_IN_WORKSPACE_PATH = '/platform/workspaces';
 

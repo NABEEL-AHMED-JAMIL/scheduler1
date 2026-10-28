@@ -9,7 +9,11 @@ import { Segmented, SegmentOption } from '../../../shared/ui/segmented';
 import { Bar, BarChart } from '../../../shared/charts/bar-chart';
 import { daySeries } from '../../../shared/charts/day-series';
 import { statusColor } from '../../../shared/charts/status-color';
-import { BillingSlo, BurnRate, PipelineRunsSlo, ReliabilityApi, RunGroup, SloWindow } from './reliability.service';
+import { BillingSlo, BurnRate, MeterRow, PipelineRunsSlo, ReliabilityApi, RunGroup, SloWindow } from './reliability.service';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
+import { AppLoading, loadErrorText } from '../../../shared/ui/loading';
+import { BlurLoader } from '../../../shared/ui/blur-loader';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { PlatformHealthView } from './platform-health';
 
@@ -174,7 +178,7 @@ const isoDay = (d: Date) => d.toISOString().slice(0, 10);
  */
 @Component({
   selector: 'app-reliability',
-  imports: [PageHeader, Icon, StatTile, Segmented, BarChart, DecimalPipe, NgTemplateOutlet, RouterLink, ServerTimePipe, PlatformHealthView],
+  imports: [PageHeader, Icon, StatTile, Segmented, BarChart, DecimalPipe, NgTemplateOutlet, RouterLink, ServerTimePipe, PlatformHealthView, SortHeader, AppLoading, BlurLoader],
   templateUrl: './reliability.html',
   // Local to the page, on the console's tokens: the status cards' big word and figures, the callout, the section head
   // (text beside its two tiles, wrapping under them when narrow) and a table that scrolls inside its own box.
@@ -251,8 +255,35 @@ export class Reliability implements OnInit {
     .sort((a, b) => (b.unpriced + b.unrolled) - (a.unpriced + a.unrolled) || b.accepted - a.accepted));
   readonly firing = computed(() => this.burn().filter(b => b.firing));
 
+  /**
+   * Owner 2026-10-27: every column of "Why runs ended" sorts; until one is picked the rows keep their own order (bad
+   * first, then left out, then good, the most runs first in each), which is what someone opens the page to find.
+   */
+  readonly runGroupSort = createTableSort<RunGroup>({
+    id: 'reliability-run-groups',
+    columns: {
+      ended: { value: g => g.outcome, kind: 'status' },
+      why: g => this.reasonLabel(g.reason),
+      countsAs: { value: g => this.sloLabel(g.slo), kind: 'status', order: ['Bad', 'Left out', 'Good'] },
+      runs: { value: g => g.runs, kind: 'number' },
+    },
+  });
+  readonly sortedRunGroups = computed(() => this.runGroupSort.apply(this.runGroups()));
+  /** One order for both meter tables (the issues and "All N meters"); their own order is the worst first. */
+  readonly meterSort = createTableSort<MeterRow>({
+    id: 'reliability-meters',
+    columns: {
+      meter: m => m.meter,
+      accepted: { value: m => m.accepted, kind: 'number' },
+      unpriced: { value: m => m.unpriced, kind: 'number' },
+      unrolled: { value: m => m.unrolled, kind: 'number' },
+    },
+  });
+
   /** Meters with something not priced or not rolled up: shown first, the rest behind "All N meters". */
   readonly meterIssues = computed(() => this.meters().filter(m => m.unpriced + m.unrolled > 0));
+  readonly sortedMeters = computed(() => this.meterSort.apply(this.meters()));
+  readonly sortedMeterIssues = computed(() => this.meterSort.apply(this.meterIssues()));
 
   readonly days = computed(() => Number(this.range()));
   readonly runsFiring = computed(() => this.firing().filter(b => b.sli === 'pipeline_execution'));
@@ -305,8 +336,13 @@ export class Reliability implements OnInit {
     const { from, to } = this.window();
     this.runsLoading.set(true); this.runsError.set('');
     this.api.pipelineRuns(from, to).subscribe({
-      next: r => { this.runsLoading.set(false); if (r.status !== API_SUCCESS) { this.runsError.set(r.message); return; } this.runs.set(r.data ?? null); },
-      error: err => { this.runsLoading.set(false); this.runsError.set(err?.error?.message || 'Could not read the pipeline execution figures.'); },
+      // Owner 2026-10-27: an answer with no figures is not a blank card; it says they could not be read.
+      next: r => {
+        this.runsLoading.set(false);
+        if (r.status !== API_SUCCESS || !r.data) { this.runsError.set(loadErrorText(r, 'Could not read the pipeline execution figures.')); return; }
+        this.runs.set(r.data);
+      },
+      error: err => { this.runsLoading.set(false); this.runsError.set(loadErrorText(err, 'Could not read the pipeline execution figures.')); },
     });
   }
 
@@ -314,16 +350,24 @@ export class Reliability implements OnInit {
     const { from, to } = this.window();
     this.billingLoading.set(true); this.billingError.set('');
     this.api.billing(from, to).subscribe({
-      next: r => { this.billingLoading.set(false); if (r.status !== API_SUCCESS) { this.billingError.set(r.message); return; } this.billing.set(r.data ?? null); },
-      error: err => { this.billingLoading.set(false); this.billingError.set(err?.error?.message || 'Could not read the billing figures.'); },
+      next: r => {
+        this.billingLoading.set(false);
+        if (r.status !== API_SUCCESS || !r.data) { this.billingError.set(loadErrorText(r, 'Could not read the billing figures.')); return; }
+        this.billing.set(r.data);
+      },
+      error: err => { this.billingLoading.set(false); this.billingError.set(loadErrorText(err, 'Could not read the billing figures.')); },
     });
   }
 
   loadBurn(): void {
     this.burnLoading.set(true); this.burnError.set('');
     this.api.burnRates().subscribe({
-      next: r => { this.burnLoading.set(false); if (r.status !== API_SUCCESS) { this.burnError.set(r.message); return; } this.burn.set(r.data ?? []); },
-      error: err => { this.burnLoading.set(false); this.burnError.set(err?.error?.message || 'Could not read the burn rates.'); },
+      next: r => {
+        this.burnLoading.set(false);
+        if (r.status !== API_SUCCESS) { this.burnError.set(loadErrorText(r, 'Could not read the burn rates.')); return; }
+        this.burn.set(r.data ?? []);
+      },
+      error: err => { this.burnLoading.set(false); this.burnError.set(loadErrorText(err, 'Could not read the burn rates.')); },
     });
   }
 

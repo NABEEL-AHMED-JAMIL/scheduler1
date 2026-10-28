@@ -14,6 +14,10 @@ import { WorkspaceDirectory } from '../../../core/workspaces/workspace-directory
 import { confirmWith } from '../../../shared/ui/confirm';
 import { Dialog } from '@angular/cdk/dialog';
 import { StatTile } from '../../../shared/ui/stat-tile';
+import { AppLoading, InlineStatus, createLoadState } from '../../../shared/ui/loading';
+import { LoadError } from '../../../shared/ui/load-error';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
 
 const ENDPOINT = () => `${API_BASE}/setting.json/engineSettings`;
 
@@ -27,7 +31,7 @@ const ENDPOINT = () => `${API_BASE}/setting.json/engineSettings`;
  */
 @Component({
   selector: 'app-engine-settings',
-  imports: [RefreshButton, PageHeader, Icon, ServerTimePipe, DecimalPipe, Combobox, StatTile],
+  imports: [RefreshButton, PageHeader, Icon, ServerTimePipe, DecimalPipe, Combobox, StatTile, AppLoading, InlineStatus, LoadError, SortHeader],
   templateUrl: './engine-settings.html',
 })
 export class EngineSettings implements OnInit {
@@ -40,8 +44,28 @@ export class EngineSettings implements OnInit {
   readonly watermarks = signal<EngineSetting[]>([]);
   readonly cacheSeconds = signal(30);
   readonly history = signal<EngineSettingChange[]>([]);
-  readonly loading = signal(true);
-  readonly error = signal('');
+  /**
+   * Owner 2026-10-27: the settings read (Limits, Watermarks, the tiles) and the history read each have their own state, so
+   * the tiles do not show 0 before the answer and a failed history no longer reads as "No change yet".
+   */
+  readonly state = createLoadState();
+  readonly loading = this.state.loading;
+  readonly error = this.state.error;
+  readonly historyState = createLoadState();
+  /** The Changes list holds the newest 50 (the request's limit), so a sort covers those. */
+  readonly historySort = createTableSort<EngineSettingChange>({
+    id: 'engine-settings-history',
+    note: 'Sorts the newest 50 shown',
+    columns: {
+      when: { value: h => h.changedAt, kind: 'date' },
+      setting: h => h.label,
+      for: h => this.workspaceName(h.tenantId),
+      from: { value: h => h.oldValue, kind: 'number' },
+      to: { value: h => h.newValue, kind: 'number' },
+      by: h => h.changedByName,
+    },
+  });
+  readonly sortedHistory = computed(() => this.historySort.apply(this.history()));
 
   /** The setting open for editing, and what is typed: the platform's value, and a workspace's own. */
   readonly open = signal<string | null>(null);
@@ -67,28 +91,29 @@ export class EngineSettings implements OnInit {
   }
 
   load(): void {
-    this.loading.set(true);
-    this.error.set('');
+    this.state.start();
     this.http.get<ApiResponse<EngineSettingsAnswer>>(ENDPOINT()).subscribe({
       next: response => {
-        this.loading.set(false);
-        if (response.status !== API_SUCCESS || !response.data) { this.error.set(response.message || 'Could not load the engine settings.'); return; }
+        if (response.status !== API_SUCCESS || !response.data) { this.state.fail(response, 'The engine settings could not be read.'); return; }
         this.settings.set(response.data.settings ?? []);
         this.watermarks.set(response.data.watermarks ?? []);
         this.cacheSeconds.set(response.data.cacheSeconds ?? 30);
+        this.state.done();
       },
-      error: err => {
-        this.loading.set(false);
-        this.error.set(err?.error?.message || 'Could not load the engine settings.');
-      },
+      error: err => this.state.fail(err, 'The engine settings could not be read.'),
     });
     this.loadHistory();
   }
 
   loadHistory(): void {
+    this.historyState.start();
     this.http.get<ApiResponse<EngineSettingChange[]>>(`${ENDPOINT()}/history`, { params: { limit: 50 } }).subscribe({
-      next: r => this.history.set(r.status === API_SUCCESS ? r.data ?? [] : []),
-      error: () => this.history.set([]),
+      next: r => {
+        if (r.status !== API_SUCCESS) { this.historyState.fail(r, 'The changes could not be read.'); return; }
+        this.history.set(r.data ?? []);
+        this.historyState.done();
+      },
+      error: err => this.historyState.fail(err, 'The changes could not be read.'),
     });
   }
 

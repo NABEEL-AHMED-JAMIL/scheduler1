@@ -42,7 +42,14 @@
           <app-field label="Pipeline" for="task" [required]="true"
                      [control]="form.get('taskDetailId')" [submitted]="submitted()">
             <app-combobox id="task" formControlName="taskDetailId" [numeric]="true"
-                          placeholder="Search pipelines…" [allowClear]="false" [options]="taskOptions()" />
+                          [placeholder]="tasksState.pending() ? 'Loading pipelines…' : 'Search pipelines…'" [allowClear]="false"
+                          [options]="taskOptions()" [searching]="tasksState.loading()" />
+            <!-- Owner 2026-10-27: the list's state under the field: loading, why it failed (Try again), or none yet. -->
+            <app-inline-status [loading]="tasksState.loading()" [error]="tasksState.error()"
+                               [empty]="tasksState.loaded() && !tasks().length" label="Loading pipelines…"
+                               emptyText="No pipeline yet." (retry)="loadTasks()">
+              @if (!locked()) { <a class="link-inline" routerLink="/pipelines/new">Add one</a> }
+            </app-inline-status>
             <!-- UX review 2026-10-12 (S2, 3.1): back to the pipeline this schedule runs. -->
             @if (values()['taskDetailId']; as pid) {
               <a class="link-inline text-xs mt-1 inline-block" data-test="open-pipeline" [routerLink]="['/pipelines', pid, 'edit']">Open the pipeline</a>
@@ -69,9 +76,16 @@
         </div>
         <!-- UX review 2026-10-12 (S2): the one-of choice above; the starts that add to either below, under their own label. -->
         <h3 class="form-subsection-title" id="also-starts">Also starts when</h3>
+        <!-- Owner 2026-10-27: the saved triggers and AI models are read beside the job; the switches wait for them, and a
+             failed read says so (with Try again) rather than showing the trigger as off. -->
+        @if (extrasLoading() || extrasError()) {
+          <app-inline-status class="mb-2" [loading]="extrasLoading()" [error]="extrasError()"
+                             label="Reading this schedule's triggers…" (retry)="retryExtras()" />
+        }
         <div class="choice-cards" role="group" aria-labelledby="also-starts">
           <label class="choice-card" [attr.data-checked]="onArrival()">
             <input type="checkbox" class="checkbox shrink-0 mt-0.5" id="onArrival" role="switch"
+                   [disabled]="triggersLoading()"
                    [checked]="onArrival()" (change)="onArrival.set($any($event.target).checked)" />
             <span class="min-w-0">
               <span class="choice-title">A file arrives</span>
@@ -81,6 +95,7 @@
           <!-- MIG-364: a document of one type being approved, by a reviewer or automatically, as a second Event start. -->
           <label class="choice-card" [attr.data-checked]="onApproval()">
             <input type="checkbox" class="checkbox shrink-0 mt-0.5" id="onApproval" role="switch"
+                   [disabled]="triggersLoading()"
                    [checked]="onApproval()" (change)="setOnApproval($any($event.target).checked)" />
             <span class="min-w-0">
               <span class="choice-title">A document is approved</span>
@@ -116,12 +131,14 @@
               <select id="documentTypeId" class="input" [class.input-invalid]="submitted() && !!documentTypeError()"
                       (change)="pickDocumentType($any($event.target).value)">
                 <option value="" [selected]="documentTypeId() === null">
-                  {{ documentTypes() === null ? 'Loading document types…' : 'Choose a document type…' }}
+                  {{ documentTypesError() ? 'The document types could not be read' : documentTypes() === null ? 'Loading document types…' : 'Choose a document type…' }}
                 </option>
                 @for (type of documentTypeOptions(); track type.id) {
                   <option [value]="'' + type.id" [selected]="documentTypeId() === type.id">{{ type.label }}</option>
                 }
               </select>
+              <app-inline-status [loading]="documentTypes() === null && !documentTypesError()" [error]="documentTypesError()"
+                                 label="Loading document types…" (retry)="retryDocumentTypes()" />
             </app-field>
             <app-field label="Documents per run" for="documentBatch" [error]="documentBatchError()"
                        hint="1: each document its own run. More: documents that waited for a run go together, up to this many, and the pipeline reads them all.">
@@ -334,7 +351,10 @@
         @if (preview().error) {
           <p class="text-sm mt-2 text-[color:var(--text-muted)]" data-preview-note>{{ preview().error }}</p>
         } @else if (preview().loading && !preview().runs.length) {
-          <p class="text-sm mt-2 text-[color:var(--text-muted)]">Working them out…</p>
+          <app-loading class="mt-2" shape="inline" label="Working them out…" />
+        } @else if (!preview().runs.length) {
+          <!-- Owner 2026-10-27: an answer with no run says so rather than an empty list. -->
+          <p class="text-sm mt-2 text-[color:var(--text-muted)]" data-preview-note>No run is coming up on this timetable.</p>
         } @else {
           <ol class="next-runs mt-2" data-next-runs>
             @for (run of preview().runs; track run) {

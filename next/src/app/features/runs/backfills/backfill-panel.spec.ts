@@ -93,3 +93,21 @@ describe('Backfill…', () => {
     expect(el.querySelector<HTMLButtonElement>('[data-test="backfill-start"]')!.disabled).toBe(true);
   });
 });
+
+describe('Backfill… preview -- Try again (owner 2026-10-27)', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it('asks the same preview again from the problem line', () => {
+    const { fixture, http, el } = panel();
+    vi.advanceTimersByTime(300);
+    http.expectOne(r => r.url.endsWith('/backfills/preview')).flush('boom', { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+    expect(el.querySelector('[data-test="backfill-problem"]')!.textContent).toContain('could not be worked out');
+    ([...el.querySelectorAll('[data-test="backfill-problem"] button')].find(b => b.textContent!.trim() === 'Try again') as HTMLButtonElement).click();
+    vi.advanceTimersByTime(300);
+    http.expectOne(r => r.url.endsWith('/backfills/preview')).flush({ status: API_SUCCESS, data: PREVIEW });
+    fixture.detectChanges();
+    expect(el.querySelector('[data-test="backfill-problem"]')).toBeNull();
+  });
+});

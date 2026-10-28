@@ -19,6 +19,11 @@ import { WorkspacePicker } from './workspace-picker';
 import { WorkspaceSelect } from '../../shared/ui/workspace-select';
 import { PageHeader } from '../../shared/ui/page-header';
 import { RefreshButton } from '../../shared/ui/refresh-button';
+import { AppLoading, createLoadState } from '../../shared/ui/loading';
+import { LoadError } from '../../shared/ui/load-error';
+import { BlurLoader } from '../../shared/ui/blur-loader';
+
+const INVOICES_UNREAD = 'The invoices could not be read.';
 
 /**
  * Invoices as rail and pane: every month closed into a bill on the left, the one picked on the
@@ -28,7 +33,7 @@ import { RefreshButton } from '../../shared/ui/refresh-button';
  */
 @Component({
   selector: 'app-invoices',
-  imports: [WorkspaceSelect, RefreshButton, PageHeader, Icon, StatTile, InvoicePane, CdkMenu, CdkMenuItem, CdkMenuTrigger],
+  imports: [WorkspaceSelect, RefreshButton, PageHeader, Icon, StatTile, InvoicePane, CdkMenu, CdkMenuItem, CdkMenuTrigger, AppLoading, LoadError, BlurLoader],
   styles: [ONE_PANE_BELOW_1024],
   templateUrl: './invoices.html',
 })
@@ -43,9 +48,16 @@ export class Invoices implements OnInit {
   readonly workspaces = inject(WorkspacePicker);
 
   readonly isPlatformAdmin = this.auth.isPlatformAdmin;
-  readonly loading = signal(false);
-  readonly error = signal('');
+  /**
+   * Owner 2026-10-27: the list's read, loading from the start -- a platform administrator's workspace list is read first,
+   * and in that wait the tiles read 0 and the rail "No invoice yet" as if that were the answer.
+   */
+  readonly state = createLoadState();
+  readonly loading = this.state.loading;
+  readonly error = this.state.error;
   readonly rows = signal<InvoiceRow[]>([]);
+  /** The first read, or another workspace's list on its way (its rows are cleared): placeholders, not zeros. */
+  readonly firstLoad = computed(() => this.state.pending() || (this.loading() && !this.rows().length));
   readonly status = signal<string>('');
   readonly search = signal('');
   readonly selectedNumber = signal<string | null>(null);
@@ -104,13 +116,13 @@ export class Invoices implements OnInit {
   }
 
   load(): void {
-    this.loading.set(true); this.error.set('');
+    this.state.start();
     this.api.invoices(this.workspaces.tenantId()).subscribe({
       next: r => {
-        this.loading.set(false);
-        if (r.status !== API_SUCCESS) { this.error.set(r.message); return; }
+        if (r.status !== API_SUCCESS) { this.state.fail(r, INVOICES_UNREAD); return; }
         const rows = (r.data ?? []).map(Invoices.numeric);
         this.rows.set(rows);
+        this.state.done();
         // The address names one, and is left alone even when it is not in this list -- the
         // pane reads it by number and says why it cannot (a wrong number, another workspace's).
         // It used to be swapped for the first row here, so a deep link to a foreign or mistyped
@@ -125,7 +137,7 @@ export class Invoices implements OnInit {
           else this.preview.set(rows[0]?.number ?? null);
         }
       },
-      error: err => { this.loading.set(false); this.error.set(err?.error?.message || 'Could not read the invoices.'); },
+      error: err => this.state.fail(err, INVOICES_UNREAD),
     });
   }
 
@@ -139,7 +151,8 @@ export class Invoices implements OnInit {
     if (open) this.pane.set('detail');
     this.router.navigate(['/billing/invoices', r.number], { replaceUrl: replace });
   }
-  pickWorkspace(id: string): void { this.workspaces.tenantId.set(id); this.selectedNumber.set(null); this.preview.set(null); this.load(); }
+  /** Another workspace is another list: the last one's rows go, so its bills never pass as this one's (owner 2026-10-27). */
+  pickWorkspace(id: string): void { this.workspaces.tenantId.set(id); this.selectedNumber.set(null); this.preview.set(null); this.rows.set([]); this.load(); }
   setStatus(s: string): void { this.status.set(this.status() === s ? '' : s); }
   clearFilters(): void { this.search.set(''); this.status.set(''); }
   money(v: number, currency = 'USD'): string { return formatMoney(v, currency); }

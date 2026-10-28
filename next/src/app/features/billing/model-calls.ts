@@ -8,11 +8,15 @@ import { instantOf } from '../../core/instant';
 import { StatTile } from '../../shared/ui/stat-tile';
 import { TableShell } from '../../shared/ui/data-table';
 import { Segmented, SegmentOption } from '../../shared/ui/segmented';
+import { createTableSort } from '../../shared/ui/sort';
+import { SortHeader } from '../../shared/ui/sort-header';
+import { loadErrorText } from '../../shared/ui/loading';
 import { BillingApi, DayTotal, ModelCallModel, ModelCallRate, ModelCallSource, ModelCallSummary, RunRow, UsageQuery } from './billing.service';
 import { dayHeading, formatMoney, formatMoneyCell, formatMoneyExact, formatShare, formatUnitPrice, groupByDay, moneyDigits, pluralUnit, zonedDay, zonedStamp, zonedTime } from './billing-format';
 
 /** How many calls Every call reads at a time. */
 const CALLS_PAGE = 25;
+const CALLS_UNREAD = 'The model calls could not be read.';
 /** By source shows the dearest this many, then "Show all N sources". */
 export const SOURCES_SHOWN = 8;
 
@@ -80,7 +84,7 @@ export function rateSentences(rates: ModelCallRate[], models: (string | null)[],
  */
 @Component({
   selector: 'app-model-calls',
-  imports: [StatTile, TableShell, Segmented, RouterLink, DecimalPipe],
+  imports: [StatTile, TableShell, Segmented, RouterLink, DecimalPipe, SortHeader],
   styleUrl: './day-table.css',
   styles: `
     .share-bar { height: 0.375rem; flex: 1 1 auto; min-width: 3rem; border-radius: var(--radius-full); overflow: hidden; background: var(--border-subtle); }
@@ -94,12 +98,13 @@ export function rateSentences(rates: ModelCallRate[], models: (string | null)[],
         <app-segmented [(value)]="view" [options]="views" ariaLabel="How to show the model calls" data-test="model-call-view" />
       </div>
 
+      <!-- Owner 2026-10-27: placeholders until the month's summary answers, and "Not available" when it failed -- never 0 / $0.00. -->
       <div class="grid grid-cols-2 md:grid-cols-4 stat-strip stat-row is-md is-start" role="list" data-test="model-call-kpis">
-        <app-stat-tile label="Calls" [value]="totals().calls" icon="sparkle" tone="info"
+        <app-stat-tile label="Calls" [value]="totals().calls" icon="sparkle" tone="info" [loading]="tilesLoading()" [failed]="tilesFailed()"
                        [foot]="totals().runs ? 'in ' + (totals().runs | number: '1.0-0') + ' pipeline run' + (totals().runs === 1 ? '' : 's') : 'none in a pipeline run'" />
-        <app-stat-tile label="Tokens in" [value]="totals().tokens_in" icon="arrowDown" tone="muted" foot="sent to the models" />
-        <app-stat-tile label="Tokens out" [value]="totals().tokens_out" icon="arrowUp" tone="muted" foot="the models' answers" />
-        <app-stat-tile label="Cost at model rates" [value]="money(totals().amount)" icon="chart" tone="info" foot="before allowances and tiers" />
+        <app-stat-tile label="Tokens in" [value]="totals().tokens_in" icon="arrowDown" tone="muted" foot="sent to the models" [loading]="tilesLoading()" [failed]="tilesFailed()" />
+        <app-stat-tile label="Tokens out" [value]="totals().tokens_out" icon="arrowUp" tone="muted" foot="the models' answers" [loading]="tilesLoading()" [failed]="tilesFailed()" />
+        <app-stat-tile label="Cost at model rates" [value]="money(totals().amount)" icon="chart" tone="info" foot="before allowances and tiers" [loading]="tilesLoading()" [failed]="tilesFailed()" />
       </div>
       <p class="text-xs text-[color:var(--text-secondary)]" data-test="model-call-note">
         Each call at its own model's rate, before the month's allowances and tiers, which the lines above apply.
@@ -108,13 +113,13 @@ export function rateSentences(rates: ModelCallRate[], models: (string | null)[],
 
       @if (view() === 'source') {
         <div class="grid gap-4 items-start 2xl:grid-cols-[minmax(0,1fr)_minmax(24rem,30rem)]">
-          <app-table-shell heading="By source" [shown]="shownSources().length" [total]="sources().length" [loading]="summaryLoading() && !summary()" [error]="summaryError()" (retry)="loadSummary()"
+          <app-table-shell heading="By source" [shown]="shownSources().length" [total]="sources().length" [loading]="summaryLoading()" [error]="summaryError()" (retry)="loadSummary()"
                            [isEmpty]="!sources().length" emptyMessage="No model calls in this month yet." emptyIcon="sparkle" [scrollRows]="false">
-            <ng-container toolbar><span class="text-xs text-[color:var(--text-muted)]">What called a model, the dearest first.</span></ng-container>
+            <ng-container toolbar><span class="text-xs text-[color:var(--text-muted)]">{{ sourceSort.key() ? 'What called a model.' : 'What called a model, the dearest first.' }}</span></ng-container>
             <table class="table-modern" data-test="model-sources">
               <thead>
-                <tr><th>Source</th><th>Model</th><th class="text-right">Calls</th><th class="text-right hidden xl:table-cell">Pipeline runs</th><th class="text-right">Tokens in</th>
-                  <th class="text-right">Tokens out</th><th class="text-right">Cost</th><th class="w-40">Share</th><th class="whitespace-nowrap hidden xl:table-cell">Last call</th></tr>
+                <tr><th appSort="source" [sortBy]="sourceSort">Source</th><th appSort="model" [sortBy]="sourceSort">Model</th><th class="text-right" appSort="calls" [sortBy]="sourceSort">Calls</th><th class="text-right hidden xl:table-cell" appSort="runs" [sortBy]="sourceSort">Pipeline runs</th><th class="text-right" appSort="tokensIn" [sortBy]="sourceSort">Tokens in</th>
+                  <th class="text-right" appSort="tokensOut" [sortBy]="sourceSort">Tokens out</th><th class="text-right" appSort="cost" [sortBy]="sourceSort">Cost</th><th class="w-40" appSort="share" [sortBy]="sourceSort">Share</th><th class="whitespace-nowrap hidden xl:table-cell" appSort="last" [sortBy]="sourceSort">Last call</th></tr>
               </thead>
               <tbody>
                 @for (s of shownSources(); track s.subject_type + ':' + (s.subject_id ?? '')) {
@@ -145,17 +150,18 @@ export function rateSentences(rates: ModelCallRate[], models: (string | null)[],
             @if (sources().length > SOURCES_SHOWN) {
               <div class="flex justify-center px-4 py-2 border-t border-subtle">
                 <button type="button" class="btn btn-default btn-sm" data-test="all-sources" (click)="allSources.set(!allSources())">
-                  {{ allSources() ? 'Show the dearest ' + SOURCES_SHOWN : 'Show all ' + sources().length + ' sources' }}</button>
+                  {{ allSources() ? (sourceSort.key() ? 'Show the first ' : 'Show the dearest ') + SOURCES_SHOWN : 'Show all ' + sources().length + ' sources' }}</button>
               </div>
             }
           </app-table-shell>
 
-          <app-table-shell heading="By model" [loading]="summaryLoading() && !summary()" [isEmpty]="!models().length"
+          <!-- Owner 2026-10-27: a failed read says so here too; it read "No model calls" before. -->
+          <app-table-shell heading="By model" [loading]="summaryLoading()" [isEmpty]="!models().length" [error]="summaryError()" (retry)="loadSummary()"
                            emptyMessage="No model calls in this month yet." emptyIcon="sparkle" [scrollRows]="false">
             <table class="table-modern" data-test="model-models">
-              <thead><tr><th>Model</th><th class="text-right">Calls</th><th class="text-right">Tokens</th><th class="text-right">Cost</th><th class="w-14 text-right">Share</th></tr></thead>
+              <thead><tr><th appSort="model" [sortBy]="modelSort">Model</th><th class="text-right" appSort="calls" [sortBy]="modelSort">Calls</th><th class="text-right" appSort="tokens" [sortBy]="modelSort">Tokens</th><th class="text-right" appSort="cost" [sortBy]="modelSort">Cost</th><th class="w-14 text-right" appSort="share" [sortBy]="modelSort">Share</th></tr></thead>
               <tbody>
-                @for (m of models(); track m.model ?? '') {
+                @for (m of sortedModels(); track m.model ?? '') {
                   <tr data-test="model-row">
                     <td class="mono text-xs">{{ m.model || 'Model not named' }}</td>
                     <td class="text-right tabular">{{ m.calls | number: '1.0-0' }}</td>
@@ -178,27 +184,31 @@ export function rateSentences(rates: ModelCallRate[], models: (string | null)[],
           <table class="table-modern day-table" data-test="model-calls">
             <thead>
               <tr>
-                <th class="w-20">Time</th>
+                <th class="w-20" appSort="time" [sortBy]="callSort">Time</th>
                 <th>What called it</th>
                 <th>Pipeline run</th>
-                <th>Model</th>
-                <th class="text-right">Tokens in</th>
-                <th class="text-right">Tokens out</th>
+                <th appSort="model" [sortBy]="callSort">Model</th>
+                <th class="text-right" appSort="tokensIn" [sortBy]="callSort">Tokens in</th>
+                <th class="text-right" appSort="tokensOut" [sortBy]="callSort">Tokens out</th>
                 @if (runActors().length > 1) { <th class="hidden lg:table-cell">By</th> }
-                <th class="text-right">Cost</th>
+                <th class="text-right" appSort="cost" [sortBy]="callSort">Cost</th>
               </tr>
             </thead>
+            <!-- Owner 2026-10-27: in time order the calls sit under their billing day; sorted by anything else the day headers
+                 would cut the order up, so the calls are one list (the day is in each row's time then). -->
             @for (g of runGroups(); track g.day) {
               <tbody>
-                <tr class="day-group" data-test="day-group">
-                  <th [attr.colspan]="runActors().length > 1 ? 8 : 7" scope="colgroup">
-                    <div class="day-group-line"><span>{{ g.day ? dayTitle(g.day) : 'Time not known' }}</span>
-                      <span class="day-group-sum" [title]="exact(g.amount)">{{ g.count | number: '1.0-0' }} {{ g.count === 1 ? 'call' : 'calls' }} · {{ money(g.amount) }}</span></div>
-                  </th>
-                </tr>
+                @if (g.day !== undefined) {
+                  <tr class="day-group" data-test="day-group">
+                    <th [attr.colspan]="runActors().length > 1 ? 8 : 7" scope="colgroup">
+                      <div class="day-group-line"><span>{{ g.day ? dayTitle(g.day) : 'Time not known' }}</span>
+                        <span class="day-group-sum" [title]="exact(g.amount)">{{ g.count | number: '1.0-0' }} {{ g.count === 1 ? 'call' : 'calls' }} · {{ money(g.amount) }}</span></div>
+                    </th>
+                  </tr>
+                }
                 @for (r of g.rows; track r.run; let i = $index) {
-                  <tr [title]="runRates(r)" [class.is-repeat]="isRepeat(g.rows, i)">
-                    <td class="text-xs tabular whitespace-nowrap" data-test="run-time">{{ runTime(r) }}</td>
+                  <tr [title]="runRates(r)" [class.is-repeat]="isRepeat(g.rows, i)" data-test="model-call">
+                    <td class="text-xs tabular whitespace-nowrap" data-test="run-time">{{ g.day === undefined ? runStamp(r) : runTime(r) }}</td>
                     <td class="min-w-40">
                       @if (promptOf(r); as id) { <a class="link-inline font-medium" [routerLink]="['/pipelines/prompts', id, 'edit']">{{ promptLabel(id, runLabel(r)) }}</a> }
                       @else { <span class="font-medium">{{ runLabel(r) }}</span> }
@@ -252,8 +262,12 @@ export class ModelCalls {
 
   // ---- by source (billing.json/runs/summary) ----
   readonly summary = signal<ModelCallSummary | null>(null);
-  readonly summaryLoading = signal(false);
+  /** Owner 2026-10-27: loading from the start (the read runs from an effect), so nothing reads "no model calls" before it. */
+  readonly summaryLoading = signal(true);
   readonly summaryError = signal('');
+  /** The tiles wait for the month's summary (a new month clears the old one), and say when it could not be read. */
+  readonly tilesLoading = computed(() => this.summaryLoading() && !this.summary());
+  readonly tilesFailed = computed(() => !!this.summaryError() && !this.summary());
   readonly totals = computed(() => {
     const t = this.summary()?.totals;
     return { calls: Number(t?.calls ?? 0), runs: Number(t?.runs ?? 0), tokens_in: Number(t?.tokens_in ?? 0), tokens_out: Number(t?.tokens_out ?? 0), amount: Number(t?.amount ?? 0) };
@@ -263,10 +277,41 @@ export class ModelCalls {
   })));
   readonly SOURCES_SHOWN = SOURCES_SHOWN;
   readonly allSources = signal(false);
-  readonly shownSources = computed(() => this.allSources() ? this.sources() : this.sources().slice(0, SOURCES_SHOWN));
+  /**
+   * Owner 2026-10-27: By source sorts on every column, before the cut to the first eight. Billing sends the dearest first,
+   * which stays the order until a heading is picked (initial null). Share is the cost's share, so it sorts by cost.
+   */
+  readonly sourceSort = createTableSort<ModelCallSource>({
+    id: 'billing-model-sources',
+    columns: {
+      source: s => { const id = promptIdOf(s); return id !== null ? this.promptLabel(id, s.label) : s.label; },
+      model: s => s.model,
+      calls: { value: s => s.calls, kind: 'number' },
+      runs: { value: s => s.runs, kind: 'number' },
+      tokensIn: { value: s => s.tokens_in, kind: 'number' },
+      tokensOut: { value: s => s.tokens_out, kind: 'number' },
+      cost: { value: s => s.amount, kind: 'number' },
+      share: { value: s => s.amount, kind: 'number' },
+      last: { value: s => s.last, kind: 'date' },
+    },
+  });
+  readonly sortedSources = computed(() => this.sourceSort.apply(this.sources()));
+  readonly shownSources = computed(() => this.allSources() ? this.sortedSources() : this.sortedSources().slice(0, SOURCES_SHOWN));
   readonly models = computed<ModelCallModel[]>(() => (this.summary()?.byModel ?? []).map(m => ({
     ...m, calls: Number(m.calls), runs: Number(m.runs), tokens_in: Number(m.tokens_in), tokens_out: Number(m.tokens_out), amount: Number(m.amount),
   })));
+  /** Owner 2026-10-27: By model sorts too; the order Billing sends stays until a heading is picked. */
+  readonly modelSort = createTableSort<ModelCallModel>({
+    id: 'billing-model-models',
+    columns: {
+      model: m => m.model || 'Model not named',
+      calls: { value: m => m.calls, kind: 'number' },
+      tokens: { value: m => m.tokens_in + m.tokens_out, kind: 'number' },
+      cost: { value: m => m.amount, kind: 'number' },
+      share: { value: m => m.amount, kind: 'number' },
+    },
+  });
+  readonly sortedModels = computed(() => this.modelSort.apply(this.models()));
   /** The month's rates, said once (from the summary, so the whole month's, not the page read). */
   readonly rateNote = computed(() => rateSentences(this.summary()?.rates ?? [], this.models().map(m => m.model), this.cur()));
 
@@ -281,10 +326,35 @@ export class ModelCalls {
   private runsRead = false;
   readonly moreRuns = computed(() => this.runs().length < this.runsTotal());
   /**
-   * Owner review 2026-10-12 ("date repeat in the cost"): the calls cut into billing days -- a header per day saying its calls
-   * and its cost, and only the time on each row, in the workspace's billing zone.
+   * Owner 2026-10-27 ("add a sort on each table"): Every call sorts on the server (billing.json/runs sort/dir), since it is
+   * paged -- sorting the pages read would be a lie about the month. A new order drops the pages read and reads again from
+   * the first; "Show more calls" then pages on through that order. No order picked: newest first, as before, and no sort
+   * is sent.
    */
-  readonly runGroups = computed(() => {
+  readonly callSort = createTableSort<RunRow>({
+    id: 'billing-model-calls',
+    server: true,
+    columns: {
+      time: { value: r => r.last, kind: 'date', param: 'time' },
+      model: { value: r => r.model, param: 'model' },
+      tokensIn: { value: r => r.tokens_in, kind: 'number', param: 'tokensIn' },
+      tokensOut: { value: r => r.tokens_out, kind: 'number', param: 'tokensOut' },
+      cost: { value: r => r.amount, kind: 'number', param: 'cost' },
+    },
+    onChange: () => { this.resetRuns(); if (this.view() === 'every') this.loadRuns(); },
+  });
+  /** Whether the calls sit under day headers: in time order only (the list's own, newest first, is time order too). */
+  readonly byDay = computed(() => !this.callSort.key() || this.callSort.key() === 'time');
+  /**
+   * Owner review 2026-10-12 ("date repeat in the cost"): the calls cut into billing days -- a header per day saying its calls
+   * and its cost, and only the time on each row, in the workspace's billing zone. Sorted by anything but time, one group with
+   * no day (undefined): the template then draws no header and gives each row its date too.
+   */
+  readonly runGroups = computed<{ day: string | null | undefined; rows: RunRow[]; count: number; amount: number }[]>(() => {
+    if (!this.byDay()) {
+      const rows = this.runs();
+      return rows.length ? [{ day: undefined, rows, count: rows.length, amount: rows.reduce((n, r) => n + r.amount, 0) }] : [];
+    }
     const zone = this.timeZone();
     const totals = new Map(this.runDays().map(d => [d.day, d]));
     return groupByDay(this.runs(), r => { const at = instantOf(r.last); return at ? zonedDay(at, zone) : null; }).map(g => {
@@ -296,8 +366,9 @@ export class ModelCalls {
   readonly runActors = computed(() => [...new Set(this.runs().map(r => this.runActor(r)))]);
   readonly everyNote = computed(() => {
     const [only, ...others] = this.runActors();
-    if (!only || others.length) return 'Newest first.';
-    return only === 'Pipeline' ? 'Newest first, every call on this page by a pipeline.' : `Newest first, every call by ${only}.`;
+    const order = this.callSort.key() ? 'Sorted on the server, across the whole month' : 'Newest first';
+    if (!only || others.length) return order + '.';
+    return only === 'Pipeline' ? `${order}, every call on this page by a pipeline.` : `${order}, every call by ${only}.`;
   });
 
   private summaryReading?: Subscription;
@@ -307,7 +378,8 @@ export class ModelCalls {
     inject(DestroyRef).onDestroy(() => { this.summaryReading?.unsubscribe(); this.runsReading?.unsubscribe(); });
     effect(() => {
       this.query();
-      untracked(() => { this.allSources.set(false); this.loadSummary(); this.resetRuns(); if (this.view() === 'every') this.loadRuns(); });
+      // A new month is another scope: its figures are not the last month's, so the old summary goes (owner 2026-10-27).
+      untracked(() => { this.allSources.set(false); this.summary.set(null); this.loadSummary(); this.resetRuns(); if (this.view() === 'every') this.loadRuns(); });
     });
     // Every call is read the first time it is shown for the month.
     effect(() => { if (this.view() === 'every') untracked(() => { if (!this.runsRead) this.loadRuns(); }); });
@@ -345,11 +417,11 @@ export class ModelCalls {
     this.summaryReading = this.api.runSummary(this.query()).subscribe({
       next: r => {
         this.summaryLoading.set(false);
-        if (r.status !== API_SUCCESS) { this.summary.set(null); this.summaryError.set(r.message || 'The model calls could not be read.'); return; }
+        if (r.status !== API_SUCCESS) { this.summary.set(null); this.summaryError.set(loadErrorText(r, CALLS_UNREAD)); return; }
         this.summary.set(r.data ?? null);
         this.readPromptNames();
       },
-      error: err => { this.summaryLoading.set(false); this.summaryError.set(err?.error?.message || 'The model calls could not be read.'); },
+      error: err => { this.summaryLoading.set(false); this.summaryError.set(loadErrorText(err, CALLS_UNREAD)); },
     });
   }
 
@@ -364,7 +436,8 @@ export class ModelCalls {
     if (this.promptNamesRead || !this.sources().some(s => promptIdOf(s) !== null)) return;
     if (this.auth.isPlatformAdmin() && !this.auth.isManagedSession()) return;
     this.promptNamesRead = true;
-    this.api.promptNames().subscribe(names => this.promptNames.set(names));
+    // Cosmetic when it fails: the meter's own "Prompt 1075" stays as the name (owner 2026-10-27: an avatar-like read may stay quiet).
+    this.api.promptNames().subscribe({ next: names => this.promptNames.set(names), error: () => { this.promptNamesRead = false; } });
   }
 
   private resetRuns(): void {
@@ -377,10 +450,11 @@ export class ModelCalls {
     this.runsRead = true;
     this.runsLoading.set(true); this.runsError.set('');
     const page = this.runsPage + 1;
-    this.runsReading = this.api.runs(this.query(), page, CALLS_PAGE).subscribe({
+    this.runsReading?.unsubscribe();
+    this.runsReading = this.api.runs(this.query(), page, CALLS_PAGE, this.callSort.param()).subscribe({
       next: r => {
         this.runsLoading.set(false);
-        if (r.status !== API_SUCCESS) { this.runsError.set(r.message || 'The model calls could not be read.'); return; }
+        if (r.status !== API_SUCCESS) { this.runsError.set(loadErrorText(r, CALLS_UNREAD)); return; }
         this.runsPage = page;
         this.runsTotal.set(Number(r.data?.total ?? 0));
         if (r.data?.days) this.runDays.set(r.data.days.map(d => ({ day: d.day, runs: Number(d.runs), amount: Number(d.amount ?? 0) })));
@@ -389,7 +463,7 @@ export class ModelCalls {
           lines: (x.lines ?? []).map(l => ({ ...l, quantity: Number(l.quantity), per: Number(l.per), unit_price: Number(l.unit_price), amount: Number(l.amount) })),
         }))]);
       },
-      error: err => { this.runsLoading.set(false); this.runsError.set(err?.error?.message || 'The model calls could not be read.'); },
+      error: err => { this.runsLoading.set(false); this.runsError.set(loadErrorText(err, CALLS_UNREAD)); },
     });
   }
 
@@ -406,5 +480,7 @@ export class ModelCalls {
   }
   /** A call's time of day in the workspace's billing zone, 24-hour. */
   runTime(r: RunRow): string { const at = instantOf(r.last); return at ? zonedTime(at, this.timeZone()) : ''; }
+  /** A call's day and time, for the one list a sort by anything but time shows (no day headers there). */
+  runStamp(r: RunRow): string { const at = instantOf(r.last); return at ? zonedStamp(at, this.timeZone()) : ''; }
   runActor(r: RunRow): string { return r.actor_name || (r.actor_user_id ? `User #${r.actor_user_id}` : 'Pipeline'); }
 }

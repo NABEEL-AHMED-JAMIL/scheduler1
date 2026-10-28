@@ -68,23 +68,25 @@
       </div>
     }
 
+    <!-- Owner 2026-10-27: placeholders, not $0.00, until the month on screen has answered. -->
     <div class="grid grid-cols-2 md:grid-cols-4 stat-strip stat-row is-md is-start" role="list">
-      <app-stat-tile label="Month to date" [value]="fmtMoney(total())" icon="chart" tone="info"
+      <app-stat-tile label="Month to date" [value]="fmtMoney(total())" icon="chart" tone="info" [loading]="figuresLoading()" [failed]="!!error() && !state.loaded()"
                      [foot]="(isCurrentMonth() ? (forecast() !== null ? 'forecast ' + fmtMoney(forecast()!) : 'no forecast yet') : 'closed month') + (previousTotal() !== null ? ' · ' + previousLabel() + ' ' + fmtMoney(previousTotal()!) : '')" />
-      <app-stat-tile label="Data deleted" [value]="fmtBytes(deletedBytes())" icon="trash" [tone]="deletedBytes() > 0 ? 'warn' : 'muted'"
+      <app-stat-tile label="Data deleted" [value]="fmtBytes(deletedBytes())" icon="trash" [tone]="deletedBytes() > 0 ? 'warn' : 'muted'" [loading]="figuresLoading()" [failed]="!!error() && !state.loaded()"
                      [foot]="(deleteOps() | number: '1.0-0') + ' delete op' + (deleteOps() === 1 ? '' : 's') + ' · ' + fmtMoney(churnAmount()) + ' churn'" />
-      <app-stat-tile label="Storage kept" [value]="fmtGb(storedGbAverage())" icon="cloud" tone="muted"
+      <app-stat-tile label="Storage kept" [value]="fmtGb(storedGbAverage())" icon="cloud" tone="muted" [loading]="figuresLoading()" [failed]="!!error() && !state.loaded()"
                      [foot]="storedNights() ? 'avg of ' + storedNights() + ' night' + (storedNights() === 1 ? '' : 's') + ' measured' : 'not measured yet'" />
-      <app-stat-tile label="Seats" [value]="seats()" icon="users" tone="muted" [foot]="fmtMoney(seatsAmount()) + ' this month'" />
+      <app-stat-tile label="Seats" [value]="seats()" icon="users" tone="muted" [foot]="fmtMoney(seatsAmount()) + ' this month'"
+                     [loading]="figuresLoading()" [failed]="!!error() && !state.loaded()" />
     </div>
 
     <!-- Owner review 2026-10-12: the chart and By service are one height; the chart fills its card. -->
     <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,28rem)] items-stretch mt-4">
       <!-- ZT-C4: the card keeps the drawn chart's height while the meter is read (it grew 175 px and moved every line below). -->
       <div class="card p-4 flex flex-col min-w-0 min-h-[25.5rem]" data-test="cost-by-day-card">
-        @if (loading() && !days().length) {
+        @if (figuresLoading()) {
           <h2 class="font-semibold text-sm">Cost by day</h2>
-          <div class="flex-1 py-10 text-center text-sm text-[color:var(--text-muted)]"><div class="spinner mx-auto mb-2"></div>Reading the meter…</div>
+          <app-loading class="flex-1" shape="spinner" label="Reading the meter…" />
         } @else {
           <app-cost-by-day class="flex-1" [month]="month()" [today]="isCurrentMonth() ? today() : null" [days]="days()"
                            [previousDays]="previousDays()" [previousLabel]="previousLabel()" [pace]="pace()" [monthToDate]="total()"
@@ -94,7 +96,9 @@
       </div>
       <div class="card p-4 flex flex-col" data-test="by-service">
         <h2 class="font-semibold text-sm mb-2">By service</h2>
-        @if (!byService().length) {
+        @if (figuresLoading()) {
+          <app-loading shape="list" label="Loading the services…" [count]="5" />
+        } @else if (!byService().length) {
           <p class="text-sm text-[color:var(--text-muted)]">Nothing metered yet.</p>
         } @else {
           <table class="table-modern">
@@ -143,16 +147,16 @@
         <table class="table-modern">
           <thead>
             <tr>
-              <th>Meter</th>
-              <th class="hidden md:table-cell">Service</th>
-              <th class="text-right">Quantity</th>
-              <th class="text-right hidden md:table-cell">Rate</th>
-              <th class="text-right">Amount</th>
+              <th appSort="meter" [sortBy]="sort">Meter</th>
+              <th class="hidden md:table-cell" appSort="service" [sortBy]="sort">Service</th>
+              <th class="text-right" appSort="quantity" [sortBy]="sort">Quantity</th>
+              <th class="text-right hidden md:table-cell" appSort="rate" [sortBy]="sort">Rate</th>
+              <th class="text-right" appSort="amount" [sortBy]="sort">Amount</th>
               <th class="w-8"></th>
             </tr>
           </thead>
           <tbody>
-            @for (line of shownLines(); track line.meter) {
+            @for (line of sortedLines(); track line.meter) {
               <tr class="cursor-pointer hover-brand" [class.is-open]="openLine()?.meter === line.meter" (click)="toggleLine(line)">
                 <td>
                   <div class="font-medium">{{ line.label }}
@@ -199,16 +203,16 @@
                 <tr class="bg-sunken">
                   <td colspan="6" class="!py-3">
                     @if (subjectsLoading()) {
-                      <span class="text-xs text-[color:var(--text-muted)]"><span class="spinner inline-block align-middle mr-2"></span>Reading the events…</span>
+                      <app-loading shape="inline" label="Reading the events…" />
                     } @else if (subjectsError()) {
-                      <span class="text-xs text-crit-500" role="alert">{{ subjectsError() }}</span>
+                      <app-inline-status [error]="subjectsError()" (retry)="readSubjects(line)" />
                     } @else if (!subjects().length) {
                       <span class="text-xs text-[color:var(--text-muted)]">No subject recorded on these events.</span>
                     } @else {
                       <table class="table-modern">
-                        <thead><tr><th>{{ line.meter.startsWith('storage.bytes.deleted') ? 'Object deleted' : 'Subject' }}</th><th class="text-right">Quantity</th><th class="text-right">Events</th><th>Last</th><th>By</th></tr></thead>
+                        <thead><tr><th appSort="subject" [sortBy]="subjectSort">{{ line.meter.startsWith('storage.bytes.deleted') ? 'Object deleted' : 'Subject' }}</th><th class="text-right" appSort="quantity" [sortBy]="subjectSort">Quantity</th><th class="text-right" appSort="events" [sortBy]="subjectSort">Events</th><th appSort="last" [sortBy]="subjectSort">Last</th><th appSort="by" [sortBy]="subjectSort">By</th></tr></thead>
                         <tbody>
-                          @for (s of subjects(); track s.subject_type + s.subject_id) {
+                          @for (s of sortedSubjects(); track s.subject_type + s.subject_id) {
                             <tr>
                               <td class="mono text-xs max-w-96"><span class="block truncate" [title]="s.subject_id">{{ subjectLabel(s) }}</span></td>
                               <td class="text-right tabular">{{ line.unit === 'GB-hour' ? fmtGb(s.quantity / 24) + ' · day' : fmtUnits(line, s.quantity) }}</td>

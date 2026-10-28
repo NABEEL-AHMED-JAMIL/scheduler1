@@ -40,40 +40,47 @@
         <app-icon name="alert" class="shrink-0" />{{ schedulesError() }}
         <button type="button" class="btn btn-default btn-xs" (click)="loadSchedules()"><app-icon name="refresh" />Try again</button>
       </p>
+    } @else if (schedulesState.loading()) {
+      <app-loading shape="inline" label="Loading schedules…" />
     }
     <div class="form-grid">
       <div class="field">
         <label class="label" for="render-schedule">Schedule</label>
         <app-combobox id="render-schedule" [selected]="jobId() ?? ''" (selectedChange)="pickSchedule($event)"
-                      placeholder="Choose a schedule" clearLabel="None" [options]="scheduleOptions()" />
+                      [placeholder]="schedulesState.loading() ? 'Loading schedules…' : 'Choose a schedule'" clearLabel="None" [options]="scheduleOptions()" />
+        <app-inline-status [empty]="schedulesState.loaded() && !schedules().length" emptyText="No schedule yet." [retryable]="false" />
       </div>
       <div class="field">
         <label class="label" for="render-run">Run</label>
         <select id="render-run" class="input" [disabled]="!runList().length"
                 (change)="pickRun($any($event.target).value)">
-          <option value="" [selected]="jobQueueId() == null">{{ jobId() == null ? 'Choose a schedule first' : runList().length ? 'Choose a run' : 'No runs yet' }}</option>
+          <option value="" [selected]="jobQueueId() == null">{{ jobId() == null ? 'Choose a schedule first' : runsState.loading() ? 'Loading runs…' : runsState.error() ? 'The runs could not be read' : runList().length ? 'Choose a run' : 'No runs yet' }}</option>
           @for (run of runList(); track run.jobQueueId) {
             <option [value]="run.jobQueueId" [selected]="run.jobQueueId === jobQueueId()">
               #{{ run.jobQueueId }} · {{ run.jobStatus || '—' }}{{ run.startTime ? ' · ' + (run.startTime | serverTime: 'recent') : '' }}
             </option>
           }
         </select>
+        <app-inline-status [loading]="runsState.loading()" [error]="runsState.error()" label="Loading runs…" (retry)="loadRuns()" />
       </div>
       <div class="field">
         <label class="label" for="render-dataset">Dataset</label>
         <select id="render-dataset" class="input" [disabled]="!datasets().length"
                 (change)="pickDataset($any($event.target).value)">
-          <option value="" [selected]="datasetId() == null">{{ outputs() && !datasets().length ? 'This run kept no dataset' : 'Choose a dataset' }}</option>
+          <option value="" [selected]="datasetId() == null">{{ outputsState.loading() ? 'Loading datasets…' : outputs() && !datasets().length ? 'This run kept no dataset' : 'Choose a dataset' }}</option>
           @for (d of datasets(); track d.runOutputId) {
             <option [value]="d.runDatasetId" [selected]="d.runDatasetId === datasetId()">
               {{ d.name }}{{ d.stepKey ? ' · step ' + d.stepKey : '' }}{{ d.rowCount != null ? ' · ' + d.rowCount + ' rows' : '' }}
             </option>
           }
         </select>
+        <app-inline-status [loading]="outputsState.loading()" [error]="outputsState.error()" label="Loading datasets…" (retry)="loadOutputs()" />
       </div>
     </div>
     @if (readingRun()) {
-      <p class="text-sm text-[color:var(--text-muted)] flex items-center gap-2"><app-icon name="refresh" class="spin" />Reading the dataset…</p>
+      <app-loading shape="inline" label="Reading the dataset…" />
+    } @else if (rowsError()) {
+      <app-inline-status [error]="rowsError()" (retry)="retryRows()" />
     } @else if (runRowCount() != null) {
       <p class="text-sm text-[color:var(--text-secondary)]">{{ runRowCount() }} row{{ runRowCount() === 1 ? '' : 's' }} from run #{{ jobQueueId() }}, ready to render.</p>
     } @else if (outputs() && !datasets().length) {
@@ -94,16 +101,22 @@
           <option value="pdf" selected>PDF</option>
         }
       </select>
-      @if (formatsError()) { <p class="field-note text-warn-500">{{ formatsError() }}</p> }
+      @if (formatsError()) { <app-inline-status [error]="formatsError() + ' PDF is offered meanwhile.'" (retry)="loadFormats()" /> }
     </div>
     @if (usesTemplate()) {
       <div class="field">
         <label class="label" for="render-template">Template</label>
         <app-combobox id="render-template" [selected]="options().templateId ?? ''" (selectedChange)="setTemplate($event)"
                       placeholder="Default layout" clearLabel="Default layout" [options]="templateOptions()" />
-        <p class="field-note text-[color:var(--text-muted)]">
-          {{ templates().length ? 'A saved template, or the default: a title, a line of facts and the table.' : 'The default layout: a title, a line of facts and the table.' }}
-        </p>
+        @if (templatesState.error()) {
+          <app-inline-status [error]="templatesState.error() + ' The default layout still works.'" (retry)="loadTemplates()" />
+        } @else if (templatesState.loading()) {
+          <app-inline-status [loading]="true" label="Loading templates…" />
+        } @else {
+          <p class="field-note text-[color:var(--text-muted)]">
+            {{ templates().length ? 'A saved template, or the default: a title, a line of facts and the table.' : 'The default layout: a title, a line of facts and the table.' }}
+          </p>
+        }
       </div>
     }
   </div>

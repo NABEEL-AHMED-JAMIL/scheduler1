@@ -47,10 +47,12 @@ Opening a row often slides a panel in from the right (a team, a catalog asset, a
 Most lists share the same tools:
 - a search box and filters above the table; **Clear** removes them all;
 - **Columns** to hide or show columns (the choice is remembered on this device);
-- sorting by a column's heading;
+- sorting by a column's heading: click once for one order, again for the other, and a third time for the list's own order. Empty values stay last both ways, your choice is remembered for you on this device, and a list read page by page is sorted across every page, not just the one on screen (a list of the newest 200 says it sorts those 200);
 - a pager at the foot: 50, 100, 150 or 200 rows a page.
 
 Some lists also switch between **Table** and **Cards**.
+
+While something loads you see grey placeholder rows or tiles in its place (never a 0 that is not real), and *Still loading…* after ten seconds. If a read fails, it says so in plain words with **Try again**; a refresh keeps what is on screen until the new answer arrives.
 
 ## Themes
 The theme menu offers **System** (Light or Dark, as your device is set), **Light**, **Dark**, **Ocean**, **Midnight** and **High contrast**. Your choice is kept on your account, so it follows you to any device. Until you choose one, the console uses your workspace's default theme.

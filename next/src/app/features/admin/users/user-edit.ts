@@ -30,6 +30,10 @@ import { announceReset } from './reset-password-announce';
 import { ResetPasswordData, ResetPasswordDialog, ResetPasswordResult } from './reset-password-dialog';
 import { grantableRoles } from './user-dialog';
 import { AppUser } from './users';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
+import { AppLoading, InlineStatus, createLoadState, loadErrorText } from '../../../shared/ui/loading';
+import { LoadError } from '../../../shared/ui/load-error';
 
 /** The page's parts, in order: the side list jumps to them. */
 export const USER_EDIT_SECTIONS = [
@@ -54,7 +58,8 @@ export const USER_EDIT_SECTIONS = [
  */
 @Component({
   selector: 'app-user-edit',
-  imports: [PageHeader, Section, FormRow, Field, PhoneInput, Combobox, Icon, Avatar, StatusPill, ServerTimePipe, ReactiveFormsModule, RouterLink],
+  imports: [PageHeader, Section, FormRow, Field, PhoneInput, Combobox, Icon, Avatar, StatusPill, ServerTimePipe, ReactiveFormsModule, RouterLink, SortHeader,
+    AppLoading, InlineStatus, LoadError],
   templateUrl: './user-edit.html',
   styles: `
     .ue-layout { display: grid; gap: 1.25rem; }
@@ -100,6 +105,18 @@ export class UserEdit implements OnInit {
   readonly people = signal<AppUser[]>([]);
   readonly loading = signal(true);
   readonly error = signal('');
+  /** Owner 2026-10-27: a read that failed can be tried again; a person who is not on the list cannot. */
+  readonly retryable = signal(true);
+  /**
+   * Owner 2026-10-27: each read around the person has its own state, so the page says "loading" where it said "In no
+   * team.", "0 of 0 pages", "Off · a password alone" or "Nothing recorded yet." before the answer, and a failure is said
+   * with Try again instead of standing as that answer.
+   */
+  readonly profilesState = createLoadState(false);
+  readonly catalogueState = createLoadState(false);
+  readonly teamsState = createLoadState(false);
+  readonly standingState = createLoadState(false);
+  readonly historyState = createLoadState(false);
   readonly saving = signal(false);
   readonly submitted = signal(false);
   /** Which action is in flight ('picture', 'unlock', 'session:<id>', ...). */
@@ -129,6 +146,17 @@ export class UserEdit implements OnInit {
   readonly standing = signal<PersonStanding | null>(null);
   readonly sessions = signal<PersonSession[] | null>(null);
   readonly sessionsError = signal('');
+  /** Owner 2026-10-27: the sessions sort by each column; they keep the server's order until a heading is picked. */
+  readonly sessionSort = createTableSort<PersonSession>({
+    id: 'user-sessions',
+    columns: {
+      device: s => this.browserOf(s.userAgent),
+      how: s => this.methodLabel[s.method] || s.method,
+      signedIn: { value: s => s.signedInAt, kind: 'date' },
+      lastActive: { value: s => s.lastActiveAt, kind: 'date' },
+    },
+  });
+  readonly sortedSessions = computed(() => this.sessionSort.apply(this.sessions() ?? []));
   readonly history = signal<SignInEvent[]>([]);
   readonly historyTotal = signal(0);
 
@@ -227,6 +255,7 @@ export class UserEdit implements OnInit {
     const id = Number(this.route.snapshot.paramMap.get('appUserId'));
     if (!Number.isFinite(id) || id <= 0) {
       this.loading.set(false);
+      this.retryable.set(false);
       this.error.set('That is not a person\'s address.');
       return;
     }
@@ -237,14 +266,16 @@ export class UserEdit implements OnInit {
   load(): void {
     this.loading.set(true);
     this.error.set('');
+    this.retryable.set(true);
     this.http.get<ApiResponse<AppUser[]>>(`${API_BASE}/appUser.json/listUsers`).subscribe({
       next: response => {
         this.loading.set(false);
-        if (response.status !== API_SUCCESS) { this.error.set(response.message || 'Could not load the user.'); return; }
+        if (response.status !== API_SUCCESS) { this.error.set(loadErrorText(response, 'Could not load the user.')); return; }
         const list = response.data ?? [];
         this.people.set(list);
         const person = list.find(u => u.appUserId === this.id());
         if (!person || person.status === 'Delete') {
+          this.retryable.set(false);
           this.error.set('This person is not on your Users list: they may have been deleted, or belong to another workspace.');
           return;
         }
@@ -253,7 +284,7 @@ export class UserEdit implements OnInit {
       },
       error: err => {
         this.loading.set(false);
-        this.error.set(err?.error?.message || 'Could not load the user.');
+        this.error.set(loadErrorText(err, 'Could not load the user.'));
       },
     });
   }
@@ -274,7 +305,26 @@ export class UserEdit implements OnInit {
   }
 
   private loadTeams(tenant: number | null): void {
-    this.teamsApi.list(tenant).subscribe({ next: r => { if (r.status === API_SUCCESS) this.teams.set(r.data ?? []); }, error: () => {} });
+    this.teamsState.start();
+    this.teamsApi.list(tenant).subscribe({
+      next: r => {
+        if (r.status !== API_SUCCESS) { this.teamsState.fail(r, 'Their teams could not be read.'); return; }
+        this.teams.set(r.data ?? []);
+        this.teamsState.done();
+      },
+      error: err => this.teamsState.fail(err, 'Their teams could not be read.'),
+    });
+  }
+
+  /** Try again on one of the reads around the person. */
+  retryTeams(): void { const p = this.person(); if (p) this.loadTeams(this.tenantOf(p)); }
+  retryProfiles(): void { const p = this.person(); if (p) this.loadProfiles(p); }
+  retryCatalogue(): void { const p = this.person(); this.loadCatalogue(); if (p) this.loadAccess(p); }
+  retryStanding(): void { const p = this.person(); if (p) this.loadStanding(p); }
+  retryHistory(): void { const p = this.person(); if (p) this.loadHistory(p); }
+
+  private tenantOf(person: AppUser): number | null {
+    return this.auth.isPlatformAdmin() ? person.tenantId ?? null : null;
   }
 
   /** F4: puts them in a team (as a member; leads are named on Teams), or takes them out of one. */
@@ -313,30 +363,76 @@ export class UserEdit implements OnInit {
 
   /** Everything around the person: profiles and pages, their standing, sessions and history. */
   private loadAround(person: AppUser): void {
-    const tenant = this.auth.isPlatformAdmin() ? person.tenantId ?? null : null;
-    this.profilesApi.pages().subscribe({ next: r => { if (r.status === API_SUCCESS) this.catalogue.set(r.data ?? []); }, error: () => {} });
+    const tenant = this.tenantOf(person);
+    this.loadCatalogue();
     if (person.tenantId != null) {
       if (!this.ownSignIn()) this.loadTeams(tenant);
-      this.profilesApi.list(tenant).subscribe({ next: r => { if (r.status === API_SUCCESS) this.profiles.set(r.data ?? []); }, error: () => {} });
-      if (person.userRole === 'TENANT_USER') {
-        this.profilesApi.people(tenant).subscribe({
-          next: r => { if (r.status === API_SUCCESS) this.access.set((r.data ?? []).find(a => a.appUserId === person.appUserId) ?? null); },
-          error: () => {},
-        });
-      }
+      this.loadProfiles(person);
+      this.loadAccess(person);
     }
-    this.security.people(tenant).subscribe({
-      next: r => { if (r.status === API_SUCCESS) this.standing.set((r.data ?? {})[String(person.appUserId)] ?? null); },
-      error: () => {},
-    });
+    this.loadStanding(person);
     this.loadSessions();
-    this.security.workspaceHistory({ tenantId: tenant, appUserId: person.appUserId, limit: 8 }).subscribe({
+    this.loadHistory(person);
+  }
+
+  private loadCatalogue(): void {
+    this.catalogueState.start();
+    this.profilesApi.pages().subscribe({
       next: r => {
-        if (r.status !== API_SUCCESS || !r.data) return;
+        if (r.status !== API_SUCCESS) { this.catalogueState.fail(r, 'What they can see could not be worked out.'); return; }
+        this.catalogue.set(r.data ?? []);
+        this.catalogueState.done();
+      },
+      error: err => this.catalogueState.fail(err, 'What they can see could not be worked out.'),
+    });
+  }
+
+  private loadProfiles(person: AppUser): void {
+    this.profilesState.start();
+    this.profilesApi.list(this.tenantOf(person)).subscribe({
+      next: r => {
+        if (r.status !== API_SUCCESS) { this.profilesState.fail(r, 'The access profiles could not be read.'); return; }
+        this.profiles.set(r.data ?? []);
+        this.profilesState.done();
+      },
+      error: err => this.profilesState.fail(err, 'The access profiles could not be read.'),
+    });
+  }
+
+  /** A member's own exceptions, for "What they can see"; a failure there is said with the preview's. */
+  private loadAccess(person: AppUser): void {
+    if (person.tenantId == null || person.userRole !== 'TENANT_USER') return;
+    this.profilesApi.people(this.tenantOf(person)).subscribe({
+      next: r => {
+        if (r.status !== API_SUCCESS) { this.catalogueState.fail(r, 'What they can see could not be worked out.'); return; }
+        this.access.set((r.data ?? []).find(a => a.appUserId === person.appUserId) ?? null);
+      },
+      error: err => this.catalogueState.fail(err, 'What they can see could not be worked out.'),
+    });
+  }
+
+  private loadStanding(person: AppUser): void {
+    this.standingState.start();
+    this.security.people(this.tenantOf(person)).subscribe({
+      next: r => {
+        if (r.status !== API_SUCCESS) { this.standingState.fail(r, 'How they sign in could not be read.'); return; }
+        this.standing.set((r.data ?? {})[String(person.appUserId)] ?? null);
+        this.standingState.done();
+      },
+      error: err => this.standingState.fail(err, 'How they sign in could not be read.'),
+    });
+  }
+
+  private loadHistory(person: AppUser): void {
+    this.historyState.start();
+    this.security.workspaceHistory({ tenantId: this.tenantOf(person), appUserId: person.appUserId, limit: 8 }).subscribe({
+      next: r => {
+        if (r.status !== API_SUCCESS || !r.data) { this.historyState.fail(r, 'Their history could not be read.'); return; }
         this.history.set(r.data.items ?? []);
         this.historyTotal.set(r.data.total ?? 0);
+        this.historyState.done();
       },
-      error: () => {},
+      error: err => this.historyState.fail(err, 'Their history could not be read.'),
     });
   }
 
@@ -349,7 +445,7 @@ export class UserEdit implements OnInit {
         if (r.status === API_SUCCESS) this.sessions.set(r.data ?? []);
         else { this.sessions.set(null); this.sessionsError.set(r.message || 'Their sessions could not be read.'); }
       },
-      error: err => { this.sessions.set(null); this.sessionsError.set(err?.error?.message || 'Their sessions could not be read.'); },
+      error: err => { this.sessions.set(null); this.sessionsError.set(loadErrorText(err, 'Their sessions could not be read.')); },
     });
   }
 

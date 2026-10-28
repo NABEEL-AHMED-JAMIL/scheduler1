@@ -20,7 +20,8 @@
       { label: 'Total',    value: summary().total,    foot: 'all time', icon: 'users', tone: 'info' }
     ]; track tile.label) {
       <app-stat-tile [label]="tile.label" [value]="tile.value" [icon]="tile.icon"
-                     [tone]="$any(tile.tone)" [foot]="tile.foot" />
+                     [tone]="$any(tile.tone)" [foot]="tile.foot"
+                     [loading]="state.pending()" [failed]="!!error() && !state.loaded()" />
     }
   </div>
 
@@ -168,43 +169,11 @@
           <!-- Only the columns worth ordering by. "Asked for" is free prose, and
                sorting it alphabetically would order requests by whichever word
                they happen to open with. -->
-          <th>
-            <button type="button" class="th-sort"
-                    [class.th-sort-active]="sort.key() === 'organisationName'"
-                    (click)="sort.toggle('organisationName')">
-              Organisation
-              <app-icon [name]="sort.iconFor('organisationName')" size="0.875rem"
-                        [class]="sort.key() === 'organisationName' ? 'icon-info' : 'icon-muted'" />
-            </button>
-          </th>
-          <th>
-            <button type="button" class="th-sort"
-                    [class.th-sort-active]="sort.key() === 'contactName'"
-                    (click)="sort.toggle('contactName')">
-              Contact
-              <app-icon [name]="sort.iconFor('contactName')" size="0.875rem"
-                        [class]="sort.key() === 'contactName' ? 'icon-info' : 'icon-muted'" />
-            </button>
-          </th>
+          <th appSort="organisationName" [sortBy]="sort">Organisation</th>
+          <th appSort="contactName" [sortBy]="sort">Contact</th>
           <th>Asked for</th>
-          <th>
-            <button type="button" class="th-sort"
-                    [class.th-sort-active]="sort.key() === 'dateCreated'"
-                    (click)="sort.toggle('dateCreated')">
-              Received
-              <app-icon [name]="sort.iconFor('dateCreated')" size="0.875rem"
-                        [class]="sort.key() === 'dateCreated' ? 'icon-info' : 'icon-muted'" />
-            </button>
-          </th>
-          <th>
-            <button type="button" class="th-sort"
-                    [class.th-sort-active]="sort.key() === 'status'"
-                    (click)="sort.toggle('status')">
-              Status
-              <app-icon [name]="sort.iconFor('status')" size="0.875rem"
-                        [class]="sort.key() === 'status' ? 'icon-info' : 'icon-muted'" />
-            </button>
-          </th>
+          <th appSort="dateCreated" [sortBy]="sort">Received</th>
+          <th appSort="status" [sortBy]="sort">Status</th>
           <!-- No width: two buttons need about 150px and w-12 asked for 48, so the column
                spent every render being overruled by its own contents. Letting it size to
                what it holds is what stops the header label and the buttons under it from

@@ -145,3 +145,34 @@ describe('waiting for review: bulk', () => {
     tick();
   });
 });
+
+describe('waiting for review -- loading and a failed read (owner 2026-10-27)', () => {
+  function mount(all: boolean) {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [provideZonelessChangeDetection(), provideHttpClient(), provideHttpClientTesting(),
+      provideRouter([])] });
+    const fixture = TestBed.createComponent(ReviewWaiting);
+    fixture.componentRef.setInput('all', all);
+    fixture.detectChanges();
+    const call = TestBed.inject(HttpTestingController).expectOne(r => r.url.endsWith('/sourceJob.json/review/waiting'));
+    return { fixture, call, el: fixture.nativeElement as HTMLElement };
+  }
+
+  it('is not loaded while the list is read, so Review > Runs does not say nothing waits', () => {
+    const { fixture, call } = mount(true);
+    expect(fixture.componentInstance.loaded()).toBe(false);
+    expect(fixture.componentInstance.error()).toBe('');
+    call.flush({ status: API_SUCCESS, data: { more: false, runs: [] } });
+    expect(fixture.componentInstance.loaded()).toBe(true);
+    expect(fixture.componentInstance.runs()).toEqual([]);
+  });
+
+  it('says the list could not be read, with Try again, instead of an empty list', () => {
+    const { fixture, call, el } = mount(true);
+    call.flush('boom', { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+    expect(fixture.componentInstance.loaded()).toBe(false);
+    expect(fixture.componentInstance.error()).toBe('The runs waiting for review could not be read.');
+    expect(el.querySelector('[data-review-waiting-error]')?.textContent).toContain('Try again');
+  });
+});

@@ -13,6 +13,7 @@ import { BucketChoice, JsonSchema, PromptChoice, StepTaskEntry } from '../../tas
 import { CreatePipeline, CreatePipelineData, CreatedPipeline } from './create-pipeline';
 import { CreatedFlow, FlowDefinition, PipelineFlowArtifact, flowVerdict, graphOf, withStepConfig } from './flow.model';
 import { RunFollow } from './run-follow';
+import { AppLoading, InlineStatus, loadErrorText } from '../../../shared/ui/loading';
 
 /**
  * The flow the assistant drew (AI workflow review), on the investigation-graph canvas: every step a node with its kind's
@@ -24,7 +25,7 @@ import { RunFollow } from './run-follow';
 @Component({
   selector: 'app-flow-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FlowGraph, Icon, SchemaForm, RouterLink, RunFollow],
+  imports: [FlowGraph, Icon, SchemaForm, RouterLink, RunFollow, AppLoading, InlineStatus],
   styles: [`
     .fp-canvas { min-height: 18rem; }
     .fp-inspector { max-height: 22rem; }
@@ -113,7 +114,14 @@ import { RunFollow } from './run-follow';
                 }
               </ul>
             }
-            @if (schemaOf(n.task); as schema) {
+            <!-- Owner 2026-10-27: the settings form waits for the task catalogue (it showed the raw settings text meanwhile, and
+                 for good when the read failed) and says why when a read failed. -->
+            @if (choicesError()) {
+              <app-inline-status [error]="choicesError()" (retry)="reloadChoices()" />
+            }
+            @if (tasksLoading()) {
+              <app-loading shape="inline" label="Loading the step's settings…" />
+            } @else if (schemaOf(n.task); as schema) {
               <app-schema-form [schema]="schema" [value]="configOf(n.id)" [steps]="keysBefore(n.id)" [prompts]="prompts()" [buckets]="buckets()"
                                [idPrefix]="'flow-' + n.id" [disabled]="!!created()" (valueChange)="setConfig(n.id, $event)" />
             } @else if (n.settings) {
@@ -212,6 +220,9 @@ export class FlowPanel {
   readonly tasks = signal<StepTaskEntry[]>([]);
   readonly prompts = signal<PromptChoice[]>([]);
   readonly buckets = signal<BucketChoice[]>([]);
+  readonly tasksLoading = signal(false);
+  /** What of the step choices could not be read (the task catalogue, the prompts, the buckets), in plain words. */
+  readonly choicesError = signal('');
   private loaded = false;
 
   readonly graph = computed(() => {
@@ -257,9 +268,25 @@ export class FlowPanel {
     this.flowName = name;
     if (this.loaded) return;
     this.loaded = true;
-    this.steps.tasks().subscribe({ next: r => this.tasks.set(r.status === API_SUCCESS ? r.data ?? [] : []), error: () => this.tasks.set([]) });
-    this.steps.prompts().subscribe({ next: p => this.prompts.set(p), error: () => this.prompts.set([]) });
-    this.steps.buckets().subscribe({ next: b => this.buckets.set(b), error: () => this.buckets.set([]) });
+    this.readChoices();
+  }
+
+  reloadChoices(): void { this.readChoices(); }
+
+  private readChoices(): void {
+    this.choicesError.set('');
+    this.tasksLoading.set(true);
+    const failed = (fallback: string, err: unknown) => { if (!this.choicesError()) this.choicesError.set(loadErrorText(err, fallback)); };
+    this.steps.tasks().subscribe({
+      next: r => {
+        this.tasksLoading.set(false);
+        if (r.status === API_SUCCESS) this.tasks.set(r.data ?? []);
+        else { this.tasks.set([]); failed('The step settings could not be read.', r); }
+      },
+      error: err => { this.tasksLoading.set(false); this.tasks.set([]); failed('The step settings could not be read.', err); },
+    });
+    this.steps.prompts().subscribe({ next: p => this.prompts.set(p), error: err => { this.prompts.set([]); failed('The prompts could not be read.', err); } });
+    this.steps.buckets().subscribe({ next: b => this.buckets.set(b), error: err => { this.buckets.set([]); failed('The storage buckets could not be read.', err); } });
   }
 
   schemaOf(task: string | null | undefined): JsonSchema | null {

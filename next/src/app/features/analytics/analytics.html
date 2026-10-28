@@ -40,6 +40,7 @@
                for="a-conn">Connection</label>
         <select id="a-conn" class="input w-full mt-1" [value]="connection()"
                 (change)="pickConnection($any($event.target).value)">
+          @if (bucketsLoading()) { <option value="">Loading connections…</option> }
           <!-- A connection this reader cannot use is shown but inert, exactly as an unreadable
                file is below: this list is the Object Browser's, and it offers FTP, FTPS and
                legacy bucket entries that the analytics reader has no way to open. The reason
@@ -51,6 +52,8 @@
             </option>
           }
         </select>
+        <!-- Owner 2026-10-27: the picker says it is loading, or why the connections could not be read. -->
+        <app-inline-status [loading]="bucketsLoading()" [error]="bucketsError()" label="Loading connections…" (retry)="loadBuckets()" />
         @if (noReadableConnection()) {
           <p class="field-note text-[color:var(--text-muted)]">
             None of your storage connections is one this reader can open. Each is listed above
@@ -111,7 +114,9 @@
            below. The negative margin cancels the padding, so nothing moves. -->
       <div class="scroll-table -mx-1 px-1 -my-1 py-1 mt-2">
         @if (browsing()) {
-          <p class="text-xs text-[color:var(--text-muted)] py-4 text-center">Reading…</p>
+          <app-loading shape="list" label="Loading the folder…" [count]="5" />
+        } @else if (listError()) {
+          <app-inline-status [error]="listError()" (retry)="retryBrowse()" />
         } @else {
           @for (folder of folders(); track folder.key) {
             <button type="button"
@@ -145,7 +150,7 @@
               }
             </button>
           }
-          @if (!folders().length && !files().length) {
+          @if (!folders().length && !files().length && !bucketsLoading()) {
             <!-- "nothing here" and "nothing matched" are different facts, and a reader who has
                  typed a filter needs to be told which one they are looking at. -->
             <p class="text-xs text-[color:var(--text-muted)] py-4 text-center">
@@ -210,10 +215,11 @@
       @if (analysesNotice()) {
         <p class="text-xs text-[color:var(--text-secondary)]">{{ analysesNotice() }}</p>
       }
-      @if (analysesLoading()) {
-        <p class="text-xs text-[color:var(--text-muted)] py-4 text-center">Reading your analyses…</p>
+      <!-- Owner 2026-10-27: list-shaped loading on the first read only; a re-read keeps the list (the refresh icon spins). -->
+      @if (analysesLoading() && !analyses().length) {
+        <app-loading shape="list" label="Loading your analyses…" [count]="4" />
       } @else if (analysesError()) {
-        <p class="text-xs text-crit-500" role="alert">{{ analysesError() }}</p>
+        <app-inline-status [error]="analysesError()" (retry)="loadAnalyses()" />
       } @else if (!analyses().length) {
         <p class="text-xs text-[color:var(--text-muted)] py-4 text-center">
           No saved analyses yet — Save puts one here.
@@ -325,7 +331,12 @@
     <!-- ── the dataset ──────────────────────────────────────────────────────────────── -->
     <div class="dataset-column min-w-0 flex flex-col gap-3">
 
-      @if (!hasDataset()) {
+      @if (!hasDataset() && deepLinked() && bucketsLoading()) {
+        <!-- Owner 2026-10-27: a link naming a dataset opens it once the connections are in; until then it is loading. -->
+        <div class="card"><app-loading shape="panel" label="Opening the dataset…" [count]="6" /></div>
+      } @else if (!hasDataset() && deepLinked() && bucketsError()) {
+        <div class="card"><app-load-error [message]="bucketsError()" (retry)="loadBuckets()" /></div>
+      } @else if (!hasDataset()) {
         <div class="card p-12 text-center">
           <app-icon name="chart" size="1.75em" class="icon-muted" />
           <p class="mt-3 text-sm text-[color:var(--text-secondary)]">Pick a file to read it.</p>
@@ -473,8 +484,14 @@
              class="min-w-0 flex flex-col gap-3">
 
         @if (tab() === 'overview') {
+          <!-- Owner 2026-10-27: the tiles wait for the file (placeholder bars, not dashes), and a file that could not be read
+               says so here too -- Overview is the tab a dataset opens on, so a failure only on the Data tab read as slow. -->
           <app-stat-strip [items]="overviewStats()" [cols]="2" [smCols]="4" size="md"
+                          [loading]="loading() && !preview()" [failed]="!!error() && !preview()"
                           label="This file at a glance" (itemClick)="onOverviewStat($event)" />
+          @if (error()) {
+            <div class="card"><app-load-error [message]="error()" (retry)="retry()" /></div>
+          }
           <app-dataset-overview [connection]="connection()" [path]="path()" [multiFile]="multiFile()"
                                 [sizeBytes]="selected()?.size ?? null" [modified]="modifiedAt()" (openInCanvas)="openInCanvas($event)" (profiled)="adoptProfile($event)" />
         }
@@ -607,7 +624,7 @@
           <app-table-shell heading="Compact"
                            [loading]="profileLoading()" [error]="profileError()"
                            [shown]="compactRows().length" [total]="columnCount()"
-                           [isEmpty]="!profileLoading() && !profileError() && !compactRows().length"
+                           [isEmpty]="!compactRows().length" loadingLabel="Loading the column statistics…"
                            emptyMessage="This dataset has no columns to describe." emptyIcon="table"
                            (retry)="loadProfile()">
             <!-- One line (owner, 2026-09-28). The two facts a reader could get wrong stay in
@@ -623,17 +640,17 @@
               <thead>
                 <tr>
                   <th class="w-6"><span class="sr-only">Expand</span></th>
-                  <th class="whitespace-nowrap">Column</th>
-                  <th class="whitespace-nowrap">Type</th>
-                  <th class="whitespace-nowrap">Sample</th>
-                  <th class="whitespace-nowrap text-right">Null</th>
-                  <th class="whitespace-nowrap text-right">Distinct</th>
-                  <th class="whitespace-nowrap">Key metric</th>
-                  <th class="whitespace-nowrap">Quality</th>
+                  <th class="whitespace-nowrap" appSort="column" [sortBy]="compactSort">Column</th>
+                  <th class="whitespace-nowrap" appSort="type" [sortBy]="compactSort">Type</th>
+                  <th class="whitespace-nowrap" appSort="sample" [sortBy]="compactSort">Sample</th>
+                  <th class="whitespace-nowrap text-right" appSort="nulls" [sortBy]="compactSort">Null</th>
+                  <th class="whitespace-nowrap text-right" appSort="distinct" [sortBy]="compactSort">Distinct</th>
+                  <th class="whitespace-nowrap" appSort="metric" [sortBy]="compactSort">Key metric</th>
+                  <th class="whitespace-nowrap" appSort="quality" [sortBy]="compactSort">Quality</th>
                 </tr>
               </thead>
               <tbody>
-                @for (row of compactRows(); track row.name) {
+                @for (row of sortedCompactRows(); track row.name) {
                   <!-- The whole row opens the card. A dense table is scanned, and asking a reader
                        to hit a 16px chevron in a row they are already pointing at is the kind of
                        target that gets missed twice before it is hit once. -->
@@ -1634,11 +1651,11 @@
                     <span class="mono truncate max-w-full"
                           [title]="secondPath()">{{ connection() }}/{{ secondPath() }}</span>
                     @if (secondLoading()) {
-                      <span class="text-[color:var(--text-muted)]">Reading…</span>
+                      <app-loading shape="inline" label="Loading its columns…" />
                     } @else if (secondError()) {
                       <!-- Said here, before a statement is written against columns that were
                            guessed at, rather than as a refusal on the query they finally ran. -->
-                      <span class="text-crit-500" role="alert">{{ secondError() }}</span>
+                      <app-inline-status class="!mt-0" [error]="secondError()" (retry)="retrySecond()" />
                     } @else {
                       <span class="text-[color:var(--text-muted)] tabular">
                         {{ secondColumns().length }}
@@ -1780,9 +1797,11 @@
                 </div>
               </div>
             } @else {
+              <!-- Owner 2026-10-27: while a statement runs with no result yet the shell draws skeleton rows (it drew its
+                   refresh veil over an empty body). -->
               <app-table-shell heading="Result" [loading]="running()"
                                [showSubbar]="truncated()"
-                               [isEmpty]="!running() && !result()"
+                               [isEmpty]="!result()" loadingLabel="Running the query…"
                                emptyMessage="Nothing has run yet." emptyIcon="terminal">
 
                 @if (result()) {
@@ -1877,13 +1896,14 @@
                 <table class="table-modern">
                   <thead>
                     <tr>
-                      @for (column of result()?.columns ?? []; track column) {
-                        <th class="whitespace-nowrap">{{ column }}</th>
+                      <!-- Owner 2026-10-27: every result column sorts, typed from its values (numbers, dates, text). -->
+                      @for (column of result()?.columns ?? []; track $index) {
+                        <th class="whitespace-nowrap" [appSort]="column" [sortBy]="resultSort">{{ column }}</th>
                       }
                     </tr>
                   </thead>
                   <tbody>
-                    @for (row of result()?.rows ?? []; track $index) {
+                    @for (row of sortedResultRows(); track $index) {
                       <tr>
                         @for (cell of row; track $index) {
                           <!-- A null is not an empty string, the same distinction the Data tab
@@ -1931,23 +1951,19 @@
                   <h3 class="text-xs uppercase tracking-wider text-[color:var(--text-muted)]
                              font-semibold">Saved queries</h3>
                   <span class="text-xs tabular text-[color:var(--text-muted)]">
-                    {{ savedQueries().length }}
+                    @if (savedLoading()) { <app-loading shape="inline" label="Loading…" /> } @else if (!savedError()) { {{ savedQueries().length }} }
                   </span>
                 </div>
 
                 <!-- loading / error / empty / list, in that order: a failed first load used to
                      show its error AND "Nothing saved yet", two statements that contradict. -->
-                @if (savedLoading()) {
-                  <p class="text-xs text-[color:var(--text-muted)] py-4 text-center">Reading…</p>
+                @if (savedLoading() && !savedQueries().length) {
+                  <app-loading shape="list" label="Loading your saved queries…" [count]="3" />
                 } @else if (savedError()) {
                   <!-- With a way back. The library is fetched once, on the first visit to this
                        tab, so a failure with no retry beside it would leave the card dead for
                        the rest of the session. -->
-                  <p class="text-xs text-crit-500" role="alert">
-                    {{ savedError() }}
-                    <button type="button" class="link-inline ml-1"
-                            (click)="loadSavedQueries()">Try again</button>
-                  </p>
+                  <app-inline-status [error]="savedError()" (retry)="loadSavedQueries()" />
                 } @else if (!savedQueries().length) {
                   <p class="text-xs text-[color:var(--text-muted)] py-4 text-center">
                     Nothing saved yet. Name a query above and it will be here next time.
@@ -2007,7 +2023,8 @@
           <app-table-shell heading="Chart" [scrollRows]="false"
                            [loading]="running()"
                            [showSubbar]="chartDrawn() && (truncated() || chartStale())"
-                           [isEmpty]="!running() && !chartDrawn()"
+                           [isEmpty]="!chartDrawn()"
+                           [error]="!chartDrawn() ? queryError() : ''" [errorRetryable]="false"
                            [emptyMessage]="chartEmptyMessage()" emptyIcon="chart">
 
             <!-- An empty tab used to be a sentence and nothing to do about it. It says where a
@@ -2263,13 +2280,10 @@
             </div>
 
             <!-- A failed load is not an empty history: the empty line sits behind the error. -->
-            @if (runsLoading()) {
-              <p class="text-xs text-[color:var(--text-muted)] p-8 text-center">Reading…</p>
+            @if (runsLoading() && !recentRuns().length) {
+              <app-loading shape="list" label="Loading the run history…" [count]="5" />
             } @else if (runsError()) {
-              <p class="text-xs text-crit-500 p-4" role="alert">
-                {{ runsError() }}
-                <button type="button" class="link-inline ml-1" (click)="loadRuns()">Try again</button>
-              </p>
+              <div class="p-4"><app-inline-status [error]="runsError()" (retry)="loadRuns()" /></div>
             } @else if (!recentRuns().length) {
               <p class="text-xs text-[color:var(--text-muted)] p-8 text-center">
                 Nothing has been run here yet.

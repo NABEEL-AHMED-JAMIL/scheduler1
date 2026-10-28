@@ -7,9 +7,11 @@ import { Field } from '../../../shared/ui/field';
 import { Icon } from '../../../shared/ui/icon';
 import { ComboboxOption } from '../../../shared/ui/combobox';
 import {
-  ContractRow, DIRECTIONS, Proposal, SENSITIVITIES, contractSaveOf, directionLabel, parseSample, requiredPaths,
+  ContractRow, DIRECTIONS, Proposal, SENSITIVITIES, SchemaField, contractSaveOf, directionLabel, parseSample, requiredPaths,
 } from './sources.model';
 import { SourcesApi } from './sources.service';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
 
 export interface ContractSampleData {
   /** Absent: a new contract, saved as v1. Present: a new version of this one. */
@@ -27,7 +29,7 @@ export interface ContractSampleData {
  */
 @Component({
   selector: 'app-contract-sample-dialog',
-  imports: [FormDialog, Field, Icon],
+  imports: [FormDialog, Field, Icon, SortHeader],
   template: `
     <app-form-dialog [heading]="data.contract ? 'New version of ' + data.contract.name : 'New data contract'"
                      [subtitle]="subtitle" size="wide" [confirmLabel]="data.contract ? 'Save version' : 'Save v1'"
@@ -69,9 +71,13 @@ export interface ContractSampleData {
             <legend class="form-section-title">Fields: tick what every payload must carry</legend>
             <div class="overflow-x-auto">
               <table class="table-modern" data-test="proposal-fields">
-                <thead><tr><th>Required</th><th>Field</th><th>Type</th></tr></thead>
+                <thead><tr>
+                  <th appSort="required" [sortBy]="sort">Required</th>
+                  <th appSort="field" [sortBy]="sort">Field</th>
+                  <th appSort="type" [sortBy]="sort">Type</th>
+                </tr></thead>
                 <tbody>
-                  @for (f of p.fields; track f.path) {
+                  @for (f of sortedFields(); track f.path) {
                     <tr>
                       <td class="w-24"><input type="checkbox" class="checkbox" [checked]="isRequired(f.path)" [attr.aria-label]="'Required: ' + f.path" (change)="toggleRequired(f.path, $any($event.target).checked)" /></td>
                       <td class="mono text-xs [overflow-wrap:anywhere]">{{ f.path }}</td>
@@ -118,6 +124,21 @@ export class ContractSampleDialog {
 
   directionText(d: string): string { return directionLabel(d); }
   isRequired(path: string): boolean { return this.requiredSet().has(path); }
+
+  /**
+   * Owner 2026-10-27: the proposed fields sort by any column; the schema walk's order (a parent before its fields) until
+   * then. The ticks live in a set by path, so a sort keeps them. Fresh each time the dialog opens.
+   */
+  readonly sort = createTableSort<SchemaField>({
+    id: 'contract-sample-fields',
+    remember: false,
+    columns: {
+      required: { value: f => this.isRequired(f.path), kind: 'bool', first: 'desc' },
+      field: f => f.path,
+      type: f => f.type,
+    },
+  });
+  readonly sortedFields = computed(() => this.sort.apply(this.proposal()?.fields ?? []));
 
   toggleRequired(path: string, on: boolean): void {
     this.requiredSet.update(set => { const next = new Set(set); if (on) next.add(path); else next.delete(path); return next; });

@@ -149,16 +149,28 @@
   <table class="table-modern">
     <thead>
       <tr>
-        <th class="min-w-48">
-          <div class="font-semibold">{{ rowDim().label }}</div>
+        <!-- Owner 2026-10-27: the grid's headings sort. Their own sort button rather than th[appSort]: a heading here also
+             holds a caption and the column's distribution bars, which must not sit inside the button. -->
+        <th class="min-w-48" [attr.aria-sort]="gridSort.ariaSort('label')">
+          <button type="button" class="th-sort font-semibold" [class.th-sort-active]="gridSort.key() === 'label'"
+                  data-test="pivot-sort-label" (click)="gridSort.toggle('label')">
+            {{ rowDim().label }}
+            <app-icon [name]="gridSort.iconFor('label')" size="0.875rem" aria-hidden="true"
+                      [class]="gridSort.key() === 'label' ? 'icon-info' : 'icon-muted'" />
+          </button>
           <div class="text-[11px] uppercase tracking-wide text-[color:var(--text-muted)]">
             dimension
           </div>
         </th>
         @for (colLabel of pivot().colLabels; track colLabel; let ci = $index) {
-          <th class="min-w-36 align-top">
+          <th class="min-w-36 align-top" [attr.aria-sort]="gridSort.ariaSort(colKey(colLabel))">
             <div class="flex items-baseline gap-1.5">
-              <span class="font-semibold">{{ colLabel }}</span>
+              <button type="button" class="th-sort font-semibold" [class.th-sort-active]="gridSort.key() === colKey(colLabel)"
+                      (click)="gridSort.toggle(colKey(colLabel))">
+                {{ colLabel }}
+                <app-icon [name]="gridSort.iconFor(colKey(colLabel))" size="0.875rem" aria-hidden="true"
+                          [class]="gridSort.key() === colKey(colLabel) ? 'icon-info' : 'icon-muted'" />
+              </button>
             </div>
             <!-- The distribution behind the column, so its shape reads before the rows do. -->
             @if (isCounting()) {
@@ -185,8 +197,13 @@
             }
           </th>
         }
-        <th class="text-right min-w-28">
-          <div class="font-semibold">All</div>
+        <th class="text-right min-w-28" [attr.aria-sort]="gridSort.ariaSort('all')">
+          <button type="button" class="th-sort font-semibold ml-auto" [class.th-sort-active]="gridSort.key() === 'all'"
+                  (click)="gridSort.toggle('all')">
+            All
+            <app-icon [name]="gridSort.iconFor('all')" size="0.875rem" aria-hidden="true"
+                      [class]="gridSort.key() === 'all' ? 'icon-info' : 'icon-muted'" />
+          </button>
           <div class="text-[11px] uppercase tracking-wide text-[color:var(--text-muted)]">
             total
           </div>
@@ -268,11 +285,19 @@
     <div class="overflow-auto">
       <table class="table-modern">
         <thead>
-          <tr><th>Run</th><th>Schedule</th><th>Pipeline</th><th>Owner</th><th>Day</th>
-              <th class="text-right">Duration</th><th class="text-right">Outcome</th></tr>
+          <tr>
+            <th appSort="run" [sortBy]="drillSort">Run</th>
+            <th appSort="schedule" [sortBy]="drillSort">Schedule</th>
+            <th appSort="pipeline" [sortBy]="drillSort">Pipeline</th>
+            <th appSort="owner" [sortBy]="drillSort">Owner</th>
+            <th appSort="day" [sortBy]="drillSort">Day</th>
+            <th class="text-right" appSort="duration" [sortBy]="drillSort">Duration</th>
+            <th class="text-right" appSort="outcome" [sortBy]="drillSort">Outcome</th>
+          </tr>
         </thead>
         <tbody>
-          @for (run of drillRows().slice(0, 300); track runIdOf(run)) {
+          <!-- Sorted before the first 300 are cut, so a sort covers every run behind the cell. -->
+          @for (run of drillShown(); track runIdOf(run)) {
             <tr>
               <td class="mono text-[color:var(--text-muted)]">#{{ runIdOf(run) }}</td>
               <td class="max-w-56"><span class="truncate block" [title]="jobOf(run)">{{ jobOf(run) }}</span></td>

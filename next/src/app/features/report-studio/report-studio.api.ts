@@ -12,7 +12,15 @@ import {
 } from './report-studio.model';
 
 /** A page of the report library (reports or jobs): the filters the service applies, then limit (1 to 200) and offset. */
-export interface LibraryQuery { status?: string; q?: string; templateId?: string; limit?: number; offset?: number; }
+export interface LibraryQuery {
+  status?: string; q?: string; templateId?: string; limit?: number; offset?: number;
+  /**
+   * Owner 2026-10-27 ("add a sort on each table"): a column the service's allow-list knows and its direction; none is the
+   * list's own order (newest change first). Reports: name, template, version, status, updatedAt; jobs: job, report,
+   * template, status, startedAt, finishedAt; templates: name, category, from, updatedAt.
+   */
+  sort?: string; dir?: 'asc' | 'desc';
+}
 
 /** One page of rows, and how many the filters match in all. */
 export interface LibraryPage<T> { rows: T[]; total: number; offset: number; limit: number; }
@@ -89,7 +97,8 @@ export class ReportStudioApi {
    * Filters: q, category, state (PUBLISHED, DRAFT, HAS_DRAFT, LIVE = has a published version), owner (ME, STARTER, COPY).
    */
   list(query: TemplateQuery = {}, tenantId?: number | null): Observable<TemplateLibrary> {
-    const params: Record<string, string> = { archived: String(!!query.archived), ...ReportStudioApi.page(query), ...ReportStudioApi.scope(tenantId) };
+    const params: Record<string, string> = { archived: String(!!query.archived), ...ReportStudioApi.page(query), ...ReportStudioApi.sortOf(query),
+      ...ReportStudioApi.scope(tenantId) };
     for (const k of ['category', 'state', 'owner'] as const) if (query[k]) params[k] = query[k]!;
     return ReportStudioApi.data$(this.http.get<ApiResponse<TemplateLibrary>>(`${this.templates}/fetchAll`, { params }))
       .pipe(map(lib => ({ ...lib, total: lib.total ?? lib.templates.length, counts: lib.counts ?? { templates: lib.templates.length },
@@ -259,7 +268,8 @@ export class ReportStudioApi {
   /** One page of the library's reports, newest change first; total is how many the filters match in all. */
   reports(query: LibraryQuery = {}, tenantId?: number | null): Observable<LibraryPage<ReportRow>> {
     return this.http.get<ApiResponse<{ reports: ReportRow[]; total?: number; offset?: number; limit?: number }>>(`${this.library}/reports`,
-      { params: { ...ReportStudioApi.page(query), ...(query.templateId ? { templateId: query.templateId } : {}), ...ReportStudioApi.scope(tenantId) } })
+      { params: { ...ReportStudioApi.page(query), ...ReportStudioApi.sortOf(query), ...(query.templateId ? { templateId: query.templateId } : {}),
+        ...ReportStudioApi.scope(tenantId) } })
       .pipe(map(r => ReportStudioApi.pageOf(r.data?.reports, r.data)));
   }
 
@@ -271,8 +281,13 @@ export class ReportStudioApi {
   /** One page of generation jobs, newest first (status RUNNING: every job not finished yet); with total. */
   jobs(query: LibraryQuery = {}, tenantId?: number | null): Observable<LibraryPage<JobRow>> {
     return this.http.get<ApiResponse<{ jobs: JobRow[]; total?: number; offset?: number; limit?: number }>>(`${this.library}/jobs`,
-      { params: { ...ReportStudioApi.page(query), ...ReportStudioApi.scope(tenantId) } })
+      { params: { ...ReportStudioApi.page(query), ...ReportStudioApi.sortOf(query), ...ReportStudioApi.scope(tenantId) } })
       .pipe(map(r => ReportStudioApi.pageOf(r.data?.jobs, r.data)));
+  }
+
+  /** sort and dir only when a column is picked: without them the service keeps its own order. */
+  private static sortOf(query: { sort?: string; dir?: 'asc' | 'desc' }): Record<string, string> {
+    return query.sort ? { sort: query.sort, dir: query.dir ?? 'asc' } : {};
   }
 
   private static page(query: { status?: string; q?: string; limit?: number; offset?: number }): Record<string, string> {

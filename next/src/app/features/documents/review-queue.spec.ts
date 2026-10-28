@@ -129,3 +129,39 @@ describe('ReviewQueue', () => {
     expect(el.textContent).toContain('claimed is mine, unclaimed or others.');
   });
 });
+
+describe('ReviewQueue -- sorted on the server (owner 2026-10-27)', () => {
+  it('sends no sort before a heading is picked, then the column and direction from page 1, and pages on in it', async () => {
+    try { localStorage.clear(); } catch { /* none */ }
+    const { fixture, el, screen, api } = screenWith();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(api.queue.mock.calls[0]).toEqual([{ status: 'Review', documentTypeId: null, claimed: '', maxConfidence: null, olderThanMinutes: null, page: 0, size: 50 }]);
+    const sortable = [...el.querySelectorAll('thead th')].filter(th => th.querySelector('button.th-sort')).map(th => th.textContent?.trim());
+    expect(sortable).toEqual(['Document', 'Type', 'To check', 'Least sure', 'Waiting since', 'Claimed', 'State']);
+    screen.goTo(2);
+    screen.sort.toggle('leastSure');
+    expect(screen.page()).toBe(1);
+    expect(api.queue).toHaveBeenLastCalledWith(expect.objectContaining({ page: 0, sort: 'leastSure', dir: 'asc' }));
+    screen.sort.toggle('toCheck');
+    expect(api.queue).toHaveBeenLastCalledWith(expect.objectContaining({ page: 0, sort: 'toCheck', dir: 'desc' }));
+    screen.goTo(2);
+    expect(api.queue).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, sort: 'toCheck', dir: 'desc' }));
+    try { localStorage.clear(); } catch { /* none */ }
+  });
+
+  it('Start reviewing keeps to the queue\'s own order, oldest first, whatever the list is sorted by', async () => {
+    try { localStorage.clear(); } catch { /* none */ }
+    // The viewer's order puts 1005 (theirs) first; the queue's own order has 1007, free and oldest, first.
+    const OWN = [{ ...ITEMS[0], extractionId: 1007, claimActive: false, claimedBy: null }, ITEMS[1]];
+    const queue = vi.fn((f: { sort?: string }) => ok({ total: 2, page: 0, size: 50, items: f.sort ? [ITEMS[1], ITEMS[0]] : OWN }));
+    const { fixture, screen, api, router } = screenWith(queue as never);
+    await fixture.whenStable();
+    screen.sort.toggle('document');
+    expect(screen.startable()).toBe(true);
+    screen.start();
+    expect(api.queue).toHaveBeenLastCalledWith({ status: 'Review', documentTypeId: null, claimed: '', maxConfidence: null, olderThanMinutes: null, page: 0, size: 50 });
+    expect(router.navigate).toHaveBeenCalledWith(['/review/documents', 1007]);
+    try { localStorage.clear(); } catch { /* none */ }
+  });
+});

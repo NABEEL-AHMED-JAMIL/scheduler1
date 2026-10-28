@@ -36,31 +36,35 @@
   } @else {
   @switch (tab()) {
     @case ('types') {
-      <app-table-shell data-test="types" heading="Document types" columnsKey="document-types" [loading]="!types().length && !typesError()" [error]="typesError()"
+      <app-table-shell data-test="types" heading="Document types" columnsKey="document-types" [loading]="typesState.loading()" [error]="typesError()"
                        [isEmpty]="!types().length" [shown]="types().length" [emptyMessage]="'No document types yet. Add one for each kind of document you receive: ' + exampleTypes + '.'" emptyIcon="file" (retry)="loadTypes()">
-        @if (canManage()) {
-          <ng-container toolbar>
+        <ng-container toolbar>
+          @if (canManage()) {
             <button type="button" class="btn btn-default btn-sm" data-test="add-starters" (click)="addStarters()"><app-icon name="layers" />Add from starters</button>
             <button type="button" class="btn btn-default btn-sm" (click)="openType(null)"><app-icon name="plus" />New document type</button>
-          </ng-container>
-        }
+          }
+          <!-- Owner 2026-10-27: the schedules' read says when it failed, with Try again (every row said "Nothing yet"). -->
+          @if (triggersError()) {
+            <app-inline-status data-test="triggers-error" [error]="triggersError()" (retry)="loadTriggers()" />
+          }
+        </ng-container>
         <table class="table-modern">
           <thead>
             <tr>
-              <th>Type</th>
-              <th class="text-right">Fields</th>
-              <th class="text-right">Tables</th>
-              <th class="text-right">Rules</th>
-              <th>Auto-approve at</th>
-              <th>Version</th>
-              <th>Kind</th>
+              <th appSort="type" [sortBy]="typeSort">Type</th>
+              <th class="text-right" appSort="fields" [sortBy]="typeSort">Fields</th>
+              <th class="text-right" appSort="tables" [sortBy]="typeSort">Tables</th>
+              <th class="text-right" appSort="rules" [sortBy]="typeSort">Rules</th>
+              <th appSort="autoApprove" [sortBy]="typeSort">Auto-approve at</th>
+              <th appSort="version" [sortBy]="typeSort">Version</th>
+              <th appSort="kind" [sortBy]="typeSort">Kind</th>
               <!-- Owner 2026-10-20 (§0.1): what used to be the overview's "What approved documents start" panel. -->
               <th class="min-w-40">When approved, starts…</th>
-              <th class="text-right">State</th>
+              <th class="text-right" appSort="state" [sortBy]="typeSort">State</th>
             </tr>
           </thead>
           <tbody>
-            @for (t of types(); track t.documentTypeId) {
+            @for (t of typesSorted(); track t.documentTypeId) {
               <tr>
                 <td class="max-w-72">
                   <button type="button" class="link-inline font-medium text-left" (click)="openType(t)">{{ t.name }}</button>
@@ -80,8 +84,10 @@
                 <td class="text-xs min-w-40 max-w-80" data-test="type-starts" [attr.data-type]="t.typeKey">
                   @if (!canSeeSchedules()) {
                     <span class="text-[color:var(--text-muted)]">—</span>
+                  } @else if (triggersError()) {
+                    <span class="text-[color:var(--text-muted)]" [title]="triggersError()">Not known</span>
                   } @else if (triggers() === null) {
-                    <span class="text-[color:var(--text-muted)]">Reading the schedules…</span>
+                    <app-loading shape="inline" label="Reading the schedules…" />
                   } @else if (startsOf(t).length) {
                     @for (s of startsOf(t); track s.jobId; let last = $last) {
                       <a class="link-inline" [routerLink]="['/pipelines/schedules', s.jobId, 'executions']" [attr.data-job]="s.jobId">{{ s.name }}</a>@if (!s.on) {<span class="text-[color:var(--text-muted)]"> ({{ s.why }})</span>}@if (!last) {<span>, </span>}
@@ -101,11 +107,13 @@
     }
 
     @case ('dataset') {
-      <app-table-shell data-test="dataset" heading="Approved data" columnsKey="document-dataset" [loading]="datasetLoading()" [error]="datasetError()"
+      <app-table-shell data-test="dataset" heading="Approved data" columnsKey="document-dataset" [loading]="datasetBusy()" [error]="datasetProblem()"
                        [isEmpty]="!dataset().length" [shown]="dataset().length" [total]="datasetTotal()"
-                       emptyMessage="No approved documents of this type yet. When one is approved, by a reviewer or on its own, its values land here as a row." emptyIcon="table" (retry)="loadDataset()">
+                       [emptyMessage]="types().length ? 'No approved documents of this type yet. When one is approved, by a reviewer or on its own, its values land here as a row.' : 'No document types yet, so there is no approved data. Add one under Document types.'"
+                       emptyIcon="table" (retry)="retryDataset()">
         <ng-container toolbar>
           <select class="input max-w-48" aria-label="Document type" [value]="datasetType()" (change)="pickDatasetType($any($event.target).value)">
+            @if (!types().length) { <option value="">{{ typesState.loading() ? 'Loading types…' : 'No document type yet' }}</option> }
             @for (t of types(); track t.documentTypeId) { <option [value]="t.documentTypeId" [selected]="t.documentTypeId + '' === datasetType()">{{ t.name }}</option> }
           </select>
           <button type="button" class="btn btn-default btn-sm" [disabled]="!!downloading() || !datasetTotal()" (click)="download('csv')">
@@ -118,10 +126,10 @@
         <table class="table-modern">
           <thead>
             <tr>
-              <th>Document</th>
-              <th>Approved</th>
-              @for (c of datasetColumns(); track c.key) { <th>{{ c.label }}</th> }
-              @for (t of datasetTables(); track t.key) { <th class="text-right">{{ t.label }}</th> }
+              <th appSort="document" [sortBy]="datasetSort">Document</th>
+              <th appSort="approved" [sortBy]="datasetSort">Approved</th>
+              @for (c of datasetColumns(); track c.key) { <th [appSort]="'fields.' + c.key" [sortBy]="datasetSort">{{ c.label }}</th> }
+              @for (t of datasetTables(); track t.key) { <th class="text-right" [appSort]="'tables.' + t.key" [sortBy]="datasetSort">{{ t.label }}</th> }
             </tr>
           </thead>
           <tbody>
@@ -168,7 +176,9 @@
           <app-icon name="mail" size="1.25rem" class="text-[color:var(--text-secondary)] mt-0.5" />
           <div class="min-w-0 flex-1">
             <h2 class="font-semibold text-sm">Email-in</h2>
-            @if (mailbox(); as m) {
+            @if (mailboxError() && !mailbox()) {
+              <app-inline-status data-test="mailbox-error" [error]="mailboxError()" (retry)="loadMailbox()" />
+            } @else if (mailbox(); as m) {
               @if (!m.enabled) {
                 <p class="text-xs text-[color:var(--text-muted)]">Email-in is not set up on this platform.</p>
               } @else if (m.configured && m.active) {
@@ -181,7 +191,7 @@
                 <p class="text-xs text-[color:var(--text-muted)]">{{ m.configured ? 'The address is off: mail to it is ignored.' : 'This workspace has no email-in address yet.' }}</p>
               }
             } @else {
-              <p class="text-xs text-[color:var(--text-muted)]">Reading the address…</p>
+              <app-loading class="text-xs" shape="inline" label="Reading the address…" />
             }
           </div>
           @if (canManageMailbox() && mailbox()?.enabled) {
@@ -201,7 +211,8 @@
     }
 
     @default {
-      <app-stat-strip [items]="kpis()" [cols]="2" [smCols]="4" align="start" size="md" label="Document Intelligence at a glance" />
+      <app-stat-strip [items]="kpis()" [cols]="2" [smCols]="4" align="start" size="md" label="Document Intelligence at a glance"
+                      [loading]="statsState.pending()" [failed]="!!statsState.error() && !statsState.loaded()" />
 
       <app-table-shell data-test="recent" heading="Recent documents" columnsKey="document-recent" [loading]="loading()" [error]="error()"
                        [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="recent().length"
@@ -230,17 +241,17 @@
         <table class="table-modern">
           <thead>
             <tr>
-              <th>Document</th>
-              <th>Type</th>
-              <th class="text-right">Fields</th>
-              <th>Confidence</th>
-              <th>State</th>
-              <th>Received</th>
+              <th appSort="document" [sortBy]="recentSort">Document</th>
+              <th appSort="type" [sortBy]="recentSort">Type</th>
+              <th class="text-right" appSort="fields" [sortBy]="recentSort">Fields</th>
+              <th appSort="confidence" [sortBy]="recentSort">Confidence</th>
+              <th appSort="state" [sortBy]="recentSort">State</th>
+              <th appSort="received" [sortBy]="recentSort">Received</th>
               <th class="w-12 th-actions">Actions</th>
             </tr>
           </thead>
           <tbody>
-            @for (r of filtered(); track r.key) {
+            @for (r of recentSorted(); track r.key) {
               <tr>
                 <td class="max-w-72">
                   @if (r.extraction) {
@@ -296,16 +307,16 @@
       <table class="table-modern">
         <thead>
           <tr>
-            <th>File</th>
-            <th>Channel</th>
-            <th>From</th>
-            <th>Outcome</th>
-            <th>Document</th>
-            <th>Arrived</th>
+            <th appSort="file" [sortBy]="intakeSort">File</th>
+            <th appSort="channel" [sortBy]="intakeSort">Channel</th>
+            <th appSort="from" [sortBy]="intakeSort">From</th>
+            <th appSort="outcome" [sortBy]="intakeSort">Outcome</th>
+            <th appSort="document" [sortBy]="intakeSort">Document</th>
+            <th appSort="arrived" [sortBy]="intakeSort">Arrived</th>
           </tr>
         </thead>
         <tbody>
-          @for (i of intakes(); track i.intakeId) {
+          @for (i of intakesSorted(); track i.intakeId) {
             <tr>
               <td class="max-w-64"><span class="font-medium [overflow-wrap:anywhere]">{{ i.fileName }}</span></td>
               <td class="text-xs whitespace-nowrap">{{ channelLabels[i.channel] || i.channel }}</td>

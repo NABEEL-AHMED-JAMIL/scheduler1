@@ -73,7 +73,11 @@ export class WorkspaceDirectory {
     if (this.loaded()) return of(this.workspaces());
     if (!this.request$) {
       this.request$ = this.http.get<ApiResponse<WorkspaceOption[]>>(`${API_BASE}/tenant.json/listTenants`).pipe(
-        map(r => (r?.status === API_SUCCESS ? (r.data ?? []) : [])),
+        // Owner 2026-10-27: a refused answer is a failure, not "no workspaces" -- it used to read as an empty list.
+        map(r => {
+          if (r?.status !== API_SUCCESS) throw new Error('refused');
+          return r.data ?? [];
+        }),
         tap(list => {
           this.workspaces.set(list.map(t => ({ tenantId: t.tenantId, tenantName: t.tenantName, tenantCode: t.tenantCode, status: t.status,
             managementMode: t.managementMode, sandboxOf: t.sandboxOf ?? null })));

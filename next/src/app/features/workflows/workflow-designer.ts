@@ -21,6 +21,8 @@ import { DraftStep, OPERATORS, OUTCOME_FIELDS, RESULT_TAKES, ResultField, RunRes
 import { shortTime } from './history';
 import { splitTail } from './inbox-list';
 import { PageHeader } from '../../shared/ui/page-header';
+import { AppLoading, InlineStatus, loadErrorText } from '../../shared/ui/loading';
+import { LoadError } from '../../shared/ui/load-error';
 import { StepsApi } from '../tasks/steps/steps.service';
 import { ApiRequestChoice } from '../tasks/steps/steps.model';
 
@@ -68,7 +70,7 @@ export function isBuiltIn(w: Pick<WorkflowSummary, 'builtIn' | 'createdBy'>): bo
  */
 @Component({
   selector: 'app-workflow-designer',
-  imports: [PageHeader, FormsModule, NgTemplateOutlet, RouterLink, Icon, StatusPill, Combobox, ManagedBanner, FlowGraph],
+  imports: [PageHeader, FormsModule, NgTemplateOutlet, RouterLink, Icon, StatusPill, Combobox, ManagedBanner, FlowGraph, AppLoading, InlineStatus, LoadError],
   templateUrl: './workflow-designer.html',
   host: { '(document:keydown)': 'onKey($event)' },
 })
@@ -123,6 +125,22 @@ export class WorkflowDesigner implements OnInit {
   readonly jobs = signal<{ jobId: number; jobName?: string }[]>([]);
   /** Owner #25: the workspace's saved API requests, for a Call API step; read the first time one is shown. */
   readonly apiRequests = signal<ApiRequestChoice[] | null>(null);
+  /**
+   * Owner 2026-10-27: each list a picker offers says while it loads, why it failed (with Try again) and that it is
+   * empty -- the schedules, the saved requests, the teams and the colleagues answered "No matches" or "No teams yet"
+   * while loading and when their read failed. Also the workflow being opened, which showed "Pick a workflow" meanwhile.
+   */
+  readonly jobsLoading = signal(true);
+  readonly jobsError = signal('');
+  readonly apiRequestsLoading = signal(false);
+  readonly apiRequestsError = signal('');
+  readonly teamsLoading = signal(false);
+  readonly teamsError = signal('');
+  readonly colleaguesError = signal('');
+  /** The workflow being opened, and why the last open failed (its key, for Try again). */
+  readonly opening = signal<string | null>(null);
+  readonly openError = signal('');
+  private openFailedKey: string | null = null;
   private readonly stepsApi = inject(StepsApi);
 
   // new workflow
@@ -257,6 +275,12 @@ export class WorkflowDesigner implements OnInit {
     return found && found !== 'missing' && found !== 'loading' ? found : null;
   });
 
+  /** The selected Run pipeline step's pipeline is still being read: no parameter is "Not declared" yet. */
+  readonly pipelineLoading = computed(() => {
+    const s = this.step();
+    return !!s && s.type === 'run_pipeline' && s.jobId != null && this.pipelineFields()[s.jobId] === 'loading';
+  });
+
   /** The parameters the selected step maps, declared or not: each with what the pipeline says of it. */
   parameterRows(s: DraftStep): { name: string; value: string; declared: PipelineParameter | null }[] {
     const declared = this.selectedPipeline()?.parameters ?? [];
@@ -378,6 +402,12 @@ export class WorkflowDesigner implements OnInit {
     });
   }
 
+  /** Reads a pipeline that could not be read again (the answer was kept, so it was never asked again). */
+  retryPipelineFields(jobId: number): void {
+    this.pipelineFields.update(m => { const next = { ...m }; delete next[jobId]; return next; });
+    this.loadPipelineFields(jobId);
+  }
+
   constructor() {
     // The requests are read once a workflow has a Call API step to show them in.
     effect(() => {
@@ -394,8 +424,19 @@ export class WorkflowDesigner implements OnInit {
   loadApiRequests(): void {
     if (this.apiRequests() !== null) return;
     this.apiRequests.set([]);
-    this.stepsApi.apiRequests().subscribe({ next: r => this.apiRequests.set(r), error: () => this.apiRequests.set([]) });
+    this.apiRequestsLoading.set(true);
+    this.apiRequestsError.set('');
+    this.stepsApi.apiRequests().subscribe({
+      next: r => { this.apiRequests.set(r); this.apiRequestsLoading.set(false); },
+      error: err => {
+        this.apiRequestsLoading.set(false);
+        this.apiRequestsError.set(loadErrorText(err, 'The saved API requests could not be read.'));
+      },
+    });
   }
+
+  /** Try again after the saved requests could not be read. */
+  retryApiRequests(): void { this.apiRequests.set(null); this.loadApiRequests(); }
 
   /** A Call API step's variables as rows to edit. */
   variableRows(s: DraftStep): { name: string; value: string }[] {
@@ -461,30 +502,61 @@ export class WorkflowDesigner implements OnInit {
   }
 
   ngOnInit(): void {
-    if (this.noWorkspace()) { this.loading.set(false); return; }
-    this.api.colleagues().subscribe({ next: r => { if (r.status === API_SUCCESS) { this.colleagues.set(r.data ?? []); this.colleaguesLoaded.set(true); } }, error: () => {} });
-    if (this.auth.isTenantAdmin()) {
-      this.teamsApi.list().subscribe({
-        next: r => { if (r.status === API_SUCCESS) this.teams.set((r.data ?? []).map(t => ({ id: t.teamId, name: t.name }))); },
-        error: () => {},
-      });
-    }
-    this.http.get<ApiResponse<{ jobId: number; jobName?: string }[]>>(`${API_BASE}/sourceJob.json/listSourceJob`).subscribe({
-      next: r => { if (r.status === API_SUCCESS) this.jobs.set(Array.isArray(r.data) ? r.data : []); },
-      error: () => {},
-    });
+    if (this.noWorkspace()) { this.loading.set(false); this.jobsLoading.set(false); return; }
+    this.loadColleagues();
+    if (this.auth.isTenantAdmin()) this.loadTeams();
+    this.loadJobs();
     const linked = this.route.snapshot.queryParamMap.get('key');
     // A link to one workflow opens on it, below 1024 px too.
     if (linked) this.pane.set('detail');
     this.loadList(linked);
   }
 
+  loadColleagues(): void {
+    this.colleaguesError.set('');
+    this.api.colleagues().subscribe({
+      next: r => {
+        if (r.status === API_SUCCESS) { this.colleagues.set(r.data ?? []); this.colleaguesLoaded.set(true); }
+        else this.colleaguesError.set(loadErrorText(r, 'The workspace\'s people could not be read.'));
+      },
+      error: err => this.colleaguesError.set(loadErrorText(err, 'The workspace\'s people could not be read.')),
+    });
+  }
+
+  loadTeams(): void {
+    this.teamsLoading.set(true);
+    this.teamsError.set('');
+    this.teamsApi.list().subscribe({
+      next: r => {
+        this.teamsLoading.set(false);
+        if (r.status === API_SUCCESS) this.teams.set((r.data ?? []).map(t => ({ id: t.teamId, name: t.name })));
+        else this.teamsError.set(loadErrorText(r, 'The teams could not be read.'));
+      },
+      error: err => { this.teamsLoading.set(false); this.teamsError.set(loadErrorText(err, 'The teams could not be read.')); },
+    });
+  }
+
+  loadJobs(): void {
+    this.jobsLoading.set(true);
+    this.jobsError.set('');
+    this.http.get<ApiResponse<{ jobId: number; jobName?: string }[]>>(`${API_BASE}/sourceJob.json/listSourceJob`).subscribe({
+      next: r => {
+        this.jobsLoading.set(false);
+        if (r.status === API_SUCCESS) this.jobs.set(Array.isArray(r.data) ? r.data : []);
+        else this.jobsError.set(loadErrorText(r, 'The schedules could not be read.'));
+      },
+      error: err => { this.jobsLoading.set(false); this.jobsError.set(loadErrorText(err, 'The schedules could not be read.')); },
+    });
+  }
+
   loadList(open?: string | null): void {
     this.loading.set(true);
+    // Owner 2026-10-27: a read again starts clean; the banner stayed after a later read worked.
+    this.error.set('');
     this.api.list().subscribe({
       next: r => {
         this.loading.set(false);
-        if (r.status !== API_SUCCESS) { this.error.set(r.message || 'Workflows could not be read.'); return; }
+        if (r.status !== API_SUCCESS) { this.error.set(loadErrorText(r, 'Workflows could not be read.')); return; }
         const rows = r.data ?? [];
         this.workflows.set(rows);
         // A link to a workflow this workspace does not have -- another workspace's, a deleted one, a typo. Said plainly in
@@ -495,7 +567,7 @@ export class WorkflowDesigner implements OnInit {
         if (key) this.open(key, true);
         else if (this.canEdit()) this.view.set('new');
       },
-      error: () => { this.loading.set(false); this.error.set('Workflows could not be read.'); },
+      error: err => { this.loading.set(false); this.error.set(loadErrorText(err, 'Workflows could not be read.')); },
     });
   }
 
@@ -542,9 +614,22 @@ export class WorkflowDesigner implements OnInit {
   }
 
   open(key: string, quiet = false): void {
+    // Owner 2026-10-27: the pane says a workflow is opening, and a failed read stays on it with Try again (it was a toast,
+    // or nothing at all for a quiet open). A late answer for a key no longer asked for is dropped.
+    this.opening.set(key);
+    this.openError.set('');
+    this.openFailedKey = null;
+    const failed = (message: string) => {
+      if (this.opening() !== key) return;
+      this.opening.set(null);
+      this.openFailedKey = key;
+      this.openError.set(message);
+    };
     this.api.fetch(key).subscribe({
       next: r => {
-        if (r.status !== API_SUCCESS || !r.data) { if (!quiet) this.toast.error(r.message || 'That workflow could not be read.'); return; }
+        if (this.opening() !== key) return;
+        if (r.status !== API_SUCCESS || !r.data) { failed(loadErrorText(r, 'That workflow could not be read.')); return; }
+        this.opening.set(null);
         this.missingKey.set(null);
         this.current.set(r.data);
         this.loadVersion(r.data.versions[0]?.steps);
@@ -560,11 +645,15 @@ export class WorkflowDesigner implements OnInit {
         this.router.navigate([], { relativeTo: this.route, queryParams: { key }, replaceUrl: true });
       },
       error: (e: unknown) => {
-        if ((e as { status?: number })?.status === 404) { this.showMissing(key); return; }
-        if (!quiet) this.toast.error('That workflow could not be read. Try again.');
+        if (this.opening() !== key) return;
+        if ((e as { status?: number })?.status === 404) { this.opening.set(null); this.showMissing(key); return; }
+        failed(loadErrorText(e, 'That workflow could not be read.'));
       },
     });
   }
+
+  /** Opens again the workflow that could not be read. */
+  retryOpen(): void { if (this.openFailedKey) this.open(this.openFailedKey); }
 
   /** No workflow by this key here: nothing is open, the link's key leaves the address, the pane says which key it was. */
   private showMissing(key: string): void {

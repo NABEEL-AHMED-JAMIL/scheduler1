@@ -111,3 +111,31 @@ describe('WorkspaceSelect (owner #5)', () => {
       .toEqual(['A (#1)', 'a (#2)', 'Workspace 3']);
   });
 });
+
+/** Owner 2026-10-27: the box says it is loading the workspaces, and a failed list says so with Try again. */
+describe('WorkspaceSelect -- loading and a failed list', () => {
+  beforeEach(() => sessionStorage.clear());
+  afterEach(() => sessionStorage.clear());
+
+  it('reads "Loading workspaces…" until the list answers', () => {
+    const { el, http, select, fixture } = render(true);
+    expect(select.listing()).toBe(true);
+    expect(el.querySelector('[data-test="workspace-select"] input')!.getAttribute('placeholder')).toBe('Loading workspaces…');
+    http.expectOne(r => r.url.endsWith('/tenant.json/listTenants')).flush({ status: API_SUCCESS, data: LIST });
+    fixture.detectChanges();
+    expect(select.listing()).toBe(false);
+  });
+
+  it('says the list could not be read, and Try again reads it again', () => {
+    const { el, http, select, fixture } = render(true);
+    http.expectOne(r => r.url.endsWith('/tenant.json/listTenants')).flush('down', { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+    expect(select.listing()).toBe(false);
+    expect(el.querySelector('[data-test="workspace-select-error"]')!.textContent).toContain('The workspaces could not be read.');
+    select.reload();
+    http.expectOne(r => r.url.endsWith('/tenant.json/listTenants')).flush({ status: API_SUCCESS, data: LIST });
+    fixture.detectChanges();
+    expect(el.querySelector('[data-test="workspace-select-error"]')).toBeNull();
+    expect(select.options().length).toBe(3);
+  });
+});

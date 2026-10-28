@@ -19,6 +19,8 @@
                      message="Who approves reports, who publishes templates and what retention removes are set by each workspace's administrators, in their own console." />
   } @else if (error()) {
     <app-load-error [message]="error()" (retry)="load()" />
+  } @else if (!settings()) {
+    <app-loading shape="cards" label="Loading the settings…" [count]="3" />
   } @else if (settings(); as s) {
     <div class="rss-grid">
       <section class="card p-4" aria-labelledby="rss-approvals" data-test="settings-approvals">
@@ -34,7 +36,9 @@
               @for (t of teams(); track t.teamId) {
                 <option [value]="'team:' + t.teamId">The {{ t.name }} team</option>
               }
+              @if (teamsState.loading() && !teams().length) { <option value="" disabled>Loading teams…</option> }
             </select>
+            <app-inline-status [loading]="teamsState.loading()" [error]="teamsState.error()" label="Loading teams…" (retry)="loadTeams()" />
             <p class="rss-why mt-1" data-test="reviewers-now">{{ whoWords(s.resolved?.reviewers) }}</p>
           </div>
         </div>
@@ -62,7 +66,9 @@
               @for (t of teams(); track t.teamId) {
                 <option [value]="'team:' + t.teamId">The {{ t.name }} team</option>
               }
+              @if (teamsState.loading() && !teams().length) { <option value="" disabled>Loading teams…</option> }
             </select>
+            <app-inline-status [loading]="teamsState.loading()" [error]="teamsState.error()" label="Loading teams…" (retry)="loadTeams()" />
             <p class="rss-why mt-1">{{ whoWords(s.resolved?.publishers) }}</p>
           </div>
         </div>
@@ -87,26 +93,31 @@
         <button type="button" class="btn btn-default btn-sm" [disabled]="previewing() || !s.editable" (click)="runPreview()" data-test="retention-preview"><app-icon name="eye" />Preview</button>
       </div>
       @if (previewError()) { <p class="text-sm text-crit-500" role="alert">{{ previewError() }}</p> }
+      @if (previewing() && !preview()) { <app-loading shape="rows" label="Working out what retention would remove…" [count]="3" /> }
       @if (preview(); as p) {
+        <app-blur-loader [active]="previewing()" label="Working it out again…">
         <p class="text-sm mb-2" data-test="retention-summary"><b>{{ p.count }}</b> item{{ p.count === 1 ? '' : 's' }} ({{ size(p.bytes) }}) of {{ p.total }} would go.
           Kept for a rule: {{ p.kept.current }} current version{{ p.kept.current === 1 ? '' : 's' }}, {{ p.kept.approved }} approved or signed, {{ p.kept.waiting }} waiting for approval.</p>
         @if (p.versions.length) {
           <div class="overflow-x-auto"><table class="table rss-table" aria-label="Report versions whose files would go">
-            <thead><tr><th>Report</th><th>Version</th><th>Made</th><th class="text-right">Files</th></tr></thead>
-            <tbody>@for (v of p.versions; track v.reportId + v.version) {
+            <thead><tr><th appSort="report" [sortBy]="retentionVersionSort">Report</th><th appSort="version" [sortBy]="retentionVersionSort">Version</th>
+              <th appSort="made" [sortBy]="retentionVersionSort">Made</th><th class="text-right" appSort="files" [sortBy]="retentionVersionSort">Files</th></tr></thead>
+            <tbody>@for (v of sortedRetentionVersions(); track v.reportId + v.version) {
               <tr><td><a [routerLink]="['/reports/library', v.reportId]" class="link-inline">{{ v.reportLabel }}</a> {{ v.name }}</td><td>v{{ v.version }}</td>
                 <td class="whitespace-nowrap">{{ v.createdAt | rsTime: 'dateTime' }}</td><td class="text-right tabular">{{ size(v.bytes) }}</td></tr>
             }</tbody></table></div>
         }
         @if (p.snapshots.length) {
           <div class="overflow-x-auto mt-3"><table class="table rss-table" aria-label="Frozen data that would go">
-            <thead><tr><th>Frozen data</th><th>Why</th><th>Taken</th><th class="text-right">Size</th></tr></thead>
-            <tbody>@for (d of p.snapshots; track d.snapshotId) {
+            <thead><tr><th appSort="data" [sortBy]="retentionSnapshotSort">Frozen data</th><th appSort="why" [sortBy]="retentionSnapshotSort">Why</th>
+              <th appSort="taken" [sortBy]="retentionSnapshotSort">Taken</th><th class="text-right" appSort="size" [sortBy]="retentionSnapshotSort">Size</th></tr></thead>
+            <tbody>@for (d of sortedRetentionSnapshots(); track d.snapshotId) {
               <tr><td class="max-w-80 truncate" [title]="d.label || ''">{{ d.label || 'Data' }}</td><td>{{ d.why }}</td>
                 <td class="whitespace-nowrap">{{ d.takenAt | rsTime: 'dateTime' }}</td><td class="text-right tabular">{{ size(d.bytes) }}</td></tr>
             }</tbody></table></div>
         }
         @if (!p.count) { <p class="text-sm text-[color:var(--text-muted)]">Nothing would go at {{ p.days }} days.</p> }
+        </app-blur-loader>
       }
     </section>
   }

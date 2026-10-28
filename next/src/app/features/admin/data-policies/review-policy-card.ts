@@ -8,6 +8,7 @@ import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { BulkReviewApi, DocumentReviewPolicy, RunReviewPolicy } from '../../../shared/ui/bulk/bulk-review.api';
 import { refusal } from '../../../shared/ui/bulk/bulk.model';
+import { AppLoading, InlineStatus } from '../../../shared/ui/loading';
 
 interface Draft { runs: boolean; documents: boolean; ruleFailures: boolean; }
 
@@ -20,7 +21,7 @@ interface Draft { runs: boolean; documents: boolean; ruleFailures: boolean; }
  */
 @Component({
   selector: 'app-review-policy-card',
-  imports: [Icon, ServerTimePipe],
+  imports: [Icon, ServerTimePipe, AppLoading, InlineStatus],
   template: `
     @if (hasWorkspace()) {
       <section class="card p-4 flex flex-col gap-3" aria-labelledby="review-policy-title" data-review-policy>
@@ -34,11 +35,9 @@ interface Draft { runs: boolean; documents: boolean; ruleFailures: boolean; }
             </p>
           </div>
         </div>
+        <!-- Owner 2026-10-27: Try again is a coloured button (app-inline-status), the loading line a status for readers. -->
         @if (error()) {
-          <p class="text-sm text-crit-500 flex items-start gap-1.5" role="alert" data-review-policy-error>
-            <app-icon name="alert" size="0.9em" class="mt-0.5 shrink-0" /><span>{{ error() }}</span>
-            <button type="button" class="link-inline ml-2" (click)="load()">Try again</button>
-          </p>
+          <app-inline-status data-review-policy-error [error]="error()" (retry)="load()" />
         } @else if (draft(); as d) {
           <ul class="flex flex-col gap-2.5">
             <li>
@@ -91,7 +90,7 @@ interface Draft { runs: boolean; documents: boolean; ruleFailures: boolean; }
             </p>
           }
         } @else {
-          <p class="text-sm text-[color:var(--text-muted)] flex items-center gap-2"><span class="spinner"></span>Reading the review policy…</p>
+          <app-loading shape="panel" [count]="3" label="Loading the review policy…" />
         }
       </section>
     }

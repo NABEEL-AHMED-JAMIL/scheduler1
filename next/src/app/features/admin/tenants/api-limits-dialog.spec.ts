@@ -2,7 +2,8 @@ import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
-import { of } from 'rxjs';
+import { NEVER, Observable, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { ApiLimitsDialog, boundValue } from './api-limits-dialog';
 import { ApiClientsApi } from '../../integration/api-clients/api-clients.api';
 import { ToastService } from '../../../shared/ui/toast.service';
@@ -55,5 +56,35 @@ describe('MIG-337: a workspace\'s API limits (Administration › Tenants)', () =
     expect(boundValue('10,000')).toBe(10000);
     expect(boundValue(' ')).toBe(0);
     expect(boundValue('-5')).toBeNull();
+  });
+});
+
+describe('API limits dialog -- loading, error (owner 2026-10-27)', () => {
+  function withLimits(limits: () => Observable<unknown>) {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [
+      provideZonelessChangeDetection(),
+      { provide: DIALOG_DATA, useValue: { tenantId: 2946, tenantName: 'Northwind Group' } },
+      { provide: DialogRef, useValue: { close: vi.fn() } },
+      { provide: ApiClientsApi, useValue: { limits, saveLimits: vi.fn() } },
+      { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn() } },
+    ] });
+    const fixture = TestBed.createComponent(ApiLimitsDialog);
+    fixture.detectChanges();
+    return { d: fixture.componentInstance, el: fixture.nativeElement as HTMLElement };
+  }
+
+  it('is loading until the limits answer', () => {
+    const { d, el } = withLimits(() => NEVER);
+    expect(d.loaded()).toBeNull();
+    expect(d.loadError()).toBe('');
+    expect(el.querySelector('app-loading')).not.toBeNull();
+  });
+
+  it('says a failed read in plain words, with Try again', () => {
+    const { d, el } = withLimits(() => throwError(() => new HttpErrorResponse({ status: 500, error: 'Internal Server Error' })));
+    expect(d.loadError()).toBe('The limits could not be read.');
+    expect(d.loaded()).toBeNull();
+    expect(el.querySelector('app-load-error')).not.toBeNull();
   });
 });

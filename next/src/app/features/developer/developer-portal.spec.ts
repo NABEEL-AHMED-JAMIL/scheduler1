@@ -5,7 +5,8 @@ import { TestBed } from '@angular/core/testing';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { Router, provideRouter, withComponentInputBinding } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
-import { of, throwError } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { routes } from '../../app.routes';
 import { pageGuard } from '../../core/auth/auth.guard';
 import { AuthService } from '../../core/auth/auth.service';
@@ -26,6 +27,7 @@ const SANDBOX = { tenantId: 2950, name: 'Northwind (sandbox)', code: 'NWSBX', st
 /** A platform administrator's directory: no workspace of his own, the one this session picked last (null: none). */
 function platformDirectory(remembered: number | null) {
   return { picks: () => true, remembered: () => remembered, names: () => new Map(), recent: () => [], workspaces: () => [], load: () => of([]),
+    loaded: () => true, error: () => '',
     choose: vi.fn(), nameOf: (id: number) => `Workspace ${id}` };
 }
 
@@ -280,5 +282,67 @@ describe('APIs this workspace calls, for each role', () => {
     expect(collections.list).toHaveBeenCalledWith('', 1, 50, 2960);
     expect(collections.get).toHaveBeenCalledWith(7, 2960);
     expect(el.querySelector('[data-collection="7"]')).not.toBeNull();
+  });
+});
+
+describe('Developer portal -- loading, empty, error (owner 2026-10-27)', () => {
+  it('the sandbox card is loading until Identity answers, then can try again after a failure', () => {
+    let answer: () => unknown = () => NEVER;
+    const api = configure(true, () => answer());
+    const fixture = TestBed.createComponent(DeveloperOverview);
+    fixture.detectChanges();
+    const page = fixture.componentInstance;
+    expect(page.sandboxLoading()).toBe(true);
+    expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('No sandbox yet');
+    answer = () => throwError(() => new HttpErrorResponse({ status: 500 }));
+    page.loadSandbox();
+    expect(page.sandboxLoading()).toBe(false);
+    expect(page.sandboxError()).toBe('Your sandbox could not be read just now.');
+    answer = () => of({ status: 'SUCCESS', message: '', data: null });
+    page.loadSandbox();
+    expect(page.sandboxError()).toBe('');
+    expect(api.sandbox).toHaveBeenCalledTimes(3);
+  });
+
+  function connectedWith(list: () => unknown, get: () => unknown, sample: () => unknown = () => of({ status: 'SUCCESS', message: '', data: null })) {
+    configure(true);
+    TestBed.overrideProvider(ApiCollectionsApi, { useValue: { list: vi.fn(list), get: vi.fn(get), sample: vi.fn(sample) } });
+    const fixture = TestBed.createComponent(DeveloperConnected);
+    fixture.detectChanges();
+    return { fixture, page: fixture.componentInstance, el: fixture.nativeElement as HTMLElement };
+  }
+  const ONE = () => of({ status: 'SUCCESS', message: '', data: [{ collectionId: 7, name: 'Public health APIs' }] });
+  const DETAIL = () => of({ status: 'SUCCESS', message: '', data: { collection: { collectionId: 7, name: 'Public health APIs' },
+    requests: [{ requestId: 3, name: 'Cases', method: 'get', urlTemplate: '/cases', enabled: true }] } });
+
+  it('the collections are loading, not "No API collection yet", until the list answers', () => {
+    const { page, el } = connectedWith(() => NEVER, DETAIL);
+    expect(page.loading()).toBe(true);
+    expect(el.textContent).not.toContain('No API collection yet');
+  });
+
+  it('a refused list is an error, not an empty list', () => {
+    const { page } = connectedWith(() => of({ status: 'ERROR', message: '' }), DETAIL);
+    expect(page.loading()).toBe(false);
+    expect(page.error()).toBe('The API collections could not be read.');
+  });
+
+  it('a collection whose detail fails is counted, not silently dropped', () => {
+    const { page, fixture, el } = connectedWith(ONE, () => throwError(() => new HttpErrorResponse({ status: 500 })));
+    fixture.detectChanges();
+    expect(page.unread()).toBe(1);
+    expect(el.querySelector('[data-collections-unread]')!.textContent).toContain('1 collection could not be read.');
+    expect(el.textContent).not.toContain('No API collection yet');
+  });
+
+  it('a last answer that could not be read says so and reads again on Try again', () => {
+    let sample: () => unknown = () => throwError(() => new HttpErrorResponse({ status: 500 }));
+    const { page } = connectedWith(ONE, DETAIL, () => sample());
+    page.toggle(3);
+    expect(page.sampleErrors()[3]).toBe('The last answer could not be read.');
+    sample = () => of({ status: 'SUCCESS', message: '', data: null });
+    page.readSample(3);
+    expect(page.sampleErrors()[3]).toBeUndefined();
+    expect(page.samples()[3]).toBeNull();
   });
 });

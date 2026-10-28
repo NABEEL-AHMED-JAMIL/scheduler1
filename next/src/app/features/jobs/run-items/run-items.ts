@@ -12,7 +12,7 @@ import { refusalOf } from '../../../shared/ui/blob-refusal';
 import { StorageService } from '../../objects/storage.service';
 import { attachmentName } from '../run-steps/run-steps.model';
 import { plural } from '../run-steps/run-page.model';
-import { RunItemsApi, refusalText } from './run-items.api';
+import { ListOrder, RunItemsApi, refusalText } from './run-items.api';
 import {
   CellLook, FILTER_LABEL, ItemFilter, ItemStep, ItemsPage, MAX_ZIP_ITEMS, NO_SELECTION, RunItem, Selection, SelectionAnswer, cellLook,
   fieldText, filterCount, filtersOf, isSelected, itemLook, itemPanelConfig, itemStats, itemSub, itemTime, itemsQuery, pageState,
@@ -22,6 +22,11 @@ import {
 import { ItemPanelData, RunItemPanel } from './run-item-panel';
 import { ItemFilesData, RunItemFiles } from './run-item-files';
 import { ReviewChoice, ReviewDialogData, RunItemsReview } from './run-items-review';
+import { AppLoading, InlineStatus } from '../../../shared/ui/loading';
+import { LoadError } from '../../../shared/ui/load-error';
+import { BlurLoader } from '../../../shared/ui/blur-loader';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
 
 /** A document's pages (or any item's sub-items), read when its row is opened. */
 interface Children { items: RunItem[]; total: number; page: number; failedOnly: boolean; loading: boolean; error: string; }
@@ -38,7 +43,7 @@ export const CHILD_PAGE = 15;
  */
 @Component({
   selector: 'app-run-items',
-  imports: [Icon, StatStrip, Pagination, EmptyState, CdkMenu, CdkMenuItemCheckbox, CdkMenuTrigger],
+  imports: [Icon, StatStrip, Pagination, EmptyState, CdkMenu, CdkMenuItemCheckbox, CdkMenuTrigger, AppLoading, InlineStatus, LoadError, BlurLoader, SortHeader],
   styles: `
     .ri-table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
     /* ZT-I35: headers in the design's sentence case, a step by its short name (its whole name on hover). */
@@ -143,13 +148,15 @@ export const CHILD_PAGE = 15;
             <app-icon name="lock" size="0.9em" />{{ data()!.maskNote }}</p>
         }
 
+        <!-- Owner 2026-10-27: a filter, search or page that fails keeps the rows and says so above them (the error was set
+             and never shown); the first load is a skeleton, its failure the shared error with Try again. -->
+        @if (error() && data()) {
+          <div class="px-4 py-2 border-b border-subtle" data-test="items-reload-error"><app-inline-status [error]="error()" (retry)="load()" /></div>
+        }
         @if (error() && !data()) {
-          <div class="p-8 flex flex-col items-start gap-3" role="alert">
-            <p class="text-sm text-crit-500">{{ error() }}</p>
-            <button type="button" class="btn btn-default btn-sm" (click)="load()">Try again</button>
-          </div>
+          <app-load-error [message]="error()" (retry)="load()" />
         } @else if (!data()) {
-          <p class="px-4 py-3 text-xs text-[color:var(--text-muted)]" aria-busy="true">Reading the run's items…</p>
+          <app-loading shape="rows" label="Reading the run's items…" />
         } @else if (!rows().length) {
           <app-empty-state class="p-8" icon="list" [title]="emptyTitle()" [message]="emptyMessage()">
             @if (status() !== 'all' || searchApplied()) {
@@ -157,6 +164,7 @@ export const CHILD_PAGE = 15;
             }
           </app-empty-state>
         } @else {
+          <app-blur-loader [active]="loading()" label="Reading the items…">
           <div class="overflow-x-auto relative" [attr.aria-busy]="loading()">
             <table class="ri-table" data-test="items-table">
               <thead>
@@ -165,16 +173,17 @@ export const CHILD_PAGE = 15;
                     <input type="checkbox" data-test="items-pick-page" [checked]="pageTick() === 'all'" [indeterminate]="pageTick() === 'some'"
                            [attr.aria-label]="'Select the ' + rows().length + ' items on this page'" (change)="tickPage($any($event.target).checked)" />
                   </th>
-                  <th scope="col" class="text-right">#</th>
-                  <th scope="col">Item</th>
-                  <th scope="col">Status</th>
+                  <!-- Owner 2026-10-27: these four sort on the server (Core's runItems); step and field columns stay plain. -->
+                  <th scope="col" appSort="position" [sortBy]="sort" class="text-right">#</th>
+                  <th scope="col" appSort="label" [sortBy]="sort">Item</th>
+                  <th scope="col" appSort="status" [sortBy]="sort">Status</th>
                   @for (s of columns(); track s.key) { <th scope="col" [attr.data-step]="s.key" [attr.title]="desc(s) || null">{{ short(s) }}</th> }
                   @for (f of fields(); track f) {
                     <th scope="col" [attr.data-field-col]="f">
                       <span class="inline-flex items-center gap-1">{{ f }}@if (isMasked(f)) { <app-icon name="lock" size="0.85em" label="Masked" title="Masked for you" /> }</span>
                     </th>
                   }
-                  <th scope="col" class="text-right">Time</th>
+                  <th scope="col" appSort="time" [sortBy]="sort" class="text-right">Time</th>
                   <th scope="col" class="ri-open"><span class="sr-only">Open</span></th>
                 </tr>
               </thead>
@@ -265,8 +274,10 @@ export const CHILD_PAGE = 15;
                     <tr class="is-child">
                       <td></td>
                       <td [attr.colspan]="span()" class="text-xs text-[color:var(--text-secondary)]" data-test="children-foot">
-                        @if (kids.loading) { Reading the pages… }
-                        @else if (kids.error) { <span class="text-crit-500">{{ kids.error }}</span> }
+                        @if (kids.loading) { <app-loading shape="inline" label="Reading the pages…" /> }
+                        @else if (kids.error) {
+                          <app-inline-status [error]="kids.error" (retry)="childPage(item, kids.page)" />
+                        }
                         @else {
                           <span class="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
                             <span class="tabular">{{ childRange(kids) }}</span>
@@ -285,6 +296,7 @@ export const CHILD_PAGE = 15;
               </tbody>
             </table>
           </div>
+          </app-blur-loader>
           <app-pagination [total]="data()!.total" [page]="page() + 1" [size]="size()" (goTo)="goTo($event - 1)" (setSize)="setSize($event)" />
         }
       </div>
@@ -362,6 +374,35 @@ export class RunItems implements OnInit {
   readonly retrying = signal(false);
   readonly children = signal<ReadonlyMap<string, Children>>(new Map());
 
+  /**
+   * Owner 2026-10-27 ("add a sort on each table"): #, Item, Status and Time sort on the server (Core reads the run's items
+   * whole and sorts them before cutting the page), so every page is in that order; a document's pages follow the same
+   * order. A new order goes back to the first page and folds the opened documents. The list's own order is # ascending (item
+   * order, exactly Core's default), and that order sends no sort.
+   */
+  readonly sort = createTableSort<RunItem>({
+    id: 'run-items',
+    server: true,
+    initial: { key: 'position', direction: 'asc' },
+    columns: {
+      position: { value: item => item.position, kind: 'number', first: 'asc' },
+      label: { value: item => item.label, kind: 'text' },
+      status: { value: item => itemLook(item).label, kind: 'status' },
+      time: { value: item => item.durationMs, kind: 'number' },
+    },
+    onChange: () => {
+      this.page.set(0);
+      this.children.set(new Map());
+      this.load();
+    },
+  });
+
+  /** What a read carries: the column and direction, or nothing for item order. */
+  private order(): ListOrder {
+    const picked = this.sort.param();
+    return picked && !(picked.sort === 'position' && picked.dir === 'asc') ? { sort: picked.sort, dir: picked.dir } : {};
+  }
+
   readonly rows = computed(() => this.data()?.items ?? []);
   readonly activeRefs = computed(() => this.showRefs() ? this.refs() : []);
   readonly refsLabel = computed(() => `Showing the ${this.activeRefs().length === 1 ? 'item' : this.activeRefs().length + ' items'} sent to review`);
@@ -403,7 +444,8 @@ export class RunItems implements OnInit {
   ngOnInit(): void {
     this.status.set(this.initialStatus());
     const first = this.first();
-    if (first && first.page === 0 && first.size === this.size() && !this.activeRefs().length) this.data.set(first);
+    // The page's own first read is in item order: a remembered column order reads again instead.
+    if (first && first.page === 0 && first.size === this.size() && !this.activeRefs().length && !this.order().sort) this.data.set(first);
     else this.load();
   }
 
@@ -425,9 +467,9 @@ export class RunItems implements OnInit {
     if (!quiet) this.loading.set(true);
     this.error.set('');
     this.request?.unsubscribe();
-    this.request = this.api.list(itemsQuery(id, {
+    this.request = this.api.list({ ...itemsQuery(id, {
       status: this.status(), search: this.searchApplied(), page: this.page(), size: this.size(), fields: this.fields(), refs: this.activeRefs(),
-    })).subscribe({
+    }), ...untracked(() => this.order()) }).subscribe({
       next: page => {
         this.loading.set(false);
         this.data.set(page);
@@ -542,9 +584,9 @@ export class RunItems implements OnInit {
       this.children.set(next);
     };
     set({ loading: true, error: '', page, failedOnly });
-    this.api.list(itemsQuery(Number(this.jobQueueId()), {
+    this.api.list({ ...itemsQuery(Number(this.jobQueueId()), {
       status: failedOnly ? 'failed' : 'all', parent: item.ref, page, size: CHILD_PAGE, fields: this.fields(),
-    })).subscribe({
+    }), ...this.order() }).subscribe({
       next: answer => set({ items: answer.items, total: answer.total, loading: false }),
       error: err => set({ loading: false, error: refusalText(err, 'The pages could not be read.') }),
     });

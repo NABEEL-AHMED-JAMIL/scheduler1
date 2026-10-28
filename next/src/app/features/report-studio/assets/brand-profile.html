@@ -61,11 +61,14 @@
                                     [disabled]="!canEdit()" (search)="find('logos', $event)" />
                 <div class="flex items-center gap-2">
                   <select class="input input-sm w-auto min-w-0 max-w-full" aria-label="Logo" [ngModel]="def().logo?.assetId ?? ''" (ngModelChange)="setLogo($event)">
-                    <option value="">Choose asset</option>
+                    <option value="">{{ pickerState.logos.loading() ? 'Loading logos…' : 'Choose asset' }}</option>
                     @for (a of logoChoices(); track a.assetId) { <option [value]="a.assetId">{{ a.name }} · v{{ a.currentVersion }}</option> }
                   </select>
                   @if (def().logo) { <button type="button" class="link-inline text-sm" (click)="setLogo('')">Remove</button> }
                 </div>
+                <app-inline-status [loading]="pickerState.logos.loading()" [error]="pickerState.logos.error()" label="Loading logos…"
+                                   [empty]="pickerState.logos.loaded() && !logoChoices().length" emptyText="No approved logo yet: upload one in Assets."
+                                   (retry)="find('logos', '')" />
               </div>
             </div>
             <div class="rsb-three">
@@ -131,9 +134,12 @@
                 <app-rs-pick-search [shown]="signatures().length" [total]="totals().signatures" label="Find a signature" placeholder="Find a signature"
                                     (search)="find('signatures', $event)" />
                 <select class="input" aria-label="Add a signature" (change)="addTo('signatures', $any($event.target).value); $any($event.target).value = ''">
-                  <option value="">Add an approved signature</option>
+                  <option value="">{{ pickerState.signatures.loading() ? 'Loading signatures…' : 'Add an approved signature' }}</option>
                   @for (a of signatures(); track a.assetId) { <option [value]="a.assetId">{{ a.name }} · v{{ a.currentVersion }}</option> }
                 </select>
+                <app-inline-status [loading]="pickerState.signatures.loading()" [error]="pickerState.signatures.error()" label="Loading signatures…"
+                                   [empty]="pickerState.signatures.loaded() && !signatures().length" emptyText="No approved signature yet."
+                                   (retry)="find('signatures', '')" />
                 <span class="text-xs text-[color:var(--text-muted)]">Approved · a template still needs its owner's grant</span>
               </div>
               <div class="field"><span class="label">Stamps</span>
@@ -144,9 +150,12 @@
                 <app-rs-pick-search [shown]="stamps().length" [total]="totals().stamps" label="Find a stamp" placeholder="Find a stamp"
                                     (search)="find('stamps', $event)" />
                 <select class="input" aria-label="Add a stamp" (change)="addTo('stamps', $any($event.target).value); $any($event.target).value = ''">
-                  <option value="">Add an approved stamp</option>
+                  <option value="">{{ pickerState.stamps.loading() ? 'Loading stamps…' : 'Add an approved stamp' }}</option>
                   @for (a of stamps(); track a.assetId) { <option [value]="a.assetId">{{ a.name }} · v{{ a.currentVersion }}</option> }
                 </select>
+                <app-inline-status [loading]="pickerState.stamps.loading()" [error]="pickerState.stamps.error()" label="Loading stamps…"
+                                   [empty]="pickerState.stamps.loaded() && !stamps().length" emptyText="No approved stamp yet."
+                                   (retry)="find('stamps', '')" />
                 <span class="text-xs text-[color:var(--text-muted)]">Approved</span>
               </div>
             </div>
@@ -165,8 +174,15 @@
           <div class="rs-head"><h2 class="section-title">Live preview</h2><span class="text-xs text-[color:var(--text-muted)]">A4 · page 1@if (previewing()) { · drawing… }</span></div>
           <div class="rsb-preview-body">
             @if (previewDoc(); as doc) { <iframe class="rsb-frame" title="Live preview of the brand" sandbox="" [srcdoc]="doc"></iframe> }
-            @else if (previewError()) { <p class="text-sm text-[color:var(--text-muted)] py-12 px-4 text-center" role="status">{{ previewError() }}</p> }
-            @else { <div class="flex justify-center py-16"><span class="spinner" role="status" aria-label="Drawing the preview"></span></div> }
+            @else if (previewError()) {
+              <div class="py-12 px-4 text-center">
+                <p class="text-sm text-[color:var(--text-muted)]" role="status">{{ previewError() }}</p>
+                @if (!isPlatformAdmin()) {
+                  <button type="button" class="btn btn-default btn-sm mt-3" (click)="retryPreview()"><app-icon name="refresh" />Try again</button>
+                }
+              </div>
+            }
+            @else { <app-loading shape="spinner" label="Drawing the preview…" /> }
             <span class="text-xs text-[color:var(--text-muted)]">Preview uses a sample wound assessment report with synthetic values. No report is generated or changed.</span>
           </div>
         </section>
@@ -225,6 +241,6 @@
     </div>
   } @else {
     <app-page-header title="Brand profile" />
-    <div class="flex justify-center py-16"><span class="spinner" role="status" aria-label="Loading"></span></div>
+    <app-loading shape="panel" label="Loading the brand profile…" [count]="6" />
   }
 </div>

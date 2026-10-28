@@ -5,6 +5,7 @@ import { SidePanel } from '../../../shared/ui/side-panel';
 import { Icon } from '../../../shared/ui/icon';
 import { ReportStudioApi, studioError } from '../report-studio.api';
 import { AssetDetail, AssetKind, KIND_WORDS, Person } from '../assets.model';
+import { InlineStatus, createLoadState } from '../../../shared/ui/loading';
 
 export interface UploadData {
   /** A new version of this asset; null: a new asset. */
@@ -28,7 +29,7 @@ const SVG_SIDE = 2048;
  */
 @Component({
   selector: 'app-rs-upload-panel',
-  imports: [SidePanel, Icon, FormsModule],
+  imports: [SidePanel, Icon, FormsModule, InlineStatus],
   template: `
     <app-side-panel [heading]="data.assetId ? 'Upload a new version: ' + data.assetName : 'Upload an asset'"
                     [subtitle]="data.assetId ? 'Old reports keep the version they used.' : 'SVG, PNG or JPG, up to 10 MB.'">
@@ -44,9 +45,12 @@ const SVG_SIDE = 2048;
           @if (kind() === 'SIGNATURE') {
             <label class="field"><span class="label">Belongs to</span>
               <select class="input" [ngModel]="owner()" (ngModelChange)="owner.set($event)" aria-label="Belongs to">
-                <option [ngValue]="null">Choose the person</option>
+                <option [ngValue]="null">{{ peopleState.loading() ? 'Loading people…' : 'Choose the person' }}</option>
                 @for (p of people(); track p.userId) { <option [ngValue]="p.userId">{{ p.name }}</option> }
               </select>
+              <app-inline-status [loading]="peopleState.loading()" [error]="peopleState.error()" label="Loading people…"
+                                 [empty]="peopleState.loaded() && !people().length" emptyText="No one in the workspace to name yet."
+                                 (retry)="loadPeople()" />
               <span class="field-note">Only this person — or someone they grant it to — places the signature on a template. When they
                 approve a report, its PDF is digitally signed in their name, and an Approver's signature on it shows this picture with their
                 name and the title below.</span></label>
@@ -87,6 +91,8 @@ export class UploadPanel implements OnInit {
   readonly owner = signal<number | null>(null);
   readonly title = signal('');
   readonly people = signal<Person[]>([]);
+  /** Owner 2026-10-27: the people read says it is loading, or why it failed, instead of a lone "Choose the person". */
+  readonly peopleState = createLoadState(false);
   readonly file = signal<Blob | null>(null);
   readonly fileName = signal('');
   readonly note = signal('');
@@ -97,7 +103,15 @@ export class UploadPanel implements OnInit {
   readonly restricted = computed(() => this.kind() === 'SIGNATURE' || this.kind() === 'STAMP');
 
   ngOnInit(): void {
-    if (this.data.custodian && !this.data.assetId) this.api.people().subscribe({ next: p => this.people.set(p), error: () => { /* the select says so */ } });
+    if (this.data.custodian && !this.data.assetId) this.loadPeople();
+  }
+
+  loadPeople(): void {
+    this.peopleState.start();
+    this.api.people().subscribe({
+      next: p => { this.people.set(p); this.peopleState.done(); },
+      error: e => this.peopleState.fail(e, 'The people could not be read.'),
+    });
   }
 
   pick(event: Event): void {

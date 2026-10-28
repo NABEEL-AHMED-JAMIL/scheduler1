@@ -36,9 +36,7 @@
   <app-managed-banner what="pipelines" />
 
   @if (loading()) {
-    <div class="card p-12 text-center text-sm text-[color:var(--text-muted)]">
-      <div class="spinner mx-auto mb-3" role="status" aria-label="Loading"></div>Loading…
-    </div>
+    <div class="card"><app-loading shape="panel" label="Loading the pipeline…" [count]="6" /></div>
   } @else if (loadError()) {
     <div class="card">
       <app-load-error [message]="loadError()" [retryable]="!loadMissing()" (retry)="retryLoad()">
@@ -83,6 +81,15 @@
         }
       </div>
     }
+    @if (definitionError()) {
+      <!-- Owner 2026-10-27: the steps could not be read; Details is shown meanwhile, and that is said. -->
+      <div class="card px-4 py-2.5" data-test="steps-error">
+        <app-inline-status [error]="definitionError() + ' The details are shown meanwhile.'" (retry)="retryDefinition()" />
+      </div>
+    }
+    @if (stepsPending()) {
+      <div class="card" data-test="steps-pending"><app-loading shape="panel" label="Loading the pipeline’s steps…" [count]="5" /></div>
+    }
     @if (offerSteps()) {
       <!-- MIG-324: a pipeline with no saved steps runs by handing its payload to the worker that reads its topic. In a
            new workspace nothing reads it, and the step builder was only reachable at ?tab=steps. -->
@@ -97,7 +104,7 @@
         <button type="button" class="btn btn-primary btn-sm" (click)="setTab('steps')"><app-icon name="layers" />Build its steps</button>
       </div>
     }
-    <form [formGroup]="form" (ngSubmit)="saveAll()" class="card p-4" [class.hidden]="activeTab() !== 'details'">
+    <form [formGroup]="form" (ngSubmit)="saveAll()" class="card p-4" [class.hidden]="activeTab() !== 'details' || stepsPending()">
       <!-- MIG-254: read-only in a MANAGED workspace (an unstyled block fieldset: .form-lock). -->
       <fieldset class="form-lock" [disabled]="locked()">
       <div class="form-section">
@@ -112,8 +119,11 @@
           <app-field label="Kafka connection" for="taskProfile"
                      hint="The connection the topic publishes through. Pick it first; its topics come next.">
             <app-combobox id="taskProfile" [selected]="selectedProfileId()" [selectedLabel]="selectedProfileLabel()" (selectedChange)="pickProfile($event)"
-                          placeholder="Search connections…" clearLabel="None"
+                          [placeholder]="profilesState.pending() ? 'Loading connections…' : 'Search connections…'" clearLabel="None"
                           [options]="profileOptions()" />
+            <app-inline-status [loading]="profilesState.loading()" [error]="profilesState.error()" label="Loading connections…"
+                               [empty]="profilesState.loaded() && !profiles().length" emptyText="No Kafka connection yet."
+                               (retry)="loadProfiles()"><a routerLink="/settings/kafka" class="link-inline">Add one</a></app-inline-status>
           </app-field>
 
           <app-field label="Topic" for="taskType" [required]="isEdit()"
@@ -126,6 +136,7 @@
             @if (noTopicsHere()) {
               <a routerLink="/settings/kafka" class="link-inline text-xs mt-1 inline-block">Add a topic</a>
             }
+            @if (topicsError()) { <app-inline-status [error]="topicsError()" (retry)="retryTopics()" /> }
           </app-field>
 
           <!-- "Registry task", not "Pipeline": this page's own record is the pipeline (UI review U11). -->
@@ -135,20 +146,25 @@
                           [placeholder]="selectedTopicId() == null ? 'Pick a topic first' : 'Search this topic’s registry tasks…'"
                           clearLabel="None"
                           [options]="pipelineOptions()" />
+            @if (pipelinesError()) { <app-inline-status [error]="pipelinesError()" (retry)="retryPipelines()" /> }
           </app-field>
 
           <app-field label="Group" for="group" [control]="form.get('groupId')"
                      [submitted]="submitted()">
             <app-combobox id="group" formControlName="groupId"
-                          placeholder="Search groups…" clearLabel="None"
+                          [placeholder]="groupsState.pending() ? 'Loading groups…' : 'Search groups…'" clearLabel="None"
                           [options]="groupOptions()" />
+            <app-inline-status [loading]="groupsState.loading()" [error]="groupsState.error()" label="Loading groups…"
+                               (retry)="loadReference('TASK_GROUP')" />
           </app-field>
 
           <app-field label="Home page" for="homePage" [control]="form.get('homePageId')"
                      [submitted]="submitted()" hint="Where users land after a run of this pipeline completes.">
             <app-combobox id="homePage" formControlName="homePageId"
-                          placeholder="Search home pages…" clearLabel="None"
+                          [placeholder]="homePagesState.pending() ? 'Loading home pages…' : 'Search home pages…'" clearLabel="None"
                           [options]="homePageOptions()" />
+            <app-inline-status [loading]="homePagesState.loading()" [error]="homePagesState.error()" label="Loading home pages…"
+                               (retry)="loadReference('HOME_PAGE')" />
           </app-field>
 
           <app-field label="Status" for="taskStatus" [required]="true"
@@ -164,9 +180,15 @@
       <!-- What this pipeline actually asks for, when somebody has described it under
            Settings > Task forms. Above the tag table because it is the thing to fill in; the
            tags are what it produces. -->
+      @if (formError()) {
+        <!-- Owner 2026-10-27: a failed read is not "this pipeline has no form": it says so above the payload box. -->
+        <div class="form-section" data-test="form-error">
+          <app-inline-status [error]="formError() + ' The payload can still be written by hand below.'" (retry)="retryForm()" />
+        </div>
+      }
       @if (formLoading()) {
         <div class="form-section">
-          <p class="text-sm text-[color:var(--text-muted)]">Checking for a form&hellip;</p>
+          <app-loading shape="inline" label="Checking for a form…" />
         </div>
       } @else if (pipelineDef(); as def) {
         <div class="form-section">
@@ -280,14 +302,18 @@
         @if (!locked()) {
           <button section-actions type="button" class="btn btn-default btn-sm" [disabled]="!taskIdNumber()" (click)="schedule()"><app-icon name="plus" />New schedule</button>
         }
-        @if (!jobsLoaded()) {
-          <p class="text-sm text-[color:var(--text-muted)]">Reading the schedules…</p>
+        @if (jobsError() && !jobs().length) {
+          <app-load-error [message]="jobsError()" (retry)="retryJobs()" />
+        } @else if (!jobsLoaded()) {
+          <app-loading shape="rows" label="Loading schedules…" [count]="3" />
         } @else if (jobs().length) {
+          @if (jobsError()) { <app-inline-status [error]="jobsError()" (retry)="retryJobs()" /> }
           <div class="overflow-x-auto">
-            <table class="table-modern">
-              <thead><tr><th>Schedule</th><th>Runs</th><th>Last run</th><th class="text-right">State</th></tr></thead>
+            <table class="table-modern" [attr.aria-busy]="jobsLoading() || null">
+              <thead><tr><th appSort="schedule" [sortBy]="jobSort">Schedule</th><th appSort="runs" [sortBy]="jobSort">Runs</th>
+                <th appSort="lastRun" [sortBy]="jobSort">Last run</th><th class="text-right" appSort="state" [sortBy]="jobSort">State</th></tr></thead>
               <tbody>
-                @for (j of jobs(); track j.jobId) {
+                @for (j of sortedJobs(); track j.jobId) {
                   <tr [attr.data-job]="j.jobId">
                     <td><a class="link-inline font-medium" [routerLink]="['/pipelines/schedules', j.jobId, 'edit']">{{ j.jobName }}</a>
                       <span class="mono text-xs text-[color:var(--text-muted)] ml-1">#{{ j.jobId }}</span></td>

@@ -7,10 +7,14 @@ import { TableShell } from '../../shared/ui/data-table';
 import { StatusPill } from '../../shared/ui/status-pill';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { instantOf } from '../../core/instant';
+import { createTableSort } from '../../shared/ui/sort';
+import { SortHeader } from '../../shared/ui/sort-header';
+import { AppLoading, InlineStatus, createLoadState, loadErrorText } from '../../shared/ui/loading';
 import { BillingApi, PipelineCostRow, PipelineCosts as Costs, RunCost, RunCostMeter, RunCostRow, RunFilter, UsageQuery } from './billing.service';
 import { dayHeading, formatMoney, formatMoneyCell, formatMoneyExact, formatShare, groupByDay, zonedDay, zonedStamp, zonedTime } from './billing-format';
 
 const RUNS_PAGE = 25;
+const COSTS_UNREAD = 'What the pipelines cost could not be read.';
 /** By pipeline shows the dearest this many, then "Show all N pipelines". */
 export const PIPELINES_SHOWN = 8;
 /** By run's chips: at most this many meters, then "+N". */
@@ -89,7 +93,7 @@ export function reconcile(total: number, attributed: number): { total: number; r
  */
 @Component({
   selector: 'app-pipeline-costs',
-  imports: [Icon, TableShell, StatusPill, ServerTimePipe, RouterLink],
+  imports: [Icon, TableShell, StatusPill, ServerTimePipe, RouterLink, SortHeader, AppLoading, InlineStatus],
   styleUrl: './day-table.css',
   styles: `
     .recon { display: flex; flex-direction: column; gap: 0.5rem; }
@@ -126,10 +130,15 @@ export function reconcile(total: number, attributed: number): { total: number; r
               <li data-test="recon-total">Month's total <b>{{ fixed(r.total) }}</b></li>
             </ul>
           </div>
+        } @else if (state.pending()) {
+          <!-- Owner 2026-10-27: the split is on its way, not missing. -->
+          <app-loading shape="inline" label="Loading the month's split…" />
         }
       </div>
 
-      @if (run(); as r) {
+      @if (runLoading()) {
+        <app-loading shape="inline" [label]="'Loading the cost of run #' + runId() + '…'" />
+      } @else if (run(); as r) {
         <div class="card p-4 flex flex-wrap items-center gap-x-6 gap-y-2" data-test="run-cost">
           <span class="stat-glyph"><app-icon name="history" /></span>
           <div class="min-w-0 mr-auto">
@@ -142,17 +151,18 @@ export function reconcile(total: number, attributed: number): { total: number; r
           }
         </div>
       } @else if (runError()) {
-        <p class="text-xs text-crit-500" role="alert">{{ runError() }}</p>
+        <app-inline-status [error]="runError()" (retry)="retryRun()" />
       }
 
-      <app-table-shell heading="By pipeline" [shown]="shownPipelines().length" [total]="pipelines().length" [loading]="loading() && !costs()" [error]="error()" (retry)="load()"
+      <!-- Owner 2026-10-27: [loading] through a reload too, so a new month's figures blur the old ones instead of passing as them. -->
+      <app-table-shell heading="By pipeline" [shown]="shownPipelines().length" [total]="pipelines().length" [loading]="loading()" [error]="error()" (retry)="load()"
                        [isEmpty]="!pipelines().length" emptyMessage="No pipeline run was billed in this month yet." emptyIcon="layers" [scrollRows]="false">
         <ng-container toolbar>
           <span class="text-xs text-[color:var(--text-muted)]">Pick a pipeline to see its runs below.</span>
         </ng-container>
         <table class="table-modern" data-test="cost-by-pipeline">
           <thead>
-            <tr><th>Pipeline</th><th class="text-right">Runs</th><th class="text-right">Cost</th><th class="text-right">Per run</th><th class="w-56">Share</th><th>Spent on</th><th class="w-24"></th></tr>
+            <tr><th appSort="pipeline" [sortBy]="sort">Pipeline</th><th class="text-right" appSort="runs" [sortBy]="sort">Runs</th><th class="text-right" appSort="cost" [sortBy]="sort">Cost</th><th class="text-right" appSort="perRun" [sortBy]="sort">Per run</th><th class="w-56" appSort="share" [sortBy]="sort">Share</th><th appSort="mostly" [sortBy]="sort">Spent on</th><th class="w-24"></th></tr>
           </thead>
           <tbody>
             @for (p of shownPipelines(); track p.taskDetailId ?? $index) {
@@ -188,13 +198,13 @@ export function reconcile(total: number, attributed: number): { total: number; r
         @if (pipelines().length > PIPELINES_SHOWN) {
           <div class="flex justify-center px-4 py-2 border-t border-subtle">
             <button type="button" class="btn btn-default btn-sm" data-test="all-pipelines" (click)="allPipelines.set(!allPipelines())">
-              {{ allPipelines() ? 'Show the dearest ' + PIPELINES_SHOWN : 'Show all ' + pipelines().length + ' pipelines' }}</button>
+              {{ allPipelines() ? (sort.key() ? 'Show the first ' : 'Show the dearest ') + PIPELINES_SHOWN : 'Show all ' + pipelines().length + ' pipelines' }}</button>
           </div>
         }
       </app-table-shell>
 
       <div id="by-run" class="scroll-mt-16">
-      <app-table-shell heading="By run" [shown]="runs().length" [total]="runsTotal()" [loading]="(loading() && !costs()) || runsLoading()" [error]="error()" (retry)="load()"
+      <app-table-shell heading="By run" [shown]="runs().length" [total]="runsTotal()" [loading]="loading() || runsLoading()" [error]="error()" (retry)="load()"
                        [isEmpty]="!runs().length" [emptyMessage]="narrowed() ? 'No run in this month matches.' : 'No pipeline run was billed in this month yet.'" emptyIcon="history" [scrollRows]="false">
         <ng-container toolbar>
           @if (pickedRow(); as p) {
@@ -217,17 +227,23 @@ export function reconcile(total: number, attributed: number): { total: number; r
         <div class="day-table-scroll">
         <table class="table-modern day-table" data-test="cost-by-run">
           <thead>
-            <tr><th class="w-20">Started</th><th class="w-24">Run</th><th>Pipeline</th><th class="w-32">Status</th><th>What it cost</th><th class="text-right w-24">Cost</th></tr>
+            <tr><th class="w-20" appSort="started" [sortBy]="runSort">Started</th><th class="w-24" appSort="run" [sortBy]="runSort">Run</th>
+              <th appSort="pipeline" [sortBy]="runSort">Pipeline</th><th class="w-32" appSort="status" [sortBy]="runSort">Status</th><th>What it cost</th>
+              <th class="text-right w-24" appSort="cost" [sortBy]="runSort">Cost</th></tr>
           </thead>
+          <!-- Owner 2026-10-27: in start order the runs sit under their billing day; sorted by anything else the day headers
+               would cut the order up, so the runs are one list (each row then gives its date too). -->
           @for (g of runGroups(); track g.day) {
           <tbody>
-            <tr class="day-group" data-test="run-day-group">
-              <th colspan="6" scope="colgroup"><div class="day-group-line"><span>{{ g.day ? heading(g.day) : 'Start not known' }}</span>
-                <span class="day-group-sum" [title]="exact(g.cost)">{{ g.count }} {{ g.count === 1 ? 'run' : 'runs' }} · {{ money(g.cost) }}</span></div></th>
-            </tr>
+            @if (g.day !== undefined) {
+              <tr class="day-group" data-test="run-day-group">
+                <th colspan="6" scope="colgroup"><div class="day-group-line"><span>{{ g.day ? heading(g.day) : 'Start not known' }}</span>
+                  <span class="day-group-sum" [title]="exact(g.cost)">{{ g.count }} {{ g.count === 1 ? 'run' : 'runs' }} · {{ money(g.cost) }}</span></div></th>
+              </tr>
+            }
             @for (r of g.rows; track r.jobQueueId) {
-              <tr [class.is-focused]="r.jobQueueId === runId()">
-                <td class="whitespace-nowrap tabular text-[color:var(--text-secondary)]" data-test="run-started" [title]="r.startedAt ? (r.startedAt | serverTime: 'dateTime') : ''">{{ time(r) || '—' }}</td>
+              <tr [class.is-focused]="r.jobQueueId === runId()" data-test="run-cost-row">
+                <td class="whitespace-nowrap tabular text-[color:var(--text-secondary)]" data-test="run-started" [title]="r.startedAt ? (r.startedAt | serverTime: 'dateTime') : ''">{{ (g.day === undefined ? stamp(r.startedAt) : time(r)) || '—' }}</td>
                 <td class="mono whitespace-nowrap">
                   @if (r.jobId) { <a class="link-inline" [routerLink]="['/pipelines/schedules', r.jobId, 'runs', r.jobQueueId]">#{{ r.jobQueueId }}</a> }
                   @else { #{{ r.jobQueueId }} }
@@ -260,6 +276,7 @@ export function reconcile(total: number, attributed: number): { total: number; r
             <button type="button" class="btn btn-default btn-sm" data-test="more-run-costs" (click)="loadMore()" [disabled]="loadingMore()">
               {{ loadingMore() ? 'Reading…' : 'Show more runs' }}</button>
           </div>
+          @if (moreError()) { <div class="px-4 pb-2 text-center"><app-inline-status [error]="moreError()" (retry)="loadMore()" /></div> }
         }
       </app-table-shell>
       </div>
@@ -281,13 +298,19 @@ export class PipelineCosts {
   readonly costs = signal<Costs | null>(null);
   readonly runs = signal<RunCostRow[]>([]);
   readonly runsTotal = signal(0);
-  readonly loading = signal(false);
+  /** Owner 2026-10-27: the month's read, loading from the start, so neither table says "No pipeline run" before it answers. */
+  readonly state = createLoadState();
+  readonly loading = this.state.loading;
   /** By run read again for a pipeline, a search or a status: only By run waits under its blur. */
   readonly runsLoading = signal(false);
   readonly loadingMore = signal(false);
-  readonly error = signal('');
+  /** "Show more runs" that failed says so under the button, rather than doing nothing. */
+  readonly moreError = signal('');
+  readonly error = this.state.error;
   readonly run = signal<RunCost | null>(null);
+  readonly runLoading = signal(false);
   readonly runError = signal('');
+  private runSeq = 0;
 
   /** By run's filter: the pipeline picked in By pipeline, the search, the status. */
   readonly picked = signal<number | null>(null);
@@ -297,7 +320,23 @@ export class PipelineCosts {
   readonly allPipelines = signal(false);
 
   readonly pipelines = computed<PipelineCostRow[]>(() => this.costs()?.pipelines ?? []);
-  readonly shownPipelines = computed(() => this.allPipelines() ? this.pipelines() : this.pipelines().slice(0, PIPELINES_SHOWN));
+  /**
+   * Owner 2026-10-27: By pipeline sorts on every column, before the dearest-eight cut (so "Runs" shows the eight with the
+   * most runs). Billing sends them dearest first, which stays the order until a heading is picked (initial null).
+   */
+  readonly sort = createTableSort<PipelineCostRow>({
+    id: 'billing-pipeline-costs',
+    columns: {
+      pipeline: p => p.pipeline || (p.taskDetailId ? `Pipeline #${p.taskDetailId}` : null),
+      runs: { value: p => p.runs, kind: 'number' },
+      cost: { value: p => Number(p.cost), kind: 'number' },
+      perRun: { value: p => this.perRun(p), kind: 'number' },
+      share: { value: p => Number(p.cost), kind: 'number' },
+      mostly: p => mostly(p),
+    },
+  });
+  readonly sortedPipelines = computed(() => this.sort.apply(this.pipelines()));
+  readonly shownPipelines = computed(() => this.allPipelines() ? this.sortedPipelines() : this.sortedPipelines().slice(0, PIPELINES_SHOWN));
   readonly pickedRow = computed(() => this.pipelines().find(p => p.taskDetailId !== null && p.taskDetailId === this.picked()) ?? null);
   readonly statuses = computed(() => this.costs()?.runs?.statuses ?? []);
   readonly moreRuns = computed(() => this.runs().length < this.runsTotal());
@@ -307,8 +346,34 @@ export class PipelineCosts {
   private readonly locale = inject(LOCALE_ID);
   /** The workspace's billing zone the period's days are counted in (H9). */
   readonly zone = computed(() => this.costs()?.zone ?? null);
-  /** The runs by the billing day they started on; each header counts and totals the whole day (Billing's, every page). */
-  readonly runGroups = computed(() => {
+  /**
+   * Owner 2026-10-27 ("add a sort on each table"): By run sorts on the server (billing.json/pipelineCosts sort/dir), since it
+   * is paged -- sorting the pages read would misstate the month. A new order reads By run again from its first page (the
+   * filters kept); "Show more runs" pages on through it. No order picked: newest first, as before, and no sort is sent.
+   */
+  readonly runSort = createTableSort<RunCostRow>({
+    id: 'billing-run-costs',
+    server: true,
+    columns: {
+      started: { value: r => r.startedAt, kind: 'date', param: 'startedAt' },
+      run: { value: r => r.jobQueueId, kind: 'number', param: 'run' },
+      pipeline: { value: r => r.pipeline, param: 'pipeline' },
+      status: { value: r => r.status, kind: 'status', param: 'status' },
+      cost: { value: r => Number(r.cost), kind: 'number', param: 'cost' },
+    },
+    onChange: () => this.reloadRuns(),
+  });
+  /** Whether the runs sit under day headers: in start order only (the list's own, newest first, is start order too). */
+  readonly byDay = computed(() => !this.runSort.key() || this.runSort.key() === 'started');
+  /**
+   * The runs by the billing day they started on; each header counts and totals the whole day (Billing's, every page).
+   * Sorted by anything but the start: one group with no day (undefined), which the template draws without a header.
+   */
+  readonly runGroups = computed<{ day: string | null | undefined; rows: RunCostRow[]; count: number; cost: number }[]>(() => {
+    if (!this.byDay()) {
+      const rows = this.runs();
+      return rows.length ? [{ day: undefined, rows, count: rows.length, cost: rows.reduce((n, r) => n + Number(r.cost), 0) }] : [];
+    }
     const zone = this.zone();
     const totals = new Map((this.costs()?.runs?.days ?? []).map(d => [d.day ?? null, d]));
     return groupByDay(this.runs(), r => { const at = instantOf(r.startedAt); return at ? zonedDay(at, zone) : null; }).map(g => {
@@ -377,17 +442,17 @@ export class PipelineCosts {
   load(): void {
     this.reading?.unsubscribe();
     this.page = 1;
-    this.loading.set(true);
-    this.error.set('');
-    this.reading = this.api.pipelineCosts(this.query(), 1, RUNS_PAGE, this.filter()).subscribe({
+    this.state.start();
+    this.moreError.set('');
+    this.reading = this.api.pipelineCosts(this.query(), 1, RUNS_PAGE, this.filter(), this.runSort.param()).subscribe({
       next: r => {
-        this.loading.set(false);
-        if (r.status !== API_SUCCESS) { this.costs.set(null); this.runs.set([]); this.error.set(r.message || 'What the pipelines cost could not be read.'); return; }
+        if (r.status !== API_SUCCESS) { this.costs.set(null); this.runs.set([]); this.state.fail(r, COSTS_UNREAD); return; }
         this.costs.set(r.data ?? null);
         this.runs.set(r.data?.runs?.rows ?? []);
         this.runsTotal.set(Number(r.data?.runs?.total ?? 0));
+        this.state.done();
       },
-      error: () => { this.loading.set(false); this.error.set('What the pipelines cost could not be read.'); },
+      error: err => this.state.fail(err, COSTS_UNREAD),
     });
   }
 
@@ -397,39 +462,53 @@ export class PipelineCosts {
     this.reading?.unsubscribe();
     this.page = 1;
     this.runsLoading.set(true);
-    this.reading = this.api.pipelineCosts(this.query(), 1, RUNS_PAGE, this.filter()).subscribe({
+    this.moreError.set('');
+    this.reading = this.api.pipelineCosts(this.query(), 1, RUNS_PAGE, this.filter(), this.runSort.param()).subscribe({
       next: r => {
         this.runsLoading.set(false);
-        if (r.status !== API_SUCCESS) { this.error.set(r.message || 'What the pipelines cost could not be read.'); return; }
-        this.error.set('');
+        if (r.status !== API_SUCCESS) { this.state.fail(r, COSTS_UNREAD); return; }
         this.costs.set(r.data ?? null);
         this.runs.set(r.data?.runs?.rows ?? []);
         this.runsTotal.set(Number(r.data?.runs?.total ?? 0));
+        this.state.done();
       },
-      error: () => { this.runsLoading.set(false); this.error.set('What the pipelines cost could not be read.'); },
+      error: err => { this.runsLoading.set(false); this.state.fail(err, COSTS_UNREAD); },
     });
   }
 
   loadMore(): void {
     this.loadingMore.set(true);
-    this.api.pipelineCosts(this.query(), this.page + 1, RUNS_PAGE, this.filter()).subscribe({
+    this.moreError.set('');
+    const more = 'More runs could not be read.';
+    this.api.pipelineCosts(this.query(), this.page + 1, RUNS_PAGE, this.filter(), this.runSort.param()).subscribe({
       next: r => {
         this.loadingMore.set(false);
-        if (r.status !== API_SUCCESS) return;
+        if (r.status !== API_SUCCESS) { this.moreError.set(loadErrorText(r, more)); return; }
         this.page += 1;
         this.runs.update(rows => [...rows, ...(r.data?.runs?.rows ?? [])]);
       },
-      error: () => this.loadingMore.set(false),
+      error: err => { this.loadingMore.set(false); this.moreError.set(loadErrorText(err, more)); },
     });
   }
 
+  /** Try again on the run card. */
+  retryRun(): void { this.loadRun(this.runId(), this.query().tenantId ?? null); }
+
   private loadRun(id: number | null, tenantId: string | null): void {
+    const seq = ++this.runSeq;
     this.run.set(null);
     this.runError.set('');
+    this.runLoading.set(!!id);
     if (!id) return;
+    const unread = `Run #${id}'s cost could not be read.`;
+    // A reply for a run opened before this one is dropped (owner 2026-10-27: an old answer never replaces the new one).
     this.api.runCost(id, tenantId).subscribe({
-      next: r => r.status === API_SUCCESS ? this.run.set(r.data ?? null) : this.runError.set(r.message || `Run #${id}'s cost could not be read.`),
-      error: () => this.runError.set(`Run #${id}'s cost could not be read.`),
+      next: r => {
+        if (seq !== this.runSeq) return;
+        this.runLoading.set(false);
+        if (r.status === API_SUCCESS) this.run.set(r.data ?? null); else this.runError.set(loadErrorText(r, unread));
+      },
+      error: err => { if (seq !== this.runSeq) return; this.runLoading.set(false); this.runError.set(loadErrorText(err, unread)); },
     });
   }
 }

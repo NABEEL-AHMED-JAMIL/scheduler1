@@ -6,6 +6,8 @@ import { Icon } from '../../../shared/ui/icon';
 import { PdfViewer } from '../../objects/preview/pdf-viewer';
 import { GeneratedService } from './generated.service';
 import { DEFAULT_OPTIONS, base64ToBlob, renderBody } from './generated.model';
+import { AppLoading, loadErrorText } from '../../../shared/ui/loading';
+import { LoadError } from '../../../shared/ui/load-error';
 
 export interface ReportPreviewData { name: string; runDatasetId: number; }
 
@@ -17,7 +19,7 @@ export interface ReportPreviewData { name: string; runDatasetId: number; }
  */
 @Component({
   selector: 'app-report-preview-dialog',
-  imports: [Icon, PdfViewer],
+  imports: [Icon, PdfViewer, AppLoading, LoadError],
   template: `
     <div class="card shadow-2xl w-[56rem] max-w-[calc(100vw-2rem)] h-[88vh] flex flex-col overflow-hidden"
          role="dialog" [attr.aria-label]="'Preview of ' + data.name">
@@ -31,18 +33,13 @@ export interface ReportPreviewData { name: string; runDatasetId: number; }
           <app-icon name="close" />
         </button>
       </div>
+      <!-- Owner 2026-10-27: a failed render offers Try again here rather than close-and-reopen. -->
       @if (error()) {
-        <div class="flex flex-col items-center justify-center gap-3 py-20 text-center" role="alert">
-          <app-icon name="alert" size="1.75rem" class="icon-crit" />
-          <p class="text-sm text-crit-500 max-w-md">{{ error() }}</p>
-        </div>
+        <app-load-error class="py-6" role="alert" [message]="error()" (retry)="render()" />
       } @else if (url(); as src) {
         <app-pdf-viewer [src]="src" />
       } @else {
-        <div class="flex flex-col items-center justify-center gap-3 py-20">
-          <div class="spinner" role="status" aria-label="Rendering"></div>
-          <p class="text-sm text-[color:var(--text-muted)]">Rendering…</p>
-        </div>
+        <app-loading shape="spinner" label="Rendering the preview…" />
       }
     </div>
   `,
@@ -60,7 +57,10 @@ export class ReportPreviewDialog implements OnInit {
     this.destroyRef.onDestroy(() => { const u = this.url(); if (u) URL.revokeObjectURL(u); });
   }
 
-  ngOnInit(): void {
+  ngOnInit(): void { this.render(); }
+
+  render(): void {
+    this.error.set('');
     const title = this.data.name.replace(/\.[^.]+$/, '');
     this.service.runDataset(this.data.runDatasetId).pipe(
       switchMap(rows => this.service.render(renderBody({ outputFormat: 'pdf', dataset: rows, options: { ...DEFAULT_OPTIONS, title } }))),
@@ -69,9 +69,9 @@ export class ReportPreviewDialog implements OnInit {
     ).subscribe({
       next: r => {
         if (r.status === 'SUCCESS' && r.data) this.url.set(URL.createObjectURL(base64ToBlob(r.data.outputBase64, 'application/pdf')));
-        else this.error.set(r.message || 'The preview could not be rendered.');
+        else this.error.set(loadErrorText(r, 'The preview could not be rendered.'));
       },
-      error: e => this.error.set(e?.error?.message || 'The preview could not be rendered; the dataset may have expired.'),
+      error: e => this.error.set(loadErrorText(e, 'The preview could not be rendered; the dataset may have expired.')),
     });
   }
 }

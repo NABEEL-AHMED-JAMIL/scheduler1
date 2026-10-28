@@ -9,9 +9,15 @@ export const PINNED: Record<string, unknown> = {
     ],
     "buttons": [
       "Close",
+      "Field",
       "New version from sample",
       "Raw JSON",
+      "Required",
+      "Saved",
+      "State",
+      "Type",
       "Validate",
+      "Version",
       "v1"
     ],
     "columns": [
@@ -95,8 +101,14 @@ export const PINNED: Record<string, unknown> = {
       "Data contracts"
     ],
     "buttons": [
+      "Active",
       "Columns",
+      "Contract",
+      "Created",
+      "Direction",
+      "Latest",
       "Refresh",
+      "Sensitivity",
       "result_manifest",
       "wound_intake"
     ],
@@ -132,10 +144,16 @@ export const PINNED: Record<string, unknown> = {
       "Data contracts"
     ],
     "buttons": [
+      "Active",
       "Columns",
+      "Contract",
+      "Created",
+      "Direction",
       "Install template",
+      "Latest",
       "New from sample",
       "Refresh",
+      "Sensitivity",
       "result_manifest",
       "wound_intake"
     ],
@@ -175,9 +193,15 @@ export const PINNED: Record<string, unknown> = {
     "buttons": [
       "Actions for UI-CHECK warehouse",
       "Columns",
+      "Connection",
+      "Host · database",
       "New connection",
+      "Password",
       "Refresh",
-      "UI-CHECK warehouse"
+      "State",
+      "TLS",
+      "UI-CHECK warehouse",
+      "User"
     ],
     "columns": [
       [
@@ -241,9 +265,14 @@ export const PINNED: Record<string, unknown> = {
     "buttons": [
       "Cards",
       "Columns",
+      "Created",
+      "Format",
+      "Kind",
       "LIVE-CHECK 0928 customers CSV",
       "LIVE-CHECK platform bucket probe",
       "Refresh",
+      "Source",
+      "State",
       "Table"
     ],
     "columns": [
@@ -307,10 +336,15 @@ export const PINNED: Record<string, unknown> = {
       "Actions for LIVE-CHECK platform bucket probe",
       "Cards",
       "Columns",
+      "Created",
+      "Format",
+      "Kind",
       "LIVE-CHECK 0928 customers CSV",
       "LIVE-CHECK platform bucket probe",
       "New source",
       "Refresh",
+      "Source",
+      "State",
       "Table"
     ],
     "columns": [

@@ -20,6 +20,13 @@ import { WorkspaceDirectory } from '../../core/workspaces/workspace-directory';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { PageHeader } from '../../shared/ui/page-header';
 import { RefreshButton } from '../../shared/ui/refresh-button';
+import { createTableSort } from '../../shared/ui/sort';
+import { SortHeader } from '../../shared/ui/sort-header';
+import { AppLoading, InlineStatus, createLoadState, loadErrorText } from '../../shared/ui/loading';
+import { LoadError } from '../../shared/ui/load-error';
+import { BlurLoader } from '../../shared/ui/blur-loader';
+
+const CARDS_UNREAD = 'The rate cards could not be read.';
 
 /**
  * Billing › Settings (owner #23, 2026-10-19; before, Platform › Rate cards), platform administrators only.
@@ -35,7 +42,7 @@ import { RefreshButton } from '../../shared/ui/refresh-button';
  */
 @Component({
   selector: 'app-rate-cards',
-  imports: [RefreshButton, PageHeader, Icon, StatTile, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, ReceiptStampSettings, RatePreviewView, NgTemplateOutlet],
+  imports: [RefreshButton, PageHeader, Icon, StatTile, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, ReceiptStampSettings, RatePreviewView, NgTemplateOutlet, SortHeader, AppLoading, InlineStatus, LoadError, BlurLoader],
   templateUrl: './rate-cards.html',
 })
 export class RateCards implements OnInit {
@@ -44,9 +51,29 @@ export class RateCards implements OnInit {
   private readonly dialog = inject(Dialog);
   readonly directory = inject(WorkspaceDirectory);
 
-  readonly loading = signal(false);
-  readonly error = signal('');
+  /**
+   * Owner 2026-10-27: the versions' read, loading from the start -- the workspace list is read first, and in that wait the
+   * rail said "No rate card yet" and the tiles 0 as if that were the answer.
+   */
+  readonly state = createLoadState();
+  readonly loading = this.state.loading;
+  readonly error = this.state.error;
+  /** The drafts are read with the versions; when they cannot be, the versions stand and the rail says so. */
+  readonly draftsError = signal('');
   readonly cards = signal<RateCard[]>([]);
+  /**
+   * Owner 2026-10-27: the meters of a version or a draft sort inside their service groups (the groups keep their order).
+   * The card's own order stays until a heading is picked. A price sorts per unit; a tiered one after the flat prices.
+   */
+  readonly meterSort = createTableSort<RateItem>({
+    id: 'billing-rate-card-meters',
+    columns: {
+      meter: i => i.label ?? i.meter,
+      price: { value: i => (i.tiers?.length ? 'Tiered' : Number(i.unit_price) / (Number(i.per) || 1)), kind: 'number' },
+      included: { value: i => Number(i.included_quantity) || 0, kind: 'number' },
+      tiers: { value: i => i.tiers?.length ?? 0, kind: 'number' },
+    },
+  });
   readonly selectedVersion = signal<number | null>(null);
   /** Owner #23: the versions being prepared, and the one picked (a draft and a version are never both picked). */
   readonly drafts = signal<RateCardDraftRow[]>([]);
@@ -91,15 +118,16 @@ export class RateCards implements OnInit {
   }
 
   load(keep = this.selectedVersion(), keepDraft = this.selectedDraftId()): void {
-    this.loading.set(true); this.error.set('');
+    this.state.start();
     forkJoin({ cards: this.api.rateCards(), drafts: this.api.rateCardDrafts() }).subscribe({
       next: ({ cards: r, drafts: d }) => {
-        this.loading.set(false);
-        if (r.status !== API_SUCCESS) { this.error.set(r.message); return; }
+        if (r.status !== API_SUCCESS) { this.state.fail(r, CARDS_UNREAD); return; }
         const cards = (r.data?.cards ?? []).map(RateCards.numeric);
         this.cards.set(cards);
         // Drafts that cannot be read leave the versions standing: the list says so instead of failing.
         this.drafts.set(d.status === API_SUCCESS ? d.data?.drafts ?? [] : []);
+        this.draftsError.set(d.status === API_SUCCESS ? '' : loadErrorText(d, 'The drafts could not be read.'));
+        this.state.done();
         if (keepDraft != null && this.drafts().some(x => x.draft_id === keepDraft)) {
           this.selectDraft(this.drafts().find(x => x.draft_id === keepDraft)!);
           return;
@@ -107,7 +135,7 @@ export class RateCards implements OnInit {
         this.selectedDraftId.set(null);
         this.selectedVersion.set(keep != null && cards.some(c => c.version === keep) ? keep : (this.today().defaultCard?.version ?? cards[0]?.version ?? null));
       },
-      error: err => { this.loading.set(false); this.error.set(err?.error?.message || 'Could not read the rate cards.'); },
+      error: err => this.state.fail(err, CARDS_UNREAD),
     });
   }
 
@@ -152,6 +180,10 @@ export class RateCards implements OnInit {
   }
   draftForLabel(d: RateCardDraftRow): string { return d.tenant_id == null ? 'Every workspace' : (d.tenantName ?? `Workspace ${d.tenant_id}`); }
   draftGroups(d: RateCardDraftRow): { service: string; items: RateItem[] }[] { return this.groups({ items: this.draftItems(d) } as RateCard); }
+  /** The groups as the Meters tables show them: each group's meters in the picked order, the groups in theirs. */
+  sortedGroups(groups: { service: string; items: RateItem[] }[]): { service: string; items: RateItem[] }[] {
+    return groups.map(g => ({ ...g, items: this.meterSort.apply(g.items) }));
+  }
 
   /** The draft opened in the editor: changes save to the same draft; "Save version" publishes it. */
   editDraft(d: RateCardDraftRow): void {
@@ -165,8 +197,8 @@ export class RateCards implements OnInit {
   previewDraft(d: RateCardDraftRow): void {
     this.previewing.set(true); this.previewError.set(''); this.preview.set(null);
     this.api.previewRateCard({ draftId: d.draft_id }, this.previewPeriod()).subscribe({
-      next: r => { this.previewing.set(false); if (r.status !== API_SUCCESS || !r.data) { this.previewError.set(r.message); return; } this.preview.set(r.data); },
-      error: err => { this.previewing.set(false); this.previewError.set(err?.error?.message || 'The preview could not be priced.'); },
+      next: r => { this.previewing.set(false); if (r.status !== API_SUCCESS || !r.data) { this.previewError.set(loadErrorText(r, 'The preview could not be priced.')); return; } this.preview.set(r.data); },
+      error: err => { this.previewing.set(false); this.previewError.set(loadErrorText(err, 'The preview could not be priced.')); },
     });
   }
 

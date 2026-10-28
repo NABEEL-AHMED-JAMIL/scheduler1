@@ -37,6 +37,7 @@ import { AiPanel } from './ai-panel';
 import { StorageService } from '../../objects/storage.service';
 import { API_SUCCESS } from '../../../core/api/api.config';
 import { applyPatch } from './json-patch';
+import { AppLoading, InlineStatus, createLoadState, loadErrorText } from '../../../shared/ui/loading';
 
 type LeftTab = 'components' | 'layers' | 'data';
 type SaveState = 'saved' | 'saving' | 'unsaved' | 'conflict' | 'error' | 'readonly';
@@ -69,7 +70,7 @@ const DRAW_MS = 300;
 @Component({
   selector: 'app-report-designer',
   imports: [Icon, LoadError, ProblemList, PropertiesPanel, PageFrame, FormsModule, RouterLink, UpperCasePipe, CdkDrag, CdkDragPreview, CdkDropList,
-    CdkDropListGroup, WorkspaceSelect, AiPanel],
+    CdkDropListGroup, WorkspaceSelect, AiPanel, AppLoading, InlineStatus],
   templateUrl: './designer.html',
   styleUrl: './designer.css',
 })
@@ -118,6 +119,17 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
   readonly search = signal('');
   readonly palette = signal<PaletteEntry[]>([]);
   readonly definitions = signal<Record<string, Record<string, unknown>>>({});
+  /**
+   * Owner 2026-10-27: the palette (components) and the component settings (schema) are read once; while they come the
+   * Components tab says so instead of "No component matches.", and a failure says why with Try again.
+   */
+  readonly paletteState = createLoadState();
+  readonly schemaError = signal('');
+  /** The Brand chip's profiles and the pickers' assets (api.usable): loading, or why they could not be read. */
+  readonly usableState = createLoadState(false);
+  /** The Data tab's read of the test data's fields: loading, or why it failed (also said over the canvas). */
+  readonly inspecting = signal(false);
+  readonly inspectError = signal('');
   readonly canvas = signal<CanvasDoc | null>(null);
   readonly drawing = signal(false);
   readonly drawError = signal('');
@@ -268,6 +280,10 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
   readonly brandWord = computed(() => {
     const b = this.branding();
     if (b.disabled) return 'No branding';
+    // Not "A profile not published" or "None yet" before the profiles have answered, or when they could not be read.
+    // (A platform administrator reads no profiles: the words stay as they were.)
+    if (!this.isPlatformAdmin() && this.usableState.error() && !this.usableState.loaded()) return 'Brand profiles not available right now';
+    if (!this.isPlatformAdmin() && !this.usableState.loaded()) return 'Loading brand profiles…';
     const p = b.profileId ? this.profiles().find(x => x.profileId === b.profileId) : this.profiles().find(x => x.isDefault);
     return p ? p.name : b.profileId ? 'A profile not published' : 'None yet';
   });
@@ -288,12 +304,36 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
   }
 
   ngOnInit(): void {
+    this.loadPalette();
+    this.load();
+  }
+
+  /** The components to add and their settings' schema: read once, and again on Try again. */
+  loadPalette(): void {
+    this.schemaError.set('');
     this.api.schema().subscribe({
       next: s => this.definitions.set(((s as { definitions?: Record<string, Record<string, unknown>> }).definitions) ?? {}),
-      error: () => this.definitions.set({}),
+      error: e => this.schemaError.set(loadErrorText(e, 'The components\' settings could not be read, so the properties may be missing fields.')),
     });
-    this.api.components().subscribe({ next: list => this.palette.set(list), error: () => this.palette.set([]) });
-    this.load();
+    this.paletteState.start();
+    this.api.components().subscribe({
+      next: list => { this.palette.set(list); this.paletteState.done(); },
+      error: e => this.paletteState.fail(e, 'The components could not be read.'),
+    });
+  }
+
+  /** The brand profiles and the assets this person may place on the template. */
+  loadUsable(): void {
+    const t = this.t();
+    if (!t || this.isPlatformAdmin()) return;
+    this.usableState.start();
+    this.api.usable(t.templateId).subscribe({
+      next: u => {
+        this.usableAssets.set(u.assets); this.usableTotal.set(u.total); this.usableTotals.set({}); this.profiles.set(u.profiles);
+        this.usableState.done();
+      },
+      error: e => this.usableState.fail(e, 'The brand profiles and assets could not be read.'),
+    });
   }
 
   toLibrary(): void {
@@ -336,12 +376,7 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
         if (pick && !this.selected() && find(this.blocks(), pick)) this.selected.set(pick);
         this.inspectTestData();
         this.draw(true);
-        if (!this.isPlatformAdmin()) {
-          this.api.usable(t.templateId).subscribe({
-            next: u => { this.usableAssets.set(u.assets); this.usableTotal.set(u.total); this.usableTotals.set({}); this.profiles.set(u.profiles); },
-            error: () => { this.usableAssets.set([]); this.profiles.set([]); },
-          });
-        }
+        this.loadUsable();
       },
       error: e => { this.error.set(studioError(e, 'The template could not be read.').message); this.loading.set(false); },
     });
@@ -505,7 +540,8 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
         this.usableAssets.update(list => [...u.assets, ...list.filter(a => !found.has(a.assetId))]);
         this.usableTotals.update(m => ({ ...m, [find.kinds.join(',')]: u.total }));
       },
-      error: () => { /* the picker keeps what it offered */ },
+      // The picker keeps what it offered; the search's failure is said rather than reading as "nothing found".
+      error: e => this.toast.error(loadErrorText(e, 'The search could not be run; the choices shown are the earlier ones.')),
     });
   }
 
@@ -1030,19 +1066,26 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
   }
 
   /** Reads the test data's schema and first records, for the pickers and the Data tab. */
-  private inspectTestData(): void {
+  inspectTestData(): void {
     const source = this.testSource();
-    if (!source) { this.inspect.set(null); return; }
+    this.inspectError.set('');
+    if (!source) { this.inspect.set(null); this.inspecting.set(false); return; }
+    this.inspecting.set(true);
+    const seq = ++this.inspectSeq;
     this.api.inspect(source, this.testRoot()).subscribe({
-      next: r => { this.inspect.set(r); if (r.label) this.testLabel.set(r.label); },
+      next: r => { if (seq !== this.inspectSeq) return; this.inspecting.set(false); this.inspect.set(r); if (r.label) this.testLabel.set(r.label); },
       error: e => {
+        if (seq !== this.inspectSeq) return;
+        this.inspecting.set(false);
         this.inspect.set(null);
         const err = studioError(e, 'The test data could not be read.');
         if (LOST_DATA.includes(err.code)) { this.loseTestData(err.message); return; }
         this.drawError.set(err.message);
+        this.inspectError.set(err.message);
       },
     });
   }
+  private inspectSeq = 0;
 
   /** ZT-R37: test data that cannot be read any more is dropped, said plainly, and the page drawn without it. */
   private loseTestData(why: string): void {

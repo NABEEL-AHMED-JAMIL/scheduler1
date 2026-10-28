@@ -10,8 +10,8 @@
       <div class="flex items-center gap-2">
         <app-workspace-select [allowAll]="true" [value]="tenantFilter() ? +tenantFilter() : null" (valueChange)="tenantFilter.set($event === null ? '' : '' + $event); pager.reset()" />
         <app-refresh-button [loading]="loading()" (refresh)="load()" />
-        <button type="button" class="btn btn-primary btn-sm" (click)="create()">
-          <app-icon name="plus" />New user
+        <button type="button" class="btn btn-primary btn-sm" (click)="create()" [disabled]="opening()">
+          <app-icon name="plus" [busy]="opening()" />New user
         </button>
       </div>
     </div>
@@ -30,8 +30,14 @@
   }
 
   <!-- Owner 2026-10-19 #30: who is here, who can get in, how they get in and who uses it; each card filters the list. -->
+  <!-- Owner 2026-10-27: placeholders until the list answers; the standing's own cards say when it is not known yet. -->
   <app-stat-strip label="People by standing" [items]="cards()" [cols]="2" [smCols]="4" [lgCols]="6" align="start" size="md"
+                  [loading]="!loaded() && !error()" [failed]="!!error() && !loaded()"
                   (itemClick)="pickCard($event)" data-test="user-cards" />
+  @if (standingError()) {
+    <app-inline-status data-test="standing-error" [error]="standingError() + ' Locked accounts and two-factor are not shown.'"
+                       (retry)="loadStanding()" />
+  }
 
   <app-table-shell heading="Users" [loading]="loading()" [error]="error()"
                    [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="users().length"
@@ -276,38 +282,15 @@
     <table class="table-modern">
       <thead>
         <tr>
-          @for (column of [
-            { key: 'fullName',    label: 'Person' },
-            { key: 'userRole',    label: 'Role' },
-            { key: 'pageAccessProfileName', label: 'Access' },
-            { key: 'tenantName',  label: 'Workspace', hide: 'hidden xl:table-cell' },
-            { key: 'lastLoginAt', label: 'Last sign-in', hide: 'hidden lg:table-cell' }
-          ]; track column.key) {
-            <th [class]="column.hide ?? ''">
-              <button type="button" class="th-sort"
-                      [class.th-sort-active]="sort.key() === column.key"
-                      (click)="sort.toggle(column.key)">
-                {{ column.label }}
-                <app-icon [name]="sort.iconFor(column.key)" size="0.875rem"
-                          [class]="sort.key() === column.key ? 'icon-info' : 'icon-muted'" />
-              </button>
-            </th>
-          }
-          <th class="text-right hidden xl:table-cell">Workload</th>
-          @for (column of [
-            { key: 'dateCreated', label: 'Added' }
-          ]; track column.key) {
-            <th class="hidden xl:table-cell">
-              <button type="button" class="th-sort"
-                      [class.th-sort-active]="sort.key() === column.key"
-                      (click)="sort.toggle(column.key)">
-                {{ column.label }}
-                <app-icon [name]="sort.iconFor(column.key)" size="0.875rem"
-                          [class]="sort.key() === column.key ? 'icon-info' : 'icon-muted'" />
-              </button>
-            </th>
-          }
-          <th class="text-right">State</th>
+          <!-- Owner 2026-10-27: the shared sortable heading on every column that holds a value (Workload and State too). -->
+          <th appSort="fullName" [sortBy]="sort">Person</th>
+          <th appSort="userRole" [sortBy]="sort">Role</th>
+          <th appSort="pageAccessProfileName" [sortBy]="sort">Access</th>
+          <th class="hidden xl:table-cell" appSort="tenantName" [sortBy]="sort">Workspace</th>
+          <th class="hidden lg:table-cell" appSort="lastLoginAt" [sortBy]="sort">Last sign-in</th>
+          <th class="text-right hidden xl:table-cell" appSort="workload" [sortBy]="sort">Workload</th>
+          <th class="hidden xl:table-cell" appSort="dateCreated" [sortBy]="sort">Added</th>
+          <th class="text-right" appSort="status" [sortBy]="sort">State</th>
           <th class="w-12 th-actions">Actions</th>
         </tr>
       </thead>

@@ -2,6 +2,7 @@ import { Component, ComponentRef, DestroyRef, ViewContainerRef, effect, inject, 
 import type { PinnedChart } from '../analytics.service';
 import type { ChartAnswer } from './chart-answer';
 import type { ChartAnswerCard } from './chart-answer-card';
+import { AppLoading, InlineStatus } from '../../../shared/ui/loading';
 
 /**
  * MIG-357: where a chart answer is drawn on a screen that may never show one (Ask your data, the AI Assistant). The card
@@ -13,7 +14,16 @@ import type { ChartAnswerCard } from './chart-answer-card';
  */
 @Component({
   selector: 'app-chart-answer-slot',
-  template: `@if (!ready()) { <p class="text-xs text-[color:var(--text-muted)]" data-test="chart-loading">Drawing the chart…</p> }`,
+  imports: [AppLoading, InlineStatus],
+  // Owner 2026-10-27: a chunk that fails to load (a deploy since the page opened, a dropped connection) said "Drawing
+  // the chart…" for ever; it now says so, with Try again.
+  template: `
+    @if (failed()) {
+      <app-inline-status error="The chart could not be drawn: part of the page did not load. Try again, or reload the page." (retry)="load()" />
+    } @else if (!ready()) {
+      <p class="text-xs" data-test="chart-loading"><app-loading shape="inline" label="Drawing the chart…" /></p>
+    }
+  `,
 })
 export class ChartAnswerSlot {
   private readonly host = inject(ViewContainerRef);
@@ -23,6 +33,7 @@ export class ChartAnswerSlot {
   readonly height = input(320);
   readonly showCaption = input(true);
   readonly ready = signal(false);
+  readonly failed = signal(false);
   /** The card's answer was pinned to a dashboard (UX final AD1: Ask your data lists what its viewer pinned). */
   readonly pinnedTo = output<PinnedChart>();
 
@@ -31,18 +42,23 @@ export class ChartAnswerSlot {
 
   constructor() {
     inject(DestroyRef).onDestroy(() => { this.gone = true; this.card?.destroy(); });
-    void import('./chart-answer-card').then(({ ChartAnswerCard }) => {
-      if (this.gone) return;
-      this.card = this.host.createComponent(ChartAnswerCard);
-      this.card.instance.pinnedTo.subscribe(p => this.pinnedTo.emit(p));
-      this.pass();
-      this.ready.set(true);
-    });
+    this.load();
     effect(() => {
       // Read every input here, so a new answer (or a change of rights) reaches the card.
       this.answer(); this.canPin(); this.height(); this.showCaption();
       this.pass();
     });
+  }
+
+  load(): void {
+    this.failed.set(false);
+    import('./chart-answer-card').then(({ ChartAnswerCard }) => {
+      if (this.gone || this.card) return;
+      this.card = this.host.createComponent(ChartAnswerCard);
+      this.card.instance.pinnedTo.subscribe(p => this.pinnedTo.emit(p));
+      this.pass();
+      this.ready.set(true);
+    }).catch(() => { if (!this.gone) this.failed.set(true); });
   }
 
   private pass(): void {

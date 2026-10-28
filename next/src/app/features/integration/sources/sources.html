@@ -48,18 +48,18 @@
         <table class="table-modern">
           <thead>
             <tr>
-              <th>Connection</th>
-              <th>Host · database</th>
-              <th>User</th>
-              <th>Password</th>
-              <th>TLS</th>
-              @if (isPlatformAdmin()) { <th>Workspace</th> }
-              <th class="text-right">State</th>
+              <th appSort="name" [sortBy]="connectionSort">Connection</th>
+              <th appSort="host" [sortBy]="connectionSort">Host · database</th>
+              <th appSort="user" [sortBy]="connectionSort">User</th>
+              <th appSort="password" [sortBy]="connectionSort">Password</th>
+              <th appSort="tls" [sortBy]="connectionSort">TLS</th>
+              @if (isPlatformAdmin()) { <th appSort="workspace" [sortBy]="connectionSort">Workspace</th> }
+              <th class="text-right" appSort="state" [sortBy]="connectionSort">State</th>
               @if (canManage()) { <th class="w-12 th-actions">Actions</th> }
             </tr>
           </thead>
           <tbody>
-            @for (c of namedConnections(); track c.id) {
+            @for (c of sortedConnections(); track c.id) {
               <tr>
                 <td class="max-w-56">
                   @if (canManage()) { <button type="button" class="link-inline font-medium text-left" (click)="editConnection(c)">{{ c.name }}</button> }
@@ -102,17 +102,17 @@
         <table class="table-modern">
           <thead>
             <tr>
-              <th>Contract</th>
-              <th>Direction</th>
-              <th class="text-right">Active</th>
-              <th class="text-right">Latest</th>
-              <th>Sensitivity</th>
-              <th>Created</th>
-              @if (isPlatformAdmin()) { <th>Workspace</th> }
+              <th appSort="name" [sortBy]="contractSort">Contract</th>
+              <th appSort="direction" [sortBy]="contractSort">Direction</th>
+              <th class="text-right" appSort="active" [sortBy]="contractSort">Active</th>
+              <th class="text-right" appSort="latest" [sortBy]="contractSort">Latest</th>
+              <th appSort="sensitivity" [sortBy]="contractSort">Sensitivity</th>
+              <th appSort="created" [sortBy]="contractSort">Created</th>
+              @if (isPlatformAdmin()) { <th appSort="workspace" [sortBy]="contractSort">Workspace</th> }
             </tr>
           </thead>
           <tbody>
-            @for (c of namedContracts(); track c.id) {
+            @for (c of sortedContracts(); track c.id) {
               <tr>
                 <td class="max-w-72">
                   <button type="button" class="link-inline font-medium text-left" (click)="openContract(c)">{{ c.name }}</button>
@@ -136,7 +136,8 @@
         <app-pipeline-reads class="block mb-6" [reads]="pipelineReads()" [loading]="pipelineReadsLoading()" [error]="pipelineReadsError()"
                             (retry)="loadPipelineReads()" />
       }
-      <app-stat-strip [items]="kpis()" [cols]="2" [smCols]="4" align="start" size="md" label="Sources at a glance" />
+      <app-stat-strip [items]="kpis()" [cols]="2" [smCols]="4" align="start" size="md" label="Sources at a glance"
+                      [loading]="sourcesState.pending()" [failed]="!!error() && !sourcesState.loaded()" />
 
       <app-table-shell data-test="sources" heading="Sources" columnsKey="sources" [loading]="loading()" [error]="error()"
                        [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="total()"
@@ -200,13 +201,13 @@
           <table class="table-modern">
             <thead>
               <tr>
-                <th>Source</th>
-                <th>Kind</th>
-                <th class="hidden lg:table-cell">Format</th>
+                <th appSort="name" [sortBy]="sourceSort">Source</th>
+                <th appSort="kind" [sortBy]="sourceSort">Kind</th>
+                <th class="hidden lg:table-cell" appSort="format" [sortBy]="sourceSort">Format</th>
                 <th>Last test</th>
-                <th class="hidden lg:table-cell">Created</th>
+                <th class="hidden lg:table-cell" appSort="created" [sortBy]="sourceSort">Created</th>
                 @if (isPlatformAdmin()) { <th>Workspace</th> }
-                <th class="text-right">State</th>
+                <th class="text-right" appSort="state" [sortBy]="sourceSort">State</th>
                 @if (canManage()) { <th class="w-12 th-actions">Actions</th> }
               </tr>
             </thead>

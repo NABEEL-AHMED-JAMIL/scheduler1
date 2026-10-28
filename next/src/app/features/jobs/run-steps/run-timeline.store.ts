@@ -34,6 +34,11 @@ export class RunTimelineStore implements OnDestroy {
   readonly outputList = computed(() => { const o = this.outputs(); return Array.isArray(o) ? o : []; });
   /** Each step's own lines by its step execution, read once; 'error' when they could not be read. */
   readonly lines = signal<Map<number, StepLogLine[] | 'error'>>(new Map());
+  /**
+   * Owner 2026-10-27: another attempt is being read; the Steps table keeps the shown attempt's rows under a blur until
+   * it lands instead of showing the old attempt as though it were the new one.
+   */
+  readonly switching = signal(false);
   /** The download in flight ("d<runDatasetId>" or "o<runOutputId>"), so its button cannot be pressed twice. */
   readonly busy = signal('');
 
@@ -75,6 +80,7 @@ export class RunTimelineStore implements OnDestroy {
     this.requestFor = attempt;
     this.request = this.http.get<ApiResponse<unknown>>(`${API_BASE}/sourceJob.json/stepExecutions`, { params }).subscribe({
       next: response => {
+        this.switching.set(false);
         this.readError.set(response.status !== API_SUCCESS);
         if (response.status !== API_SUCCESS) return;
         const timeline = engineTimeline(response.data);
@@ -99,8 +105,26 @@ export class RunTimelineStore implements OnDestroy {
         this.loadOutputs(jobQueueId, timeline.attempt);
       },
       // The run's entries are the point of the page; losing the steps must not break it.
-      error: () => this.readError.set(true),
+      error: () => { this.switching.set(false); this.readError.set(true); },
     });
+  }
+
+  /**
+   * Try again after the steps could not be read (owner 2026-10-27: the tabs that need them say so instead of "Reading
+   * the run's steps…" for ever). Clears the failure first so the tabs show loading again while it reads.
+   */
+  retry(): void {
+    if (!this.jobQueueId) return;
+    this.readError.set(false);
+    this.load(this.jobQueueId);
+  }
+
+  /** Try again on the outputs alone, after they could not be read (the Steps table's Output column says so). */
+  retryOutputs(): void {
+    const timeline = this.timeline();
+    if (!this.jobQueueId || !timeline) return;
+    this.outputs.set(null);
+    this.loadOutputs(this.jobQueueId, timeline.attempt);
   }
 
   /** Another attempt of a retried run; null follows the latest. */
@@ -108,6 +132,7 @@ export class RunTimelineStore implements OnDestroy {
     if (!this.jobQueueId) return;
     this.requestedAttempt = attempt;
     this.settled = false;
+    if (this.timeline()) this.switching.set(true);
     this.lines.set(new Map());
     this.outputs.set(null);
     this.load(this.jobQueueId);

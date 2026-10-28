@@ -20,7 +20,8 @@ import { TaskCountService } from '../workflows/task-count.service';
     <div class="page">
       <app-page-header title="Runs to review"
                        subtitle="Runs whose results wait for a review, newest first. Open one to see its results and decide, or pick several to decide together.">
-        @if (!noWorkspace()) { <app-refresh-button [loading]="!waiting()?.loaded()" (refresh)="reload()" /> }
+        <!-- Owner 2026-10-27: a failed read leaves loaded() false, so the button stops spinning on an error too. -->
+        @if (!noWorkspace()) { <app-refresh-button [loading]="!waiting()?.loaded() && !waiting()?.error()" (refresh)="reload()" /> }
       </app-page-header>
       @if (noWorkspace()) {
         <!-- Core's review/waiting answers "Reviews belong to a workspace" to a sign-in with none (2026-10-20): nothing is read. -->
