@@ -9,7 +9,7 @@
 // Each topic folder of help/ may hold a shots.json: a list of
 //   { "name": "rs-designer",            the file: public/help/img/<name>.webp (help Markdown says ![...](rs-designer))
 //     "route": "/reports/templates",    where the console opens
-//     "as": "riverside.admin",          who: <workspace>.<admin|reviewer|viewer> or summit.<person> (.state/demo/rebuild.json)
+//     "as": "riverside.admin",          who: <workspace>.<admin|reviewer|viewer>, summit.<person> or platform.admin (.state/demo/rebuild.json)
 //     "steps": [ {"click": "text=New template"}, {"selectIndex": ["select", 1]}, {"waitFor": "app-designer"}, {"wait": 800}, {"fill": ["input[name=q]", "wound"]},
 //                {"hover": "css"}, {"press": "Escape"}, {"scroll": "css"},
 //                {"pick": ["#id or app-advanced-select css", "value or name" | {"label": "name"}]} ],  (an advanced select)
@@ -54,7 +54,9 @@ const OWNER = (() => {
 function personId(who) {
   const [ws, ...rest] = who.split('.');
   const role = rest.join('.');
-  const id = ws === 'summit' ? state.showcase?.people?.[role]?.appUserId : state.workspaces?.[ws]?.[role];
+  // platform.admin: the TEST platform administrator (rebuild.json's platformAdmin), never the owner.
+  const id = ws === 'platform' ? state.platformAdmin?.appUserId
+    : ws === 'summit' ? state.showcase?.people?.[role]?.appUserId : state.workspaces?.[ws]?.[role];
   if (!Number.isInteger(id)) throw new Error(`no person ${who} in rebuild.json`);
   if (id === 1000 || id === OWNER) throw new Error(`refusing ${who}: the owner's account`);
   return id;

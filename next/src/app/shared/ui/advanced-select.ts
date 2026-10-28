@@ -119,6 +119,9 @@ export function rowsOf(options: AdvancedOption[]): Row[] {
             @if (showDescription() && c.description) { <span class="adv-trigger-desc">{{ c.description }}</span> }
           } @else if (loading()) {
             <span class="adv-placeholder">{{ loadingText() }}</span>
+          } @else if (allowClear() && !value() && placeholder() === clearLabel()) {
+            <!-- "All workflows", "None": the empty choice is a choice, said as one, not greyed as a prompt. -->
+            <span class="adv-cleared">{{ clearLabel() }}</span>
           } @else if (value() && unknownText()) {
             <span class="adv-trigger-main"><span class="adv-name mono">{{ value() }}</span></span>
             @if (showDescription()) { <span class="adv-trigger-desc adv-unknown">{{ unknownText() }}</span> }
@@ -200,6 +203,11 @@ export function rowsOf(options: AdvancedOption[]): Row[] {
     .adv-trigger.is-invalid { border-color: var(--crit-text); }
     .adv-sm .adv-trigger { min-height: 1.75rem; padding-block: 0.125rem; font-size: 0.75rem; }
     .adv-sm .adv-trigger-desc { display: none; }
+    /* Among a page head's or a list toolbar's buttons it is their height, as a native select there is (styles.css). */
+    :host-context(.page-head) .adv-trigger, :host-context(.table-toolbar) .adv-trigger { min-height: 1.75rem; padding-block: 0.125rem; font-size: 0.75rem; }
+    :host-context(.page-head) .adv-trigger-desc, :host-context(.table-toolbar) .adv-trigger-desc { display: none; }
+    :host-context(.field-invalid) .adv-trigger, :host(.input-invalid) .adv-trigger { border-color: var(--crit-text); }
+    .adv-cleared { color: var(--text-primary); }
     .adv-bare .adv-trigger { min-height: 0; padding: 0 1.25rem 0 0; border: 0; background: transparent; font: inherit; font-weight: 600; }
     .adv-bare .adv-trigger-desc { display: none; }
     .adv-bare .adv-chevron { right: 0; }

@@ -170,7 +170,7 @@ export class NewPipeline implements OnInit {
   readonly idValue = idValue;
   readonly idOf = idOf;
   readonly topicOptions = computed<AdvancedOption[]>(() => this.topics().map(t => ({ value: '' + t.sourceTaskTypeId, label: t.serviceName,
-    mono: true, badge: t.status && t.status !== 'Active' ? t.status : undefined })));
+    badge: t.status && t.status !== 'Active' ? t.status : undefined })));
   readonly copyOptions = computed<AdvancedOption[]>(() => this.copyable().map(p => ({ value: '' + p.taskDetailId, label: p.taskName,
     description: p.taskStatus ? `${p.taskStatus} · #${p.taskDetailId}` : `#${p.taskDetailId}`, keywords: '' + p.taskDetailId })));
 
