@@ -107,6 +107,8 @@ describe('run page: counts and files in words', () => {
   it('says a table\'s type, rows and size', () => {
     expect(outputLabel({ name: 'xray-triage.csv', format: 'csv', rowCount: 1, byteCount: 349 })).toBe('CSV · 1 row · 349 B');
     expect(outputLabel({ name: 'out.json', format: 'json', rowCount: 40, byteCount: null })).toBe('JSON · 40 rows');
+    expect(outputLabel({ name: 'scan-page-01.png', format: 'png', rowCount: 1, byteCount: 81615 })).toBe('PNG · 79.7 KB');
+    expect(outputLabel({ name: 'notes.txt', format: null, rowCount: 1, byteCount: 349 })).toBe('TXT · 349 B');
   });
 
   it('describes a step\'s kept file by its output and its upload as a chip of its own', () => {

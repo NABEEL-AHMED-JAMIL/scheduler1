@@ -121,16 +121,20 @@ export function runRows(steps: StepExecution[]): { value: string; hint: string }
     hint: `${plural(first, 'record')} read, ${plural(last, 'record')} out of the last step` };
 }
 
+/** Formats whose files are rows (FileFormats.READABLE), so a row count says something about them. */
+const ROWS = ['CSV', 'JSON', 'JSONL', 'PARQUET'];
+
 /**
  * A file the run put out, as people describe one: its type, then what it holds. A PDF is pages and bytes, never rows
- * ("PDF · 2 pages · 21.8 KB"); a table is rows and bytes ("CSV · 40 rows · 2.1 KB").
+ * ("PDF · 2 pages · 21.8 KB"); a table is rows and bytes ("CSV · 40 rows · 2.1 KB"); an image only bytes ("PNG · 79.7 KB").
  */
 export function outputLabel(o: Pick<RunOutput, 'name' | 'format' | 'rowCount' | 'byteCount' | 'pageCount'>): string {
   const format = (o.format || (/\.([a-z0-9]+)$/i.exec(o.name ?? '')?.[1] ?? '')).toUpperCase();
   const parts: string[] = format ? [format] : [];
   if (format === 'PDF') {
     if (o.pageCount) parts.push(plural(o.pageCount, 'page'));
-  } else if (o.rowCount !== null && o.rowCount !== undefined) {
+  } else if (o.rowCount !== null && o.rowCount !== undefined && (!format || ROWS.includes(format))) {
+    // Only rows are counted in rows: an image or a text file is one file, never "1 row".
     parts.push(plural(o.rowCount, 'row'));
   }
   if (o.byteCount !== null && o.byteCount !== undefined) parts.push(formatSize(o.byteCount));
