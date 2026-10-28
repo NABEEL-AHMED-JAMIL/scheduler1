@@ -1,0 +1,41 @@
+code,code_nodot,description,chapter,chapter_title,billable,fiscal_year
+A41,A41,Other sepsis,1,Certain infectious and parasitic diseases (A00-B99),0,2026
+A41.9,A419,"Sepsis, unspecified organism",1,Certain infectious and parasitic diseases (A00-B99),1,2026
+C50,C50,Malignant neoplasm of breast,2,Neoplasms (C00-D49),0,2026
+C50.911,C50911,Malignant neoplasm of unspecified site of right female breast,2,Neoplasms (C00-D49),1,2026
+E11,E11,Type 2 diabetes mellitus,4,"Endocrine, nutritional and metabolic diseases (E00-E89)",0,2026
+E11.9,E119,Type 2 diabetes mellitus without complications,4,"Endocrine, nutritional and metabolic diseases (E00-E89)",1,2026
+E78,E78,Disorders of lipoprotein metabolism and other lipidemias,4,"Endocrine, nutritional and metabolic diseases (E00-E89)",0,2026
+E78.5,E785,"Hyperlipidemia, unspecified",4,"Endocrine, nutritional and metabolic diseases (E00-E89)",1,2026
+F32,F32,Depressive episode,5,"Mental, behavioral and neurodevelopmental disorders (F01-F99)",0,2026
+F32.A,F32A,"Depression, unspecified",5,"Mental, behavioral and neurodevelopmental disorders (F01-F99)",1,2026
+I10,I10,Essential (primary) hypertension,9,Diseases of the circulatory system (I00-I99),1,2026
+I50,I50,Heart failure,9,Diseases of the circulatory system (I00-I99),0,2026
+I50.3,I503,Diastolic (congestive) heart failure,9,Diseases of the circulatory system (I00-I99),0,2026
+J18,J18,"Pneumonia, unspecified organism",10,Diseases of the respiratory system (J00-J99),0,2026
+J18.9,J189,"Pneumonia, unspecified organism",10,Diseases of the respiratory system (J00-J99),1,2026
+J45,J45,Asthma,10,Diseases of the respiratory system (J00-J99),0,2026
+J45.909,J45909,"Unspecified asthma, uncomplicated",10,Diseases of the respiratory system (J00-J99),1,2026
+K21,K21,Gastro-esophageal reflux disease,11,Diseases of the digestive system (K00-K95),0,2026
+K21.9,K219,Gastro-esophageal reflux disease without esophagitis,11,Diseases of the digestive system (K00-K95),1,2026
+L97,L97,"Non-pressure chronic ulcer of lower limb, not elsewhere classified",12,Diseases of the skin and subcutaneous tissue (L00-L99),0,2026
+L97.529,L97529,Non-pressure chronic ulcer of other part of left foot with unspecified severity,12,Diseases of the skin and subcutaneous tissue (L00-L99),1,2026
+M54,M54,Dorsalgia,13,Diseases of the musculoskeletal system and connective tissue (M00-M99),0,2026
+M54.5,M545,Low back pain,13,Diseases of the musculoskeletal system and connective tissue (M00-M99),0,2026
+M54.50,M5450,"Low back pain, unspecified",13,Diseases of the musculoskeletal system and connective tissue (M00-M99),1,2026
+N18,N18,Chronic kidney disease (CKD),14,Diseases of the genitourinary system (N00-N99),0,2026
+N18.30,N1830,"Chronic kidney disease, stage 3 unspecified",14,Diseases of the genitourinary system (N00-N99),1,2026
+O9A,O9A,"Maternal malignant neoplasms, traumatic injuries and abuse classifiable elsewhere but complicating pregnancy, childbirth and the puerperium",15,"Pregnancy, childbirth and the puerperium (O00-O9A)",0,2026
+O9A.211,O9A211,"Injury, poisoning and certain other consequences of external causes complicating pregnancy, first trimester",15,"Pregnancy, childbirth and the puerperium (O00-O9A)",1,2026
+R07,R07,Pain in throat and chest,18,"Symptoms, signs and abnormal clinical and laboratory findings, not elsewhere classified (R00-R99)",0,2026
+R07.9,R079,"Chest pain, unspecified",18,"Symptoms, signs and abnormal clinical and laboratory findings, not elsewhere classified (R00-R99)",1,2026
+S72,S72,Fracture of femur,19,"Injury, poisoning and certain other consequences of external causes (S00-T88)",0,2026
+S72.001,S72001,Fracture of unspecified part of neck of right femur,19,"Injury, poisoning and certain other consequences of external causes (S00-T88)",0,2026
+S72.001A,S72001A,"Fracture of unspecified part of neck of right femur, initial encounter for closed fracture",19,"Injury, poisoning and certain other consequences of external causes (S00-T88)",1,2026
+Z00,Z00,"Encounter for general examination without complaint, suspected or reported diagnosis",21,Factors influencing health status and contact with health services (Z00-Z99),0,2026
+Z00.0,Z000,Encounter for general adult medical examination,21,Factors influencing health status and contact with health services (Z00-Z99),0,2026
+Z00.00,Z0000,Encounter for general adult medical examination without abnormal findings,21,Factors influencing health status and contact with health services (Z00-Z99),1,2026
+Z79,Z79,Long term (current) drug therapy,21,Factors influencing health status and contact with health services (Z00-Z99),0,2026
+Z79.4,Z794,Long term (current) use of insulin,21,Factors influencing health status and contact with health services (Z00-Z99),1,2026
+U07,U07,Emergency use of U07,22,Codes for special purposes (U00-U85),0,2026
+U07.1,U071,COVID-19,22,Codes for special purposes (U00-U85),1,2026

@@ -72,6 +72,16 @@ Tested by ______ on ______
 | QA-07.27 | Another workspace cannot open it | As A, copy the pipeline's address; as X, open it | **Pipeline #N does not exist or was deleted.** (not yet verified from another workspace) | ☐ Pass ☐ Fail |
 | QA-07.28 | Another workspace's list | As X, **Build › Pipelines**, search `QA occupancy` | Not found | ☐ Pass ☐ Fail |
 
+## Check codes against a reference list
+Needs the files of [Check ICD-10 codes against the CMS list](#rcp-icd10-code-check): the sample claims and the code
+list (the excerpt is enough for QA-07.29 and QA-07.30; QA-07.31 needs the whole FY2026 list).
+
+| # | Check | Steps | Expected | Pass / Fail |
+|---|---|---|---|---|
+| QA-07.29 | The code list is a public reference | Upload the list to `reference/icd10cm/2026/codes.csv`; open it in **See results › Analysis › Data Catalog**, set **Sensitivity** **Public** | The asset shows **Public**, its row count and seven columns; no column is tagged sensitive | ☐ Pass ☐ Fail |
+| QA-07.30 | Every claim gets a status | Build the recipe's **ICD-10 code check** with the sample claims; **Run now**; open the summary from **Outputs** | valid 22, header 6, invalid 6, blank 3; the flagged file holds 15 claims, `E1.19` among them with *The dot is misplaced* and `E11.9` | ☐ Pass ☐ Fail |
+| QA-07.31 | A join refuses the whole list | With the full list, change step 10's **Join with** to `reference`; run; then change it back | The step fails before joining: the output of step `reference` has 98,186 rows, and a step that holds its whole input takes at most 50,000 | ☐ Pass ☐ Fail |
+
 ## Example
 At Summit Valley the tester's `QA occupancy` run reads 3 rows, keeps 4B and ICU, and saves
 `qa-occupancy-2026-10-27.csv` with the run. Changing the filter to 95 saves v2; the first run still names v1 and still

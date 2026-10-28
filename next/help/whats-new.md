@@ -2,6 +2,7 @@
 
 Newest first. Each line: `- date · [Title](#article) · one sentence`.
 
+- 2026-10-27 · [Check ICD-10 codes against the CMS list](#rcp-icd10-code-check) · A recipe: look each claim's diagnosis code up in the CMS ICD-10-CM list, add its description and chapter, and keep the invalid, header and blank codes for review.
 - 2026-10-27 · [Personal data in a request](#apr-my-requests--personal-data-in-a-request) · A form's personal answers are hidden in its approval requests; people with See personal data can show them, and each showing is in the history.
 - 2026-10-27 · [Request details](#apr-my-requests--follow-a-request) · A pipeline's outcome reads as one line with its run, a kept decision as who decided and when, and a hidden value as hidden.
 - 2026-10-27 · [Approver's signature](#rs-approve--the-approvers-own-signature) · A report shows the signature of whoever approved it, placed at approval with their name, title and time; with none of their own, their typed name and "Signed digitally".

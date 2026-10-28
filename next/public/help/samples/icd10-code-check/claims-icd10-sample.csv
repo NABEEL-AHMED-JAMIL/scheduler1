@@ -1,0 +1,38 @@
+claim_id,patient_ref,payer,service_date,icd10,billed
+RV-CLM-0001,RV-PT-00079,Medicare (synthetic),2026-10-26,E11.9,285.17
+RV-CLM-0002,RV-PT-00307,Riverside Community Plan (synthetic),2026-10-14,I10,235.97
+RV-CLM-0003,RV-PT-00014,Medicare (synthetic),2026-10-16,i10,793.26
+RV-CLM-0004,RV-PT-00284,Medicare (synthetic),2026-10-03, J45.909 ,1327.88
+RV-CLM-0005,RV-PT-00120,Valley Mutual (synthetic),2026-10-24,E119,1625.74
+RV-CLM-0006,RV-PT-00362,Riverside Community Plan (synthetic),2026-10-09,Z00.00,729.15
+RV-CLM-0007,RV-PT-00089,Riverside Community Plan (synthetic),2026-10-16,M54.50,1416.35
+RV-CLM-0008,RV-PT-00209,Riverside Community Plan (synthetic),2026-10-09,N18.30,700.94
+RV-CLM-0009,RV-PT-00164,Medicare (synthetic),2026-10-01,L97.529,1516.51
+RV-CLM-0010,RV-PT-00061,Riverside Community Plan (synthetic),2026-10-09,F32.A,1657.36
+RV-CLM-0011,RV-PT-00289,Riverside Community Plan (synthetic),2026-10-09,U07.1,205.36
+RV-CLM-0012,RV-PT-00077,Valley Mutual (synthetic),2026-10-11,S72.001A,1078.17
+RV-CLM-0013,RV-PT-00364,Medicare (synthetic),2026-10-13,O9A.211,1048.74
+RV-CLM-0014,RV-PT-00362,Valley Mutual (synthetic),2026-10-21,K21.9,1366.14
+RV-CLM-0015,RV-PT-00182,Valley Mutual (synthetic),2026-10-21,R07.9,560.98
+RV-CLM-0016,RV-PT-00074,Medicare (synthetic),2026-10-08,E78.5,714.40
+RV-CLM-0017,RV-PT-00264,Self-pay (synthetic),2026-10-10,J18.9,1445.36
+RV-CLM-0018,RV-PT-00314,Medicare (synthetic),2026-10-17,Z79.4,1162.94
+RV-CLM-0019,RV-PT-00317,Medicare (synthetic),2026-10-08,C50.911,102.25
+RV-CLM-0020,RV-PT-00068,Riverside Community Plan (synthetic),2026-10-08,A41.9,579.30
+RV-CLM-0021,RV-PT-00097,Self-pay (synthetic),2026-10-19,e11.9,1231.94
+RV-CLM-0022,RV-PT-00240,Medicare (synthetic),2026-10-20,I10,996.23
+RV-CLM-0023,RV-PT-00273,Self-pay (synthetic),2026-10-13,E11,1792.23
+RV-CLM-0024,RV-PT-00363,Valley Mutual (synthetic),2026-10-23,I50.3,655.24
+RV-CLM-0025,RV-PT-00060,Valley Mutual (synthetic),2026-10-12,J45,551.05
+RV-CLM-0026,RV-PT-00262,Medicare (synthetic),2026-10-03,M54.5,262.51
+RV-CLM-0027,RV-PT-00115,Valley Mutual (synthetic),2026-10-12,S72.001,884.51
+RV-CLM-0028,RV-PT-00297,Riverside Community Plan (synthetic),2026-10-10,Z00.0,162.51
+RV-CLM-0029,RV-PT-00388,Self-pay (synthetic),2026-10-05,E11.99,443.15
+RV-CLM-0030,RV-PT-00259,Riverside Community Plan (synthetic),2026-10-08,XYZ.1,420.77
+RV-CLM-0031,RV-PT-00271,Valley Mutual (synthetic),2026-10-26,E1.19,1339.17
+RV-CLM-0032,RV-PT-00381,Self-pay (synthetic),2026-10-05,I10.1,1799.96
+RV-CLM-0033,RV-PT-00278,Valley Mutual (synthetic),2026-10-12,250.00,1721.53
+RV-CLM-0034,RV-PT-00367,Riverside Community Plan (synthetic),2026-10-19,R07.10,120.28
+RV-CLM-0035,RV-PT-00261,Self-pay (synthetic),2026-10-05,,1205.96
+RV-CLM-0036,RV-PT-00270,Valley Mutual (synthetic),2026-10-06,  ,455.55
+RV-CLM-0037,RV-PT-00006,Riverside Community Plan (synthetic),2026-10-11,,1316.87
