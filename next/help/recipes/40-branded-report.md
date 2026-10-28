@@ -103,9 +103,9 @@ More on each component's settings is in [The designer](#rs-designer) and [Compon
 
 1. On the template's page choose **Create report**. The new report opens on **Template** with Ward summary picked.
 2. **Report name**: `Ward summary · October 2026`.
-3. Under **Data source** pick **Test sample** and the sample `October, all wards`. Under **Match template fields**
-   every field the template reads shows **Matched**.
-4. Choose **Preview and check**. **Checks** should say the data contract, bindings, assets and layout pass.
+3. Under **Where does the data come from?** pick **A test sample** and the sample `October, all wards`. The fields are
+   matched for you: the header reads **Matched N of N** and nothing is in **Needs you**.
+4. Choose **Preview and checks →**. **Checks** should say the data contract, bindings, assets and layout pass.
 5. Under **Outputs** keep **PDF** ticked, and choose **Generate v1**, then **Open the report**.
 
 ## Check it worked

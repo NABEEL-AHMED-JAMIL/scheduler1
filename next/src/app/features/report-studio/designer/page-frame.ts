@@ -1,6 +1,11 @@
 import { Component, DestroyRef, ElementRef, effect, inject, input, output } from '@angular/core';
 import { CANVAS_ID, canvasCss, idOf } from './canvas-doc';
 
+/** A class name escaped for a selector (CSS.escape where the browser has it; a test's DOM may not). */
+function cssName(name: string): string {
+  return typeof CSS !== 'undefined' && typeof CSS.escape === 'function' ? CSS.escape(name) : name.replace(/[^\w-]/g, c => `\\${c}`);
+}
+
 /**
  * One page of the designer's canvas (MIG-404): the report's own HTML and stylesheet for that page, drawn in a shadow root
  * so neither the console's styles nor the report's leak into the other. A click names the component under it; the
@@ -25,6 +30,8 @@ export class PageFrame {
   readonly dropInto = input<string | null>(null);
   /** Phase 6: blocks an AI proposal adds or changes, outlined while it is shown on the page. */
   readonly proposed = input<string[]>([]);
+  /** Report data and mapping (2026-10-27): blocks that print a field still needing a source, outlined in red. */
+  readonly flagged = input<string[]>([]);
   /** The component clicked, or null for the page itself. */
   readonly picked = output<string | null>();
   /** The content's height in CSS pixels, unscaled. */
@@ -53,6 +60,7 @@ export class PageFrame {
       this.mark(this.selected());
       this.markDrop(this.dropInto());
       this.markProposal(this.proposed());
+      this.markFlagged(this.flagged());
       const sheet = this.root.querySelector('.rs-sheet');
       if (sheet && sizes) {
         sizes.disconnect();
@@ -63,6 +71,15 @@ export class PageFrame {
     effect(() => this.mark(this.selected()));
     effect(() => this.markDrop(this.dropInto()));
     effect(() => this.markProposal(this.proposed()));
+    effect(() => this.markFlagged(this.flagged()));
+  }
+
+  private flagMarks: Element[] = [];
+
+  private markFlagged(ids: string[]): void {
+    this.flagMarks.forEach(e => e.classList.remove('rsd-flagged'));
+    this.flagMarks = ids.map(id => this.element(id)).filter((e): e is Element => !!e);
+    this.flagMarks.forEach(e => e.classList.add('rsd-flagged'));
   }
 
   private proposalMarks: Element[] = [];
@@ -87,7 +104,7 @@ export class PageFrame {
 
   /** The element that draws a component on this page, or null. */
   element(id: string): Element | null {
-    return this.root.querySelector(`.${CSS.escape(CANVAS_ID + id)}`);
+    return this.root.querySelector(`.${cssName(CANVAS_ID + id)}`);
   }
 
   /** Where a component is drawn, in the window's coordinates, or null when it is not on this page. */

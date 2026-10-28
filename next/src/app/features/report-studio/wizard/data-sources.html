@@ -1,0 +1,113 @@
+<div class="rsds">
+  <div role="radiogroup" aria-label="Where the data comes from" class="rsds-cards" [class.rsds-cards-5]="cards().length >= 5">
+    @for (c of cards(); track c.id) {
+      <button type="button" role="radio" class="rsds-card" [attr.aria-checked]="card() === c.id" [class.is-on]="card() === c.id"
+              [disabled]="c.disabled" (click)="pick(c.id)">
+        <span class="rsds-card-name">{{ c.name }}</span>
+        <span class="rsds-card-hint">{{ c.hint }}</span>
+      </button>
+    }
+  </div>
+  <button type="button" class="link-inline text-xs self-start" [attr.aria-pressed]="card() === 'bundle'" (click)="pick('bundle')">
+    <app-icon name="layers" />Several files as one report's data…</button>
+
+  @switch (card()) {
+    @case ('same') {
+      @if (version(); as v) {
+        <p class="rsds-note" data-same>
+          <app-icon name="lock" class="shrink-0" />
+          <span>The data v{{ v.version }} was made from, kept exactly as it was@if (v.snapshot?.label) { ({{ v.snapshot!.label }})}. Its field choices come with it.</span>
+        </p>
+      }
+    }
+    @case ('run') {
+      @if (schedulesError()) { <app-inline-status [error]="schedulesError()" (retry)="loadSchedules(true)" /> }
+      <div class="rsds-run">
+        <div class="rsds-col">
+          <span class="rsds-label" id="rsds-pipeline">Pipeline</span>
+          <app-advanced-select [inline]="true" [options]="pipelineOptions()" [value]="jobId()" (valueChange)="pickJob($event)"
+                               labelledBy="rsds-pipeline" ariaLabel="Pipeline" searchLabel="Search pipelines" searchPlaceholder="Search pipelines"
+                               [loading]="schedulesLoading()" emptyText="No pipelines you may read. Run one, or pick another way."
+                               noMatchText="No pipeline matches the search." [visibleRows]="5" (searched)="searchPipelines($event)" />
+        </div>
+        <div class="rsds-col">
+          <span class="rsds-label" id="rsds-run">Run <span class="rsds-muted">(the latest completed, by default)</span></span>
+          @if (jobId()) {
+            <app-advanced-select [inline]="true" [options]="runOptions()" [value]="runId()" (valueChange)="pickRun($event)"
+                                 labelledBy="rsds-run" ariaLabel="Run" searchLabel="Search runs" searchPlaceholder="Search runs by number or date"
+                                 [loading]="runsLoading()" emptyText="This pipeline has no runs yet: run it, or pick another way." [visibleRows]="5" />
+            @if (runId()) {
+              @if (outputsLoading()) { <app-loading shape="inline" label="Reading what the run kept…" /> }
+              @else if (!outputs().length) {
+                <p class="rsds-warn" role="status">This run kept no data a report can read (rows expire with the pipeline's retention). Pick another run.</p>
+              } @else if (outputs().length > 1) {
+                <label class="rsds-label" for="rsds-output">Its data</label>
+                <app-advanced-select id="rsds-output" [options]="outputOptions()" [value]="datasetId()" (valueChange)="datasetId.set($event)"
+                                     ariaLabel="Its data" searchLabel="Search the run's outputs" placeholder="Choose the rows to read" />
+              }
+            }
+          } @else {
+            <div class="rsds-empty">Pick a pipeline: its runs show here, the newest completed one chosen.</div>
+          }
+        </div>
+      </div>
+      <p class="rsds-muted">Read as you: a run you cannot open in Runs is refused. "Fits" counts the template's fields its newest completed run fills.</p>
+    }
+    @case ('bucket') {
+      <div class="rsds-file">
+        @if (bucketFile(); as f) {
+          <div class="rsds-picked"><app-icon name="file" class="shrink-0" /><span class="min-w-0"><b class="mono break-all">{{ f.name }}</b>
+            <span class="rsds-muted"> · {{ f.bucket }}</span></span>
+            <button type="button" class="btn btn-default btn-sm" (click)="chooseFile()">Change</button></div>
+        } @else {
+          <button type="button" class="btn btn-default btn-sm self-start" (click)="chooseFile()"><app-icon name="folder" />Choose a file in a bucket…</button>
+        }
+        @if (again() && canUpload()) {
+          <span class="rsds-or">or upload one</span>
+          <ng-container *ngTemplateOutlet="drop" />
+        }
+        <p class="rsds-muted">JSON or CSV, read only, as you: a bucket or file you cannot open in Storage is refused.</p>
+      </div>
+    }
+    @case ('upload') {
+      <ng-container *ngTemplateOutlet="drop" />
+    }
+    @case ('paste') {
+      <label class="field">
+        <span class="label">Paste {{ csv() ? 'CSV' : 'JSON' }}</span>
+        <textarea class="input mono text-xs" rows="8" spellcheck="false" [ngModel]="text()" (ngModelChange)="text.set($event)"
+                  [attr.aria-invalid]="(!!text() && !!pasteError()) || null"
+                  placeholder='{"patient_name": "Ambrose Fairweather", "dob": "1946-03-02"}  or  [ {...}, {...} ]'></textarea>
+        <span class="block field-note text-[color:var(--text-muted)]">One record, or a list of them. Read straight away and never stored. At most 5 MB.</span>
+        @if (text() && pasteError()) { <span class="block field-note text-[color:var(--crit-text)]" role="alert">{{ pasteError() }}</span> }
+      </label>
+      <label class="inline-flex items-center gap-2 text-sm">
+        <input type="checkbox" [ngModel]="csv()" (ngModelChange)="csv.set($event)" /> It is CSV (a header row, then rows)
+      </label>
+    }
+    @case ('bundle') {
+      <app-report-source-picker [only]="onlyBundle" [samples]="samples()" [tenantId]="tenantId()" [(mode)]="bundleMode" [(source)]="bundle" />
+    }
+    @case ('sample') {
+      <label class="rsds-label" for="rsds-sample">Test sample</label>
+      <app-advanced-select id="rsds-sample" [options]="sampleOptions()" [value]="sampleId()" (valueChange)="sampleId.set($event)"
+                           ariaLabel="Test sample" searchLabel="Search the samples" placeholder="Choose a sample" emptyText="No test sample is saved with this template." />
+    }
+  }
+</div>
+
+<ng-template #drop>
+  @if (uploaded(); as u) {
+    <div class="rsds-picked"><app-icon name="upload" class="shrink-0" /><span class="min-w-0"><b class="break-all">{{ u.name }}</b>
+      @if (u.records != null) { <span class="rsds-muted"> · {{ u.records }} row{{ u.records === 1 ? '' : 's' }}</span> }</span></div>
+  }
+  <app-file-dropzone accept=".json,.csv,.tsv" [prompt]="uploaded() ? 'Drop another file to replace it' : 'Drop a JSON or CSV file here'"
+                     hint="A .json or .csv file, kept for reports in this workspace" [disabled]="uploading()" (picked)="upload($event)" />
+  @if (uploading()) { <app-loading shape="inline" label="Uploading…" /> }
+  @if (uploadError()) { <app-inline-status [error]="uploadError()" [retryable]="false" /> }
+  @if (saved().length) {
+    <label class="rsds-label" for="rsds-saved">Or one uploaded before</label>
+    <app-advanced-select id="rsds-saved" [options]="savedOptions()" [value]="savedId()" (valueChange)="pickSaved($event)" ariaLabel="Uploaded before"
+                         searchLabel="Search the uploads" placeholder="Choose an upload" [allowClear]="true" clearLabel="None" />
+  }
+</ng-template>

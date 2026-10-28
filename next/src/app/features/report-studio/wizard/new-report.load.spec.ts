@@ -9,7 +9,7 @@ import { AuthService } from '../../../core/auth/auth.service';
 import { WorkspaceDirectory } from '../../../core/workspaces/workspace-directory';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { ReportStudioApi } from '../report-studio.api';
-import { InspectResult, TemplateDetail } from '../report-studio.model';
+import { TemplateDetail } from '../report-studio.model';
 import { NewReport } from './new-report';
 import { ReportTemplatePage } from '../template-page';
 import { PageLimitCard } from '../page-limit-card';
@@ -17,8 +17,9 @@ import { ReportFileDialog } from '../report-file-dialog';
 
 /**
  * Owner 2026-10-27, Create report and its neighbours: step 1's templates say they are loading and why they failed (with
- * Try again), picking a template says it is opening, the preview never spins for ever on an answer without a PDF, the
- * source's sample and schema sort; a template's data contract sorts; the page limit and the file viewer can try again.
+ * Try again), picking a template says it is opening, the preview never spins for ever on an answer without a PDF (the
+ * source's sample and schema moved into Data and mapping, redesigned 2026-10-27); a template's data contract sorts; the
+ * page limit and the file viewer can try again.
  */
 const failed = () => throwError(() => new HttpErrorResponse({ status: 500, error: 'Internal Server Error' }));
 const authFake = { canOpen: () => true, isPlatformAdmin: () => false, isManagedSession: () => false, user: signal({ appUserId: 4640 }) };
@@ -43,14 +44,6 @@ function wizard(api: Record<string, unknown>, query: Record<string, string> = {}
   fixture.detectChanges();
   return fixture.componentInstance;
 }
-
-const inspected = {
-  records: 1, shape: 'object', warnings: [], sampleRecords: 1, inspected: 1, label: 'run #12', connector: 'RUN_OUTPUT', format: 'JSON', bytes: 10,
-  sha256: 'x', rootPath: '$', tree: { path: '$', type: 'object' },
-  schema: [{ path: 'visits', type: 'array', nullable: false }, { path: 'visits[].site', type: 'string', nullable: false },
-    { path: 'visits[].area', type: 'number', nullable: true }],
-  sample: { visits: [{ site: 'Ward 9', area: 12 }, { site: 'Ward 10', area: 3.5 }, { site: 'Ward 2', area: null }] },
-} as unknown as InspectResult;
 
 beforeEach(() => { try { localStorage.clear(); } catch { /* none */ } });
 
@@ -101,17 +94,17 @@ describe('Create report -- the preview never spins for ever (owner 2026-10-27)',
   });
 });
 
-describe('Create report -- the source\'s sample and schema sort (owner 2026-10-27)', () => {
-  it('sorts the sample by a column\'s raw values both ways, nothing last, and the schema by field', () => {
+describe('Create report -- Data and mapping decides what may be generated (redesign 2026-10-27)', () => {
+  it('blocks generating while a field needs a person, and names one report per row', () => {
     const w = wizard({ list: vi.fn(() => NEVER) });
-    w.inspect.set(inspected);
-    expect(w.sortedSample().map(r => r.cells[0])).toEqual(['Ward 9', 'Ward 10', 'Ward 2']);
-    w.sampleSort.toggle('area');
-    expect(w.sortedSample().map(r => r.raw[1])).toEqual([3.5, 12, null]);
-    w.sampleSort.toggle('area');
-    expect(w.sortedSample().map(r => r.raw[1])).toEqual([12, 3.5, null]);
-    w.schemaSort.toggle('type');
-    expect(w.sortedSchema().map(f => f.type)).toEqual(['array', 'number', 'string']);
+    w.needCount.set(2);
+    expect(w.blocked()).toBe(true);
+    w.needCount.set(0);
+    expect(w.blocked()).toBe(false);
+    expect(w.title()).toBe('Create a report');
+    w.step.set(2);
+    w.t.set({ templateId: 'T1', name: 'Patient intake summary', currentPublishedVersion: 8 } as unknown as TemplateDetail);
+    expect(w.title()).toBe('New report from “Patient intake summary” v8');
   });
 });
 

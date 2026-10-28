@@ -113,12 +113,15 @@ describe('Report Studio screens (zero-tolerance)', () => {
     }
   });
 
-  it('ZT-R20/R21: Create report claims no page count before a preview, and no "nothing for it" banner before data is chosen', async () => {
+  it('ZT-R20/R21: Create report claims no page count before a preview, and nothing "needs you" before data is chosen', async () => {
     const html = await here('wizard/new-report.html');
     const card = html.split('\n').find(l => l.includes("a published version can't be edited"))!;
     expect(card).toContain('@if (pages(); as n)');
     expect(card).not.toContain('pageCount()');
-    expect(html).toContain('@for (m of (inspect() ? missing().slice(0, 1) : []); track m.field.path)');
+    // Redesign 2026-10-27: the fields, and their "Needs you", show only once the data is read.
+    const mapping = await here('wizard/data-mapping.html');
+    expect(mapping.indexOf('@if (inspect()) {\n  <div class="rsdm-two">')).toBeGreaterThan(0);
+    expect(mapping.indexOf('data-needs')).toBeGreaterThan(mapping.indexOf('<div class="rsdm-two">'));
   });
 
   it('ZT-R22: Generation jobs keeps "v3 · 200 p." on one line', async () => {

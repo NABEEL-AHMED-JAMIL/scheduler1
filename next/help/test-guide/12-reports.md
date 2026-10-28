@@ -1,7 +1,7 @@
 ---
 id: qa-reports
 title: "Test area 12: Report Studio"
-summary: Templates and publishing, creating a report and its versions, approving and signing, the approver's own signature, verifying a signature, COPY and VOID, the page limit, reports from a pipeline, and who may do what.
+summary: Templates and publishing, creating a report (data and mapping) and its versions, approving and signing, the approver's own signature, verifying a signature, COPY and VOID, the page limit, reports from a pipeline, and who may do what.
 section: Results
 who: Testers; A designs and generates, A2 and R approve, with V and X for access and isolation
 where: Reports › Overview (/reports/overview); Reports › Templates (/reports/templates); Reports › Library (/reports/library); Reports › Settings (/reports/settings)
@@ -66,6 +66,20 @@ Tested by ______ on ______
 | QA-12.28 | No signature of their own | An approver with no approved signature (or retire theirs first) approves a new version | The PDF shows their typed name and **SIGNED DIGITALLY**, no picture; **Signature on it** says *typed name, signed digitally* | ☐ Pass ☐ Fail |
 | QA-12.29 | The check warns about a fixed signature | In a draft, put a **Signature (fixed person)** in the same section as a **Label and value** labelled `Reviewed by` | The checks warn *One person's signature beside an approval* on that signature and name **Approver's signature**; it is a warning, publishing still works | ☐ Pass ☐ Fail |
 | QA-12.30 | An approved version stays as approved | After QA-12.27, upload a new version of A2's signature and approve it; download the version A2 approved earlier | The earlier PDF is unchanged (Verify signature still holds) and shows the old signature; A2's next approval shows the new one | ☐ Pass ☐ Fail |
+
+## Data and mapping
+| # | Check | Steps | Expected | Pass / Fail |
+|---|---|---|---|---|
+| QA-12.31 | Generate again starts from the version | On a report with v1, **Generate again** › **Other data** | **Same data as v1** is chosen; the fields read **Matched N of M**, each **Kept from v1**; nothing is blank and no row says *Pick the data first* | ☐ Pass ☐ Fail |
+| QA-12.32 | The data comes first | **New report** from any template | **Where does the data come from?** shows five cards; no field is listed until the data is read; the footer says *Pick the data first: the fields are matched to it.* | ☐ Pass ☐ Fail |
+| QA-12.33 | A pipeline by how well it fits | **A pipeline run**; type part of a pipeline's name in **Search pipelines** | The list narrows as you type; each pipeline shows its last run, rows and columns and **Fits N of M**; picking one chooses its latest completed run | ☐ Pass ☐ Fail |
+| QA-12.34 | Auto-match and Needs you | Paste `{"first_name": "Robin", "last_name": "Hale", "date_of_birth": "1950-01-02"}` for a template whose required field is `patient_name` | `dob` reads **Same meaning**; **Needs you** lists the required name with **Suggested: combine first_name + last_name** and `Robin Hale`; **Use it** clears it | ☐ Pass ☐ Fail |
+| QA-12.35 | Two columns that fit | Paste data with both `gender` and `Gender_` for a template that reads `sex` | `sex` is in **Needs you**: *Two columns could fit*; nothing is chosen until you pick | ☐ Pass ☐ Fail |
+| QA-12.36 | The field picker | **Choose…** on a field; try **A column** (search, type, first row's value), **Combine columns** and **A fixed value** | Each tab works with the keyboard; **Combine** shows the result on the first row; an optional field offers **Leave it blank**, a required one does not; **Escape** closes it | ☐ Pass ☐ Fail |
+| QA-12.37 | Choices are kept | Generate a version after choosing a combination and a fixed value; **Generate again** › **Other data** | Both choices come back **Kept from vN**; **Changed from vN · 0** | ☐ Pass ☐ Fail |
+| QA-12.38 | Several rows | Paste a list of three records for a one-record template | The page offers **The first row**, **One row I pick**, **One report per row (3)** and **All rows in one report**; one report per row generates three reports, a row each | ☐ Pass ☐ Fail |
+| QA-12.39 | Every kind of template | Repeat QA-12.32 with a template of one record (an intake), one that lists rows (a department table), a list-heavy one (an imaging review), one with few fields and one with no sections | Each groups its fields by its own parts (or one **Fields** group), labels them in its own words, and matches its tables' columns; pictures, QR codes and signatures are not listed as data | ☐ Pass ☐ Fail |
+| QA-12.40 | Live preview and the footer | With a field in **Needs you**, look at **Live preview**; choose **Show me** | The page shows the template with the data; a red box marks where the field prints; **Show me** moves to **Needs you**; **Preview and checks →** stays off until nothing needs you | ☐ Pass ☐ Fail |
 
 ## Example
 At Summit Valley the Summit Valley admin generates Elena Marsh's discharge summary; the page tells him *You generated it;

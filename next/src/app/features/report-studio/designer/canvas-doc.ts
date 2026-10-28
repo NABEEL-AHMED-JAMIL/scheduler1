@@ -101,5 +101,6 @@ export function canvasCss(page: number, pages: number, heightMm: number): string
 .rsd-selected, .rsd-selected:hover { outline: 2px solid var(--color-brand-600) !important; outline-offset: 2px; }
 .rs-canvas-hidden { opacity: 0.35; }
 .rsd-drop-into { outline: 2px dashed var(--color-brand-500) !important; outline-offset: 2px; }
-.rsd-ai-added { outline: 2px dashed var(--color-brand-500) !important; outline-offset: 2px; background: color-mix(in oklab, var(--color-brand-500) 7%, transparent); }`;
+.rsd-ai-added { outline: 2px dashed var(--color-brand-500) !important; outline-offset: 2px; background: color-mix(in oklab, var(--color-brand-500) 7%, transparent); }
+.rsd-flagged { outline: 2px solid var(--color-crit-500) !important; outline-offset: 2px; background: color-mix(in oklab, var(--color-crit-500) 6%, transparent); }`;
 }

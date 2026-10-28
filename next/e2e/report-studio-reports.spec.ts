@@ -6,8 +6,8 @@ import { download, publishedTemplate, report, stamp, Template, woundJson, WOUND_
 /**
  * Report Studio's reports, live (MIG-404 and MIG-406), one report through its life:
  *   - Create report (/reports/new): the template, then pasted data. Data without the visits the template's contract needs
- *     shows Missing and Generate stays locked; the full data matches 2 of 2, previews and checks clean, and generates v1,
- *     whose page shows the PDF and the HTML.
+ *     puts them in "Needs you" and the preview stays off; the full data matches 2 of 2, previews and checks clean, and
+ *     generates v1, whose page shows the PDF and the HTML.
  *   - Generate again: v2 from v1's frozen data; v1 stays in Versions (nothing is overwritten).
  *   - Approve and sign: Riverside's administrator generated it and cannot approve it (no button; the API refuses);
  *     Riverside's reviewer approves v2 and it shows Signed.
@@ -47,27 +47,25 @@ test.describe('Report Studio: create, regenerate, approve and verify a report (l
     await expect(page.getByRole('heading', { level: 1, name: 'Create a report' })).toBeVisible();
     await page.getByLabel('Search templates').fill(TEMPLATE);
     await page.getByRole('button', { name: new RegExp(TEMPLATE) }).click();
-    await expect(page.getByRole('heading', { level: 1, name: 'Connect the right data' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: new RegExp(`New report from “${TEMPLATE}”`) })).toBeVisible();
     await page.getByLabel('Report name').fill(REPORT);
+    // The data first (redesign 2026-10-27): no field is listed until it is read.
+    await expect(page.getByText('Pick the data first: the fields are matched to it.')).toBeVisible();
 
-    // Data without the visits: the required list is Missing, and Generate is locked.
-    await page.getByRole('button', { name: 'Paste JSON', exact: true }).click();
+    // Data without the visits: the required list needs a source, and the preview stays off.
+    await page.getByRole('radio', { name: /^Paste JSON/ }).click();
     const { visits: _visits, ...withoutVisits } = WOUND_DATA;
     await page.getByLabel('Paste JSON').fill(woundJson(withoutVisits));
-    await expect(page.getByText('1 of 2 matched')).toBeVisible();
-    await expect(page.getByText('Required field missing: visits')).toBeVisible();
-    await expect(page.getByText('1 required field missing · can\'t generate yet')).toBeVisible();
-    await page.getByRole('button', { name: 'Preview with problems' }).click();
-    await expect(page.getByRole('heading', { level: 1, name: 'Check before you generate' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Generate v1' })).toBeDisabled();
-    await expect(page.getByText('Fix the blocking problem to generate.')).toBeVisible();
-    await page.getByRole('button', { name: 'Back to mapping' }).click();
+    await expect(page.getByText(/Matched 1 of 2 · 1 needs you/)).toBeVisible();
+    await expect(page.locator('[data-needs]')).toContainText('visits');
+    await expect(page.locator('.rsdm-foot')).toContainText('1 required field needs a source');
+    await expect(page.getByRole('button', { name: 'Preview and checks' })).toBeDisabled();
 
     // The full data: both fields matched, the preview checks clean, v1 is generated.
     await page.getByLabel('Paste JSON').fill(woundJson());
-    await expect(page.getByText('2 of 2 matched')).toBeVisible();
-    await expect(page.getByText('Required field missing')).toHaveCount(0);
-    await page.getByRole('button', { name: 'Preview and check' }).click();
+    await expect(page.getByText(/Matched 2 of 2/)).toBeVisible();
+    await expect(page.locator('[data-needs]')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Preview and checks' }).click();
     await expect(page.getByText('Page 1 of 1')).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText('0 blocking')).toBeVisible();
     await expect(page.getByText('Data contract, bindings, assets and layout pass.')).toBeVisible();

@@ -83,19 +83,22 @@
   "settle": 2000,
   "steps": [
    {
-    "click": "button:has-text('Samples')"
+    "click": "button[role=radio]:has-text('A test sample')"
    },
    {
     "wait": 600
    },
    {
-    "selectIndex": [
-     "app-report-source-picker select",
-     1
-    ]
+    "click": "#rsds-sample"
    },
    {
-    "wait": 2500
+    "wait": 400
+   },
+   {
+    "click": "[role=listbox] [role=option] >> nth=0"
+   },
+   {
+    "wait": 3500
    }
   ],
   "thumb": true

@@ -1,0 +1,80 @@
+<div class="rsfp">
+  @if (tabs().length > 1) {
+    <div role="tablist" class="rsfp-tabs" aria-label="Where the value comes from">
+      @for (t of tabs(); track t.id; let i = $index) {
+        <button type="button" role="tab" class="rsfp-tab" [class.is-on]="tab() === t.id" [attr.aria-selected]="tab() === t.id"
+                [attr.tabindex]="tab() === t.id ? 0 : -1" (click)="tab.set(t.id)" (keydown)="onTabKey($event, i)">{{ t.label }}</button>
+      }
+    </div>
+  } @else {
+    <div role="tablist" class="rsfp-tabs rsfp-tabs-one" aria-label="Where the value comes from">
+      <button type="button" role="tab" class="rsfp-tab is-on" aria-selected="true" tabindex="0">{{ tabs()[0].label }}</button>
+    </div>
+  }
+
+  <div class="rsfp-body" role="tabpanel">
+    @switch (tab()) {
+      @case ('column') {
+        <app-advanced-select [inline]="true" [options]="columnOptions()" [value]="column()" (valueChange)="column.set($event)"
+                             [ariaLabel]="'Columns for ' + field().label" searchLabel="Search the columns"
+                             [searchPlaceholder]="'Search ' + columnOptions().length + ' columns'" emptyText="This data has no single values." [visibleRows]="6" />
+      }
+      @case ('combine') {
+        <div class="rsfp-parts" aria-label="The parts, in order" role="list">
+          @for (p of parts(); track $index; let i = $index) {
+            <span role="listitem" class="rsfp-part" [class.rsfp-part-text]="!isColumn(p)">
+              <span [class.mono]="isColumn(p)">{{ partLabel(p) }}</span>
+              @if (partSample(p); as v) { <span class="rsfp-part-sample">{{ v }}</span> }
+              <button type="button" class="rsfp-part-x" [attr.aria-label]="'Remove ' + partLabel(p)" (click)="removePart(i)"><app-icon name="close" size="0.75em" /></button>
+            </span>
+          } @empty { <span class="rsfp-muted">Add the columns to join, in order.</span> }
+        </div>
+        <div class="rsfp-add">
+          <div class="rsfp-add-col">
+            <app-advanced-select [options]="addOptions()" [value]="adding()" (valueChange)="addColumn($event)" ariaLabel="Add a column"
+                                 placeholder="+ Add a column" searchLabel="Search the columns" [showDescription]="false" panelWidth="28rem" />
+          </div>
+          <label class="rsfp-add-text">
+            <span class="sr-only">Text between the columns</span>
+            <input class="input" [ngModel]="text()" (ngModelChange)="text.set($event)" aria-label="Text between the columns" maxlength="200" />
+          </label>
+          <button type="button" class="btn btn-default btn-sm" [disabled]="!text()" (click)="addText()">Add the text</button>
+        </div>
+        <div class="rsfp-result" role="status"><span class="rsfp-muted">Result on the first row:</span>
+          <strong>{{ combinedText() || '—' }}</strong></div>
+      }
+      @case ('fixed') {
+        <label class="field">
+          <span class="label">The value</span>
+          <input class="input" [ngModel]="fixed()" (ngModelChange)="fixed.set($event)" maxlength="2000" [attr.aria-label]="'Fixed value for ' + field().label" />
+          <span class="block field-note text-[color:var(--text-muted)]">Printed the same on every report made with this mapping.</span>
+        </label>
+      }
+      @case ('list') {
+        <app-advanced-select [inline]="true" [options]="listOptions()" [value]="list()" (valueChange)="list.set($event)"
+                             [ariaLabel]="'Lists for ' + field().label" searchLabel="Search the lists" searchPlaceholder="Search the data's lists"
+                             emptyText="This data has no list." [visibleRows]="4" />
+        @if (list() && field().columns.length) {
+          <div class="rsfp-cols">
+            <span class="rsfp-cols-head">Its columns</span>
+            @for (c of listColumns(); track c.column) {
+              <div class="rsfp-col-row">
+                <span class="min-w-0"><span class="block truncate font-medium">{{ c.label }}</span><span class="block mono text-xs text-[color:var(--text-muted)]">{{ c.column }}</span></span>
+                <app-advanced-select [options]="itemOptions()" [value]="c.source || ''" (valueChange)="setColumn(c.column, $event)"
+                                     [ariaLabel]="'Column for ' + c.label" [allowClear]="true" clearLabel="Not in the data (prints empty)"
+                                     placeholder="Not in the data (prints empty)" searchLabel="Search the list's columns" [showDescription]="false" />
+              </div>
+            }
+          </div>
+        }
+      }
+    }
+  </div>
+
+  <div class="rsfp-foot">
+    <span class="rsfp-note">{{ note() }}</span>
+    @if (!field().required) { <button type="button" class="btn btn-default btn-sm" (click)="blank()">Leave it blank</button> }
+    <button type="button" class="btn btn-default btn-sm" (click)="cancelled.emit()">Cancel</button>
+    <button type="button" class="btn btn-primary btn-sm" [disabled]="!canUse()" (click)="use()">Use this</button>
+  </div>
+</div>

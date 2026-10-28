@@ -1,0 +1,198 @@
+<section class="card rsdm-data" aria-labelledby="rsdm-data-h">
+  <div class="rsdm-data-head">
+    <h2 class="section-title" id="rsdm-data-h">@if (again()) { Data for v{{ versionNo() + 1 }} } @else { 1. Where does the data come from? }</h2>
+    @if (inspecting()) { <app-loading shape="inline" label="Reading the data…" /> }
+    @else if (inspect(); as i) { <span class="pill pill-neutral" data-read>{{ i.records }} row{{ i.records === 1 ? '' : 's' }} · {{ i.format }}</span> }
+  </div>
+  <app-rs-data-sources [version]="version()" [pipelineJobId]="pipelineJobId()" [stepKey]="stepKey()" [samples]="samples()"
+                       [fields]="guide().fields" [tenantId]="tenantId()" [(source)]="source" [(card)]="card" />
+
+  @if (inspectError()) { <app-inline-status [error]="inspectError()" (retry)="retryRead()" /> }
+
+  @if (inspect(); as i) {
+    @if (manyRows()) {
+      <div class="rsdm-rows" role="radiogroup" aria-label="Which rows the report reads">
+        <span class="rsdm-label">The data has {{ i.records }} rows</span>
+        <label class="rsdm-radio"><input type="radio" name="rsdm-rows" [checked]="rowMode() === 'first'" (change)="rowMode.set('first')" /> The first row</label>
+        <label class="rsdm-radio"><input type="radio" name="rsdm-rows" [checked]="rowMode() === 'row'" (change)="rowMode.set('row')" /> One row I pick</label>
+        @if (manyReports()) {
+          <label class="rsdm-radio"><input type="radio" name="rsdm-rows" [checked]="rowMode() === 'each'" (change)="rowMode.set('each')" />
+            One report per row ({{ i.records > eachMax ? 'the first ' + eachMax : i.records }})</label>
+        }
+        <label class="rsdm-radio"><input type="radio" name="rsdm-rows" [checked]="rowMode() === 'all'" (change)="rowMode.set('all')" /> All rows in one report</label>
+        @if (rowMode() === 'row') {
+          <div class="rsdm-row-pick">
+            <app-advanced-select [options]="rowOptions()" [value]="'' + rowIndex()" (valueChange)="setRow($event)" ariaLabel="The row"
+                                 searchLabel="Search the rows" placeholder="Choose a row" />
+          </div>
+        }
+      </div>
+    } @else if (isList() && guide().readsRows) {
+      <p class="rsdm-muted">The template lists the data's rows: all {{ i.records }} go in one report.</p>
+    }
+    @if (columnsShown().length) {
+      <div class="rsdm-cols">
+        <span class="rsdm-label">Its columns <span class="rsdm-muted">· {{ columnsShown().length }}, @if (manyRows() && rowMode() === 'row') { row {{ rowIndex() + 1 }} } @else { first row } shown</span></span>
+        <div class="rsdm-chips">
+          @for (c of (allColumns() ? columnsShown() : columnsShown().slice(0, columnsLimit)); track c.name) {
+            <span class="rsdm-chip" [title]="c.type"><span class="mono">{{ c.name }}</span>@if (c.value) { <span class="rsdm-chip-v">{{ c.value }}</span> }</span>
+          }
+          @if (columnsShown().length > columnsLimit) {
+            <button type="button" class="link-inline text-xs" (click)="allColumns.set(!allColumns())">{{ allColumns() ? 'Show fewer' : '+ ' + (columnsShown().length - columnsLimit) + ' more' }}</button>
+          }
+        </div>
+      </div>
+    }
+    <details class="rsdm-adv">
+      <summary>Where the report's data starts <span class="mono">{{ base() }}</span></summary>
+      <label class="field rsdm-adv-field">
+        <span class="label">Data starts at</span>
+        <input class="input mono" [value]="baseDraft()" (change)="setBase($any($event.target).value)" aria-label="Where the report's data starts" />
+        <span class="block field-note text-[color:var(--text-muted)]">$ is the whole data; $.report reads the part called report. Rows are picked above.</span>
+      </label>
+    </details>
+  }
+</section>
+
+@if (inspect()) {
+  <div class="rsdm-two">
+    <section class="card rsdm-fields" aria-labelledby="rsdm-fields-h">
+      <div class="rsdm-fields-head">
+        <h2 class="section-title rsdm-fields-title" id="rsdm-fields-h">@if (!again()) { 2. } Template fields
+          <span class="rsdm-count">· Matched {{ matched() }} of {{ matches().length }}@if (needs().length) { · {{ needs().length }} need{{ needs().length === 1 ? 's' : '' }} you }</span></h2>
+        <div class="rsdm-filters" role="group" aria-label="Show">
+          <button type="button" class="rsdm-filter" [class.is-on]="filter() === 'needs'" [class.is-crit]="needs().length > 0"
+                  [attr.aria-pressed]="filter() === 'needs'" (click)="filter.set('needs')">Needs you · {{ needs().length }}</button>
+          @if (again()) {
+            <button type="button" class="rsdm-filter" [class.is-on]="filter() === 'changed'" [attr.aria-pressed]="filter() === 'changed'"
+                    (click)="filter.set('changed')">Changed from v{{ versionNo() }} · {{ changed().length }}</button>
+          }
+          <button type="button" class="rsdm-filter" [class.is-on]="filter() === 'all'" [attr.aria-pressed]="filter() === 'all'"
+                  (click)="filter.set('all')">All · {{ matches().length }}</button>
+        </div>
+        <label class="rsdm-search">
+          <app-icon name="search" class="rsdm-search-icon" />
+          <input type="search" placeholder="Find a field" aria-label="Find a field" [value]="query()" (input)="query.set($any($event.target).value)" />
+        </label>
+      </div>
+
+      @if (needs().length) {
+        <div class="rsdm-needs" data-needs aria-labelledby="rsdm-needs-h" role="region">
+          <h3 class="rsdm-eyebrow" id="rsdm-needs-h">Needs you</h3>
+          @for (m of needs(); track m.field.path) {
+            <div class="rsdm-need" (mouseenter)="hovered.set(m.field.path)" (mouseleave)="hovered.set(null)">
+              <div class="rsdm-need-field">
+                <span class="rsdm-need-label">{{ m.field.label }}@if (m.field.required) { <span class="rsdm-req" aria-label="required"> *</span> }</span>
+                <span class="rsdm-key">{{ m.field.path }} · {{ m.field.section }}</span>
+              </div>
+              <div class="rsdm-need-why">
+                <span class="rsdm-muted-2">{{ m.why }}</span>
+                @if (m.suggestion) {
+                  <span class="rsdm-suggest"><b>Suggested:</b> {{ m.suggestionText }}@if (m.suggestionSample) { <span class="rsdm-sample">{{ m.suggestionSample }}</span> }</span>
+                } @else {
+                  <span class="rsdm-suggest">Nothing in the data looks like it: choose a column, combine some, or give a fixed value.</span>
+                }
+              </div>
+              <div class="rsdm-need-act">
+                @if (m.suggestion) { <button type="button" class="btn btn-primary btn-sm" (click)="useSuggestion(m)" [attr.aria-label]="'Use the suggestion for ' + m.field.label">Use it</button> }
+                <button type="button" class="btn btn-default btn-sm" [attr.data-field-trigger]="m.field.path" [attr.aria-expanded]="editing() === m.field.path"
+                        (click)="open(m.field.path)" [attr.aria-label]="'Choose a source for ' + m.field.label">Choose…</button>
+              </div>
+              @if (editing() === m.field.path) {
+                <app-rs-field-picker class="rsdm-picker" [match]="m" [schema]="schema()" [record]="record()"
+                                     (chosen)="chosen(m.field.path, $event)" (cancelled)="closePicker(m.field.path)" />
+              }
+            </div>
+          }
+        </div>
+      }
+
+      @if (filter() === 'needs') {
+        @if (!needs().length) { <p class="rsdm-none">Nothing needs you: every field is matched or may print empty.</p> }
+      } @else {
+        <div class="rsdm-groups">
+          @for (g of groups(); track g.name) {
+            <details class="rsdm-group" [open]="isOpen(g)" (toggle)="toggle(g, $any($event.target).open)">
+              <summary class="rsdm-group-head">
+                <app-icon name="chevronRight" class="rsdm-caret" />
+                <span class="rsdm-group-name">{{ g.name }}</span>
+                <span class="rsdm-muted">{{ groupCount(g) }}</span>
+                <span class="pill" [class]="groupState(g).tone">{{ groupState(g).text }}</span>
+              </summary>
+              <div class="rsdm-rows-list">
+                @for (m of g.rows; track m.field.path) {
+                  <div class="rsdm-row" [class.is-needs]="m.state === 'needs'" (mouseenter)="hovered.set(m.field.path)" (mouseleave)="hovered.set(null)">
+                    <span class="rsdm-row-field">
+                      <span class="rsdm-row-label">{{ m.field.label }}@if (m.field.required) { <span class="rsdm-req" aria-label="required"> *</span> }</span>
+                      <span class="rsdm-key">{{ m.field.path }}@if (fieldKind(m.field); as k) { · {{ k }} }</span>
+                    </span>
+                    <button type="button" class="rsdm-trigger" [class.is-empty]="m.choice.kind === 'none'" [attr.data-field-trigger]="m.field.path"
+                            [attr.aria-expanded]="editing() === m.field.path" [attr.aria-label]="m.field.label + ': ' + choiceText(m) + (m.sample ? ', ' + m.sample : '') + '. Change'"
+                            (click)="open(m.field.path)">
+                      <span class="rsdm-trigger-col" [class.mono]="m.choice.kind === 'column' || m.choice.kind === 'combine'">{{ choiceText(m) }}</span>
+                      <span class="rsdm-trigger-sample">{{ m.sample }}</span>
+                      <app-icon name="chevronDown" class="rsdm-trigger-caret" />
+                    </button>
+                    <span class="rsdm-how" [class.is-ok]="m.state === 'matched'" [class.is-crit]="m.state === 'needs'">{{ howText(m) }}</span>
+                    @if (m.columns.length && m.state === 'matched') {
+                      <span class="rsdm-row-cols">
+                        <span class="rsdm-muted">{{ columnsText(m) }}:</span>
+                        @for (c of m.columns; track c.column) {
+                          <span class="rsdm-colmap" [class.is-missing]="!c.source">{{ c.label }} <span class="mono">← {{ c.source || 'nothing' }}</span></span>
+                        }
+                      </span>
+                    }
+                    @if (editing() === m.field.path && m.state !== 'needs') {
+                      <app-rs-field-picker class="rsdm-picker" [match]="m" [schema]="schema()" [record]="record()"
+                                           (chosen)="chosen(m.field.path, $event)" (cancelled)="closePicker(m.field.path)" />
+                    }
+                  </div>
+                } @empty { <p class="rsdm-none">No field here matches.</p> }
+              </div>
+            </details>
+          } @empty {
+            <p class="rsdm-none">@if (query().trim()) { No field matches “{{ query().trim() }}”. } @else if (filter() === 'changed') { Nothing changed from v{{ versionNo() }}. } @else { This template reads no data. }</p>
+          }
+        </div>
+      }
+    </section>
+
+    <aside class="card rsdm-preview" aria-label="Preview">
+      <app-rs-mapping-preview [definition]="definition()" [templateId]="templateId()" [source]="source()" [rootPath]="rootPath()"
+                              [mapping]="mapping()" [focus]="focusComponent()" [marked]="flaggedComponents()" />
+      @if (needs().length) {
+        <p class="rsdm-muted-2">The red boxes are where
+          @for (m of needs().slice(0, 3); track m.field.path; let last = $last) { <b>{{ m.field.label }}</b>@if (!last) {, } }
+          @if (needs().length > 3) { and {{ needs().length - 3 }} more } print. They're blank until you choose a source.</p>
+      }
+      <ul class="rsdm-summary">
+        @if (requiredNeeds().length) { <li class="is-crit">{{ requiredNeeds().length }} required field{{ requiredNeeds().length === 1 ? '' : 's' }} need{{ requiredNeeds().length === 1 ? 's' : '' }} a source</li> }
+        @if (needs().length > requiredNeeds().length) { <li class="is-warn">{{ needs().length - requiredNeeds().length }} to confirm</li> }
+        <li class="is-ok">{{ matched() }} field{{ matched() === 1 ? '' : 's' }} matched</li>
+        @if (emptyCount()) { <li>{{ emptyCount() }} optional field{{ emptyCount() === 1 ? '' : 's' }} not in this data (print empty)</li> }
+        @if (listsFed().length) {
+          <li>{{ listsFed().length }} list{{ listsFed().length === 1 ? '' : 's' }} fed ({{ listsFedText() }})</li>
+        }
+      </ul>
+    </aside>
+  </div>
+}
+
+<div class="rsdm-foot">
+  <button type="button" class="btn btn-default btn-sm" (click)="back.emit()"><app-icon name="arrowLeft" />{{ again() ? 'Back to the report' : 'Template' }}</button>
+  <span class="rsdm-foot-gap"></span>
+  @if (inspect()) {
+    @if (needs().length) {
+      <span class="rsdm-foot-text is-crit">@if (requiredNeeds().length === needs().length) { {{ needs().length }} required field{{ needs().length === 1 ? '' : 's' }} need{{ needs().length === 1 ? 's' : '' }} a source }
+        @else { {{ needs().length }} field{{ needs().length === 1 ? '' : 's' }} need{{ needs().length === 1 ? 's' : '' }} you }</span>
+      <button type="button" class="btn btn-default btn-sm" (click)="showMe()">Show me</button>
+    } @else if (eachRow()) {
+      <span class="rsdm-foot-text">Every field has a source · {{ eachRow() }} reports, one per row</span>
+    } @else {
+      <span class="rsdm-foot-text">Every field has a source</span>
+    }
+  } @else if (!inspecting()) {
+    <span class="rsdm-foot-text">Pick the data first: the fields are matched to it.</span>
+  }
+  <button type="button" class="btn btn-primary btn-sm" [disabled]="!inspect() || needs().length > 0" (click)="goNext()">Preview and checks<app-icon name="arrowRight" /></button>
+</div>
