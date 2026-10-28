@@ -25,7 +25,7 @@ import { ApprovalData, ApprovalPanel } from './approval-panel';
 import { CanvasDoc, splitCanvas } from './canvas-doc';
 import {
   Block, CanvasPage, LayerRow, PX_PER_MM, PaletteEntry, allIds, blockLabel, canHold, cloneWithNewIds, componentsOf, fieldsUsed, find,
-  firstRecord, fromPalette, innerPath, insertBlock, layerRows, moveBlock, pageSizeMm, pagesOf, parts, pathsOf, primaryNames, removeBlock,
+  firstRecord, fromPalette, innerPath, insertBlock, layerRows, limitProblem, moveBlock, pageSizeMm, pagesOf, parts, pathsOf, primaryNames, removeBlock,
   rootPathOf, rulerMarks, typeIcon, typeWord, walk, looksLikePicture,
 } from './designer-model';
 import { PageFrame } from './page-frame';
@@ -624,17 +624,24 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
   /** Adds a palette entry: after the selected block (or into it, when it is a container that may hold it), else at the end. */
   add(entry: PaletteEntry): void {
     let made: Block | null = null;
-    this.edit(blocks => {
+    let refused: string | null = null;
+    const ok = this.edit(blocks => {
       made = fromPalette(entry, allIds(blocks));
       const sel = this.selected() ? find(blocks, this.selected()!) : null;
       if (sel && canHold(sel.block, made) && (sel.block.type === 'section' || sel.block.type === 'column')) {
+        refused = limitProblem(blocks, sel.block.id, made, true);
         return insertBlock(blocks, sel.block.id, sel.block.children?.length ?? 0, made);
       }
-      if (sel && canHold(sel.parent, made)) return insertBlock(blocks, sel.parent?.id ?? null, sel.index + 1, made);
+      if (sel && canHold(sel.parent, made)) {
+        refused = limitProblem(blocks, sel.parent?.id ?? null, made, true);
+        return insertBlock(blocks, sel.parent?.id ?? null, sel.index + 1, made);
+      }
       const footerAt = blocks.findIndex(b => b.type === 'section' && b['role'] === 'footer');
+      refused = limitProblem(blocks, null, made, true);
       return insertBlock(blocks, null, footerAt >= 0 ? footerAt : blocks.length, made);
     });
-    if (made) this.selected.set((made as Block).id);
+    if (ok && made) this.selected.set((made as Block).id);
+    else if (refused) this.toast.info(refused);
   }
 
   /** The page parts: a header or footer (one each; an existing one is selected), or a page break after the selection. */
@@ -683,15 +690,19 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
     const id = this.selected();
     if (!id) return;
     let copyId = '';
+    let refused: string | null = null;
     this.edit(blocks => {
       const at = find(blocks, id);
       if (!at || (at.block.type === 'section' && at.block['role'] !== 'body' && at.block['role'] !== undefined)) return false;
       const copy = cloneWithNewIds(at.block, allIds(blocks));
+      refused = limitProblem(blocks, at.parent?.id ?? null, copy, true);
+      if (refused) return false;
       copyId = copy.id;
       at.list.splice(at.index + 1, 0, copy);
       return true;
     });
     if (copyId) this.selected.set(copyId);
+    else if (refused) this.toast.info(refused);
   }
 
   /** Moves the selected block one place up or down among its siblings. */
@@ -942,15 +953,18 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
   private place(data: DragData, parentId: string | null, index: number): void {
     if ('add' in data) {
       let made: Block | null = null;
+      let refused: string | null = null;
       const ok = this.edit(blocks => {
         made = fromPalette(data.add, allIds(blocks));
+        refused = limitProblem(blocks, parentId, made, true);
         return insertBlock(blocks, parentId, index, made);
       });
       if (ok && made) this.selected.set((made as Block).id);
-      else this.toast.info(`${data.add.label} cannot go there.`);
+      else this.toast.info(refused ?? `${data.add.label} cannot go there.`);
     } else {
+      const moving = find(this.blocks(), data.move)?.block;
       const ok = this.edit(blocks => moveBlock(blocks, data.move, parentId, index));
-      if (!ok) this.toast.info('That block cannot go there.');
+      if (!ok) this.toast.info((moving && limitProblem(this.blocks(), parentId, moving, false)) || 'That block cannot go there.');
       this.selected.set(data.move);
     }
   }

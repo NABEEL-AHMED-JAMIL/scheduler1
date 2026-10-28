@@ -9,7 +9,7 @@ import { neededFields, typeWords } from '../wizard/new-report';
 import { CANVAS_ID, clean, idOf, splitCanvas } from './canvas-doc';
 import {
   Block, PaletteEntry, allIds, canHold, cloneWithNewIds, collections, fieldsUsed, find, fromPalette, innerPath, insertBlock, itemFields,
-  layerRows, lengthAt, moveBlock, newId, pageSizeMm, pagesOf, primaryNames, removeBlock, rulerMarks, scalars, valueAt,
+  MAX_BLOCKS, MAX_NESTING, layerRows, lengthAt, limitProblem, moveBlock, newId, pageSizeMm, pagesOf, primaryNames, removeBlock, rulerMarks, scalars, valueAt,
   looksLikePicture, firstTextAt, typeIcon, typeWord,
 } from './designer-model';
 import { fieldsFor } from './properties';
@@ -72,6 +72,38 @@ describe('the designer model', () => {
     const copy = cloneWithNewIds(find(blocks, 'footer')!.block, allIds(blocks));
     expect(copy.id).not.toBe('footer');
     expect(copy.children![0].id).not.toBe('pn');
+  });
+
+  it('refuses to nest blocks deeper than the media service allows, and says so (ZT 2026-10-28)', () => {
+    // A chain of sections 11 deep: the innermost is at level 11.
+    const blocks: Block[] = [];
+    let list = blocks;
+    for (let i = 1; i <= MAX_NESTING - 1; i++) {
+      const s: Block = { id: `s${i}`, type: 'section', children: [] };
+      list.push(s);
+      list = s.children!;
+    }
+    expect(limitProblem(blocks, 's11', { id: 'leaf', type: 'text' }, true)).toBeNull();
+    expect(insertBlock(blocks, 's11', 0, { id: 'leaf', type: 'text' })).toBe(true);
+    const tooDeep = { id: 'more', type: 'section', children: [{ id: 'inner', type: 'text' }] } as Block;
+    expect(limitProblem(blocks, 's11', tooDeep, true)).toBe(
+      'Blocks nest at most 12 levels deep; there this section would reach level 13. Put it in an outer section, row or column instead.');
+    expect(insertBlock(blocks, 's11', 0, tooDeep)).toBe(false);
+    expect(find(blocks, 'more')).toBeNull();
+    // Moving a deep branch under another deep one counts the branch's own levels.
+    blocks.push({ id: 'side', type: 'section', children: [{ id: 'side2', type: 'section', children: [{ id: 'side3', type: 'text' }] }] });
+    expect(moveBlock(blocks, 'side', 's10', 0)).toBe(false);
+    expect(limitProblem(blocks, 's10', find(blocks, 'side')!.block, false)).toContain('would reach level 13');
+    expect(moveBlock(blocks, 'side', 's9', 0)).toBe(true);
+    expect(find(blocks, 'side')?.parent?.id).toBe('s9');
+  });
+
+  it('refuses a new block past the template\'s block limit', () => {
+    const blocks: Block[] = Array.from({ length: MAX_BLOCKS }, (_, i) => ({ id: `t${i}`, type: 'text' }));
+    expect(limitProblem(blocks, null, { id: 'one', type: 'text' }, true)).toBe(
+      'A template holds at most 500 blocks; this would make 501. Remove blocks, or split it into two templates.');
+    expect(insertBlock(blocks, null, 0, { id: 'one', type: 'text' })).toBe(false);
+    expect(moveBlock(blocks, 't3', null, 0)).toBe(true);
   });
 
   it('lets a conditional or repeated block hold blocks, but not in a header or footer (phase 4)', () => {

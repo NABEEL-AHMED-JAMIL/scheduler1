@@ -176,6 +176,44 @@ export function canHold(parent: Block | null, child: Block): boolean {
   return isContainer(parent.type);
 }
 
+/** How deep components may nest, and how many a template holds: the media service's limits (TemplateValidator). */
+export const MAX_NESTING = 12;
+export const MAX_BLOCKS = 500;
+
+/** How many levels a block takes up: 1, plus its deepest child's. */
+function levelsOf(b: Block): number {
+  let deepest = 0;
+  for (const c of b.children ?? []) deepest = Math.max(deepest, levelsOf(c));
+  return 1 + deepest;
+}
+
+function countOf(blocks: Block[]): number {
+  let n = 0;
+  walk(blocks, () => { n++; });
+  return n;
+}
+
+/**
+ * Why a block may not go into a parent (null: it may, as far as the limits go): it would nest deeper than
+ * {@link MAX_NESTING}, or a new block would take the template past {@link MAX_BLOCKS}. In the words the server refuses with.
+ */
+export function limitProblem(blocks: Block[], parentId: string | null, block: Block, isNew: boolean): string | null {
+  let parentDepth = 0;
+  if (parentId !== null) {
+    walk(blocks, (b, _p, depth) => { if (b.id === parentId) parentDepth = depth + 1; });
+  }
+  const reach = parentDepth + levelsOf(block);
+  if (reach > MAX_NESTING) {
+    return `Blocks nest at most ${MAX_NESTING} levels deep; there this ${typeWord(block.type).toLowerCase()} would reach level ${reach}. `
+      + 'Put it in an outer section, row or column instead.';
+  }
+  if (isNew) {
+    const total = countOf(blocks) + countOf([block]);
+    if (total > MAX_BLOCKS) return `A template holds at most ${MAX_BLOCKS} blocks; this would make ${total}. Remove blocks, or split it into two templates.`;
+  }
+  return null;
+}
+
 /** Removes a block (and what it holds); true when it was there. */
 export function removeBlock(blocks: Block[], id: string): boolean {
   const at = find(blocks, id);
@@ -193,24 +231,26 @@ export function listOf(blocks: Block[], parentId: string | null): Block[] | null
   return at.block.children;
 }
 
-/** Puts a block into a parent at an index (clamped); false when the parent cannot hold it. */
+/** Puts a block into a parent at an index (clamped); false when the parent cannot hold it or it is past the limits. */
 export function insertBlock(blocks: Block[], parentId: string | null, index: number, block: Block): boolean {
   const parent = parentId === null ? null : find(blocks, parentId)?.block ?? null;
   if (parentId !== null && !parent) return false;
   if (!canHold(parent, block)) return false;
+  if (limitProblem(blocks, parentId, block, true)) return false;
   const list = listOf(blocks, parentId);
   if (!list) return false;
   list.splice(Math.max(0, Math.min(index, list.length)), 0, block);
   return true;
 }
 
-/** Moves a block to a parent and index; never into itself. False when the move is not allowed. */
+/** Moves a block to a parent and index; never into itself. False when the move is not allowed (or past the limits). */
 export function moveBlock(blocks: Block[], id: string, parentId: string | null, index: number): boolean {
   if (parentId !== null && within(blocks, parentId, id)) return false;
   const at = find(blocks, id);
   if (!at) return false;
   const parent = parentId === null ? null : find(blocks, parentId)?.block ?? null;
   if (!canHold(parent, at.block)) return false;
+  if (limitProblem(blocks, parentId, at.block, false)) return false;
   const target = listOf(blocks, parentId);
   if (!target) return false;
   let i = index;
