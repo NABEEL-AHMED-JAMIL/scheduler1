@@ -35,17 +35,8 @@
     <div>
       <label class="label"
              for="r-measure">Measure</label>
-      <select id="r-measure" class="input max-w-52 mt-1"
-              (change)="setMeasure($any($event.target).value)">
-        @for (group of measureGroups; track group.label) {
-          <optgroup [label]="group.label">
-            @for (option of group.measures; track option) {
-              <option [value]="option"
-                      [selected]="option === measure()">{{ measureLabels[option] }}</option>
-            }
-          </optgroup>
-        }
-      </select>
+      <app-advanced-select id="r-measure" class="w-52 mt-1" [options]="measureOptions" [value]="measure()"
+                           (valueChange)="setMeasure($event)" searchLabel="Search the measures" panelWidth="16rem" />
     </div>
 
     <div class="flex items-center gap-2 ml-auto">

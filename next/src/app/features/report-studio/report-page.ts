@@ -9,7 +9,7 @@ import { PageHeader } from '../../shared/ui/page-header';
 import { RefreshButton } from '../../shared/ui/refresh-button';
 import { Icon } from '../../shared/ui/icon';
 import { StatusPill } from '../../shared/ui/status-pill';
-import { RsTimePipe, zoneCity } from './rs-time.pipe';
+import { RsTimePipe, zoneCity, rsTime } from './rs-time.pipe';
 import { ToastService } from '../../shared/ui/toast.service';
 import { LoadError } from '../../shared/ui/load-error';
 import { confirmWith } from '../../shared/ui/confirm';
@@ -34,6 +34,8 @@ import { PageLimitActions } from './page-limit-actions';
 import { AppLoading, InlineStatus, createLoadState, loadErrorText } from '../../shared/ui/loading';
 import { createTableSort } from '../../shared/ui/sort';
 import { SortHeader } from '../../shared/ui/sort-header';
+import { AdvancedOption, AdvancedSelect } from '../../shared/ui/advanced-select';
+import { idOf, idValue } from '../../shared/ui/advanced-options';
 
 type Tab = 'details' | 'versions' | 'activity' | 'access';
 
@@ -46,7 +48,7 @@ type Tab = 'details' | 'versions' | 'activity' | 'access';
  */
 @Component({
   selector: 'app-report-page',
-  imports: [PageHeader, RefreshButton, Icon, StatusPill, RsTimePipe, LoadError, ProblemList, RouterLink, FormsModule, NgTemplateOutlet, PageLimitActions, AppLoading, InlineStatus, SortHeader],
+  imports: [PageHeader, RefreshButton, Icon, StatusPill, RsTimePipe, LoadError, ProblemList, RouterLink, FormsModule, NgTemplateOutlet, PageLimitActions, AppLoading, InlineStatus, SortHeader, AdvancedSelect],
   templateUrl: './report-page.html',
   styleUrl: './report-page.css',
 })
@@ -81,6 +83,16 @@ export class ReportPage implements OnInit {
   /** Following a queued job: a progress read that fails says so (and can be asked again), not a job "running" for ever. */
   readonly pollError = signal('');
   readonly againVersion = signal<number | null>(null);
+  readonly idValue = idValue;
+  readonly idOf = idOf;
+  /** The template's versions a report may be made again with: published (fixed) or superseded, newest first, with when. */
+  readonly versionOptions = computed<AdvancedOption[]>(() => [...this.templateVersions()].sort((a, b) => b.version - a.version).map(tv => ({
+    value: String(tv.version),
+    label: `v${tv.version}`,
+    description: [tv.changeSummary ?? '', tv.publishedAt ? 'published ' + (rsTime(tv.publishedAt, 'date') ?? '') : ''].filter(Boolean).join(' · ') || undefined,
+    badge: tv.state === 'PUBLISHED' ? 'Published (fixed)' : 'Superseded',
+    badgeTone: tv.state === 'PUBLISHED' ? 'ok' : 'neutral',
+  })));
   readonly againData = signal<'same' | 'other'>('same');
   /** Phase 4: "Mark this version as COPY" -- the new version carries COPY on every page. */
   readonly againCopy = signal(false);

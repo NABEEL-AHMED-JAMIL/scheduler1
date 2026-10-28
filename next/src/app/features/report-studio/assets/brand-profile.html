@@ -60,10 +60,10 @@
                 <app-rs-pick-search [shown]="logos().length" [total]="totals().logos" label="Find a logo" placeholder="Find a logo"
                                     [disabled]="!canEdit()" (search)="find('logos', $event)" />
                 <div class="flex items-center gap-2">
-                  <select class="input input-sm w-auto min-w-0 max-w-full" aria-label="Logo" [ngModel]="def().logo?.assetId ?? ''" (ngModelChange)="setLogo($event)">
-                    <option value="">{{ pickerState.logos.loading() ? 'Loading logos…' : 'Choose asset' }}</option>
-                    @for (a of logoChoices(); track a.assetId) { <option [value]="a.assetId">{{ a.name }} · v{{ a.currentVersion }}</option> }
-                  </select>
+                  <app-advanced-select class="min-w-56 max-w-full" ariaLabel="Logo" [compact]="true" [options]="logoOptions()"
+                                       [value]="def().logo?.assetId ?? ''" (valueChange)="setLogo($event)" placeholder="Choose asset"
+                                       searchLabel="Search the logos" [loading]="pickerState.logos.loading()" loadingText="Loading logos…"
+                                       emptyText="No approved logo yet: upload one in Assets." panelWidth="24rem" />
                   @if (def().logo) { <button type="button" class="link-inline text-sm" (click)="setLogo('')">Remove</button> }
                 </div>
                 <app-inline-status [loading]="pickerState.logos.loading()" [error]="pickerState.logos.error()" label="Loading logos…"
@@ -133,10 +133,10 @@
                 }
                 <app-rs-pick-search [shown]="signatures().length" [total]="totals().signatures" label="Find a signature" placeholder="Find a signature"
                                     (search)="find('signatures', $event)" />
-                <select class="input" aria-label="Add a signature" (change)="addTo('signatures', $any($event.target).value); $any($event.target).value = ''">
-                  <option value="">{{ pickerState.signatures.loading() ? 'Loading signatures…' : 'Add an approved signature' }}</option>
-                  @for (a of signatures(); track a.assetId) { <option [value]="a.assetId">{{ a.name }} · v{{ a.currentVersion }}</option> }
-                </select>
+                <app-advanced-select ariaLabel="Add a signature" [options]="signatureOptions()" [resetOnPick]="true"
+                                     (picked)="addTo('signatures', $event?.value ?? '')" placeholder="Add an approved signature"
+                                     searchLabel="Search the signatures" [loading]="pickerState.signatures.loading()" loadingText="Loading signatures…"
+                                     emptyText="No approved signature yet." />
                 <app-inline-status [loading]="pickerState.signatures.loading()" [error]="pickerState.signatures.error()" label="Loading signatures…"
                                    [empty]="pickerState.signatures.loaded() && !signatures().length" emptyText="No approved signature yet."
                                    (retry)="find('signatures', '')" />
@@ -149,10 +149,10 @@
                 }
                 <app-rs-pick-search [shown]="stamps().length" [total]="totals().stamps" label="Find a stamp" placeholder="Find a stamp"
                                     (search)="find('stamps', $event)" />
-                <select class="input" aria-label="Add a stamp" (change)="addTo('stamps', $any($event.target).value); $any($event.target).value = ''">
-                  <option value="">{{ pickerState.stamps.loading() ? 'Loading stamps…' : 'Add an approved stamp' }}</option>
-                  @for (a of stamps(); track a.assetId) { <option [value]="a.assetId">{{ a.name }} · v{{ a.currentVersion }}</option> }
-                </select>
+                <app-advanced-select ariaLabel="Add a stamp" [options]="stampOptions()" [resetOnPick]="true"
+                                     (picked)="addTo('stamps', $event?.value ?? '')" placeholder="Add an approved stamp"
+                                     searchLabel="Search the stamps" [loading]="pickerState.stamps.loading()" loadingText="Loading stamps…"
+                                     emptyText="No approved stamp yet." />
                 <app-inline-status [loading]="pickerState.stamps.loading()" [error]="pickerState.stamps.error()" label="Loading stamps…"
                                    [empty]="pickerState.stamps.loaded() && !stamps().length" emptyText="No approved stamp yet."
                                    (retry)="find('stamps', '')" />

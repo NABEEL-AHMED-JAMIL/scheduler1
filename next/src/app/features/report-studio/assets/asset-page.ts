@@ -7,7 +7,7 @@ import { of, switchMap } from 'rxjs';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { Icon } from '../../../shared/ui/icon';
 import { LoadError } from '../../../shared/ui/load-error';
-import { RsTimePipe } from '../rs-time.pipe';
+import { RsTimePipe, rsTime } from '../rs-time.pipe';
 import { sidePanelConfig } from '../../../shared/ui/side-panel';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { confirmWith } from '../../../shared/ui/confirm';
@@ -22,6 +22,8 @@ import { BlurLoader } from '../../../shared/ui/blur-loader';
 import { createTableSort } from '../../../shared/ui/sort';
 import { SortHeader } from '../../../shared/ui/sort-header';
 import { UploadData, UploadPanel } from './upload-panel';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
+import { idOf, idValue, personOption } from '../../../shared/ui/advanced-options';
 
 /**
  * One asset (MIG-406, the owner-approved screen 10, Figma frame 10; page report-assets, or report-approve for the
@@ -32,7 +34,7 @@ import { UploadData, UploadPanel } from './upload-panel';
  */
 @Component({
   selector: 'app-asset-page',
-  imports: [PageHeader, Icon, LoadError, RsTimePipe, FormsModule, RouterLink, AssetPicture, RsPickSearch, AppLoading, InlineStatus, BlurLoader, SortHeader],
+  imports: [PageHeader, Icon, LoadError, RsTimePipe, FormsModule, RouterLink, AssetPicture, RsPickSearch, AppLoading, InlineStatus, BlurLoader, SortHeader, AdvancedSelect],
   templateUrl: './asset-page.html',
   styleUrl: './assets.css',
 })
@@ -74,6 +76,10 @@ export class AssetPage implements OnInit {
   /** The activity's every entry (drawing 10's "Full audit"), not only the latest eight. */
   readonly fullAudit = signal(false);
   readonly aligns = [{ value: 'left', label: 'left' }, { value: 'center', label: 'centre' }, { value: 'right', label: 'right' }];
+  /** Every width with every alignment, grouped by width. */
+  readonly placeOptions: AdvancedOption[] = ['30mm', '40mm', '50mm', '60mm'].flatMap(w => this.aligns.map(al => ({
+    value: w + '|' + al.value, label: `${w.replace('mm', ' mm')} · ${al.label}`, group: w.replace('mm', ' mm') + ' wide',
+  })));
   readonly placeStamp = signal('');
   readonly kindWords = KIND_WORDS;
   readonly stateWord = stateWord;
@@ -88,6 +94,24 @@ export class AssetPage implements OnInit {
   readonly current = computed(() => { const a = this.a(); return a?.versions.find(v => v.version === a.currentVersion) ?? null; });
   readonly pending = computed(() => this.a()?.versions.find(v => v.state === 'PENDING') ?? null);
   readonly approvedVersions = computed(() => (this.a()?.versions ?? []).filter(v => v.state === 'APPROVED' || v.state === 'SUPERSEDED'));
+  readonly idValue = idValue;
+  readonly idOf = idOf;
+  /** The people use may be granted to: the workspace's, not the owner (who has it). */
+  readonly grantOptions = computed<AdvancedOption[]>(() => this.people().filter(p => p.userId !== this.a()?.ownerUserId)
+    .map(p => personOption(p.userId, { name: p.name, role: p.role })));
+  readonly templateOptions = computed<AdvancedOption[]>(() => this.templates().map(t => ({
+    value: t.templateId, label: t.name, description: t.category || t.description || undefined,
+    badge: t.hasDraft ? 'Draft' : t.currentPublishedVersion ? 'v' + t.currentPublishedVersion : undefined,
+    badgeTone: t.hasDraft ? 'warn' as const : 'neutral' as const,
+  })));
+  readonly versionOptions = computed<AdvancedOption[]>(() => this.approvedVersions().map(v => ({
+    value: String(v.version), label: `${this.a()?.name ?? ''} · v${v.version}`,
+    description: [v.width && v.height ? `${v.width} × ${v.height} px` : '', v.uploadedAt ? 'uploaded ' + (rsTime(v.uploadedAt, 'date') ?? '') : ''].filter(Boolean).join(' · ') || undefined,
+    badge: v.state === 'APPROVED' ? 'Approved' : 'Superseded', badgeTone: v.state === 'APPROVED' ? 'ok' as const : 'neutral' as const,
+  })));
+  readonly stampOptions = computed<AdvancedOption[]>(() => this.stamps().map(s => ({
+    value: s.assetId, label: s.name, description: s.description || s.category || undefined, sample: s.currentVersion ? 'v' + s.currentVersion : undefined,
+  })));
   readonly ownerWord = computed(() => this.a()?.ownerName ?? 'its owner');
   /** Owner 2026-10-27: the versions sort by any column; the API's order (newest first) until one is picked. */
   readonly versionSort = createTableSort<AssetVersion>({

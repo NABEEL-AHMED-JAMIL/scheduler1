@@ -187,10 +187,10 @@
           <section class="rs-side-sec">
             <div><h2 class="section-title">Generate again</h2><span class="text-xs text-[color:var(--text-muted)]">Make a new version and keep all the others.</span></div>
             <label class="field"><span class="label">Template version</span>
-              <select class="input" [ngModel]="againVersion()" (ngModelChange)="againVersion.set($event)" aria-label="Template version">
-                @if (versionsState.loading() && !templateVersions().length) { <option [ngValue]="null" disabled>Loading versions…</option> }
-                @for (tv of templateVersions(); track tv.versionId) { <option [ngValue]="tv.version">v{{ tv.version }} · {{ tv.state === 'PUBLISHED' ? 'Published (fixed)' : 'Superseded' }}</option> }
-              </select>
+              <app-advanced-select ariaLabel="Template version" [options]="versionOptions()" [value]="idValue(againVersion())"
+                                   (valueChange)="againVersion.set(idOf($event))" placeholder="Choose a version" searchLabel="Search the versions"
+                                   [loading]="versionsState.loading() && !templateVersions().length" loadingText="Loading versions…"
+                                   emptyText="The template has no published version yet." />
               <app-inline-status [loading]="versionsState.loading()" [error]="versionsState.error()" label="Loading versions…"
                                  [empty]="versionsState.loaded() && !templateVersions().length" emptyText="The template has no published version yet."
                                  (retry)="loadVersions()" /></label>

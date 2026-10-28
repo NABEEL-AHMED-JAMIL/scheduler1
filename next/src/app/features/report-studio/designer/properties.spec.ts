@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { TestBed } from '@angular/core/testing';
+import { AdvancedSelect } from '../../../shared/ui/advanced-select';
+import { advancedSelects } from '../../../shared/ui/advanced-select.testing';
 import { Block } from './designer-model';
 import { PropChange, PropertiesPanel, fieldsFor, filterRows, filterValues, opValue } from './properties';
 import { neededFields, passedStages } from '../wizard/new-report';
@@ -46,9 +48,12 @@ function panel(block: Block) {
   });
   fixture.detectChanges();
   const el = fixture.nativeElement as HTMLElement;
-  const select = (label: string) => el.querySelector(`select[aria-label="${label}"]`) as HTMLSelectElement | null;
+  // A short fixed list is a native select; a list of the data's fields is the console's advanced select (owner 2026-10-27).
+  const select = (label: string): HTMLSelectElement | AdvancedSelect | null =>
+    (el.querySelector(`select[aria-label="${label}"]`) as HTMLSelectElement | null) ?? advancedSelects(fixture).find(b => b.ariaLabel() === label) ?? null;
   const pick = (label: string, value: string) => {
     const s = select(label)!;
+    if (s instanceof AdvancedSelect) { s.choose(value); fixture.detectChanges(); return; }
     s.value = value;
     s.dispatchEvent(new Event('change'));
   };
@@ -60,7 +65,9 @@ function panel(block: Block) {
   return { fixture, el, changes, select, pick, write, last: () => changes[changes.length - 1] };
 }
 
-const options = (s: HTMLSelectElement | null) => [...(s?.options ?? [])].map(o => o.textContent!.trim());
+const options = (s: HTMLSelectElement | AdvancedSelect | null) => s instanceof AdvancedSelect
+  ? [...(s.allowClear() ? [s.clearLabel()] : []), ...s.options().map(o => o.label)]
+  : [...(s?.options ?? [])].map(o => o.textContent!.trim());
 
 describe('the properties panel: the template features of 2026-10-20', () => {
   it('draws filter, a list\'s field and the value size as their own editors, not JSON', () => {
@@ -114,7 +121,7 @@ describe('the properties panel: the template features of 2026-10-20', () => {
     const p = panel({ id: 't', type: 'table', dataset: 'primary.rows', columns: [{ id: 'c1', field: 'site' }] });
     expect(options(p.select('Filter field'))).toEqual(['All rows', 'site', 'status', 'accuracy']);
     // Owner 2026-10-21: the filter's field, operator and value sit in one bordered box under its label.
-    const group = p.select('Filter field')!.closest('[role="group"]') as HTMLElement;
+    const group = p.el.querySelector('button[aria-label^="Filter field"]')!.closest('[role="group"]') as HTMLElement;
     expect(group.classList).toContain('rsd-group');
     expect(group.getAttribute('aria-label')).toBe('Show only rows where');
     expect(group.querySelector('[aria-label="Filter operator"]')).not.toBeNull();

@@ -1,8 +1,6 @@
 import { Component, OnInit, computed, effect, inject, input, model, signal, untracked } from '@angular/core';
-import { UpperCasePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Segmented, SegmentOption } from '../../shared/ui/segmented';
-import { RsTimePipe } from './rs-time.pipe';
 import { Icon } from '../../shared/ui/icon';
 import { AuthService } from '../../core/auth/auth.service';
 import { GeneratedService, pipelineOf } from '../documents/generated/generated.service';
@@ -18,6 +16,9 @@ import {
 import { BucketSummary, StorageService } from '../objects/storage.service';
 import { API_SUCCESS } from '../../core/api/api.config';
 import { InlineStatus, createLoadState } from '../../shared/ui/loading';
+import { AdvancedOption, AdvancedSelect } from '../../shared/ui/advanced-select';
+import { bucketOption, idOf, idValue, runOption } from '../../shared/ui/advanced-options';
+import { rsTime } from './rs-time.pipe';
 
 export type SourceMode = 'paste' | 'step' | 'run' | 'bucket' | 'saved' | 'sample' | 'bundle';
 type Mode = SourceMode;
@@ -96,7 +97,7 @@ export function newestRuns(lists: RunRow[][], limit = 10): RunRow[] {
  */
 @Component({
   selector: 'app-report-source-picker',
-  imports: [FormsModule, Segmented, RsTimePipe, UpperCasePipe, Icon, InlineStatus],
+  imports: [FormsModule, Segmented, Icon, InlineStatus, AdvancedSelect],
   template: `
     <div class="flex flex-col gap-3">
       @if (modes().length > 1) { <div class="rs-source-modes"><app-segmented [options]="modes()" [(value)]="mode" ariaLabel="Where the data comes from" /></div> }
@@ -119,12 +120,10 @@ export function newestRuns(lists: RunRow[][], limit = 10): RunRow[] {
         @case ('step') {
           <label class="field">
             <span class="label">Run of this pipeline</span>
-            <select class="input" [ngModel]="stepRunId()" (ngModelChange)="pickStepRun($event)" aria-label="Run of this pipeline">
-              <option [ngValue]="null">{{ stepRuns().length ? 'Choose a run' : stepRunsError() ? 'The runs could not be read' : stepRunsLoaded() ? 'No runs yet: run the pipeline, or paste sample JSON' : 'Reading the runs…' }}</option>
-              @for (r of stepRuns(); track r.jobQueueId) {
-                <option [ngValue]="r.jobQueueId">#{{ r.jobQueueId }} · {{ r.jobStatus || '—' }} · {{ r.startTime | rsTime: 'dateTime' }}</option>
-              }
-            </select>
+            <app-advanced-select [options]="stepRunOptions()" [value]="idValue(stepRunId())" (valueChange)="pickStepRun(idOf($event))"
+                                 ariaLabel="Run of this pipeline" placeholder="Choose a run" searchLabel="Search the runs"
+                                 searchPlaceholder="Search by run number or date" [loading]="!stepRunsLoaded()" loadingText="Reading the runs…"
+                                 [emptyText]="stepRunsError() ? 'The runs could not be read.' : 'No runs yet: run the pipeline, or paste sample JSON.'" />
             <app-inline-status [loading]="!stepRunsLoaded()" [error]="stepRunsError()" label="Reading the runs…" (retry)="retryStepRuns()" />
           </label>
           @if (stepRunId() !== null) {
@@ -145,34 +144,30 @@ export function newestRuns(lists: RunRow[][], limit = 10): RunRow[] {
         @case ('run') {
           <label class="field">
             <span class="label">Pipeline schedule</span>
-            <select class="input" [ngModel]="jobId()" (ngModelChange)="pickJob($event)" aria-label="Pipeline schedule">
-              <option [ngValue]="null">{{ jobsState.loading() && !jobs().length ? 'Loading schedules…' : 'Choose a schedule' }}</option>
-              @for (j of jobs(); track j.jobId) { <option [ngValue]="j.jobId">{{ j.label }}</option> }
-            </select>
+            <app-advanced-select [options]="jobOptions()" [value]="idValue(jobId())" (valueChange)="pickJob(idOf($event))"
+                                 ariaLabel="Pipeline schedule" placeholder="Choose a schedule" searchLabel="Search the schedules"
+                                 searchPlaceholder="Search schedules and pipelines" [loading]="jobsState.loading() && !jobs().length"
+                                 loadingText="Loading schedules…" [emptyText]="runsError() || 'No schedule you can open yet.'" />
             <app-inline-status [loading]="jobsState.loading()" [error]="runsError()" label="Loading schedules…"
                                [empty]="jobsState.loaded() && !jobs().length" emptyText="No schedule you can open yet." (retry)="retryJobs()" />
           </label>
           @if (jobId() !== null) {
             <label class="field">
               <span class="label">Run</span>
-              <select class="input" [ngModel]="runId()" (ngModelChange)="pickRun($event)" aria-label="Run">
-                <option [ngValue]="null">{{ runs().length ? 'Choose a run' : runsState.loading() ? 'Loading runs…' : runsState.error() ? 'The runs could not be read' : 'No runs yet' }}</option>
-                @for (r of runs(); track r.jobQueueId) {
-                  <option [ngValue]="r.jobQueueId">#{{ r.jobQueueId }} · {{ r.jobStatus || '—' }} · {{ r.startTime | rsTime: 'dateTime' }}</option>
-                }
-              </select>
+              <app-advanced-select [options]="runOptions()" [value]="idValue(runId())" (valueChange)="pickRun(idOf($event))"
+                                   ariaLabel="Run" placeholder="Choose a run" searchLabel="Search the runs" searchPlaceholder="Search by run number or date"
+                                   [loading]="runsState.loading()" loadingText="Loading runs…"
+                                   [emptyText]="runsState.error() ? 'The runs could not be read.' : 'This schedule has no runs yet.'" />
               <app-inline-status [loading]="runsState.loading()" [error]="runsState.error()" label="Loading runs…" (retry)="pickJob(jobId())" />
             </label>
           }
           @if (runId() !== null) {
             <label class="field">
               <span class="label">Output</span>
-              <select class="input" [ngModel]="datasetId()" (ngModelChange)="pickDataset($event)" aria-label="Output">
-                <option [ngValue]="null">{{ outputs().length ? 'Choose an output' : outputsState.loading() ? 'Reading the run\'s outputs…' : outputsState.error() ? 'The outputs could not be read' : 'This run kept no data a report can read' }}</option>
-                @for (o of outputs(); track o.runOutputId) {
-                  <option [ngValue]="o.runDatasetId">{{ o.stepKey ? o.stepKey + ' · ' : '' }}{{ o.name }} ({{ (o.format || 'data') | uppercase }}@if (o.rowCount != null) {, {{ o.rowCount }} rows})</option>
-                }
-              </select>
+              <app-advanced-select [options]="outputOptions()" [value]="idValue(datasetId())" (valueChange)="pickDataset(idOf($event))"
+                                   ariaLabel="Output" placeholder="Choose an output" searchLabel="Search the outputs" searchPlaceholder="Search by step or name"
+                                   [loading]="outputsState.loading()" loadingText="Reading the run's outputs…"
+                                   [emptyText]="outputsState.error() ? 'The outputs could not be read.' : 'This run kept no data a report can read.'" />
               <app-inline-status [loading]="outputsState.loading()" [error]="outputsState.error()" label="Reading the run's outputs…" (retry)="pickRun(runId())" />
             </label>
           }
@@ -184,10 +179,9 @@ export function newestRuns(lists: RunRow[][], limit = 10): RunRow[] {
         @case ('bucket') {
           <label class="field">
             <span class="label">Bucket</span>
-            <select class="input" [ngModel]="bucket()" (ngModelChange)="bucket.set($event); publish()" aria-label="Bucket">
-              <option value="">{{ buckets().length ? 'Choose a bucket' : bucketsState.loading() ? 'Loading buckets…' : bucketsState.error() ? 'The buckets could not be read' : 'No buckets you may browse' }}</option>
-              @for (b of buckets(); track b.bucket) { <option [value]="b.bucket">{{ b.label || b.bucket }}</option> }
-            </select>
+            <app-advanced-select [options]="bucketOptions()" [value]="bucket()" (valueChange)="bucket.set($event); publish()"
+                                 ariaLabel="Bucket" placeholder="Choose a bucket" searchLabel="Search the buckets" [loading]="bucketsState.loading()"
+                                 loadingText="Loading buckets…" [emptyText]="bucketsState.error() ? 'The buckets could not be read.' : 'No buckets you may browse.'" />
             <app-inline-status [loading]="bucketsState.loading()" [error]="bucketsState.error()" label="Loading buckets…" (retry)="retryBuckets()" />
           </label>
           <label class="field">
@@ -199,22 +193,18 @@ export function newestRuns(lists: RunRow[][], limit = 10): RunRow[] {
         @case ('saved') {
           <label class="field">
             <span class="label">Uploaded or saved data</span>
-            <select class="input" [ngModel]="sourceId()" (ngModelChange)="sourceId.set($event); publish()" aria-label="Saved data">
-              <option [ngValue]="null">{{ saved().length ? 'Choose a source' : savedState.loading() ? 'Loading uploads…' : savedState.error() ? 'The uploads could not be read' : 'Nothing saved yet: upload on the Data tab' }}</option>
-              @for (s of saved(); track s.sourceId) { <option [ngValue]="s.sourceId">{{ s.name }} ({{ s.format }})</option> }
-            </select>
+            <app-advanced-select [options]="savedOptions()" [value]="sourceId() ?? ''" (valueChange)="sourceId.set($event || null); publish()"
+                                 ariaLabel="Saved data" placeholder="Choose a source" searchLabel="Search the uploads" [loading]="savedState.loading()"
+                                 loadingText="Loading uploads…" [emptyText]="savedState.error() ? 'The uploads could not be read.' : 'Nothing saved yet: upload on the Data tab.'" />
             <app-inline-status [loading]="savedState.loading()" [error]="savedState.error()" label="Loading uploads…" (retry)="retrySaved()" />
           </label>
         }
         @case ('sample') {
           <label class="field">
             <span class="label">Test sample</span>
-            <select class="input" [ngModel]="sampleId()" (ngModelChange)="sampleId.set($event); publish()" aria-label="Test sample">
-              <option [ngValue]="null">Choose a sample</option>
-              @for (s of samples(); track s.sampleId) {
-                <option [ngValue]="s.sampleId">{{ s.name }} · {{ kindOf(s) }}</option>
-              }
-            </select>
+            <app-advanced-select [options]="sampleOptions()" [value]="sampleId() ?? ''" (valueChange)="sampleId.set($event || null); publish()"
+                                 ariaLabel="Test sample" placeholder="Choose a sample" searchLabel="Search the samples"
+                                 emptyText="This template has no test samples yet." />
           </label>
         }
         @case ('bundle') {
@@ -278,6 +268,8 @@ export class ReportSourcePicker implements OnInit {
   readonly stepKey = input<string | null>(null);
   readonly stepJobs = input<number[]>([]);
   readonly kindOf = sampleKindLabel;
+  readonly idValue = idValue;
+  readonly idOf = idOf;
   readonly text = signal('');
   readonly csv = signal(false);
   private readonly allJobs = signal<{ jobId: number; label: string; tenantId?: number | null }[]>([]);
@@ -305,6 +297,27 @@ export class ReportSourcePicker implements OnInit {
   readonly buckets = signal<BucketSummary[]>([]);
   readonly bucket = signal('');
   readonly key = signal('');
+  // The lists as the advanced selects show them (owner 2026-10-27, "all select should be advance").
+  readonly jobOptions = computed<AdvancedOption[]>(() => this.jobs().map(j => {
+    const [name, ...pipeline] = j.label.split(' · ');
+    return { value: String(j.jobId), label: name, description: pipeline.join(' · ') || undefined, keywords: String(j.jobId) };
+  }));
+  readonly runOptions = computed<AdvancedOption[]>(() => this.runs().map(r => runOption(r, rsTime(r.startTime, 'dateTime'))));
+  readonly stepRunOptions = computed<AdvancedOption[]>(() => this.stepRuns().map(r => runOption(r, rsTime(r.startTime, 'dateTime'))));
+  readonly outputOptions = computed<AdvancedOption[]>(() => this.outputs().filter(o => o.runDatasetId != null).map(o => ({
+    value: String(o.runDatasetId),
+    label: o.name,
+    description: [o.stepKey ? `Step ${o.stepKey}` : '', o.rowCount != null ? `${o.rowCount} row${o.rowCount === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · ') || undefined,
+    sample: (o.format || 'data').toUpperCase(),
+    keywords: o.stepKey ?? '',
+  })));
+  readonly bucketOptions = computed<AdvancedOption[]>(() => this.buckets().map(bucketOption));
+  readonly savedOptions = computed<AdvancedOption[]>(() => this.saved().map(s => ({
+    value: s.sourceId, label: s.name, sample: (s.format || '').toUpperCase() || undefined,
+    description: s.records != null ? `${s.records} row${s.records === 1 ? '' : 's'}` : undefined,
+  })));
+  readonly sampleOptions = computed<AdvancedOption[]>(() => this.samples().map(s => ({ value: s.sampleId, label: s.name, description: sampleKindLabel(s) })));
+
   /** The schedule's newest run, when a run before it is picked ("Use a newer run"). */
   readonly newerRun = computed(() => {
     const newest = this.runs()[0]?.jobQueueId;

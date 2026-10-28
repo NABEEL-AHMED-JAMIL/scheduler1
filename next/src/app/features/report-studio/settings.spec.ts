@@ -10,6 +10,7 @@ import { ReportStudioApi } from './report-studio.api';
 import { StudioSettings } from './report-studio.model';
 import { ReportSettings, assigneeOf, choiceOf } from './settings';
 import { AuthService } from '../../core/auth/auth.service';
+import { advancedSelect } from '../../shared/ui/advanced-select.testing';
 
 /**
  * Report Studio phase 7 -- Report Studio › Settings: who approves (automatic, the administrators or a team; F4), every version, two approvals and publishing by a second person -- all off by
@@ -57,9 +58,10 @@ describe('Report settings (Report Studio phase 7)', () => {
     const { fixture, api, el } = mount();
     await fixture.whenStable();
     fixture.detectChanges();
-    const options = Array.from(el.querySelectorAll<HTMLOptionElement>('#rss-reviewers option')).map(o => o.textContent!.trim());
-    expect(options[2]).toBe('The Reviewer team');
-    expect(options[3]).toBe('The Viewer team');
+    const options = advancedSelect(fixture, 'rss-reviewers').options();
+    expect(options[2]).toEqual(expect.objectContaining({ label: 'The Reviewer team', group: 'Teams' }));
+    expect(options[3]).toEqual(expect.objectContaining({ label: 'The Viewer team', group: 'Teams' }));
+    expect(options[2].description).toMatch(/member/);
     expect(el.querySelector('[data-test="reviewers-now"]')!.textContent).toContain('the Reviewer team');
     expect((el.querySelector('[data-test="settings-save"]') as HTMLButtonElement).disabled).toBe(true);
     fixture.componentInstance.secondApprover.set(true);

@@ -145,10 +145,9 @@
               <p class="text-sm">The template switches branding off: it prints in its own look.</p>
             } @else {
               <label class="field"><span class="label">Brand profile</span>
-                <select class="input" aria-label="Brand profile" [ngModel]="brandProfileId()" (ngModelChange)="brandProfileId.set($event); check()">
-                  <option value="">@if (!brandProfileId() && brand(); as b) { {{ b.name }} } @else { {{ templateProfileId() ? "The template's profile" : 'The workspace default' }} }</option>
-                  @for (p of profiles(); track p.profileId) { <option [value]="p.profileId">{{ p.name }} · v{{ p.version }}{{ p.isDefault ? ' (workspace default)' : '' }}</option> }
-                </select>
+                <app-advanced-select ariaLabel="Brand profile" [options]="profileOptions()" [value]="brandProfileId()"
+                                     (valueChange)="brandProfileId.set($event); check()" searchLabel="Search the brand profiles"
+                                     [loading]="profilesState.loading() && !profiles().length" loadingText="Loading brand profiles…" />
                 <app-inline-status [loading]="profilesState.loading()" [error]="profilesState.error()" label="Loading brand profiles…" (retry)="loadProfiles()" /></label>
               @if (brand(); as b) {
                 <div class="flex items-center gap-2 text-sm min-w-0">

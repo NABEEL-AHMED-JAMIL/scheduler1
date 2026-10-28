@@ -7,6 +7,7 @@ import { RsPickSearch } from '../pick-search';
 import {
   Block, collections, innerPath, itemFields, lengthAt, sampleText, scalars, typeIcon, typeWord, valueAt,
 } from './designer-model';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
 
 /** One setting of a component, as the form draws it. */
 export interface PropField {
@@ -96,6 +97,23 @@ const GROUPS: Record<string, PropField['group']> = {
 
 const FORMAT_TYPES = ['text', 'number', 'integer', 'currency', 'percent', 'date', 'datetime', 'boolean', 'uppercase', 'lowercase', 'capitalize', 'mask',
   'count'];
+/** An example of each format, shown beside it in the format picker. */
+const FORMAT_SAMPLES: Record<string, string> = {
+  text: 'as text', number: '1,234.5', integer: '1,235', currency: '$1,234.50', percent: '11.2%', date: '19 Oct 2026',
+  datetime: '19 Oct 2026, 14:02', boolean: 'Yes / No', uppercase: 'ABC', lowercase: 'abc', capitalize: 'Abc', mask: '••••1234', count: '3',
+};
+function formatOption(t: string): AdvancedOption {
+  return { value: t, label: FORMAT_WORDS[t] ?? t, sample: FORMAT_SAMPLES[t] };
+}
+/** A field of the test data: its path in monospace, its type beside it. */
+function fieldOption(f: SchemaField): AdvancedOption {
+  return { value: f.path, label: f.path, mono: true, sample: f.type };
+}
+/** An approved asset a block may place: one that needs its owner's grant is listed and cannot be picked. */
+function assetPick(a: AssetCard): AdvancedOption {
+  return { value: a.assetId, label: a.name, sample: a.currentVersion ? 'v' + a.currentVersion : undefined, description: a.description || undefined,
+    badge: a.mayPlace === false ? 'Needs a grant' : undefined, badgeTone: 'warn', disabled: a.mayPlace === false };
+}
 /** A format type's words in the pickers, where its id alone does not say it ("count": how many items a list has). */
 export const FORMAT_WORDS: Record<string, string> = { count: 'count (how many items)' };
 /** The tones a chip (a small rounded badge) and a soft tint come in, with the colour each one is by default. */
@@ -213,7 +231,7 @@ export function filterRows(rows: unknown[], f: RowFilter | null): unknown[] {
  */
 @Component({
   selector: 'app-rs-properties',
-  imports: [Icon, NgTemplateOutlet, RsPickSearch],
+  imports: [Icon, NgTemplateOutlet, RsPickSearch, AdvancedSelect],
   template: `
     @if (block(); as b) {
       <div class="rsd-props-head">
@@ -293,44 +311,40 @@ export function filterRows(rows: unknown[], f: RowFilter | null): unknown[] {
               @case ('listBinding') {
                 <label class="field">
                   <span class="label">Collection</span>
-                  <select class="input mono text-xs" [disabled]="readonly()" aria-label="Collection" (change)="setCollection('binding', $any($event.target).value)">
-                    <option value="" [selected]="!collectionOf('binding')">{{ hasData() ? 'Choose a list in the data' : 'No test data yet' }}</option>
-                    @for (c of lists(); track c.path) { <option [value]="c.path" [selected]="c.path === collectionOf('binding')">{{ c.path }}</option> }
-                    @if (collectionOf('binding') && !hasList(collectionOf('binding'))) { <option [value]="collectionOf('binding')" selected>{{ collectionOf('binding') }}</option> }
-                  </select>
+                  <app-advanced-select [disabled]="readonly()" ariaLabel="Collection" [options]="listOptions()" [value]="collectionOf('binding')"
+                                       (valueChange)="setCollection('binding', $event)" [allowClear]="hasData()" clearLabel="None"
+                                       [placeholder]="hasData() ? 'Choose a list in the data' : 'No test data yet'" unknownText="Not in the test data"
+                                       searchLabel="Search the data's lists" emptyText="The test data has no list." />
                 </label>
                 <ng-container *ngTemplateOutlet="match; context: { $implicit: listMatch('binding') }" />
               }
               @case ('collection') {
                 <label class="field">
                   <span class="label">Collection</span>
-                  <select class="input mono text-xs" [disabled]="readonly()" aria-label="Collection" (change)="setCollection('dataset', $any($event.target).value)">
-                    <option value="" [selected]="!collectionOf('dataset')">{{ hasData() ? 'Choose a list in the data' : 'No test data yet' }}</option>
-                    @for (c of lists(); track c.path) { <option [value]="c.path" [selected]="c.path === collectionOf('dataset')">{{ c.path }}</option> }
-                    @if (collectionOf('dataset') && !hasList(collectionOf('dataset'))) { <option [value]="collectionOf('dataset')" selected>{{ collectionOf('dataset') }}</option> }
-                  </select>
+                  <app-advanced-select [disabled]="readonly()" ariaLabel="Collection" [options]="listOptions()" [value]="collectionOf('dataset')"
+                                       (valueChange)="setCollection('dataset', $event)" [allowClear]="hasData()" clearLabel="None"
+                                       [placeholder]="hasData() ? 'Choose a list in the data' : 'No test data yet'" unknownText="Not in the test data"
+                                       searchLabel="Search the data's lists" emptyText="The test data has no list." />
                 </label>
                 <ng-container *ngTemplateOutlet="match; context: { $implicit: listMatch('dataset') }" />
               }
               @case ('itemField') {
                 <label class="field">
                   <span class="label">{{ f.label }}</span>
-                  <select class="input mono text-xs" [disabled]="readonly()" [attr.aria-label]="f.label" (change)="set(f.key, $any($event.target).value || undefined)">
-                    <option value="" [selected]="!text(f.key)">{{ f.key === 'itemField' ? 'The item itself' : 'None' }}</option>
-                    @for (c of itemsOf(listKey()); track c.path) { <option [value]="c.path" [selected]="c.path === text(f.key)">{{ c.path }} · {{ c.type }}</option> }
-                    @if (text(f.key) && !hasItemField(listKey(), text(f.key))) { <option [value]="text(f.key)" selected>{{ text(f.key) }}</option> }
-                  </select>
+                  <app-advanced-select [disabled]="readonly()" [ariaLabel]="f.label" [options]="itemOptions()[listKey()]" [value]="text(f.key)"
+                                       (valueChange)="set(f.key, $event || undefined)" [allowClear]="true"
+                                       [clearLabel]="f.key === 'itemField' ? 'The item itself' : 'None'" [placeholder]="f.key === 'itemField' ? 'The item itself' : 'None'"
+                                       unknownText="Not in the items" searchLabel="Search the item's fields" emptyText="The list's items have no fields in the test data." />
                 </label>
               }
               @case ('rowField') {
                 @if (rowsShown()) {
                   <label class="field">
                     <span class="label">{{ f.label }}</span>
-                    <select class="input mono text-xs" [disabled]="readonly()" [attr.aria-label]="f.label" (change)="set('field', $any($event.target).value || undefined)">
-                      <option value="" [selected]="!text('field')">None · the list itself (Format: count)</option>
-                      @for (c of itemsOf('binding'); track c.path) { <option [value]="c.path" [selected]="c.path === text('field')">{{ c.path }} · {{ c.type }}</option> }
-                      @if (text('field') && !hasItemField('binding', text('field'))) { <option [value]="text('field')" selected>{{ text('field') }}</option> }
-                    </select>
+                    <app-advanced-select [disabled]="readonly()" [ariaLabel]="f.label" [options]="itemOptions()['binding']" [value]="text('field')"
+                                         (valueChange)="set('field', $event || undefined)" [allowClear]="true" clearLabel="None · the list itself (Format: count)"
+                                         placeholder="None · the list itself (Format: count)" unknownText="Not in the items" searchLabel="Search the item's fields"
+                                         emptyText="The list's items have no fields in the test data." />
                   </label>
                 }
               }
@@ -345,11 +359,9 @@ export function filterRows(rows: unknown[], f: RowFilter | null): unknown[] {
                     </div>
                     <div class="rsd-two">
                       @if (filterFields().length) {
-                        <select class="input mono text-xs" [disabled]="readonly()" aria-label="Filter field" (change)="setFilterField($any($event.target).value)">
-                          <option value="" [selected]="!filter()">All rows</option>
-                          @for (x of filterFields(); track x.path) { <option [value]="x.path" [selected]="x.path === filter()?.field">{{ x.path }}</option> }
-                          @if (filter() && !hasFilterField(filter()!.field)) { <option [value]="filter()!.field" selected>{{ filter()!.field }}</option> }
-                        </select>
+                        <app-advanced-select [disabled]="readonly()" ariaLabel="Filter field" [options]="filterFieldOptions()" [value]="filter()?.field ?? ''"
+                                             (valueChange)="setFilterField($event)" [allowClear]="true" clearLabel="All rows" placeholder="All rows"
+                                             unknownText="Not in the rows" searchLabel="Search the fields" panelWidth="20rem" />
                       } @else {
                         <input class="input mono text-xs" [value]="filter()?.field ?? ''" [disabled]="readonly()" aria-label="Filter field"
                                placeholder="Field (all rows)" (change)="setFilterField($any($event.target).value)" />
@@ -388,10 +400,9 @@ export function filterRows(rows: unknown[], f: RowFilter | null): unknown[] {
                         }
                       </div>
                       <div class="rsd-two">
-                        <select class="input mono text-xs" [disabled]="readonly()" [attr.aria-label]="'Series ' + (i + 1) + ' field'" (change)="setSeries(i, 'field', $any($event.target).value)">
-                          @if (!hasItemField('dataset', x.field)) { <option [value]="x.field" selected>{{ x.field || 'Choose a field' }}</option> }
-                          @for (c of itemsOf('dataset'); track c.path) { <option [value]="c.path" [selected]="c.path === x.field">{{ c.path }} · {{ c.type }}</option> }
-                        </select>
+                        <app-advanced-select [disabled]="readonly()" [ariaLabel]="'Series ' + (i + 1) + ' field'" [options]="itemOptions()['dataset']"
+                                             [value]="x.field" (valueChange)="setSeries(i, 'field', $event)" placeholder="Choose a field" unknownText="Not in the items"
+                                             searchLabel="Search the fields" panelWidth="20rem" emptyText="The list's items have no fields in the test data." />
                         <select class="input text-xs" [disabled]="readonly()" [attr.aria-label]="'Series ' + (i + 1) + ' aggregate'" (change)="setSeries(i, 'aggregate', $any($event.target).value)">
                           @for (a of aggregates; track a) { <option [value]="a" [selected]="a === (x.aggregate ?? 'sum')">{{ words.aggregate[a] }}</option> }
                         </select>
@@ -445,17 +456,12 @@ export function filterRows(rows: unknown[], f: RowFilter | null): unknown[] {
                         }
                       </div>
                       <div class="rsd-two">
-                        <select class="input mono text-xs" [disabled]="readonly()" [attr.aria-label]="'Column ' + (i + 1) + ' field'"
-                                (change)="setColumn(i, 'field', $any($event.target).value)">
-                          @if (!hasItemField('dataset', c.field)) { <option [value]="c.field" selected>{{ c.field }}</option> }
-                          @for (x of itemsOf('dataset'); track x.path) { <option [value]="x.path" [selected]="x.path === c.field">{{ x.path }}</option> }
-                        </select>
-                        <select class="input text-xs" [disabled]="readonly()" [attr.aria-label]="'Column ' + (i + 1) + ' format'"
-                                (change)="setColumnFormat(i, $any($event.target).value)">
-                          <option value="" [selected]="!c.format?.type && c.type !== 'image'">As written</option>
-                          <option value="__image" [selected]="c.type === 'image'">Picture (a bucket key)</option>
-                          @for (t of formatTypes; track t) { <option [value]="t" [selected]="t === c.format?.type && c.type !== 'image'">{{ formatWords[t] ?? t }}</option> }
-                        </select>
+                        <app-advanced-select [disabled]="readonly()" [ariaLabel]="'Column ' + (i + 1) + ' field'" [options]="itemOptions()['dataset']"
+                                             [value]="c.field" (valueChange)="setColumn(i, 'field', $event)" placeholder="Choose a field" unknownText="Not in the items"
+                                             searchLabel="Search the fields" panelWidth="20rem" emptyText="The list's items have no fields in the test data." />
+                        <app-advanced-select [disabled]="readonly()" [ariaLabel]="'Column ' + (i + 1) + ' format'" [options]="columnFormatOptions"
+                                             [value]="c.type === 'image' ? '__image' : $any(c.format?.type) || ''" (valueChange)="setColumnFormat(i, $event)"
+                                             searchLabel="Search the formats" panelWidth="20rem" />
                       </div>
                       @if (c.type !== 'image') {
                         <select class="input text-xs" [disabled]="readonly()" [attr.aria-label]="'Column ' + (i + 1) + ' chip'"
@@ -508,10 +514,8 @@ export function filterRows(rows: unknown[], f: RowFilter | null): unknown[] {
                 <div class="rsd-two">
                   <label class="field">
                     <span class="label">Format</span>
-                    <select class="input" [disabled]="readonly()" aria-label="Format" (change)="setFormat('type', $any($event.target).value)">
-                      <option value="" [selected]="!formatType()">As written</option>
-                      @for (t of formatTypes; track t) { <option [value]="t" [selected]="t === formatType()">{{ formatWords[t] ?? t }}</option> }
-                    </select>
+                    <app-advanced-select [disabled]="readonly()" ariaLabel="Format" [options]="formatOptions" [value]="formatType() || ''"
+                                         (valueChange)="setFormat('type', $event)" searchLabel="Search the formats" panelWidth="20rem" />
                   </label>
                   @if (formatType() === 'currency') {
                     <label class="field">
@@ -587,13 +591,11 @@ export function filterRows(rows: unknown[], f: RowFilter | null): unknown[] {
                                         [label]="'Find ' + f.label" placeholder="Find an approved asset" [disabled]="readonly()"
                                         (search)="findAssets.emit({ q: $event, kinds: assetKinds(f.key) })" />
                   }
-                  <select class="input" [disabled]="readonly()" [attr.aria-label]="f.label" (change)="pickAsset(f.key, $any($event.target).value)">
-                    <option value="" [selected]="!text(f.key)">{{ f.key === 'stampRef' ? 'No stamp' : 'Choose an approved asset' }}</option>
-                    @for (a of assetChoices(f.key); track a.assetId) {
-                      <option [value]="a.assetId" [selected]="a.assetId === pickedAsset(f.key)" [disabled]="a.mayPlace === false">{{ a.name }} · v{{ a.currentVersion }}{{ a.mayPlace === false ? ' (needs a grant)' : '' }}</option>
-                    }
-                    @if (text(f.key) && !pickedAsset(f.key)) { <option [value]="''" selected>{{ text(f.key) }} (embedded)</option> }
-                  </select>
+                  <app-advanced-select [disabled]="readonly()" [ariaLabel]="f.label" [options]="assetOptions()[f.key === 'stampRef' ? 'stamp' : 'main']"
+                                       [value]="pickedAsset(f.key) ?? ''" (valueChange)="pickAsset(f.key, $event)" [allowClear]="true"
+                                       [clearLabel]="f.key === 'stampRef' ? 'No stamp' : 'None'"
+                                       [placeholder]="text(f.key) && !pickedAsset(f.key) ? text(f.key) + ' (embedded)' : f.key === 'stampRef' ? 'No stamp' : 'Choose an approved asset'"
+                                       searchLabel="Search the approved assets" emptyText="No approved asset of this kind yet: upload one in Assets." />
                   @if (f.hint) { <span class="text-xs text-[color:var(--text-muted)]">{{ f.hint }}</span> }
                 </label>
               }
@@ -709,6 +711,20 @@ export class PropertiesPanel {
   readonly primary = computed(() => this.names()[0] ?? 'primary');
   readonly hasData = computed(() => this.fields().length > 0);
   readonly lists = computed(() => collections(this.fields()));
+  // The pickers' lists as advanced-select options (owner 2026-10-27): paths in monospace, each field's type beside it.
+  readonly listOptions = computed<AdvancedOption[]>(() => this.lists().map(c => ({ value: c.path, label: c.path, mono: true, sample: 'list' })));
+  /** The item fields of the two lists a block may read (its rows, its dataset), each a stable list for its select. */
+  readonly itemOptions = computed<Record<string, AdvancedOption[]>>(() => ({
+    binding: this.itemsOf('binding').map(fieldOption), dataset: this.itemsOf('dataset').map(fieldOption),
+  }));
+  readonly filterFieldOptions = computed<AdvancedOption[]>(() => this.filterFields().map(fieldOption));
+  readonly formatOptions: AdvancedOption[] = [{ value: '', label: 'As written', sample: 'as in the data' }, ...FORMAT_TYPES.map(formatOption)];
+  readonly columnFormatOptions: AdvancedOption[] = [{ value: '', label: 'As written', sample: 'as in the data' },
+    { value: '__image', label: 'Picture (a bucket key)', description: 'The field names a picture; it prints in the cell' }, ...FORMAT_TYPES.map(formatOption)];
+  /** The approved assets the two kinds of setting pick from: a stamp, and the block's own kind. */
+  readonly assetOptions = computed<{ stamp: AdvancedOption[]; main: AdvancedOption[] }>(() => ({
+    stamp: this.assetChoices('stampRef').map(assetPick), main: this.assetChoices('').map(assetPick),
+  }));
   readonly scalarFields = computed(() => scalars(this.fields()));
   readonly icon = computed(() => typeIcon(this.block()?.type ?? ''));
   readonly title = computed(() => this.label() || typeWord(this.block()?.type ?? ''));

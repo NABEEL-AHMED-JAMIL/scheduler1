@@ -162,10 +162,10 @@
               } @empty { <span class="text-xs text-[color:var(--text-muted)]">No grants.</span> }
               @if (a.you.mayGrant && a.status === 'ACTIVE') {
                 <div class="flex flex-wrap gap-2 items-end">
-                  <select class="input input-sm w-auto" aria-label="Grant to" [ngModel]="grantTo()" (ngModelChange)="grantTo.set($event)">
-                    <option [ngValue]="null">{{ peopleState.loading() ? 'Loading people…' : 'Grant use to…' }}</option>
-                    @for (p of people(); track p.userId) { @if (p.userId !== a.ownerUserId) { <option [ngValue]="p.userId">{{ p.name }}</option> } }
-                  </select>
+                  <app-advanced-select class="min-w-56" ariaLabel="Grant to" [compact]="true" [options]="grantOptions()" [value]="idValue(grantTo())"
+                                       (valueChange)="grantTo.set(idOf($event))" placeholder="Grant use to…" searchLabel="Search the people"
+                                       [loading]="peopleState.loading()" loadingText="Loading people…" panelWidth="22rem"
+                                       emptyText="No one in the workspace to grant it to yet." />
                   <button type="button" class="btn btn-default btn-sm" [disabled]="!grantTo()" (click)="grant()">Grant</button>
                 </div>
                 <app-inline-status [loading]="peopleState.loading()" [error]="peopleState.error()" label="Loading people…"
@@ -195,37 +195,33 @@
             <app-rs-pick-search [shown]="templates().length" [total]="templatesTotal()" label="Find a template" placeholder="Find a template"
                                 (search)="findTemplates($event)" />
             <label class="field"><span class="label">Template</span>
-              <select class="input" aria-label="Template" [ngModel]="placeTemplate()" (ngModelChange)="placeTemplate.set($event)">
-                <option value="">{{ templatesState.loading() ? 'Loading templates…' : 'Choose a template' }}</option>
-                @for (t of templates(); track t.templateId) { <option [value]="t.templateId">{{ t.name }}{{ t.hasDraft ? ' · draft' : t.currentPublishedVersion ? ' · v' + t.currentPublishedVersion : '' }}</option> }
-              </select>
+              <app-advanced-select ariaLabel="Template" [options]="templateOptions()" [value]="placeTemplate()" (valueChange)="placeTemplate.set($event)"
+                                   placeholder="Choose a template" searchLabel="Search the templates" [loading]="templatesState.loading()"
+                                   loadingText="Loading templates…" emptyText="No template to place it on yet." />
               <app-inline-status [loading]="templatesState.loading()" [error]="templatesState.error()" label="Loading templates…"
                                  [empty]="templatesState.loaded() && !templates().length" emptyText="No template to place it on yet."
                                  (retry)="findTemplates('')" /></label>
             <label class="field"><span class="label">{{ a.kind === 'STAMP' ? 'Stamp' : 'Signature' }} version</span>
-              <select class="input" [attr.aria-label]="(a.kind === 'STAMP' ? 'Stamp' : 'Signature') + ' version'" [ngModel]="placeVersion()" (ngModelChange)="placeVersion.set($event)">
-                @for (v of approvedVersions(); track v.version) { <option [ngValue]="v.version">{{ a.name }} · v{{ v.version }}</option> }
-              </select></label>
+              <app-advanced-select [ariaLabel]="(a.kind === 'STAMP' ? 'Stamp' : 'Signature') + ' version'" [options]="versionOptions()"
+                                   [value]="idValue(placeVersion())" (valueChange)="placeVersion.set(idOf($event))" placeholder="Choose a version"
+                                   searchLabel="Search the versions" emptyText="No approved version yet." /></label>
             <div class="rsb-two">
               <label class="field"><span class="label">Position</span>
                 <select class="input" aria-label="Position" [ngModel]="placeAt()" (ngModelChange)="placeAt.set($event)">
                   <option value="end">Last page · end</option><option value="inline">Before the footer · movable</option>
                 </select></label>
               <label class="field"><span class="label">Width · alignment</span>
-                <select class="input" aria-label="Width and alignment" [ngModel]="placeWidth() + '|' + placeAlign()"
-                        (ngModelChange)="placeWidth.set($event.split('|')[0]); placeAlign.set($any($event.split('|')[1]))">
-                  @for (w of ['30mm', '40mm', '50mm', '60mm']; track w) {
-                    @for (al of aligns; track al.value) { <option [value]="w + '|' + al.value">{{ w.replace('mm', ' mm') }} · {{ al.label }}</option> }
-                  }
-                </select></label>
+                <app-advanced-select ariaLabel="Width and alignment" [options]="placeOptions" [value]="placeWidth() + '|' + placeAlign()"
+                                     (valueChange)="placeWidth.set($event.split('|')[0]); placeAlign.set($any($event.split('|')[1]))"
+                                     searchLabel="Search widths and alignments" /></label>
             </div>
             @if (a.kind === 'SIGNATURE') {
               <app-rs-pick-search [shown]="stamps().length" [total]="stampsTotal()" label="Find a stamp" placeholder="Find a stamp"
                                   (search)="findStamps($event)" />
               <label class="field"><span class="label">Stamp · optional</span>
-                <select class="input" aria-label="Stamp" [ngModel]="placeStamp()" (ngModelChange)="placeStamp.set($event)">
-                  <option value="">{{ stampsState.loading() ? 'Loading stamps…' : 'No stamp' }}</option>@for (s of stamps(); track s.assetId) { <option [value]="s.assetId">{{ s.name }}</option> }
-                </select>
+                <app-advanced-select ariaLabel="Stamp" [options]="stampOptions()" [value]="placeStamp()" (valueChange)="placeStamp.set($event)"
+                                     [allowClear]="true" clearLabel="No stamp" placeholder="No stamp" searchLabel="Search the stamps"
+                                     [loading]="stampsState.loading()" loadingText="Loading stamps…" emptyText="No stamp you may place yet." />
                 <app-inline-status [loading]="stampsState.loading()" [error]="stampsState.error()" label="Loading stamps…"
                                    [empty]="stampsState.loaded() && !stamps().length" emptyText="No stamp you may place yet."
                                    (retry)="findStamps('')" /></label>

@@ -21,13 +21,14 @@ import {
 import { ProblemList } from '../problem-list';
 import { PdfPages } from '../pdf-pages';
 import { AssetPicture } from '../assets/asset-picture';
-import { UsableProfile } from '../assets.model';
+import { UsableProfile, profileOption } from '../assets.model';
 import { componentsOf, innerPath, pagesOf, primaryNames, rootPathOf, walk } from '../designer/designer-model';
 import { AppLoading, InlineStatus, createLoadState, loadErrorText } from '../../../shared/ui/loading';
 import { LoadError } from '../../../shared/ui/load-error';
 import { BlurLoader } from '../../../shared/ui/blur-loader';
 import { DataMapping } from './data-mapping';
 import { templateFields } from './template-fields';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -101,7 +102,7 @@ export function neededFields(def: TemplateDefinition): NeededField[] {
 @Component({
   selector: 'app-new-report',
   imports: [PageHeader, Icon, StatusPill, RsTimePipe, FormsModule, RouterLink, ProblemList, PdfPages, WorkspaceSelect, Pagination,
-    AssetPicture, AppLoading, InlineStatus, LoadError, BlurLoader, DataMapping],
+    AssetPicture, AppLoading, InlineStatus, LoadError, BlurLoader, DataMapping, AdvancedSelect],
   templateUrl: './new-report.html',
   styleUrl: './new-report.css',
 })
@@ -190,6 +191,15 @@ export class NewReport implements OnInit {
   // MIG-406: the Branding box -- the brand profile this report is made in (the template's, the workspace default's, or another).
   readonly profiles = signal<UsableProfile[]>([]);
   readonly brandProfileId = signal('');
+  /** The template's own profile or the workspace default first (the choice of none), then every profile this report may use. */
+  readonly profileOptions = computed<AdvancedOption[]>(() => {
+    const auto = this.profiles().find(p => (this.templateProfileId() ? p.profileId === this.templateProfileId() : p.isDefault));
+    const word = this.templateProfileId() ? 'The template\'s profile' : 'The workspace default';
+    return [
+      { value: '', label: auto ? auto.name : word, description: auto ? word : undefined },
+      ...this.profiles().map(p => ({ ...profileOption(p), group: 'Brand profiles' })),
+    ];
+  });
   readonly brandOff = computed(() => !!((this.def()?.template as { branding?: { disabled?: boolean } } | undefined)?.branding?.disabled));
   readonly templateProfileId = computed(() => ((this.def()?.template as { branding?: { profileId?: string } } | undefined)?.branding?.profileId) ?? '');
   readonly brand = computed<UsableProfile | null>(() => {

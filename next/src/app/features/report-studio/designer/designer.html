@@ -81,11 +81,8 @@
       <button type="button" class="btn btn-default btn-sm" [class.rsd-on]="!selected()" [attr.aria-pressed]="!selected()" (click)="select(null)">Page settings</button>
       <label class="rsd-chip rsd-brand" [title]="'The brand this template prints in: ' + brandWord()">
         <span>Brand:</span>
-        <select class="rsd-brand-select" aria-label="Brand profile" [disabled]="!editable()" (change)="setBrand($any($event.target).value)">
-          <option value="" [selected]="!branding().profileId && !branding().disabled">Workspace default{{ !branding().profileId && !branding().disabled && brandWord() !== 'None yet' && (usableState.loaded() || isPlatformAdmin()) ? ' · ' + brandWord() : '' }}</option>
-          @for (p of profiles(); track p.profileId) { <option [value]="p.profileId" [selected]="branding().profileId === p.profileId">{{ p.name }}</option> }
-          <option value="off" [selected]="!!branding().disabled">No branding</option>
-        </select>
+        <app-advanced-select class="rsd-brand-select" [bare]="true" ariaLabel="Brand profile" [disabled]="!editable()" [options]="brandOptions()"
+                             [value]="brandChoice()" (valueChange)="setBrand($event)" searchLabel="Search the brand profiles" panelWidth="22rem" />
       </label>
       @if (usableState.error()) {
         <!-- Owner 2026-10-27: a failed read of the brand profiles says so, instead of offering only the defaults. -->
@@ -398,10 +395,9 @@
                 </select></label>
             </div>
             <label class="field"><span class="label">Letterhead</span>
-              <select class="input" [ngModel]="letterheadAsset()" (ngModelChange)="pickLetterhead($event)" [disabled]="!editable()" aria-label="Letterhead">
-                <option value="">None</option>
-                @for (a of letterheadChoices(); track a.assetId) { <option [value]="a.assetId">{{ a.name }} · v{{ a.currentVersion }}</option> }
-              </select></label>
+              <app-advanced-select ariaLabel="Letterhead" [options]="letterheadOptions()" [value]="letterheadAsset()" (valueChange)="pickLetterhead($event)"
+                                   [disabled]="!editable()" [allowClear]="true" clearLabel="None" placeholder="None" searchLabel="Search the pictures"
+                                   emptyText="No approved image or logo yet: upload one in Assets." /></label>
             @if (letterheadAsset()) {
               <div class="rsd-two">
                 <label class="field"><span class="label">Fit</span>

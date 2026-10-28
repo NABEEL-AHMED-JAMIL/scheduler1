@@ -31,13 +31,14 @@ import {
 import { PageFrame } from './page-frame';
 import { PropChange, PropertiesPanel, TONES } from './properties';
 import { TestDataChoice, TestDataData, TestDataPanel } from './test-data-panel';
-import { AssetCard, UsableProfile } from '../assets.model';
+import { AssetCard, UsableProfile, profileOption } from '../assets.model';
 import { AiDataContext, Proposal } from '../ai-designer.api';
 import { AiPanel } from './ai-panel';
 import { StorageService } from '../../objects/storage.service';
 import { API_SUCCESS } from '../../../core/api/api.config';
 import { applyPatch } from './json-patch';
 import { AppLoading, InlineStatus, createLoadState, loadErrorText } from '../../../shared/ui/loading';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
 
 type LeftTab = 'components' | 'layers' | 'data';
 type SaveState = 'saved' | 'saving' | 'unsaved' | 'conflict' | 'error' | 'readonly';
@@ -70,7 +71,7 @@ const DRAW_MS = 300;
 @Component({
   selector: 'app-report-designer',
   imports: [Icon, LoadError, ProblemList, PropertiesPanel, PageFrame, FormsModule, RouterLink, UpperCasePipe, CdkDrag, CdkDragPreview, CdkDropList,
-    CdkDropListGroup, WorkspaceSelect, AiPanel, AppLoading, InlineStatus],
+    CdkDropListGroup, WorkspaceSelect, AiPanel, AppLoading, InlineStatus, AdvancedSelect],
   templateUrl: './designer.html',
   styleUrl: './designer.css',
 })
@@ -286,6 +287,18 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
     if (!this.isPlatformAdmin() && !this.usableState.loaded()) return 'Loading brand profiles…';
     const p = b.profileId ? this.profiles().find(x => x.profileId === b.profileId) : this.profiles().find(x => x.isDefault);
     return p ? p.name : b.profileId ? 'A profile not published' : 'None yet';
+  });
+
+  /** The Brand chip's choice: '' the workspace default, a profile's id, or 'off'. */
+  readonly brandChoice = computed(() => (this.branding().disabled ? 'off' : this.branding().profileId || ''));
+  readonly brandOptions = computed<AdvancedOption[]>(() => {
+    const b = this.branding();
+    const known = !b.profileId && !b.disabled && this.brandWord() !== 'None yet' && (this.usableState.loaded() || this.isPlatformAdmin());
+    return [
+      { value: '', label: 'Workspace default' + (known ? ' · ' + this.brandWord() : ''), description: 'The profile the workspace marks as its default' },
+      { value: 'off', label: 'No branding', description: 'The template prints without a logo or brand colours' },
+      ...this.profiles().map(p => ({ ...profileOption(p), group: 'Brand profiles' })),
+    ];
   });
 
   constructor() {
@@ -1227,6 +1240,9 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
   readonly letterhead = computed(() => ((((this.def()?.template['page'] ?? {}) as Record<string, unknown>)['letterhead']) ?? {}) as Record<string, unknown>);
   /** Approved pictures that can be a letterhead (images and logos). */
   readonly letterheadChoices = computed(() => this.usableAssets().filter(a => a.kind === 'IMAGE' || a.kind === 'LOGO'));
+  readonly letterheadOptions = computed<AdvancedOption[]>(() => this.letterheadChoices().map(a => ({
+    value: a.assetId, label: a.name, sample: a.currentVersion ? 'v' + a.currentVersion : undefined, description: a.description || undefined,
+  })));
   readonly letterheadAsset = computed(() => {
     const id = String(this.letterhead()['asset'] ?? '');
     const entry = this.templateAssets().find(e => e['id'] === id);

@@ -1,4 +1,5 @@
 import { ActivityRow } from './report-studio.model';
+import type { AdvancedOption } from '../../shared/ui/advanced-select';
 
 /** Report Studio's asset library and brand profiles (MIG-406), as media-service's reportAsset.json answers them. */
 export type AssetKind = 'LOGO' | 'IMAGE' | 'SIGNATURE' | 'STAMP';
@@ -137,6 +138,14 @@ export interface BrandVersion {
 }
 
 export interface Contrast { text: number; primary: number; passes: boolean; }
+
+/** A brand profile as an advanced-select option: its name, its version, the workspace default and a draft marked. */
+export function profileOption(p: { profileId: string; name: string; description?: string | null; isDefault?: boolean;
+  currentPublishedVersion?: number | null; hasDraft?: boolean; version?: number | null }, label = p.name): AdvancedOption {
+  const v = p.currentPublishedVersion ?? p.version;
+  return { value: p.profileId, label, description: p.description || undefined, sample: v ? 'v' + v : undefined,
+    badge: p.isDefault ? 'Workspace default' : p.hasDraft && !v ? 'Draft' : undefined, badgeTone: p.isDefault ? 'info' : 'neutral' };
+}
 
 export interface BrandProfileRow {
   profileId: string;

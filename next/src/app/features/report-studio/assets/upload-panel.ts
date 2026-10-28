@@ -6,6 +6,8 @@ import { Icon } from '../../../shared/ui/icon';
 import { ReportStudioApi, studioError } from '../report-studio.api';
 import { AssetDetail, AssetKind, KIND_WORDS, Person } from '../assets.model';
 import { InlineStatus, createLoadState } from '../../../shared/ui/loading';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
+import { idOf, idValue, personOption } from '../../../shared/ui/advanced-options';
 
 export interface UploadData {
   /** A new version of this asset; null: a new asset. */
@@ -29,7 +31,7 @@ const SVG_SIDE = 2048;
  */
 @Component({
   selector: 'app-rs-upload-panel',
-  imports: [SidePanel, Icon, FormsModule, InlineStatus],
+  imports: [SidePanel, Icon, FormsModule, InlineStatus, AdvancedSelect],
   template: `
     <app-side-panel [heading]="data.assetId ? 'Upload a new version: ' + data.assetName : 'Upload an asset'"
                     [subtitle]="data.assetId ? 'Old reports keep the version they used.' : 'SVG, PNG or JPG, up to 10 MB.'">
@@ -44,10 +46,9 @@ const SVG_SIDE = 2048;
                    [placeholder]="kind() === 'SIGNATURE' ? 'Dr. Asha Patel · signature' : 'Riverside Health logo'" /></label>
           @if (kind() === 'SIGNATURE') {
             <label class="field"><span class="label">Belongs to</span>
-              <select class="input" [ngModel]="owner()" (ngModelChange)="owner.set($event)" aria-label="Belongs to">
-                <option [ngValue]="null">{{ peopleState.loading() ? 'Loading people…' : 'Choose the person' }}</option>
-                @for (p of people(); track p.userId) { <option [ngValue]="p.userId">{{ p.name }}</option> }
-              </select>
+              <app-advanced-select ariaLabel="Belongs to" [options]="peopleOptions()" [value]="idValue(owner())" (valueChange)="owner.set(idOf($event))"
+                                   placeholder="Choose the person" searchLabel="Search the people" [loading]="peopleState.loading()"
+                                   loadingText="Loading people…" emptyText="No one in the workspace to name yet." />
               <app-inline-status [loading]="peopleState.loading()" [error]="peopleState.error()" label="Loading people…"
                                  [empty]="peopleState.loaded() && !people().length" emptyText="No one in the workspace to name yet."
                                  (retry)="loadPeople()" />
@@ -91,6 +92,9 @@ export class UploadPanel implements OnInit {
   readonly owner = signal<number | null>(null);
   readonly title = signal('');
   readonly people = signal<Person[]>([]);
+  readonly peopleOptions = computed<AdvancedOption[]>(() => this.people().map(p => personOption(p.userId, { name: p.name, role: p.role })));
+  readonly idValue = idValue;
+  readonly idOf = idOf;
   /** Owner 2026-10-27: the people read says it is loading, or why it failed, instead of a lone "Choose the person". */
   readonly peopleState = createLoadState(false);
   readonly file = signal<Blob | null>(null);

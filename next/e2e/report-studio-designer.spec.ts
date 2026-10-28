@@ -2,6 +2,7 @@ import { expect, test, Page } from '@playwright/test';
 import { canSignIn, NEEDS, pageAs, Session, sessionFor } from './support/session';
 import { hasFixtures, NEEDS_FIXTURES } from './support/fixtures';
 import { stamp, template, uploadedImage, woundJson } from './support/report-studio';
+import { pickOption } from './support/advanced-select';
 
 /**
  * Report Studio's designer, live (MIG-404): Riverside's administrator makes a blank template, fills the canvas with
@@ -74,18 +75,18 @@ test.describe('Report Studio: the designer (live)', () => {
     await props(page).getByLabel('Text', { exact: true }).fill('Clinic: {{primary.clinic}}. A draft for a clinician to review.');
     // A table bound to the visits, with two columns.
     await add(page, 'Table');
-    await props(page).getByLabel('Collection').selectOption('visits');
-    await props(page).getByLabel('Column 1 field').selectOption('patient');
+    await pickOption(props(page).getByLabel('Collection'), 'visits');
+    await pickOption(props(page).getByLabel('Column 1 field'), 'patient');
     await props(page).getByLabel('Column 1 label').fill('Patient');
     await props(page).getByLabel('Column 1 label').press('Tab');
     await props(page).getByRole('button', { name: 'Column', exact: true }).click();
-    await props(page).getByLabel('Column 2 field').selectOption('areaCm2');
+    await pickOption(props(page).getByLabel('Column 2 field'), 'areaCm2');
     await props(page).getByLabel('Column 2 label').fill('Area cm²');
     await props(page).getByLabel('Column 2 label').press('Tab');
     await expect(props(page).getByText('Data matches · 3 sample rows')).toBeVisible();
     // An image from the asset library.
     await add(page, 'Image or logo');
-    await props(page).getByLabel('Image', { exact: true }).selectOption({ label: `${IMAGE} · v1` });
+    await pickOption(props(page).getByLabel('Image', { exact: true }), { label: IMAGE });
 
     // The canvas draws the data: the table's rows and the clinic's name.
     const canvas = page.getByRole('region', { name: 'Page canvas' });

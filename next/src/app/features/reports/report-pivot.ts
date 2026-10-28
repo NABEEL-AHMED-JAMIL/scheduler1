@@ -20,6 +20,7 @@ import {
 import { dayLabel, formatDuration } from '../../shared/ui/time-format';
 import { createTableSort } from '../../shared/ui/sort';
 import { SortHeader } from '../../shared/ui/sort-header';
+import { AdvancedOption, AdvancedSelect } from '../../shared/ui/advanced-select';
 
 const EMPTY: RunData = { task: [], status: [], owner: [], day: [], job: [], tenant: [], rows: [] };
 
@@ -41,7 +42,7 @@ const EMPTY: RunData = { task: [], status: [], owner: [], day: [], job: [], tena
  */
 @Component({
   selector: 'app-report-pivot',
-  imports: [Icon, StatusPill, TableShell, ReportChart, Pagination, Segmented, SortHeader],
+  imports: [Icon, StatusPill, TableShell, ReportChart, Pagination, Segmented, SortHeader, AdvancedSelect],
   templateUrl: './report-pivot.html',
   // The spacing used to come from the .page wrapper this markup sat inside. Without it the
   // shape card, the chart and the grid render flush against each other, and an Angular host is
@@ -63,6 +64,8 @@ export class ReportPivot {
   readonly dimensions = DIMENSIONS;
   readonly measureGroups = MEASURE_GROUPS;
   readonly measureLabels = MEASURE_LABELS;
+  /** The measures under their groups (How many, Middle, Edges ...), as the Measure picker lists them. */
+  readonly measureOptions: AdvancedOption[] = MEASURE_GROUPS.flatMap(g => g.measures.map(m => ({ value: m, label: MEASURE_LABELS[m], group: g.label })));
 
   /** Which clock the selected measure is on, when that is not obvious from its name. */
   readonly durationNote = computed(() => {

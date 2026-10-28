@@ -17,6 +17,7 @@ import { AppLoading, InlineStatus, createLoadState } from '../../shared/ui/loadi
 import { BlurLoader } from '../../shared/ui/blur-loader';
 import { createTableSort } from '../../shared/ui/sort';
 import { SortHeader } from '../../shared/ui/sort-header';
+import { AdvancedOption, AdvancedSelect } from '../../shared/ui/advanced-select';
 
 type RetentionVersion = RetentionPreview['versions'][number];
 type RetentionSnapshot = RetentionPreview['snapshots'][number];
@@ -49,7 +50,7 @@ export function assigneeOf(c: WhoChoice): Assignee | null {
  */
 @Component({
   selector: 'app-report-settings',
-  imports: [PageHeader, RefreshButton, Icon, LoadError, EmptyState, FormsModule, RouterLink, RsTimePipe, PageLimitCard, AppLoading, InlineStatus, BlurLoader, SortHeader],
+  imports: [PageHeader, RefreshButton, Icon, LoadError, EmptyState, FormsModule, RouterLink, RsTimePipe, PageLimitCard, AppLoading, InlineStatus, BlurLoader, SortHeader, AdvancedSelect],
   templateUrl: './settings.html',
   styles: `
     .rss-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(28rem, 1fr)); gap: 1rem; align-items: start; }
@@ -75,6 +76,21 @@ export class ReportSettings implements OnInit {
   readonly teams = signal<Team[]>([]);
   /** Owner 2026-10-27: the teams the two "who" choices offer: loading, or why they could not be read, never silently none. */
   readonly teamsState = createLoadState(false);
+  /** Who approves and who publishes: automatic, the administrators, or one of the workspace's teams (its size under it). */
+  readonly reviewerOptions = computed(() => this.whoOptions('approve'));
+  readonly publisherOptions = computed(() => this.whoOptions('publish'));
+
+  private whoOptions(verb: 'approve' | 'publish'): AdvancedOption[] {
+    return [
+      { value: 'auto', label: `Automatic: the team whose people may ${verb}` },
+      { value: 'admins', label: 'The workspace administrators' },
+      ...this.teams().map(t => ({
+        value: 'team:' + t.teamId, label: `The ${t.name} team`, group: 'Teams', keywords: t.name,
+        description: [`${t.memberCount} member${t.memberCount === 1 ? '' : 's'}`, t.status === 'ARCHIVED' ? 'archived' : '', t.description ?? '']
+          .filter(Boolean).join(' · '),
+      })),
+    ];
+  }
   readonly reviewers = signal<WhoChoice>('auto');
   readonly publishers = signal<WhoChoice>('auto');
   readonly everyVersion = signal(false);

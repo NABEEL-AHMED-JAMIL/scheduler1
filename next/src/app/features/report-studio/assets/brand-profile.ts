@@ -19,6 +19,7 @@ import {
 import { RsPickSearch } from '../pick-search';
 import { AssetPicture } from './asset-picture';
 import { AppLoading, InlineStatus, LoadState, createLoadState } from '../../../shared/ui/loading';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
 
 const FONTS = ['Noto Sans', 'Noto Serif', 'Noto Sans Mono', 'DejaVu Sans'];
 
@@ -31,12 +32,18 @@ const FONTS = ['Noto Sans', 'Noto Serif', 'Noto Sans Mono', 'DejaVu Sans'];
  * setting wins, with what is allowed and what is locked. Publishing needs report-publish; new versions apply to future
  * reports only.
  */
+/** An approved asset as an option: its name, its version, what it is; one already added is marked and not picked again. */
+function assetOption(a: AssetCard, added = false): AdvancedOption {
+  return { value: a.assetId, label: a.name, sample: a.currentVersion ? 'v' + a.currentVersion : undefined,
+    description: a.description || a.category || undefined, badge: added ? 'Added' : undefined, disabled: added };
+}
+
 /** The brand profile's three asset pickers. */
 type Picker = 'logos' | 'signatures' | 'stamps';
 
 @Component({
   selector: 'app-brand-profile',
-  imports: [PageHeader, Icon, LoadError, RsTimePipe, FormsModule, AssetPicture, RsPickSearch, AppLoading, InlineStatus],
+  imports: [PageHeader, Icon, LoadError, RsTimePipe, FormsModule, AssetPicture, RsPickSearch, AppLoading, InlineStatus, AdvancedSelect],
   templateUrl: './brand-profile.html',
   styleUrl: './assets.css',
 })
@@ -92,6 +99,10 @@ export class BrandProfilePage implements OnInit {
   readonly logoChoices = computed(() => this.logos().length ? this.logos()
     : (this.p()?.assets ?? []).filter(a => a.kind === 'LOGO' || a.kind === 'IMAGE'));
   readonly logo = computed(() => this.logoChoices().find(a => a.assetId === this.def().logo?.assetId) ?? null);
+  readonly logoOptions = computed<AdvancedOption[]>(() => this.logoChoices().map(a => assetOption(a)));
+  /** What may be added: every approved one, those already on the profile marked and not picked twice. */
+  readonly signatureOptions = computed<AdvancedOption[]>(() => this.signatures().map(a => assetOption(a, this.def().signatures.some(x => x.assetId === a.assetId))));
+  readonly stampOptions = computed<AdvancedOption[]>(() => this.stamps().map(a => assetOption(a, this.def().stamps.some(x => x.assetId === a.assetId))));
 
   ngOnInit(): void {
     this.load();

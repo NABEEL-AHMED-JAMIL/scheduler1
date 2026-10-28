@@ -27,6 +27,7 @@ import { downloadJson } from './report-files';
 import { RsTabCounts } from './rs-tab-counts';
 import { SortHeader } from '../../shared/ui/sort-header';
 import { SortState, createTableSort, sortRows } from '../../shared/ui/sort';
+import { AdvancedOption, AdvancedSelect } from '../../shared/ui/advanced-select';
 
 /** Which templates the library shows (Figma frame 2's tabs). */
 type Group = 'all' | 'workspace' | 'starters' | 'shared';
@@ -52,7 +53,7 @@ export interface LibraryItem {
 @Component({
   selector: 'app-report-templates',
   imports: [PageHeader, WorkspaceSelect, RefreshButton, Icon, TableShell, StatusPill, RsTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger,
-    Segmented, ViewToggle, Pagination, SortHeader],
+    Segmented, ViewToggle, Pagination, SortHeader, AdvancedSelect],
   templateUrl: './templates.html',
   styleUrl: './templates.css',
   host: { '[style.--rst-brand]': 'brandColour()' },
@@ -168,6 +169,7 @@ export class ReportTemplates implements OnInit {
   ]);
   readonly categories = computed(() => [...new Set([...this.serverCategories(), ...this.starters().map(s => s.category)]
     .filter((c): c is string => !!c))].sort());
+  readonly categoryOptions = computed<AdvancedOption[]>(() => this.categories().map(c => ({ value: c, label: c })));
   readonly filtering = computed(() => !!(this.search().trim() || this.state() || this.category() || this.owner()));
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
   /** Answers come back in any order: only the latest read's is kept. */
