@@ -503,9 +503,11 @@
                 <td class="hidden xl:table-cell text-xs whitespace-nowrap">@if (f.dateUpdated) { {{ f.dateUpdated | serverTime: 'dateTime' }} }</td>
               }
               <td class="text-right whitespace-nowrap">
-                <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="rowMenu" [attr.aria-label]="'Actions for ' + f.name">
-                  <app-icon name="dots" size="1.05em" />
-                </button>
+                @if (rowHasActions(f)) {
+                  <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="rowMenu" [attr.aria-label]="'Actions for ' + f.name">
+                    <app-icon name="dots" size="1.05em" />
+                  </button>
+                }
                 <ng-template #rowMenu>
                   <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
                     @if (f.status === 'Active') {

@@ -106,6 +106,16 @@ export class InvoicePane implements OnDestroy {
   readonly pdfDocument = computed(() => this.invoice()?.documents.find(d => d.kind === 'invoice' || d.kind === 'credit_note') ?? null);
   /** MIG-359: card payment through Stripe's hosted page -- offered on an issued, unpaid invoice when the platform has it set up. */
   readonly canPayByCard = computed(() => this.isOpen() && !!this.invoice()?.cardPayable);
+  /**
+   * Whether the ⋯ menu holds anything for this reader -- its items' own conditions, one by one: the PDF, the card link, a
+   * payment, the draft's rebuild and line, a credit note, Void. None (a workspace admin on a draft): no menu.
+   */
+  readonly hasActions = computed(() => {
+    const i = this.invoice();
+    if (!i) return false;
+    const admin = this.isPlatformAdmin();
+    return !!this.pdfDocument() || (this.canPayByCard() && admin) || this.isOpen() || (admin && i.status === 'draft') || this.canVoid();
+  });
   readonly cardChip = computed(() => { const i = this.invoice(); return i ? cardPaymentChip(i) : null; });
   /** When the card payment that settled it arrived: "Paid by card on …". */
   readonly paidByCardAt = computed(() => {

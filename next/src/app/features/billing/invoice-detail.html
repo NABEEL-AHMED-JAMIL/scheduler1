@@ -29,6 +29,9 @@
           @if (paidByCardAt(); as at) { · <span data-paid-by-card>Paid by card on {{ at | serverTime: 'date' }}</span> }
         </p>
         @if (isPlatformAdmin() && stillRunning(); as why) { <p class="text-xs text-[color:var(--text-muted)] mt-1" data-month-running>{{ why }}</p> }
+        @if (!isPlatformAdmin() && i.status === 'draft') {
+          <p class="text-xs text-[color:var(--text-muted)] mt-1" data-draft-hint>Draft: its PDF and payment options appear once it's issued.</p>
+        }
       </div>
       <div class="flex items-center gap-1.5 shrink-0">
         @if (isPlatformAdmin() && i.status === 'draft') {
@@ -40,7 +43,10 @@
         } @else if (pdfDocument()) {
           <button type="button" class="btn btn-primary btn-sm" (click)="pdf()"><app-icon name="file" />PDF</button>
         }
-        <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="invoiceMenu" aria-label="More actions"><app-icon name="dots" size="1.05em" /></button>
+        <!-- A menu with nothing in it is not offered (owner 2026-10-27: a workspace admin's draft opened an empty one). -->
+        @if (hasActions()) {
+          <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="invoiceMenu" aria-label="More actions"><app-icon name="dots" size="1.05em" /></button>
+        }
         <ng-template #invoiceMenu>
           <div cdkMenu class="card shadow-xl py-1 min-w-52 text-sm">
             @if (pdfDocument()) {

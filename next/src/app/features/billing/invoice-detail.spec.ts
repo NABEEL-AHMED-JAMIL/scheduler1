@@ -54,6 +54,23 @@ function page(platformAdmin: boolean, detail: object = DETAIL, clients = { listO
 }
 
 describe('InvoicePane', () => {
+  // Owner 2026-10-27 (INV-2026-10-0003, Riverside's draft, as its workspace admin): the ⋯ opened an empty menu.
+  it('offers no ⋯ menu when nothing in it is for this reader, and says what a draft is instead', () => {
+    const draft = { ...DETAIL, number: 'INV-2026-10-0003', status: 'draft', issuedAt: null, dueAt: null, payments: [], documents: [] };
+    const more = (el: HTMLElement) => el.querySelector('[aria-label="More actions"]');
+    const member = page(false, draft);
+    expect(member.component.hasActions()).toBe(false);
+    expect(more(member.fixture.nativeElement)).toBeNull();
+    expect(member.fixture.nativeElement.querySelector('[data-draft-hint]')?.textContent)
+      .toContain("Draft: its PDF and payment options appear once it's issued.");
+    // The platform administrator rebuilds a draft and adds lines from it; an issued invoice offers its PDF and payment to anyone.
+    expect(more(page(true, draft).fixture.nativeElement)).not.toBeNull();
+    expect(page(true, draft).fixture.nativeElement.querySelector('[data-draft-hint]')).toBeNull();
+    const issued = page(false);
+    expect(issued.component.hasActions()).toBe(true);
+    expect(more(issued.fixture.nativeElement)).not.toBeNull();
+  });
+
   it('ZT-B2: a draft whose month is still running in its zone is issued once the month is over', () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-10-21T17:00:00Z'));

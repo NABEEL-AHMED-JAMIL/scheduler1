@@ -97,6 +97,11 @@ export class FormBuilder implements OnInit {
   /** Read-only editor: an administrator in a MANAGED workspace (our team builds there). */
   readonly locked = computed(() => !this.canBuild());
   readonly canSeeSubmissions = computed(() => this.auth.canOpen('form-submissions'));
+
+  /** Whether a form's ⋯ menu holds anything for this reader: its items' own conditions (no items, no menu). */
+  rowHasActions(f: FormSummary): boolean {
+    return f.status === 'Active' || this.canSeeSubmissions() || this.isAdmin() || this.canBuild();
+  }
   readonly problems = computed(() => { const d = this.draft(); return d ? definitionProblems(d) : {}; });
   readonly problemCount = computed(() => Object.keys(this.problems()).length);
   readonly fieldTypes = FIELD_TYPES;

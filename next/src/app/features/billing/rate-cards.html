@@ -182,7 +182,9 @@
           </div>
           <div class="flex items-center gap-1.5 shrink-0">
             <button type="button" class="btn btn-primary btn-sm" (click)="newVersion(c)"><app-icon name="plus" />New version from this</button>
-            <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="cardMenu" aria-label="More actions"><app-icon name="dots" size="1.05em" /></button>
+            @if (c.tenant_id == null || c.based_on_version) {
+              <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="cardMenu" aria-label="More actions"><app-icon name="dots" size="1.05em" /></button>
+            }
             <ng-template #cardMenu>
               <div cdkMenu class="card shadow-xl py-1 min-w-56 text-sm">
                 @if (c.tenant_id == null) {

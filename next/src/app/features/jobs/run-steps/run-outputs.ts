@@ -111,7 +111,7 @@ import { ToastService } from '../../../shared/ui/toast.service';
                                       (click)="store.downloadDataset(o.runDatasetId!, formatsFor(o.name, o.format)[0].id, o.name)">
                                 <app-icon name="download" />Download
                               </button>
-                            } @else {
+                            } @else if (formatsFor(o.name, o.format).length > 1) {
                               <button type="button" class="btn btn-default btn-xs" data-test="download" [cdkMenuTriggerFor]="formats"
                                       [disabled]="!usable(o) || store.busy() !== ''" [attr.aria-label]="'Download ' + o.name + ' as…'">
                                 <app-icon name="download" />Download<app-icon name="chevronDown" size="0.8em" />
