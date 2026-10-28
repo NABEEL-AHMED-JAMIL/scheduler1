@@ -72,6 +72,7 @@ Tested by ______ on ______
 |---|---|---|---|---|
 | QA-03.28 | Another workspace's people are not listed | As X, **Administration › Users**, search for R's and F's addresses | Neither is found | ☐ Pass ☐ Fail |
 | QA-03.29 | Another workspace's profiles and teams are not listed | As X, **Page access** and **Teams** | Only X's own profiles and teams; `QA desk` and `QA team` are not there | ☐ Pass ☐ Fail |
+| QA-03.30 | Three accesses are only ever given | In a workspace with no default profile, a member with no profile opens a sensitive pipeline's file, a request's personal data and **Integration › Developer portal** | Refused: **Download sensitive files**, **See personal data** and the **Developer portal** are not held without a profile; tick them on a profile (or for the one person) and they work | ☐ Pass ☐ Fail |
 
 ## Example
 At Summit Valley the tester opens **Runs › By date** for the viewer for seven days with the reason `QA check`, sees it in

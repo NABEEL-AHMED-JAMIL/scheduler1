@@ -56,7 +56,7 @@ A person's role decides how much they may do, and whether page access applies to
 
 | Role | Opens | Can change |
 |---|---|---|
-| **Workspace member** | The pages on their page access profile (or the workspace's default profile); with no profile and no default, every page; plus any page opened for them alone | Only what those pages allow: running, reviewing, reading |
+| **Workspace member** | The pages on their page access profile (or the workspace's default profile); with no profile and no default, every page but See personal data, Download sensitive files and the Developer portal; plus any page opened for them alone | Only what those pages allow: running, reviewing, reading |
 | **Workspace administrator** | Every page of the workspace; page access does not apply | People, connections, pipelines, policies and settings, and the bills |
 | **Platform administrator** | Every workspace (the platform's own team) | Everything; a workspace's data only from inside that workspace |
 

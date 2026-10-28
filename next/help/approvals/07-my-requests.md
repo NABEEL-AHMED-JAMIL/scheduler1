@@ -39,10 +39,13 @@ Open the request in **My requests**:
     person to check;
   - a value hidden from you shows as a lock and ••• (*Hidden: personal data*; see
     [Personal data in a request](#apr-my-requests--personal-data-in-a-request));
+  - a request whose subject is a single text or number shows it as one **Details** paragraph, and a list of records as a
+    table;
   - the form's answers come after what the steps kept, in the form's own order, under its section headings and with its
     labels; a date reads as a day, such as *14 Feb 1942*;
-- **History** says every step in words: *Requested by …*, *waiting for the team · due …*, *approved by …*, *yes* or *no*
-  for a condition, *started run #2051* for a pipeline, *saved to dataset …*, *overdue, escalated to …*, *Request approved*.
+- **History** says every step in words, by its name (a step named only by its key, such as `manager`, reads *Manager*):
+  *Requested by …*, *waiting for the team · due …*, *approved by …*, a condition's question and its answer (*High
+  priority? Yes*), *started run #2051* for a pipeline, *saved to dataset …*, *overdue, escalated to …*, *Request approved*.
   A decision's comment shows under it.
 
 Search the list, or narrow it with **Any status** and **Any workflow**.
@@ -54,7 +57,7 @@ submission starts, those answers read as a lock and ••• for everyone excep
   *Your own request*;
 - **people with See personal data**, an access an administrator gives on a profile or to one person
   (**Administration › Page access**). Workspace administrators always have it. Unlike other pages, a person with no
-  profile does not have it: it is only ever given. They see the data hidden too, and choose **Show personal data** when they
+  profile does not have it (nor **Download sensitive files**): it is only ever given. They see the data hidden too, and choose **Show personal data** when they
   need it; **Hide** hides it again.
 
 Each **Show** is recorded: the request's **History** says *Personal data shown to* that person, with the time (once

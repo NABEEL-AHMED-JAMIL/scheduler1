@@ -13,7 +13,8 @@ A **page access profile** is a named bundle of pages for workspace members: Clin
 ![Administration › Page access](adm-access-profiles "Page access: the profiles, who can open what, and Check a person")
 
 ## How it works
-- A workspace with **no profiles** lets every member open every page. The first profile you make becomes the default, and everyone without one moves onto it.
+- A workspace with **no profiles** lets every member open every page, but for **See personal data**, **Download
+  sensitive files** and the **Developer portal**: those are only ever given, on a profile or to one person. The first profile you make becomes the default, and everyone without one moves onto it.
 - A profile opens **whole pages**, and for a page with tabs, **every tab or only some**.
 - **Home**, **Your profile** and **Notifications** are always open; **Administration** stays administrator-only.
 - On top of a profile, a page or tab can be opened or withheld **for one person**: see [Give a person only some tabs](#adm-some-tabs).

@@ -13,8 +13,10 @@ the template version and the frozen data it was made from. This is what lets a s
 ## Read a report's versions
 Open a report in **Reports › Library**. The **Versions** table lists each one: **Current**, when and by whom it was
 generated, the template version and data, whether it is **Signed**, **Approved**, **Waiting** or **Superseded**, and its
-files (view or download the PDF and HTML). **Activity** lists everything done to the report, and **Where version N came
-from** traces the template, the data, the generation job, the approval and the report.
+files (view or download the PDF and HTML). **Activity** lists everything done to the report in words, with who did it:
+*Approval asked*, *First approval given by …*, *Approved and signed by …*, *Approved (not signed)* with why, *Version
+voided* with its reason, *Downloaded · Version 2 · PDF*, *Delivered*, *Archived*, *Deleted*. **Where version N came from**
+traces the template, the data, the generation job, the approval and the report.
 
 ![The Library](rs-library "Reports › Library: every report with its template, version, files, status and signature")
 

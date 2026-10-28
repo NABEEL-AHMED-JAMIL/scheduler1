@@ -54,7 +54,7 @@ Tested by ______ on ______
 | QA-11.17 | Steps and a condition | **Add a step** › **Condition**: **Field of the request** `amount`, **is more than** `1000`; yes: an **Approval** for **Everyone in a team** `QA team` with **A rejection needs a reason**; no: **Request ends** | The steps are placed; nothing is live until published | ☐ Pass ☐ Fail |
 | QA-11.18 | Publish | **Publish version 1** with a note under **What changed** | **Versions** lists version 1 as current | ☐ Pass ☐ Fail |
 | QA-11.19 | Start a request | As A2, **Review › Approvals** › **My requests** › **New request**: **Workflow** `QA purchase`, **Title** `QA laptop`, field `amount` = `2500`; **Start the request** | R has a task in **Review**; the request reads **Running** | ☐ Pass ☐ Fail |
-| QA-11.20 | The condition decides the way | Start another with `amount` = `200` | It goes straight to its end; **History** shows *no* for the condition | ☐ Pass ☐ Fail |
+| QA-11.20 | The condition decides the way | Start another with `amount` = `200` | It goes straight to its end; **History** shows the condition's question answered *No* (a step named only by its key reads in words, such as *Amount? No*) | ☐ Pass ☐ Fail |
 | QA-11.21 | Ask for changes | As R, on the first request's task, **Ask for changes** with a comment | The request shows *Changes asked*; its history carries the comment | ☐ Pass ☐ Fail |
 | QA-11.22 | Nobody decides their own request | As R, start a `QA purchase` request with `amount` `5000`; look at it in R's **Review** | It is listed but cannot be decided by R: someone else decides it | ☐ Pass ☐ Fail |
 | QA-11.23 | Running requests keep their version | Change the workflow and **Publish version 2**; open a request started before | It still reads version 1 | ☐ Pass ☐ Fail |
@@ -77,6 +77,7 @@ Tested by ______ on ______
 | QA-11.32 | The submitter sees their own | As F, open the intake you sent in **My requests** | Its personal data shows in full; the bar says *Your own request* | ☐ Pass ☐ Fail |
 | QA-11.33 | Lists and notices hide it too | As R, look at the approval's title in the list and at its bell notice | Where a title holds a personal value it reads ••• | ☐ Pass ☐ Fail |
 | QA-11.34 | The form's order, labels and sections | Open any *Patient intake* approval | What the steps kept (decisions, pipelines) comes first, then the answers under *Patient*, *Insurance*, *This visit* … in the form's order and with its labels (*Date of birth*, *Height (cm)*); a date reads *14 Feb 1942* | ☐ Pass ☐ Fail |
+| QA-11.35 | A request about a single text | Start a request whose subject is one text (from a workflow test run or the API), open its task | **Request details** shows one **Details** paragraph, never a field per character; the subtitle and history name its steps in words (*Manager*, *Large? No*) | ☐ Pass ☐ Fail |
 
 ## Example
 At Summit Valley **Controlled substance count reconciliation** pauses at its Approval step for Avi Cohen, the pharmacist,

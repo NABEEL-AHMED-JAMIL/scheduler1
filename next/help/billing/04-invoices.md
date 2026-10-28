@@ -31,7 +31,8 @@ card version that priced them, and its PDF is made.
 - **Documents**: the invoice PDF once issued, the payment slips, receipts and credit notes.
 - **Payments**: each payment, its method, reference, who sent it and its state.
 
-**PDF** views or downloads the invoice; the ⋯ menu has **View PDF** and **Download PDF**.
+**PDF** views or downloads the invoice; the ⋯ menu has **View PDF** and **Download PDF**. A draft has neither yet, so
+it shows no ⋯ menu and says *Draft: its PDF and payment options appear once it's issued*.
 
 ## Pay an invoice
 - **Pay now** (when card payment is on): pay by card on the payment provider's secure page. The payment counts as soon

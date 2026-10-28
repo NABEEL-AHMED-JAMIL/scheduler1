@@ -47,8 +47,9 @@ Columns marked sensitive in the **Data Catalog** (patient identifiers, names, co
 
 ## Sensitive files
 Masking changes what a screen shows, not the files a sensitive pipeline keeps. Viewing or downloading those files (a
-saved file, an item's files, a report's PDF) needs **Download sensitive files** on the person's access profile; without
-it they see the file's name, size and type and a lock. See [The Items view](#run-items--sensitive-pipelines).
+saved file, an item's files, a report's PDF) needs **Download sensitive files** on the person's access profile (or
+given to them alone; a person with no profile does not have it); without it they see the file's name, size and type and a
+lock. See [The Items view](#run-items--sensitive-pipelines).
 
 ## Personal data in approval requests
 A form's fields marked **Personal data** read as a lock and ••• in the approval requests its submissions start. Showing
