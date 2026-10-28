@@ -45,6 +45,11 @@ fields, even if the form has changed since.
 
 ![A submission's answers](form-submission "A submission opened: the claimant and each line of the claim")
 
+## Personal data
+Answers to fields marked **Personal data** read as ••• for people without **See personal data** on their access profile,
+here and in **Export CSV**; the submission says *Personal data is hidden for you*. Administrators, people with that access,
+and the person who sent the submission see them. See [Personal data in a request](#apr-my-requests--personal-data-in-a-request).
+
 ## Read an attached file as a document
 On a file answer, choose **Read with Document Intelligence** to send it to be read and extracted as a document. It then
 says **Being read — open Document Intelligence**. You need page access to Documents for this.

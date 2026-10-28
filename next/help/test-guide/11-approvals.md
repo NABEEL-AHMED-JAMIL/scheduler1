@@ -72,6 +72,11 @@ Tested by ______ on ______
 | # | Check | Steps | Expected | Pass / Fail |
 |---|---|---|---|---|
 | QA-11.29 | A request's data reads in words | Open a request whose workflow ran a pipeline and kept an approval's decision (such as *Patient intake*), in **Approvals**, in **My requests** and from **Review**'s side panel | The pipeline is one line (its step, *Completed*, **Run #…**) with its values under it, no *Job ID*, *Give up at* or *Ok* rows; the decision reads *Approved by* and the person's name, then the day, month, year and 24-hour time with its comment as a quote; a long summary takes the width; a hidden value is a lock and ••• with *Hidden: personal data* | ☐ Pass ☐ Fail |
+| QA-11.30 | A form's personal answers are hidden | As R (a profile without **See personal data**), open a *Patient intake* approval | Name, date of birth, phone, address and member IDs read as a lock and •••; the AI summary and comments show ••• where the name was; the bar says *Personal data is hidden for you*; there is no **Show** | ☐ Pass ☐ Fail |
+| QA-11.31 | Show is for See personal data, and recorded | As A (or R after an administrator ticks **See personal data** on R's profile), open the same approval › **Show personal data** | The answers appear; **History** gains *Personal data shown to* A; **Hide** hides them again; a second **Show** within 15 minutes adds no second line | ☐ Pass ☐ Fail |
+| QA-11.32 | The submitter sees their own | As F, open the intake you sent in **My requests** | Its personal data shows in full; the bar says *Your own request* | ☐ Pass ☐ Fail |
+| QA-11.33 | Lists and notices hide it too | As R, look at the approval's title in the list and at its bell notice | Where a title holds a personal value it reads ••• | ☐ Pass ☐ Fail |
+| QA-11.34 | The form's order, labels and sections | Open any *Patient intake* approval | What the steps kept (decisions, pipelines) comes first, then the answers under *Patient*, *Insurance*, *This visit* … in the form's order and with its labels (*Date of birth*, *Height (cm)*); a date reads *14 Feb 1942* | ☐ Pass ☐ Fail |
 
 ## Example
 At Summit Valley **Controlled substance count reconciliation** pauses at its Approval step for Avi Cohen, the pharmacist,

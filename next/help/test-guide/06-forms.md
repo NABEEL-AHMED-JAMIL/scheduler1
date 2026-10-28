@@ -65,6 +65,7 @@ Tested by ______ on ______
 | QA-06.26 | A viewer has no forms | As V, go to `/forms/builder` | Refused | ☐ Pass ☐ Fail |
 | QA-06.27 | Another workspace cannot open the form | As A, copy the address of the form's **Fill in** page; as X, open it | **Form not found.** | ☐ Pass ☐ Fail |
 | QA-06.28 | Rebuild dataset files | As A, if the form keeps a dataset: row menu › **Rebuild dataset files** › **Rebuild files** | The dialog says where the files are written; no answer changes | ☐ Pass ☐ Fail |
+| QA-06.30 | Mark a field as personal data | As A, open a form in **Build › Forms**, select a field (such as *Date of birth*), tick **Personal data**, **Save** | After a reload the box is still ticked; a new submission's approval shows that answer hidden to R (QA-11.30) | ☐ Pass ☐ Fail |
 
 > **Privacy:** Do not use a share link without **Only signed-in members** for a form that asks for patient or personal
 > data unless your organisation has approved it. In this test the answers are made up.

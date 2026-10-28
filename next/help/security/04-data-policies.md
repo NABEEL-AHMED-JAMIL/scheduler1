@@ -50,6 +50,12 @@ Masking changes what a screen shows, not the files a sensitive pipeline keeps. V
 saved file, an item's files, a report's PDF) needs **Download sensitive files** on the person's access profile; without
 it they see the file's name, size and type and a lock. See [The Items view](#run-items--sensitive-pipelines).
 
+## Personal data in approval requests
+A form's fields marked **Personal data** read as a lock and ••• in the approval requests its submissions start. Showing
+them needs **See personal data** on the person's access profile (administrators always have it); each showing is
+recorded in the request's history. **Download sensitive files** is for files only and does not show personal data. See
+[Personal data in a request](#apr-my-requests--personal-data-in-a-request).
+
 ## Bulk review
 Whether reviewers may approve many runs or documents in one decision. Each item is still decided and recorded on its own, and rejecting in bulk is always allowed.
 - **Allow bulk approve of runs**: off, runs are approved one by one.

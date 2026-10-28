@@ -37,12 +37,34 @@ Open the request in **My requests**:
   - a decision an earlier step kept reads *Approved by Dr. Anika Patel · 27 Oct 2026, 00:52*, with its comment as a quote;
   - a long text, such as an AI summary, takes the whole width; a value marked **DRAFT** was written by a model for a
     person to check;
-  - a value hidden from you shows as a lock and ••• (*Hidden: personal data*);
+  - a value hidden from you shows as a lock and ••• (*Hidden: personal data*; see
+    [Personal data in a request](#apr-my-requests--personal-data-in-a-request));
+  - the form's answers come after what the steps kept, in the form's own order, under its section headings and with its
+    labels; a date reads as a day, such as *14 Feb 1942*;
 - **History** says every step in words: *Requested by …*, *waiting for the team · due …*, *approved by …*, *yes* or *no*
   for a condition, *started run #2051* for a pipeline, *saved to dataset …*, *overdue, escalated to …*, *Request approved*.
   A decision's comment shows under it.
 
 Search the list, or narrow it with **Any status** and **Any workflow**.
+
+## Personal data in a request
+A form's fields can be marked **Personal data** (see [Set up a field](#form-build--set-up-a-field)). In the request a
+submission starts, those answers read as a lock and ••• for everyone except:
+- **the person who sent the form**: they see their own requests in full, and the bar over **Request details** says
+  *Your own request*;
+- **people with See personal data**, an access an administrator gives on a profile or to one person
+  (**Administration › Page access**). Workspace administrators always have it. Unlike other pages, a person with no
+  profile does not have it: it is only ever given. They see the data hidden too, and choose **Show personal data** when they
+  need it; **Hide** hides it again.
+
+Each **Show** is recorded: the request's **History** says *Personal data shown to* that person, with the time (once
+every 15 minutes per person). Everyone else reads *Personal data is hidden for you* and can ask an administrator.
+
+The same values are hidden wherever the request quotes them: in a pipeline's AI summary kept by an earlier step, in
+comments, in the history, in the request's title on lists, and in the bell and e-mail notices.
+
+> **Note:** Values a pipeline masked in its own results (a column the Data Catalog marks sensitive) stay masked for
+> everyone in the request; open the run to see them, where its own access rules apply.
 
 ## When changes are asked for
 An approver may **Ask for changes**, with a comment saying what should change. The request shows *Changes asked*; the history

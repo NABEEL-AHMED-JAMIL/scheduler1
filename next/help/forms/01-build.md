@@ -48,6 +48,10 @@ Forms** and filled in by the workspace's own members.
   40. A few names belong to the submission itself and cannot be used (such as `submitted_by`).
 - **Type**: change it here if you picked the wrong one.
 - **Required**: the form cannot be sent without it.
+- **Personal data**: the answer identifies a person, such as a name, a date of birth, a phone, an address or a member ID.
+  In the approval request a submission starts, it shows as a lock and •••, and so does that value wherever it appears in
+  the request's text (an AI summary, a comment, the history). Only the person who sent the form, and people with
+  **See personal data**, can show it. See [Personal data in a request](#apr-my-requests--personal-data-in-a-request).
 - **Placeholder (optional)**: example text inside the empty box, such as `e.g. SV-000123`, up to 120 characters on one
   line. The label stays; people still see it. Text, long text, number, date, e-mail, choice and lookup fields take one.
   Left empty, the box shows a default for its type, such as "Enter case number" (greyed in the setting).
