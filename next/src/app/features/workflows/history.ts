@@ -46,8 +46,9 @@ export function historyLines(events: HistoryEvent[], name: Names, stepName: (key
       case 'Reminded': line(`${step}: reminder sent`, 'plain'); break;
       case 'AssignedToAdministrators': line(`${step}: went to the administrators`, 'plain', str(d['reason'])); break;
       // A condition named as a question ("High priority?") answers it: "High priority? yes".
-      case 'ConditionTrue': line(`${step}${step.endsWith('?') ? '' : ':'} yes`, 'plain'); break;
-      case 'ConditionFalse': line(`${step}${step.endsWith('?') ? '' : ':'} no`, 'plain'); break;
+      // A condition asks its question: "High priority? Yes", "Large? No" (its name, or its key in words, as one).
+      case 'ConditionTrue': line(`${question(step)} Yes`, 'plain'); break;
+      case 'ConditionFalse': line(`${question(step)} No`, 'plain'); break;
       case 'PipelineStarted': line(`${step}: started run #${d['runId']}`, 'ok'); break;
       case 'PipelineFailed': line(`${step}: the pipeline could not start`, 'bad', str(d['error'])); break;
       case 'DatasetSaved': line(`${step}: saved to dataset ${d['dataset']}`, 'ok'); break;
@@ -143,6 +144,24 @@ export function dateTime(iso: string | null | undefined, timeZone?: string): str
   const parts = new Intl.DateTimeFormat('en-GB', { year: 'numeric', day: 'numeric', month: 'numeric', timeZone }).formatToParts(at);
   const part = (type: string) => parts.find(p => p.type === type)?.value ?? '';
   return `${Number(part('day'))} ${MONTHS[Number(part('month')) - 1]} ${part('year')}, ${clock(at, timeZone)}`;
+}
+
+/**
+ * A step as people read it (owner, 2026-10-27, task 2769): its name, unless the name is only its key ("manager",
+ * "large_spend") -- then the key in words ("Manager", "Large spend"); the key in words when it has no name.
+ */
+const KEY_LIKE = /^[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)*$/;
+
+export function stepLabel(name: string | null | undefined, key?: string | null): string {
+  const given = (name ?? '').trim();
+  if (given && !KEY_LIKE.test(given)) return given;
+  const words = (given || (key ?? '').trim()).replace(/[-_.]+/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').trim().toLowerCase();
+  return words ? words.charAt(0).toUpperCase() + words.slice(1) : '';
+}
+
+/** A condition's name as a question: "Large" asks "Large?"; "High priority?" asks itself. */
+function question(step: string): string {
+  return step.endsWith('?') ? step : `${step}?`;
 }
 
 /**

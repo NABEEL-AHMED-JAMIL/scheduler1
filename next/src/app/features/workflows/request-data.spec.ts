@@ -141,4 +141,18 @@ describe('A request\'s data, by its shape', () => {
     expect(valueKind('2026-02-30')).toMatchObject({ kind: 'text', text: '2026-02-30' });
     expect(entry('dob')).toMatchObject({ view: { kind: 'text', text: '2 Mar 1950' } });
   });
+
+  // Owner 2026-10-27, task 2769 (Summit's Write-off): its subject is a plain text, and it read one character a field.
+  it('reads a subject that is not a record as one Details row, by its shape', () => {
+    expect(requestData('Perf cycle (synthetic) for Write-off approval')).toEqual([{ kind: 'value', key: 'details', label: 'Details',
+      value: 'Perf cycle (synthetic) for Write-off approval', view: { kind: 'long', text: 'Perf cycle (synthetic) for Write-off approval' },
+      draft: false }]);
+    expect(requestData(42)).toMatchObject([{ key: 'details', view: { kind: 'long', text: '42' } }]);
+    expect(requestData([{ item: 'Bed 4', amount: 120 }, { item: 'Bed 7', amount: 80 }])).toMatchObject([{ key: 'details',
+      view: { kind: 'table', columns: ['Item', 'Amount'], rows: [['Bed 4', '120'], ['Bed 7', '80']] } }]);
+    expect(requestData('\u2022\u2022\u2022')).toMatchObject([{ view: { kind: 'masked' } }]);
+    expect(requestData('{"amount": 1200, "reason": "Write-off"}').map(e => e.key)).toEqual(['amount', 'reason']);
+    expect(requestData(null)).toEqual([]);
+    expect(requestData('')).toEqual([]);
+  });
 });

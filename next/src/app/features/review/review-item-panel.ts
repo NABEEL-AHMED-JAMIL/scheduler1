@@ -12,6 +12,7 @@ import { AuthService } from '../../core/auth/auth.service';
 import { RequestDataView } from '../workflows/request-data-view';
 import { PersonalDataBar } from '../workflows/personal-data-bar';
 import { requestContext, requestData } from '../workflows/request-data';
+import { stepLabel } from '../workflows/history';
 import { ReviewItem, ageOf } from './review-sources';
 import { KIND_LABEL, linkOf } from './review-home.model';
 
@@ -60,7 +61,7 @@ interface RunReview { reviewStatus?: string; required?: string[]; decisions?: { 
 
       @if (task(); as t) {
         <section class="mt-5" data-test="panel-task">
-          <h3 class="text-sm font-semibold mb-1">{{ t.name }}</h3>
+          <h3 class="text-sm font-semibold mb-1">{{ stepOf(t) }}</h3>
           <p class="text-sm m-0 text-[color:var(--text-secondary)]">{{ t.requestTitle }}@if (t.workflowName) { <span> · {{ t.workflowName }}</span> }</p>
           @if (fields().length) {
             <!-- Owner 2026-10-27: the request's data as Approvals shows it (a run's outcome, a decision, each value by its shape). -->
@@ -137,9 +138,17 @@ export class ReviewItemPanel implements OnInit {
   /** The request's first twelve values, read as Approvals reads them; Approvals has them all. The link is the panel's own. */
   readonly fields = computed(() => {
     const t = this.task();
-    const subject = Object.fromEntries(Object.entries(t?.subject ?? {}).filter(([k]) => k !== 'link'));
+    // A subject is usually a record (its link is the panel's own); task 2769's is a plain text, read as it is.
+    const raw: unknown = t?.subject;
+    const subject = raw !== null && typeof raw === 'object' && !Array.isArray(raw)
+      ? Object.fromEntries(Object.entries(raw as Record<string, unknown>).filter(([k]) => k !== 'link')) : raw;
     return requestData(subject, { ...requestContext(this.colleagues(), this.auth, t?.history), fields: t?.subjectFields }).slice(0, 12);
   });
+  /** A task's step as people read it: its name, or its key in words. */
+  stepOf(t: { name?: string | null; stepKey?: string | null }): string {
+    return stepLabel(t.name, t.stepKey);
+  }
+
   /** ZT-I34: a Show of personal data in flight. */
   readonly showingPersonal = signal(false);
 

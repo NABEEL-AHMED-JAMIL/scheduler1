@@ -230,8 +230,8 @@
         @if (detail(); as d) {
           <div class="inbox-detail-head">
             <button type="button" class="btn btn-default btn-sm inbox-back" (click)="backToList()" data-test="back-to-list"><app-icon name="arrowLeft" />Back to list</button>
-            <h2 class="inbox-detail-title"><ng-container *ngTemplateOutlet="titled; context: { $implicit: d.requestTitle || d.name }" /></h2>
-            <p class="inbox-detail-sub">{{ d.name }} · {{ d.workflowName }}</p>
+            <h2 class="inbox-detail-title"><ng-container *ngTemplateOutlet="titled; context: { $implicit: d.requestTitle || stepOf(d) }" /></h2>
+            <p class="inbox-detail-sub">{{ stepOf(d) }} · {{ d.workflowName }}</p>
             <div class="inbox-chips">
               <app-status [label]="stateLabel(d)" />
               <span class="pill pill-neutral">@if (d.assigneeUserId != null) {<app-avatar [appUserId]="d.assigneeUserId" [name]="holder(d)" [size]="1.05" [decorative]="true" />} @else {<app-icon name="users" size="0.9em" />}With {{ holder(d) }}</span>

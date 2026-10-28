@@ -1,3 +1,4 @@
+import { stepLabel } from '../workflows/history';
 import { HttpClient, HttpContext, HttpContextToken } from '@angular/common/http';
 import { Injector, WritableSignal } from '@angular/core';
 import { AuthService } from '../../core/auth/auth.service';
@@ -163,7 +164,7 @@ export function merge(viewer: ReviewViewer, a: {
     items.push({
       uid: uidOf(runId != null ? 'run' : 'approval', t.id), kind: runId != null ? 'run' : 'approval', via: 'task', id: t.id,
       runId: runId ?? undefined, jobId: run?.jobId,
-      title: runId != null && run ? `Run #${runId}` : t.requestTitle || t.name,
+      title: runId != null && run ? `Run #${runId}` : t.requestTitle || stepLabel(t.name, t.stepKey),
       from: run?.jobName || t.workflowName || t.workflow || '',
       since: run?.finishedAt ?? t.createdAt ?? null, due: t.dueAt ?? null, overdue: !!t.overdue,
       waitsOn: waitsOnTask(t, mine, viewer.me),

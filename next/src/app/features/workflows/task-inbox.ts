@@ -17,7 +17,7 @@ import { confirmWith } from '../../shared/ui/confirm';
 import { Dialog } from '@angular/cdk/dialog';
 import { Observable } from 'rxjs';
 import { Colleague, Decision, HistoryEvent, InboxPage, InboxTask, RequestDetail, RequestRow, StartableWorkflow, TaskDetail, WorkflowsApi, CANNOT_ACT } from './workflows.api';
-import { HistoryLine, compactTime, dropOwnStep, exactTime, historyLines, relativeTime, shortTime } from './history';
+import { HistoryLine, compactTime, dropOwnStep, exactTime, historyLines, relativeTime, shortTime, stepLabel } from './history';
 import { TaskCountService } from './task-count.service';
 import { ListItem, RowTone, appendPage, choicesOf, commonOf, dueGroup, groupRows, matchesSearch, mergeHead, nextAfter, pastGroup, splitRef, stepFrom } from './inbox-list';
 import { RequestDataView } from './request-data-view';
@@ -174,7 +174,8 @@ export class TaskInbox implements OnInit {
   /** The task's history, its own lines without its name: the heading already says it. */
   readonly taskHistory = computed<HistoryLine[]>(() => {
     const d = this.detail();
-    return d ? dropOwnStep(historyLines(d.history, id => this.historyName(id), key => this.stepName(key, d.tasks, d.history)), d.name) : [];
+    return d ? dropOwnStep(historyLines(d.history, id => this.historyName(id), key => this.stepName(key, d.tasks, d.history)),
+      stepLabel(d.name, d.stepKey)) : [];
   });
 
   readonly requestHistory = computed<HistoryLine[]>(() => {
@@ -874,7 +875,8 @@ export class TaskInbox implements OnInit {
     if (!key) return 'The request';
     const base = key.endsWith('#changes') ? key.slice(0, -'#changes'.length) : key;
     const t = tasks.find(x => x.stepKey === key) ?? tasks.find(x => x.stepKey === base);
-    return t ? t.name : stepNamesOf(history).get(base) ?? base;
+    // Task 2769: a step named only by its key ("manager") reads as words ("Manager").
+    return stepLabel(t ? t.name : stepNamesOf(history).get(base), base);
   }
 
   holder(t: InboxTask): string {
@@ -889,6 +891,11 @@ export class TaskInbox implements OnInit {
     if (t.state !== 'Open') return t.actedAt ? 'Acted ' + shortTime(t.actedAt) : '';
     if (!t.dueAt) return 'No due time';
     return (t.overdue ? 'Overdue · was due ' : 'Due ') + shortTime(t.dueAt);
+  }
+
+  /** A task's step as people read it: its name, or its key in words (task 2769: "manager" reads "Manager"). */
+  stepOf(t: { name?: string | null; stepKey?: string | null }): string {
+    return stepLabel(t.name, t.stepKey);
   }
 
   /** A title's name and trailing reference (#1016), for a heading that wraps the name but never the reference. */
@@ -927,9 +934,9 @@ export class TaskInbox implements OnInit {
     const people = [this.holder(t), this.name(t.requestedBy), this.name(t.actedBy), t.standingInFor ? this.name(t.standingInFor) : '']
       .filter(p => p && p !== 'the workflow');
     const common = this.common();
-    const sub = [common.step ? '' : t.name, common.workflow ? '' : t.workflowName, t.standingInFor ? `for ${this.name(t.standingInFor)}` : '']
+    const sub = [common.step ? '' : stepLabel(t.name, t.stepKey), common.workflow ? '' : t.workflowName, t.standingInFor ? `for ${this.name(t.standingInFor)}` : '']
       .filter(Boolean).join(' · ');
-    const title = t.requestTitle || t.name;
+    const title = t.requestTitle || stepLabel(t.name, t.stepKey);
     return {
       id: t.id, kind: 'task', title, ...splitRef(title), sub, status, tone: this.toneOf(status),
       time: at ? (open ? 'Due ' : '') + compactTime(at, now, undefined, true) : '',

@@ -126,7 +126,7 @@ describe('A request\'s data on every screen that shows it', () => {
   it('names each step of the history as the engine entered it, not by its key', () => {
     const el = inbox();
     const lines = [...el.querySelectorAll('[data-test="task-history"] .inbox-timeline-text')].map(l => l.textContent);
-    expect(lines).toContain('Assessed? yes');
+    expect(lines).toContain('Assessed? Yes');
     expect(lines).toContain('Assess the intake: checks, rules and the AI summary: started run #2926');
   });
 

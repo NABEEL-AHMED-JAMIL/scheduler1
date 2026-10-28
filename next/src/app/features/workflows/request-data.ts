@@ -115,10 +115,32 @@ const STATUS_WORD: Record<string, string> = { TimedOut: 'Timed out' };
 /** A record inside a record inside the subject is read as one value (value-kind's table): deeper nesting says nothing more. */
 const MAX_DEPTH = 2;
 
-export function requestData(subject: Record<string, unknown> | null | undefined, ctx: RequestDataContext = {}): RequestEntry[] {
-  if (!subject) return [];
-  const entries = entriesOf(Object.entries(subject).filter(([, v]) => !isAssignee(v)), ctx, 0, new Set(), false);
+export function requestData(subject: unknown, ctx: RequestDataContext = {}): RequestEntry[] {
+  if (subject === null || subject === undefined || subject === '') return [];
+  // Task 2769: a subject that is not a record -- a text, a number, a list -- is one "Details" value, read as its shape (a
+  // text a paragraph, a list of records a table); a text that is a record's JSON is that record.
+  const record = recordOf(subject) ?? (typeof subject === 'string' ? recordOf(parsedJson(subject)) : null);
+  if (!record) return [detailsOf(subject, ctx)];
+  const entries = entriesOf(Object.entries(record).filter(([, v]) => !isAssignee(v)), ctx, 0, new Set(), false);
   return ordered(entries, ctx.fields ?? null);
+}
+
+/** A subject that is not a record, as one row: a text as a paragraph (or hidden, when it is the mask), a list by its shape. */
+function detailsOf(subject: unknown, ctx: RequestDataContext): ValueEntry {
+  const view = valueKind(subject);
+  const text = textOf(subject, ctx);
+  const paragraph: ValueView = view.kind === 'text' || view.kind === 'id' || view.kind === 'bool' ? { kind: 'long', text: view.text } : view;
+  return { kind: 'value', key: 'details', label: 'Details', value: text, view: paragraph, draft: false };
+}
+
+function parsedJson(text: string): unknown {
+  const t = text.trim();
+  if (!t.startsWith('{')) return null;
+  try {
+    return JSON.parse(t);
+  } catch {
+    return null;
+  }
 }
 
 /**
