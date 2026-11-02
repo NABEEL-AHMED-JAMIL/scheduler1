@@ -37,6 +37,8 @@ import { askReason } from '../../shared/ui/reason';
 import { ReportViewer } from './report-viewer';
 import { Meaning, ReportLibraryApi, TemplateFeatures } from './report-library.api';
 import { Stage, reportStages } from './report-stages';
+import { encodeQr } from './designer/qr-encoder';
+import { qrPath } from './designer/qr-inspector';
 
 type Tab = 'approval' | 'details' | 'activity' | 'access' | 'again';
 
@@ -373,6 +375,12 @@ export class ReportPage implements OnInit {
   verifyLink(v: ReportVersionRow): string {
     return v.verifyCode ? `${window.location.origin}/r/${v.verifyCode}`
       : `${window.location.origin}/reports/library/${v.reportId}?version=${v.version}&verify=1`;
+  }
+
+  /** The QR code the version prints, drawn here from the same link (its modules and quiet zone of 4). */
+  qrDrawing(v: ReportVersionRow): { across: number; path: string } | null {
+    const m = encodeQr(this.verifyLink(v), 'M');
+    return m ? { across: m.modules + 8, path: qrPath(m.dark, 4) } : null;
   }
 
   copyVerify(v: ReportVersionRow): void {

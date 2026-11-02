@@ -75,3 +75,7 @@
   border-bottom: 1px solid var(--border-subtle); font-size: 0.8125rem; }
 .rsp-versions > li:last-child { border-bottom: 0; }
 .rsp-versions > li.is-shown { box-shadow: inset 3px 0 0 var(--accent-mark, var(--text-primary)); padding-left: 0.5rem; margin-left: -0.5rem; }
+
+.rsp-qr-svg { width: 4.75rem; height: 4.75rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); }
+.rsp-qr-light { fill: var(--qr-paper); }
+.rsp-qr-dark { fill: var(--qr-ink); }

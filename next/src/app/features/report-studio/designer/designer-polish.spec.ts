@@ -44,12 +44,16 @@ describe('the QR scan check: version and modules for a content and level', () =>
     expect(qrFit('a'.repeat(3000), 'L')).toBeNull();
   });
 
-  it('measures today\'s verify link and a short public code as the redesign notes say', () => {
+  it('measures the public verify link and the old signed-in one as the redesign notes say', () => {
+    // Feature 1: what a QR code prints now -- the public page by the version's random code.
     const link = verifyLinkSample(ORIGIN);
-    expect(link).toBe(`${ORIGIN}/reports/library/01JBQ7RZ4K8M2N6P9T3V5W7X9Y?version=1&verify=1`);
-    expect(link.length).toBe(102);
+    expect(link).toBe(`${ORIGIN}/r/00000-00000`);
+    expect(link.length).toBe(54);
     const today = qrFit(link, 'H')!;
-    expect([today.version, today.modules]).toEqual([10, 57]);
+    expect([today.version, today.modules]).toEqual([6, 41]);
+    // The signed-in link a version made before codes keeps: version 10 at H.
+    const old = qrFit(`${ORIGIN}/reports/library/01JBQ7RZ4K8M2N6P9T3V5W7X9Y?version=1&verify=1`, 'H')!;
+    expect([old.version, old.modules]).toEqual([10, 57]);
     expect(SHORT.length).toBe(44);
     const short = qrFit(SHORT, 'H')!;
     expect([short.version, short.modules]).toEqual([5, 37]);
@@ -84,12 +88,14 @@ describe('the QR scan check: version and modules for a content and level', () =>
       'Not readable as a fax (needs 0.5 mm a module); make it 23 mm or more',
     ]);
     const today = scanCheck(verifyLinkSample(ORIGIN), 'H', 18, 4);
-    expect(today.across).toBe(65);
-    expect(today.print).toBe('marginal');
-    expect(today.lines[0].text).toBe('Marginal when printed: 0.28 mm a module (0.33 mm is safe); make it 22 mm or more');
+    // Feature 1: the public link (<console>/r/<code>, 54 characters here) is version 6 at H, 41 modules.
+    expect(today.across).toBe(49);
+    expect(today.print).toBe('ok');
+    expect(today.lines[0].text).toBe('Readable when printed: 0.37 mm a module');
+    expect(today.lines[1].text).toBe('Not readable as a fax (needs 0.5 mm a module); make it 25 mm or more');
     const big = scanCheck(verifyLinkSample(ORIGIN), 'H', 40, 4);
     expect([big.print, big.fax]).toEqual(['ok', 'ok']);
-    expect(big.lines[1].text).toBe('Readable as a fax: 0.62 mm a module (a fax needs 0.5 mm)');
+    expect(big.lines[1].text).toBe('Readable as a fax: 0.82 mm a module (a fax needs 0.5 mm)');
   });
 
   it('says marginal from 0.25 mm, too small below it, and fax only from 0.5 mm', () => {
@@ -136,7 +142,7 @@ describe('the QR scan check: version and modules for a content and level', () =>
     // A QR block is named by its caption, never by what it opens ("binding", "verifyLink").
     expect(blockLabel(qr({ content: 'binding', caption: 'Visit {{v.visitRef}}' }))).toBe('Visit {{v.visitRef}}');
     expect(blockLabel(qr({ content: 'verifyLink' }))).toBe('QR code');
-    expect(qrAudience('verifyLink')).toContain('Signed-in members');
+    expect(qrAudience('verifyLink')).toContain('random code');
     expect(qrAudience('binding')).toContain('Never encode a patient');
   });
 });
@@ -159,11 +165,11 @@ describe('the QR inspector', () => {
     const { el } = inspector({ id: 'qr', type: 'qrCode', content: 'verifyLink', sizeMm: 18, errorCorrection: 'H' });
     const svg = el.querySelector('svg.qri-svg') as SVGElement;
     expect(svg.style.width).toBe('18mm');
-    expect(svg.getAttribute('viewBox')).toBe('0 0 65 65');
-    expect(el.querySelector('[data-qr-fit]')?.textContent?.trim()).toBe('102 characters · version 10 at H · 57 × 57 modules');
+    expect(svg.getAttribute('viewBox')).toBe('0 0 49 49');
+    expect(el.querySelector('[data-qr-fit]')?.textContent?.trim()).toBe('54 characters · version 6 at H · 41 × 41 modules');
     const lines = Array.from(el.querySelectorAll('[data-scan-check] li')).map(l => l.textContent?.trim());
-    expect(lines[0]).toContain('Marginal when printed');
-    expect(el.textContent).toContain('Signed-in members of this workspace only');
+    expect(lines[0]).toContain('Readable when printed');
+    expect(el.textContent).toContain('never its contents');
   });
 
   it('sets what it opens, the level and the size; read only, it changes nothing', () => {

@@ -16,7 +16,6 @@ export const PRINT_MIN_MM = 0.25;
 export const FAX_OK_MM = 0.5;
 
 /** A synthetic report id of a real one's length (media's report ids are 26-character ULIDs). */
-const SAMPLE_REPORT_ID = '01JBQ7RZ4K8M2N6P9T3V5W7X9Y';
 /** A report number as media writes it into a QR code (Views.reportLabel + " · v" + version). */
 export const SAMPLE_REPORT_LABEL = 'RPT-0001 · v1';
 
@@ -26,7 +25,8 @@ export const SAMPLE_REPORT_LABEL = 'RPT-0001 · v1';
  * becomes a short public code, change this function and every length, version and verdict follows.
  */
 export function verifyLinkSample(consoleOrigin: string): string {
-  return `${consoleOrigin.replace(/\/+$/, '')}/reports/library/${SAMPLE_REPORT_ID}?version=1&verify=1`;
+  // Reports redesign (feature 1): a version's public verify page by its random code, media's QrContent.publicLink.
+  return `${consoleOrigin.replace(/\/+$/, '')}/r/00000-00000`;
 }
 
 /**
@@ -78,7 +78,7 @@ export function qrSample(block: Block, origin: string, sample: unknown, names: s
 export function qrAudience(source: QrSource): string {
   switch (source) {
     case 'verifyLink':
-      return 'Signed-in members of this workspace only. The link opens the console\'s sign-in, then this version\'s page; it carries no token or secret.';
+      return 'Anyone who scans sees whether the copy is genuine and current, who issued and approved it — never its contents, which stay behind sign-in. The link carries only the version\'s random code.';
     case 'binding':
       return 'Anyone who scans reads the value itself, without signing in. Never encode a patient\'s name or identifier.';
     default:

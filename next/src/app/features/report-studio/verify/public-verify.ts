@@ -83,7 +83,7 @@ export function codeOf(typed: string): string | null {
                 <dt>Issued</dt><dd>{{ a.issuedAt }} ({{ city(a.zone) }})</dd>
                 @if (a.signers?.length) {
                   <dt>{{ a.signed ? 'Signed by' : 'Approved by' }}</dt>
-                  <dd>@for (s of a.signers!; track $index) { <span class="block">{{ s.name }}@if (s.title) { , {{ s.title }} } · {{ s.at }}@if (s.meaning) { · {{ s.meaning }} }</span> }</dd>
+                  <dd>@for (s of a.signers!; track $index) { <span class="block">{{ s.name }}{{ s.title ? ', ' + s.title : '' }} · {{ s.at }}@if (s.meaning) { · {{ s.meaning }} }</span> }</dd>
                 }
                 @if (a.pages) { <dt>Pages</dt><dd>{{ a.pages }}</dd> }
                 @if (a.fingerprints?.length) { <dt>Fingerprint</dt><dd class="mono text-xs">{{ shortPrint(a.fingerprints![0]) }}</dd> }
