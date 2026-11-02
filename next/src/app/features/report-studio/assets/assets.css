@@ -53,3 +53,15 @@
 .rsa-hero-caption { color: var(--text-muted); }
 .rsa-muted { color: var(--text-muted); }
 .rsb-wrap { white-space: normal; }
+/* 2026-11-02: a version waiting for approval beside the one in use; each version's picture in the Versions table. */
+.rsa-pending { border-color: color-mix(in oklab, var(--warn-text) 45%, var(--border-subtle)); }
+.rsa-compare { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 1rem; align-items: center; }
+.rsa-compare-side { display: flex; flex-direction: column; gap: 0.375rem; margin: 0; min-width: 0; }
+.rsa-compare-arrow { color: var(--text-muted); }
+.rsa-hero-small { min-height: 7.5rem; }
+.rsa-thumb-cell { width: 4.5rem; }
+.rsa-thumb { display: grid; place-items: center; width: 4rem; height: 2.75rem; padding: 0.125rem; border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm); background: var(--signature-paper); cursor: pointer; }
+.rsa-thumb:hover { border-color: var(--border-strong); }
+.rsa-thumb:focus-visible { outline: 2px solid var(--focus-ring, var(--info-mark)); outline-offset: 2px; }
+@media (max-width: 699px) { .rsa-compare { grid-template-columns: minmax(0, 1fr); } .rsa-compare-arrow { transform: rotate(90deg); justify-self: center; } }

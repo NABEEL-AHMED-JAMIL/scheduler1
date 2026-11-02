@@ -22,6 +22,7 @@ import { BlurLoader } from '../../../shared/ui/blur-loader';
 import { createTableSort } from '../../../shared/ui/sort';
 import { SortHeader } from '../../../shared/ui/sort-header';
 import { UploadData, UploadPanel } from './upload-panel';
+import { AssetVersionData, AssetVersionPanel, versionStateTone, versionStateWord } from './asset-version-panel';
 import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
 import { idOf, idValue, personOption } from '../../../shared/ui/advanced-options';
 
@@ -68,6 +69,7 @@ export class AssetPage implements OnInit {
   readonly grantTemplate = signal<string>('');
   // Placement on a template (the design's optional section).
   readonly placeTemplate = signal('');
+  /** The version a placement pins; null: the latest approved one, which follows each new approval (the default). */
   readonly placeVersion = signal<number | null>(null);
   readonly placeAt = signal<'end' | 'inline'>('end');
   readonly placeWidth = signal('40mm');
@@ -104,11 +106,13 @@ export class AssetPage implements OnInit {
     badge: t.hasDraft ? 'Draft' : t.currentPublishedVersion ? 'v' + t.currentPublishedVersion : undefined,
     badgeTone: t.hasDraft ? 'warn' as const : 'neutral' as const,
   })));
-  readonly versionOptions = computed<AdvancedOption[]>(() => this.approvedVersions().map(v => ({
+  readonly versionOptions = computed<AdvancedOption[]>(() => [{ value: '', label: 'Latest approved version',
+    description: 'Follows each newly approved version (recommended)', badge: this.a()?.currentVersion ? 'now v' + this.a()!.currentVersion : undefined,
+    badgeTone: 'ok' as const }, ...this.approvedVersions().map(v => ({
     value: String(v.version), label: `${this.a()?.name ?? ''} · v${v.version}`,
     description: [v.width && v.height ? `${v.width} × ${v.height} px` : '', v.uploadedAt ? 'uploaded ' + (rsTime(v.uploadedAt, 'date') ?? '') : ''].filter(Boolean).join(' · ') || undefined,
-    badge: v.state === 'APPROVED' ? 'Approved' : 'Superseded', badgeTone: v.state === 'APPROVED' ? 'ok' as const : 'neutral' as const,
-  })));
+    badge: v.state === 'APPROVED' ? 'Pin · current' : 'Pin · replaced', badgeTone: v.state === 'APPROVED' ? 'ok' as const : 'neutral' as const,
+  }))]);
   readonly stampOptions = computed<AdvancedOption[]>(() => this.stamps().map(s => ({
     value: s.assetId, label: s.name, description: s.description || s.category || undefined, sample: s.currentVersion ? 'v' + s.currentVersion : undefined,
   })));
@@ -135,6 +139,10 @@ export class AssetPage implements OnInit {
   });
   readonly sortedUsage = computed(() => this.usageSort.apply(this.a()?.usage ?? []));
   readonly usageKey = (u: AssetUse) => `${u.kind}:${u.templateId ?? u.name}:${u.templateVersion ?? ''}`;
+  readonly versionWord = versionStateWord;
+  readonly versionTone = versionStateTone;
+  /** The first upload's person (the versions come newest first). */
+  readonly firstUpload = computed(() => { const vs = this.a()?.versions ?? []; return vs.length ? vs[vs.length - 1] : null; });
   readonly reviewOf = (v: { reviewedByName?: string | null; reviewedAt?: string | null; state: string; reviewRequired: boolean }) =>
     v.state === 'PENDING' ? 'Waiting for an approver' : !v.reviewRequired ? 'Usable on upload' : v.reviewedByName ?? '—';
 
@@ -149,7 +157,7 @@ export class AssetPage implements OnInit {
       next: a => {
         this.a.set(a);
         this.state.done();
-        this.placeVersion.set(a.currentVersion ?? null);
+        this.placeVersion.set(null);
         if (a.you.mayGrant && !this.people().length) this.loadPeople();
         if (a.restricted && this.canTemplates() && a.you.mayPlace && !this.templates().length) {
           this.findTemplates('');
@@ -215,13 +223,28 @@ export class AssetPage implements OnInit {
     });
   }
 
+  /**
+   * Owner 2026-11-02: any version -- waiting, current, replaced or rejected -- opened from the Versions table: its picture,
+   * file, who uploaded and approved it and when, and the templates that pin it.
+   */
+  openVersion(version: AssetVersion): void {
+    const a = this.a();
+    if (!a) return;
+    this.dialog.open<void, AssetVersionData>(AssetVersionPanel, sidePanelConfig<AssetVersionData>({ asset: a, version }, 'narrow', 'right'));
+  }
+
   newVersion(): void {
     const a = this.a();
     if (!a) return;
     this.dialog.open<AssetDetail | undefined, UploadData>(UploadPanel, sidePanelConfig<UploadData>({
       assetId: a.assetId, assetName: a.name, kind: a.kind, custodian: this.canCustodian(), library: this.canLibrary(),
     })).closed.subscribe(next => {
-      if (next) { this.a.set(next); this.toast.success(next.restricted ? 'New version uploaded; it waits for an approver.' : 'New version uploaded.'); }
+      if (next) {
+        this.a.set(next);
+        const waiting = next.versions.find(v => v.state === 'PENDING');
+        this.toast.success(waiting ? `v${waiting.version} uploaded. It waits for an approver; until then reports keep using `
+          + (next.currentVersion ? `v${next.currentVersion}.` : 'nothing.') : 'New version uploaded: new reports use it now.');
+      }
     });
   }
 
@@ -293,7 +316,9 @@ export class AssetPage implements OnInit {
         const assets = tpl.assets ?? [];
         const sigId = `sig-${a.assetNo}`;
         const assetsKept = assets.filter(x => x['id'] !== sigId && x['id'] !== `stamp-${this.placeStamp().slice(-6)}`);
-        assetsKept.push({ id: sigId, purpose: a.kind === 'STAMP' ? 'stamp' : 'signature', assetRef: a.assetId, ...(this.placeVersion() ? { version: this.placeVersion() } : {}) });
+        // A version chosen on purpose is pinned; none follows the latest approved version (2026-11-02).
+        assetsKept.push({ id: sigId, purpose: a.kind === 'STAMP' ? 'stamp' : 'signature', assetRef: a.assetId,
+          ...(this.placeVersion() ? { version: this.placeVersion(), pin: true } : {}) });
         const stamp = this.stamps().find(s => s.assetId === this.placeStamp());
         const stampId = stamp ? `stamp-${stamp.assetNo}` : null;
         if (stamp && stampId && a.kind === 'SIGNATURE') assetsKept.push({ id: stampId, purpose: 'stamp', assetRef: stamp.assetId });

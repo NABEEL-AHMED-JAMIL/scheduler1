@@ -75,6 +75,8 @@ export interface AssetUse {
   assetVersion?: number;
   purpose?: string;
   reports?: number;
+  /** The template pins assetVersion on purpose; false: it prints the asset's latest approved version (2026-11-02). */
+  pinned?: boolean;
 }
 
 export interface AssetGrant {

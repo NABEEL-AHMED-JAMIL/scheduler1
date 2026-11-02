@@ -37,24 +37,28 @@
     <app-blur-loader [active]="state.loading()" label="Refreshing…">
     <div class="rsa-detail">
       <div class="flex flex-col gap-4 min-w-0">
-        <section class="card">
+        <section class="card" data-test="current-version">
           <div class="rs-head"><h2 class="section-title">Current approved version</h2>
             @if (current(); as v) { <span class="pill pill-ok">Approved · v{{ v.version }}</span> } @else { <span class="pill pill-warn">Nothing approved yet</span> }</div>
           <div class="p-4 flex flex-col gap-3">
             <div class="rsa-hero rsa-hero-white">
-              @if (a.currentVersion || pending()) {
+              @if (a.currentVersion) {
                 <div class="flex flex-col items-center gap-1">
-                  <app-rs-asset-picture [assetId]="a.assetId" [version]="a.currentVersion ?? pending()?.version" [alt]="a.name" maxHeight="8rem" />
+                  <app-rs-asset-picture [assetId]="a.assetId" [version]="a.currentVersion" [alt]="a.name" maxHeight="8rem" />
                   @if (a.ownerName) { <span class="text-xs rsa-hero-caption">{{ a.ownerName }}@if (a.ownerTitle) { · {{ a.ownerTitle }} }</span> }
                 </div>
+              } @else {
+                <span class="text-sm text-[color:var(--text-muted)]">No version is approved yet, so no report prints it.@if (pending()) { v{{ pending()!.version }} waits for an approver below. }</span>
               }
             </div>
-            @if (current() ?? pending(); as v) {
+            @if (current(); as v) {
               <div class="rsb-three text-sm">
                 <div><span class="text-xs text-[color:var(--text-muted)]">File</span><br><span class="mono text-xs">{{ v.originalName || '—' }}</span></div>
                 <div><span class="text-xs text-[color:var(--text-muted)]">Size</span><br>{{ v.width }} × {{ v.height }} px · {{ size(v.bytes) }}</div>
                 <div><span class="text-xs text-[color:var(--text-muted)]">Background</span><br>{{ v.alpha ? 'Transparent PNG' : (v.contentType === 'image/png' ? 'PNG' : 'JPEG') }}</div>
               </div>
+              <div class="text-xs text-[color:var(--text-muted)]">Uploaded by {{ v.uploadedByName || '—' }} · {{ v.uploadedAt | rsTime: 'recent' }}
+                @if (v.reviewRequired && v.reviewedByName) { · approved by {{ v.reviewedByName }}@if (v.reviewedAt) { · {{ v.reviewedAt | rsTime: 'recent' }} } }</div>
             }
             <div class="flex flex-wrap items-center justify-between gap-2">
               @if (a.ownerName) { <span class="pill pill-neutral">Belongs to {{ a.ownerName }}</span> } @else { <span></span> }
@@ -63,50 +67,81 @@
           </div>
         </section>
 
+        <!-- Owner 2026-11-02: a new upload of a signature or stamp waits for approval; it is shown here, with its own picture,
+             beside what reports use until then -- the page used to show only the old picture. -->
+        @if (pending(); as p) {
+          <section class="card rsa-pending" data-test="pending-version" aria-labelledby="rsa-pending-title">
+            <div class="rs-head"><h2 class="section-title" id="rsa-pending-title">New version v{{ p.version }} · waiting for approval</h2>
+              <span class="pill pill-warn">Not in use yet</span></div>
+            <div class="p-4 rsa-compare">
+              <figure class="rsa-compare-side">
+                <figcaption class="rsa-eyebrow">In use now@if (current()) { · v{{ current()!.version }} }</figcaption>
+                <div class="rsa-hero rsa-hero-white rsa-hero-small">
+                  @if (a.currentVersion) { <app-rs-asset-picture [assetId]="a.assetId" [version]="a.currentVersion" [alt]="a.name + ', version in use'" maxHeight="6rem" /> }
+                  @else { <span class="text-xs text-[color:var(--text-muted)]">Nothing approved yet</span> }
+                </div>
+              </figure>
+              <app-icon name="arrowRight" class="rsa-compare-arrow" />
+              <figure class="rsa-compare-side">
+                <figcaption class="rsa-eyebrow">Waiting · v{{ p.version }}</figcaption>
+                <div class="rsa-hero rsa-hero-white rsa-hero-small">
+                  <app-rs-asset-picture [assetId]="a.assetId" [version]="p.version" [alt]="a.name + ', version ' + p.version + ' waiting for approval'" maxHeight="6rem" />
+                </div>
+              </figure>
+            </div>
+            <div class="px-4 pb-4 flex flex-col gap-3">
+              <p class="text-sm">Uploaded by {{ p.uploadedByName || '—' }} · {{ p.uploadedAt | rsTime: 'recent' }}.
+                Reports keep using @if (current()) { v{{ current()!.version }} } @else { nothing } until an approver approves v{{ p.version }};
+                after that, templates print the new one in reports made from then on. Reports already made keep their own.</p>
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <button type="button" class="btn btn-default btn-sm" (click)="openVersion(p)"><app-icon name="eye" />Open v{{ p.version }}</button>
+                <div class="flex flex-wrap items-center gap-2">
+                  @if (p.uploadedBy === a.you.userId) { <span class="text-xs text-[color:var(--text-muted)]">You uploaded it; someone else approves it.</span> }
+                  @else if (!canApprove()) { <span class="text-xs text-[color:var(--text-muted)]">An approver approves or rejects it.</span> }
+                  <button type="button" class="btn btn-default btn-sm" [disabled]="busy() || !canApprove() || p.uploadedBy === a.you.userId" (click)="review(p.version, false)">Reject v{{ p.version }}</button>
+                  <button type="button" class="btn btn-primary btn-sm" [disabled]="busy() || !canApprove() || p.uploadedBy === a.you.userId" (click)="review(p.version, true)"
+                          [title]="p.uploadedBy === a.you.userId ? 'You uploaded it; someone else approves it' : !canApprove() ? 'Approvers approve it' : ''">Approve v{{ p.version }}</button>
+                </div>
+              </div>
+            </div>
+          </section>
+        }
+
         <section class="card">
           <div class="rs-head">
             <div><h2 class="section-title">Versions</h2>
-              <p class="text-xs text-[color:var(--text-muted)]">@if (a.restricted) { A new upload needs approval. The current version stays in use until then. } @else { A new upload is in use at once; old reports keep theirs. }</p></div>
+              <p class="text-xs text-[color:var(--text-muted)]">@if (a.restricted) { A new upload needs approval. The current version stays in use until then. } @else { A new upload is in use at once; old reports keep theirs. }
+                Open any version to see its picture and who uploaded and approved it.</p></div>
             <span class="pill pill-neutral">{{ a.versions.length }} version{{ a.versions.length === 1 ? '' : 's' }}</span>
           </div>
           <div class="overflow-x-auto"><table class="table-modern">
-            <thead><tr><th appSort="version" [sortBy]="versionSort">Version · state</th><th appSort="uploadedBy" [sortBy]="versionSort">Uploaded by</th>
-              <th appSort="review" [sortBy]="versionSort">Review</th><th appSort="date" [sortBy]="versionSort">Date</th></tr></thead>
+            <thead><tr><th><span class="sr-only">Picture</span></th><th appSort="version" [sortBy]="versionSort">Version · state</th><th appSort="uploadedBy" [sortBy]="versionSort">Uploaded by</th>
+              <th appSort="review" [sortBy]="versionSort">Review</th><th appSort="date" [sortBy]="versionSort">Date</th><th class="text-right"><span class="sr-only">Open</span></th></tr></thead>
             <tbody>
               @for (v of sortedVersions(); track v.version) {
-                <tr>
-                  <td class="whitespace-nowrap">v{{ v.version }} ·
-                    @switch (v.state) {
-                      @case ('PENDING') { <span class="pill pill-warn">Waiting for approval</span> }
-                      @case ('APPROVED') { <span class="pill pill-ok">Current</span> }
-                      @case ('REJECTED') { <span class="pill pill-crit">Rejected</span> }
-                      @default { <span class="pill pill-neutral">Replaced</span> }
-                    }</td>
+                <tr data-test="version-row">
+                  <td class="rsa-thumb-cell"><button type="button" class="rsa-thumb" (click)="openVersion(v)" [attr.aria-label]="'Open v' + v.version">
+                    <app-rs-asset-picture [assetId]="a.assetId" [version]="v.version" [alt]="a.name + ', version ' + v.version" maxHeight="2.25rem" /></button></td>
+                  <td class="whitespace-nowrap">v{{ v.version }} · <span class="pill" [class]="versionTone(v)">{{ versionWord(v) }}</span></td>
                   <td>{{ v.uploadedByName }}</td>
                   <td [class.rsa-muted]="v.state === 'PENDING'">{{ reviewOf(v) }}@if (v.reviewedAt) { · {{ v.reviewedAt | rsTime: 'recent' }} }
                     @if (v.reviewNote) { <div class="text-xs text-[color:var(--text-muted)]">{{ v.reviewNote }}</div> }</td>
                   <td class="whitespace-nowrap">{{ v.uploadedAt | rsTime: 'recent' }}</td>
+                  <td class="text-right"><button type="button" class="btn btn-ghost btn-sm" (click)="openVersion(v)">Open v{{ v.version }}</button></td>
                 </tr>
               }
             </tbody>
           </table></div>
           @if (a.restricted) {
-            <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-t border-subtle">
+            <div class="px-4 py-3 border-t border-subtle">
               <span class="text-xs text-[color:var(--text-muted)]">The uploader and the approver must be different people.</span>
-              @if (pending(); as v) {
-                <div class="flex gap-2">
-                  <button type="button" class="btn btn-default btn-sm" [disabled]="busy() || !canApprove() || v.uploadedBy === a.you.userId" (click)="review(v.version, false)">Reject v{{ v.version }}</button>
-                  <button type="button" class="btn btn-primary btn-sm" [disabled]="busy() || !canApprove() || v.uploadedBy === a.you.userId" (click)="review(v.version, true)"
-                          [title]="v.uploadedBy === a.you.userId ? 'You uploaded it; someone else approves it' : !canApprove() ? 'Approvers approve it' : ''">Approve v{{ v.version }}</button>
-                </div>
-              }
             </div>
           }
         </section>
 
         <section class="card">
           <div class="rs-head"><div><h2 class="section-title">Where it's used</h2>
-            <p class="text-xs text-[color:var(--text-muted)]">{{ a.usageTemplates }} template{{ a.usageTemplates === 1 ? '' : 's' }} · {{ a.usageReports }} report{{ a.usageReports === 1 ? '' : 's' }} keep the version they were made with.</p></div></div>
+            <p class="text-xs text-[color:var(--text-muted)]">{{ a.usageTemplates }} template{{ a.usageTemplates === 1 ? '' : 's' }} · {{ a.usageReports }} report{{ a.usageReports === 1 ? '' : 's' }}. A template prints the latest approved version unless it pins one; reports keep the version they were made with.</p></div></div>
           <div class="overflow-x-auto"><table class="table-modern">
             <thead><tr><th appSort="usedIn" [sortBy]="usageSort">Used in</th><th appSort="version" [sortBy]="usageSort">Version</th>
               <th appSort="use" [sortBy]="usageSort">Use</th></tr></thead>
@@ -115,7 +150,8 @@
                 <tr>
                   <td>@if (u.templateId) { <a class="link-inline" [routerLink]="['/reports/templates', u.templateId]">{{ u.name }} · v{{ u.templateVersion }}</a>@if (u.templateVersionState === 'DRAFT') { <span class="text-xs text-[color:var(--text-muted)]"> (draft)</span> } }
                       @else { {{ u.name }} (brand profile) }</td>
-                  <td>@if (u.assetVersion) { v{{ u.assetVersion }} } @else { — }</td>
+                  <td>@if (u.kind === 'TEMPLATE' && !u.pinned) { Latest approved@if (a.currentVersion) { <span class="text-xs text-[color:var(--text-muted)]"> (v{{ a.currentVersion }} now)</span> } }
+                      @else if (u.assetVersion) { v{{ u.assetVersion }}@if (u.pinned) { <span class="text-xs text-[color:var(--text-muted)]"> (pinned)</span> } } @else { Latest approved }</td>
                   <td>@if (u.kind === 'TEMPLATE') { {{ u.reports }} report{{ u.reports === 1 ? '' : 's' }} } @else { Approved choice }</td>
                 </tr>
               } @empty { <tr><td colspan="3" class="text-sm text-[color:var(--text-muted)]">Not used yet.</td></tr> }
@@ -125,8 +161,9 @@
 
         <div class="rs-banner rs-banner-info" role="note">
           <app-icon name="info" class="shrink-0" />
-          <div class="min-w-0 flex-1"><b>Replacing never rewrites history</b><br>A new version doesn't change old reports. Templates keep their version until an editor
-            picks the new one. Retiring stops new use but keeps old reports and the audit trail.</div>
+          <div class="min-w-0 flex-1"><b>Replacing never rewrites history</b><br>A new approved version is used by reports made from then on, from every
+            template that prints the latest approved version (the usual choice). Reports already made keep theirs, and a template that pins a version keeps it.
+            Retiring stops new use but keeps old reports and the audit trail.</div>
         </div>
       </div>
 
@@ -135,7 +172,7 @@
           <div class="flex items-center justify-between gap-2"><h2 class="section-title">Permissions and approval</h2>
             <span class="pill" [class]="a.restricted ? 'pill-warn' : 'pill-ok'">{{ a.restricted ? 'Limited' : 'Editors manage' }}</span></div>
           <div class="rsb-two text-sm">
-            <div><span class="text-xs text-[color:var(--text-muted)]">Uploaded by</span><br>{{ a.versions[a.versions.length - 1]?.uploadedByName || a.createdByName || '—' }}</div>
+            <div><span class="text-xs text-[color:var(--text-muted)]">First uploaded by</span><br>{{ firstUpload()?.uploadedByName || a.createdByName || '—' }}</div>
             <div><span class="text-xs text-[color:var(--text-muted)]">Approved by@if (current()) { · v{{ current()!.version }} }</span><br>{{ current()?.reviewedByName || (a.restricted ? '—' : 'Usable on upload') }}</div>
           </div>
           <ul class="rsa-perms">
