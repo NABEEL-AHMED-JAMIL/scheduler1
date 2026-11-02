@@ -127,7 +127,7 @@
                   <td [class.rsa-muted]="v.state === 'PENDING'">{{ reviewOf(v) }}@if (v.reviewedAt) { · {{ v.reviewedAt | rsTime: 'recent' }} }
                     @if (v.reviewNote) { <div class="text-xs text-[color:var(--text-muted)]">{{ v.reviewNote }}</div> }</td>
                   <td class="whitespace-nowrap">{{ v.uploadedAt | rsTime: 'recent' }}</td>
-                  <td class="text-right"><button type="button" class="btn btn-ghost btn-sm" (click)="openVersion(v)">Open v{{ v.version }}</button></td>
+                  <td class="text-right"><button type="button" class="btn btn-default btn-sm" (click)="openVersion(v)">Open v{{ v.version }}</button></td>
                 </tr>
               }
             </tbody>
