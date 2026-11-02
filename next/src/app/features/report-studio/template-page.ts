@@ -1,8 +1,9 @@
-import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { NgTemplateOutlet } from '@angular/common';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { PageHeader } from '../../shared/ui/page-header';
 import { RefreshButton } from '../../shared/ui/refresh-button';
 import { Icon } from '../../shared/ui/icon';
@@ -21,8 +22,26 @@ import { downloadJson } from './report-files';
 import { createTableSort } from '../../shared/ui/sort';
 import { SortHeader } from '../../shared/ui/sort-header';
 import { AppLoading } from '../../shared/ui/loading';
+import { Segmented, SegmentOption } from '../../shared/ui/segmented';
+import { isTest, qrWord, withTestTag } from './templates-gallery';
 
 interface ContractField { path: string; type: string; required?: boolean; label?: string; }
+
+/** A template's page's tabs (reports redesign 2026-11-02): ?tab= in the address, Overview when none. */
+export type TemplateTab = 'overview' | 'data' | 'versions' | 'used' | 'samples' | 'json';
+export const TEMPLATE_TABS: TemplateTab[] = ['overview', 'data', 'versions', 'used', 'samples', 'json'];
+/** ?tab= read into a tab the page has; Overview for anything else. */
+export function tabFrom(v: string | null | undefined): TemplateTab {
+  return TEMPLATE_TABS.includes(v as TemplateTab) ? v as TemplateTab : 'overview';
+}
+
+/** One version's pages drawn with the test sample: the pictures (null while one comes), how many, and why not. */
+export interface PageSet { key: string; urls: (string | null)[]; count: number; loading: boolean; error: string; }
+
+/** Pages drawn at most for one version (a long template says how many more there are). */
+export const MAX_PAGES_SHOWN = 24;
+
+export interface GlanceFact { label: string; value: string; }
 
 /**
  * One template (MIG-403): its draft and versions, its test samples and its data contract. The draft is edited in the
@@ -37,8 +56,9 @@ export const TEMPLATE_DELETE_WORDS = 'Its versions, drafts and test samples are 
 @Component({
   selector: 'app-report-template-page',
   imports: [PageHeader, RefreshButton, Icon, RsTimePipe, LoadError, ProblemList, FormsModule, CdkMenu, CdkMenuItem,
-    CdkMenuTrigger, RouterLink, SortHeader, AppLoading],
+    CdkMenuTrigger, RouterLink, SortHeader, AppLoading, Segmented, NgTemplateOutlet],
   templateUrl: './template-page.html',
+  styleUrl: './template-page.css',
 })
 export class ReportTemplatePage implements OnInit {
   readonly templateId = input.required<string>();
@@ -47,6 +67,7 @@ export class ReportTemplatePage implements OnInit {
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute, { optional: true });
 
   readonly t = signal<TemplateDetail | null>(null);
   readonly loading = signal(true);
@@ -80,6 +101,161 @@ export class ReportTemplatePage implements OnInit {
     },
   });
   readonly sortedContract = computed(() => this.contractSort.apply(this.contract()));
+  /** The Overview's short list: the required fields first, then the others, five at most. */
+  readonly contractPreview = computed(() => [...this.contract()].sort((a, b) => Number(!!b.required) - Number(!!a.required)).slice(0, 5));
+  readonly requiredCount = computed(() => this.contract().filter(f => f.required).length);
+
+  /**
+   * Reports redesign (owner 2026-11-02): the page leads with what the template makes -- every page filled with the test
+   * sample -- its facts, the data it needs and who uses it; the JSON has a tab of its own.
+   */
+  readonly tab = signal<TemplateTab>(tabFrom(this.route?.snapshot?.queryParamMap?.get('tab')));
+  readonly isTest = computed(() => { const t = this.t(); return !!t && isTest(t); });
+  readonly pipelines = computed(() => this.t()?.usedBy?.pipelines ?? []);
+  readonly usedCount = computed(() => this.pipelines().length + (this.t()?.reports ?? 0));
+  /** The pasted sample the server fills the pages with (the first one), or none. */
+  readonly sampleName = computed(() => this.t()?.samples.find(s => s.kind === 'INLINE_JSON')?.name ?? null);
+  /** Which version the Overview draws: the published one first, the draft from the switch (or when there is no other). */
+  readonly which = signal<'published' | 'draft'>('published');
+  readonly compare = signal(false);
+  readonly whichOptions = computed<SegmentOption<'published' | 'draft'>[]>(() => {
+    const t = this.t();
+    return t?.draft && t.currentPublishedVersion
+      ? [{ id: 'published', label: `v${t.currentPublishedVersion} published` }, { id: 'draft', label: `v${t.draft.version} draft` }] : [];
+  });
+  readonly shownWhich = computed<'published' | 'draft'>(() => {
+    const t = this.t();
+    if (!t?.currentPublishedVersion) return 'draft';
+    if (!t.draft) return 'published';
+    return this.which();
+  });
+  /** The page sets on show: one, or the published and the draft side by side (Compare). */
+  readonly pageSets = signal<Record<string, PageSet>>({});
+  readonly shownSets = computed<{ label: string; set: PageSet | undefined }[]>(() => {
+    const t = this.t();
+    if (!t) return [];
+    const one = (w: 'published' | 'draft') => ({ label: this.versionLabel(w), set: this.pageSets()[this.setKey(w)] });
+    return this.compare() && t.draft && t.currentPublishedVersion ? [one('published'), one('draft')] : [one(this.shownWhich())];
+  });
+  /** The rows of the Overview's pages: page by page, one picture per version shown. */
+  readonly pageRows = computed(() => {
+    const sets = this.shownSets();
+    const n = Math.max(0, ...sets.map(s => s.set?.urls.length ?? 0));
+    return Array.from({ length: n }, (_, i) => ({ page: i + 1, cells: sets.map(s => ({ label: s.label, url: s.set?.urls[i] ?? null, past: i >= (s.set?.urls.length ?? 0) })) }));
+  });
+  readonly facts = computed<GlanceFact[]>(() => {
+    const t = this.t();
+    const f = t?.features;
+    if (!t || !f) return [];
+    const set = this.pageSets()[this.setKey(t.draft ? 'draft' : 'published')];
+    const page = [f.pageSize, f.orientation].filter(Boolean).join(' ') || 'Default page';
+    const sections = [f.conditional ? 'some shown only when the data says so' : '', f.repeat ? 'some repeated for each item' : ''].filter(Boolean);
+    return [
+      { label: 'Page', value: page + (set?.count ? ` · ${set.count} page${set.count === 1 ? '' : 's'} with the sample` : '') },
+      { label: 'Outputs', value: 'PDF and HTML' },
+      { label: 'Approval', value: f.approvals ? `${f.approvals} approver${f.approvals === 1 ? '' : 's'}` : 'none in the template' },
+      { label: 'Signature', value: f.signature ? 'a signature block' : 'none' },
+      { label: 'QR code', value: f.qr ? qrWord(f.qrContent) : 'none' },
+      { label: 'Charts', value: f.charts ? String(f.charts) : 'none' },
+      { label: 'Images', value: f.images ? String(f.images) : 'none' },
+      { label: 'Sections', value: sections.length ? sections.join('; ') : 'always shown' },
+      { label: 'Stamp', value: f.stamp ? 'yes' : 'none' },
+      { label: 'Confidentiality notice', value: f.confidentiality ? 'yes' : 'none' },
+    ];
+  });
+  /** The reports made from it, in the library (test reports shown when it is a test template). */
+  readonly reportsQuery = computed(() => ({ templateId: this.t()?.templateId, ...(this.isTest() ? { tests: '1' } : {}) }));
+  private readonly urls = new Set<string>();
+
+  constructor() {
+    inject(DestroyRef).onDestroy(() => this.urls.forEach(u => URL.revokeObjectURL(u)));
+    // The Overview draws the pages of the version(s) on show, once per version and revision.
+    effect(() => {
+      const t = this.t();
+      if (!t || this.tab() !== 'overview') return;
+      const wanted: ('published' | 'draft')[] = this.compare() && t.draft && t.currentPublishedVersion ? ['published', 'draft'] : [this.shownWhich()];
+      untracked(() => wanted.forEach(w => this.drawPages(w)));
+    });
+  }
+
+  tabTo(tab: TemplateTab): void {
+    this.tab.set(tab);
+    void this.router.navigate([], { relativeTo: this.route ?? undefined, queryParams: { tab: tab === 'overview' ? null : tab },
+      queryParamsHandling: 'merge', replaceUrl: true });
+  }
+
+  versionLabel(w: 'published' | 'draft'): string {
+    const t = this.t();
+    return w === 'draft' ? `draft v${t?.draft?.version ?? ''}` : `published v${t?.currentPublishedVersion ?? ''}`;
+  }
+
+  /** A version's pages are drawn again when the version, its revision or the sample changes. */
+  setKey(w: 'published' | 'draft'): string {
+    const t = this.t();
+    if (!t) return '';
+    const sample = t.samples.find(s => s.kind === 'INLINE_JSON')?.sampleId ?? '-';
+    return w === 'draft' ? `draft:${t.draft?.revision ?? 0}:${sample}` : `v${t.currentPublishedVersion}:${sample}`;
+  }
+
+  /** Page 1 says how many there are (X-Report-Pages); the others follow, each its own picture. */
+  drawPages(w: 'published' | 'draft'): void {
+    const t = this.t();
+    const key = this.setKey(w);
+    if (!t || !key || this.pageSets()[key]) return;
+    const version = w === 'draft' ? 'draft' : String(t.currentPublishedVersion);
+    const scope = this.auth.isPlatformAdmin() ? t.tenantId : null;
+    const put = (patch: Partial<PageSet>) => this.pageSets.update(m => ({ ...m, [key]: { ...m[key], ...patch } }));
+    this.pageSets.update(m => ({ ...m, [key]: { key, urls: [], count: 0, loading: true, error: '' } }));
+    const picture = (page: number, then?: (count: number) => void) => this.api.templatePage(t.templateId, version, page, scope).subscribe({
+      next: r => {
+        if (!r.body || !(r.headers.get('Content-Type') ?? '').includes('png')) {
+          if (page === 1) put({ loading: false, error: 'The pages could not be drawn.' });
+          return;
+        }
+        const url = URL.createObjectURL(r.body);
+        this.urls.add(url);
+        this.pageSets.update(m => {
+          const urls = [...m[key].urls];
+          urls[page - 1] = url;
+          return { ...m, [key]: { ...m[key], urls } };
+        });
+        then?.(Number(r.headers.get('X-Report-Pages')) || 1);
+      },
+      error: e => {
+        if (page === 1) put({ loading: false, error: studioError(e, 'The pages could not be drawn.').message });
+      },
+    });
+    picture(1, count => {
+      const shown = Math.min(count, MAX_PAGES_SHOWN);
+      put({ count, loading: false, urls: [...(this.pageSets()[key].urls.slice(0, 1)), ...Array<string | null>(shown - 1).fill(null)] });
+      for (let p = 2; p <= shown; p++) picture(p);
+    });
+  }
+
+  /** Mark as test / Not a test: the tag "test" alone, no draft made; test templates hide in the gallery and library. */
+  markTest(on: boolean): void {
+    const t = this.t();
+    if (!t) return;
+    this.api.setTags(t.templateId, withTestTag(t.tags, on), t.rowVersion).subscribe({
+      next: d => {
+        this.t.set({ ...t, tags: d.tags ?? withTestTag(t.tags, on), test: d.test ?? on, rowVersion: d.rowVersion ?? t.rowVersion });
+        this.toast.success(on ? `${t.name} is a test template now: hidden in the gallery and the library unless asked for.`
+          : `${t.name} is no longer a test template.`);
+      },
+      error: e => this.toast.error(studioError(e).message),
+    });
+  }
+
+  /** "Edit draft" opens the designer; without a draft, one is started from the published version first. */
+  editInDesigner(): void {
+    const t = this.t();
+    if (!t) return;
+    if (t.draft || !t.currentPublishedVersion) { void this.router.navigate(['/reports/templates', t.templateId, 'design']); return; }
+    this.api.newDraft(t.templateId, t.currentPublishedVersion).subscribe({
+      next: () => void this.router.navigate(['/reports/templates', t.templateId, 'design']),
+      error: e => this.toast.error(studioError(e).message),
+    });
+  }
 
   ngOnInit(): void {
     this.load();

@@ -5,7 +5,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { Dialog } from '@angular/cdk/dialog';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { API_BASE } from '../../core/api/api.config';
 import { AuthService } from '../../core/auth/auth.service';
 import { WorkspaceDirectory } from '../../core/workspaces/workspace-directory';
@@ -19,9 +19,8 @@ import { ReportAssets } from './assets/assets';
 import { RsPickSearch } from './pick-search';
 
 /**
- * Owner 2026-10-20, after the library: Templates and Assets page on the server too. The Templates page shows one list --
- * the workspace's templates a page at a time from the service, then the matching starters -- with one pager for its
- * cards and its table; the Assets page's cards page the same way; the pickers search the service.
+ * Owner 2026-10-20, after the library: Assets page on the server; the pickers search the service. The Templates page
+ * (reports redesign 2026-11-02) reads every template in the service's largest pages and filters them in the browser.
  */
 const tpl = (n: number): TemplateRow => ({ templateId: `T${n}`, tenantId: 2960, name: `Wound template ${n}`, status: 'PUBLISHED',
   currentPublishedVersion: 1, hasDraft: false, origin: 'BLANK', tags: [], updatedAt: '2026-10-20T10:00:00Z' } as unknown as TemplateRow);
@@ -60,75 +59,35 @@ function templatesWith(answer: (q: TemplateQuery) => TemplateLibrary) {
 
 afterEach(() => vi.useRealTimers());
 
-describe('Templates -- the server pages them', () => {
-  it('asks for the first page and shows the templates, then the starters, under one total', () => {
-    const { api, screen } = templatesWith(() => lib([tpl(1), tpl(2)], 2));
+describe('Templates -- read whole, filtered in the browser (reports redesign 2026-11-02)', () => {
+  it('asks for every live and archived template in the service\'s largest pages; the search needs no new read', () => {
+    const { api, screen } = templatesWith(q => (q.archived ? lib([], 0) : lib([tpl(1), tpl(2)], 2)));
     screen.ngOnInit();
-    expect(api.list).toHaveBeenCalledWith({ archived: false, q: '', category: '', state: '', owner: '', limit: 50, offset: 0 }, null);
-    expect(screen.total()).toBe(5);
-    expect(screen.filtered().map(i => i.id)).toEqual(['T1', 'T2', 'starter:s1', 'starter:s2', 'starter:s3']);
-    expect(screen.groups().map(g => g.label)).toEqual(['All 5', 'This workspace 2', 'Starters 3', 'Shared with me 0']);
-    expect(screen.categories()).toEqual(['Clinical', 'Wound care']);
-  });
-
-  it('puts the starters after the last template: page 2 of 52 templates holds two templates and the starters', () => {
-    const { api, screen } = templatesWith(q => lib(q.offset === 50 ? [tpl(51), tpl(52)] : Array.from({ length: 50 }, (_, i) => tpl(i + 1)), 52));
-    screen.ngOnInit();
-    expect(screen.filtered().length).toBe(50);
-    expect(screen.filtered().every(i => i.kind === 'template')).toBe(true);
-    screen.goTo(2);
-    expect(api.list).toHaveBeenLastCalledWith(expect.objectContaining({ limit: 50, offset: 50 }), null);
-    expect(screen.filtered().map(i => i.id)).toEqual(['T51', 'T52', 'starter:s1', 'starter:s2', 'starter:s3']);
-    expect(screen.total()).toBe(55);
-  });
-
-  it('sends the filters to the service, each from page 1; the owner words become ME, STARTER, COPY', () => {
-    const { api, screen } = templatesWith(() => lib([tpl(1)], 1));
-    screen.ngOnInit();
-    screen.goTo(2);
-    screen.setState('HAS_DRAFT');
-    expect(screen.page()).toBe(1);
-    screen.setCategory('Wound care');
-    screen.setOwner('me');
-    expect(api.list).toHaveBeenLastCalledWith({ archived: false, q: '', category: 'Wound care', state: 'HAS_DRAFT', owner: 'ME', limit: 50,
-      offset: 0 }, null);
-    screen.setOwner('copy');
-    expect(api.list).toHaveBeenLastCalledWith(expect.objectContaining({ owner: 'COPY' }), null);
-    // A state other than Published leaves the starters out, as before.
-    expect(screen.filtered().some(i => i.kind === 'starter')).toBe(false);
-    screen.showArchived(true);
-    expect(api.list).toHaveBeenLastCalledWith(expect.objectContaining({ archived: true, offset: 0 }), null);
-  });
-
-  it('searches on the service after the typing stops; Starters and This workspace are their own lists', () => {
-    vi.useFakeTimers();
-    const { api, screen } = templatesWith(() => lib([tpl(1)], 1));
-    screen.ngOnInit();
+    expect(api.list).toHaveBeenCalledWith({ archived: false, limit: 200, offset: 0 }, null);
+    expect(api.list).toHaveBeenCalledWith({ archived: true, limit: 200, offset: 0 }, null);
+    expect(screen.visible().map(t => t.templateId)).toEqual(['T1', 'T2']);
     api.list.mockClear();
-    screen.onSearch('kn');
-    screen.onSearch('knee');
-    vi.advanceTimersByTime(350);
-    expect(api.list).toHaveBeenCalledTimes(1);
-    expect(api.list).toHaveBeenLastCalledWith(expect.objectContaining({ q: 'knee', offset: 0 }), null);
-    screen.onSearch('');
-    vi.advanceTimersByTime(350);
-    screen.setGroup('starters');
-    expect(screen.filtered().map(i => i.kind)).toEqual(['starter', 'starter', 'starter']);
-    expect(screen.total()).toBe(3);
-    screen.setGroup('workspace');
-    expect(screen.filtered().map(i => i.id)).toEqual(['T1']);
-    expect(screen.total()).toBe(1);
+    screen.onSearch('template 2');
+    expect(api.list).not.toHaveBeenCalled();
+    expect(screen.visible().map(t => t.templateId)).toEqual(['T2']);
+    // The starters are hidden until ticked, and then follow the search too.
+    screen.setHidden('starters', true);
+    expect(screen.shownStarters()).toEqual([]);
+    screen.onSearch('starter');
+    expect(screen.shownStarters().map(s => s.key)).toEqual(['s1', 's2', 's3']);
   });
 
-  it('refresh keeps the page; a page emptied under the reader goes back to the last one with rows', () => {
-    const { api, screen } = templatesWith(q => lib(q.offset === 100 ? [] : [tpl(51)], 60, []));
+  it('a read that fails says why; a refresh reads everything again', () => {
+    let down = true;
+    const { api, screen } = templatesWith(q => (q.archived ? lib([], 0) : lib([tpl(1)], 1)));
+    api.list.mockImplementation((q: TemplateQuery) => (down ? throwError(() => ({ error: { message: 'Media is down.' } }))
+      : of(q.archived ? lib([], 0) : lib([tpl(1)], 1))));
     screen.ngOnInit();
-    screen.goTo(2);
+    expect(screen.error()).toBe('Media is down.');
+    down = false;
     screen.refresh();
-    expect(api.list).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 50 }), null);
-    screen.goTo(3);
-    expect(screen.page()).toBe(2);
-    expect(screen.filtered().map(i => i.id)).toEqual(['T51']);
+    expect(screen.error()).toBe('');
+    expect(screen.rows().map(t => t.templateId)).toEqual(['T1']);
   });
 });
 

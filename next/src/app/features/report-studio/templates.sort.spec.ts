@@ -13,23 +13,23 @@ import { RsTabCounts } from './rs-tab-counts';
 import { ReportTemplates } from './templates';
 
 /**
- * Owner 2026-10-27 ("add a sort on each table"): the Templates table's headings sort the workspace's templates on the
- * server; the starters, which come whole with every answer, stay in their block after them and are sorted here by the
- * same column (by name or category; by From or Updated they keep their order). No read names a sort before a pick;
- * a pick goes back to page 1.
+ * Reports redesign (owner 2026-11-02): the gallery reads every template once -- the live ones and the archived ones, 200
+ * at a time -- and sorts, groups and filters them in the browser. One order for the cards and the table: Most used first,
+ * Name or Recently changed from the switch, any table heading too. Mark as test hides a card at once.
  */
-const tpl = (n: number): TemplateRow => ({ templateId: `T${n}`, tenantId: 2960, name: `Template ${n}`, status: 'PUBLISHED',
-  currentPublishedVersion: 1, hasDraft: false, origin: 'BLANK', tags: [], updatedAt: '2026-10-20T10:00:00Z' } as unknown as TemplateRow);
-const starter = (key: string, name: string, category: string | null): StarterRow => ({ key, name, category, components: 4 });
-const STARTERS = [starter('b', 'Lab results', 'Clinical'), starter('a', 'Wound care', 'Billing'), starter('c', 'Discharge', null)];
-const lib = (rows: TemplateRow[], total: number): TemplateLibrary =>
+const tpl = (n: number, over: Partial<TemplateRow> = {}): TemplateRow => ({ templateId: `T${n}`, tenantId: 2960, name: `Template ${n}`, status: 'PUBLISHED',
+  currentPublishedVersion: 1, hasDraft: false, origin: 'BLANK', tags: [], rowVersion: 3, updatedAt: `2026-10-${10 + n}T10:00:00Z`, reportCount: n,
+  category: 'Clinical quality', test: false, ...over } as TemplateRow);
+const STARTERS: StarterRow[] = [{ key: 'a', name: 'Wound care', category: 'Clinical quality', components: 4 }];
+const lib = (rows: TemplateRow[], total = rows.length): TemplateLibrary =>
   ({ templates: rows, starters: STARTERS, total, counts: { templates: total }, categories: [] });
 
-function screenWith() {
+function screenWith(live: (q: TemplateQuery) => TemplateLibrary, archived: TemplateRow[] = []) {
   const api = {
-    list: vi.fn((_q: TemplateQuery, _t?: number | null) => of(lib([tpl(1), tpl(2)], 2))),
+    list: vi.fn((q: TemplateQuery, _t?: number | null) => of(q.archived ? lib(archived) : live(q))),
     templateThumbnail: vi.fn(() => of({ body: null, headers: { get: () => '' } })),
     brandProfiles: vi.fn(() => of([])),
+    setTags: vi.fn((templateId: string, tags: string[]) => of({ templateId, tags, test: tags.includes('test'), rowVersion: 4 })),
   };
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
@@ -53,44 +53,66 @@ function screenWith() {
 
 beforeEach(() => { try { localStorage.clear(); } catch { /* none */ } });
 
-describe('Templates -- server-side sort (owner 2026-10-27)', () => {
-  it('names no sort before a heading is picked; Updated, newest first, is the table\'s own order', () => {
-    const { api, screen } = screenWith();
-    expect(api.list.mock.calls[0][0].sort).toBeUndefined();
-    expect(screen.sort.ariaSort('updated')).toBe('descending');
-    expect(screen.filtered().map(i => i.id)).toEqual(['T1', 'T2', 'starter:b', 'starter:a', 'starter:c']);
+describe('Templates gallery -- reading every template', () => {
+  it('reads the live and the archived templates, 200 at a time, and pages on past 200', () => {
+    const all = Array.from({ length: 230 }, (_, i) => tpl(i + 1));
+    const { api, screen } = screenWith(q => lib(all.slice(q.offset!, q.offset! + q.limit!), 230), [tpl(900, { status: 'ARCHIVED' })]);
+    expect(api.list.mock.calls.map(c => `${c[0].archived}:${c[0].limit}:${c[0].offset}`).sort()).toEqual(['false:200:0', 'false:200:200', 'true:200:0']);
+    expect(screen.rows().length).toBe(231);
+    expect(screen.visible().length).toBe(230);
+    expect(screen.capped()).toBe(false);
+    expect(screen.counts().status.find(s => s.value === 'archived')!.count).toBe(1);
   });
 
-  it('a heading sends its column both ways from page 1', () => {
-    const { api, screen } = screenWith();
-    screen.goTo(2);
-    screen.sort.toggle('template');
-    expect(screen.page()).toBe(1);
-    expect(api.list).toHaveBeenLastCalledWith(expect.objectContaining({ sort: 'name', dir: 'asc', offset: 0 }), null);
-    screen.sort.toggle('template');
-    expect(api.list).toHaveBeenLastCalledWith(expect.objectContaining({ sort: 'name', dir: 'desc', offset: 0 }), null);
-    screen.sort.toggle('from');
-    expect(api.list).toHaveBeenLastCalledWith(expect.objectContaining({ sort: 'from', dir: 'asc' }), null);
+  it('the cards and the table share one order: Most used first, then the switch or a heading', () => {
+    const { screen } = screenWith(() => lib([tpl(1, { name: 'Bravo' }), tpl(3, { name: 'alpha', category: 'Imaging' }), tpl(2, { name: 'Charlie' })]));
+    expect(screen.sortPick()).toBe('used');
+    expect(screen.visible().map(t => t.templateId)).toEqual(['T3', 'T2', 'T1']);
+    screen.setSort('name');
+    expect(screen.visible().map(t => t.name)).toEqual(['alpha', 'Bravo', 'Charlie']);
+    screen.setSort('changed');
+    expect(screen.visible().map(t => t.templateId)).toEqual(['T3', 'T2', 'T1']);
     screen.sort.toggle('category');
-    expect(api.list).toHaveBeenLastCalledWith(expect.objectContaining({ sort: 'category', dir: 'asc' }), null);
-    screen.sort.toggle('updated');
-    expect(api.list.mock.calls.at(-1)![0].sort).toBeUndefined();
+    expect(screen.visible().map(t => t.name)).toEqual(['Bravo', 'Charlie', 'alpha']);
+    // The cards: the biggest category first, each in the order picked.
+    expect(screen.groups().map(g => [g.label, g.templates.map(t => t.templateId)])).toEqual([['Clinical quality', ['T1', 'T2']], ['Imaging', ['T3']]]);
   });
 
-  it('the starters keep their block after the templates and sort by the same column there', () => {
-    const { screen } = screenWith();
-    screen.sort.toggle('template');
-    // The service sorted the templates (the fake answers them as they are); the starters A to Z by name after them.
-    expect(screen.filtered().map(i => i.id)).toEqual(['T1', 'T2', 'starter:c', 'starter:b', 'starter:a']);
-    screen.sort.toggle('template');
-    expect(screen.filtered().map(i => i.id)).toEqual(['T1', 'T2', 'starter:a', 'starter:b', 'starter:c']);
-    // By category: the one with none goes last, both ways.
-    screen.sort.toggle('category');
-    expect(screen.filtered().map(i => i.id)).toEqual(['T1', 'T2', 'starter:a', 'starter:b', 'starter:c']);
-    screen.sort.toggle('category');
-    expect(screen.filtered().map(i => i.id)).toEqual(['T1', 'T2', 'starter:b', 'starter:a', 'starter:c']);
-    // By From: they have no maker of their own, so they keep their order.
-    screen.sort.toggle('from');
-    expect(screen.filtered().map(i => i.id)).toEqual(['T1', 'T2', 'starter:b', 'starter:a', 'starter:c']);
+  it('hides the test templates and says how many; "Show them" brings them back', () => {
+    const { screen } = screenWith(() => lib([tpl(1), tpl(2, { test: true, tags: ['test'] }), tpl(3, { tags: ['test'] })]));
+    expect(screen.visible().map(t => t.templateId)).toEqual(['T1']);
+    expect(screen.hiddenTests()).toBe(2);
+    screen.setHidden('tests', true);
+    expect(screen.visible().length).toBe(3);
+    expect(screen.hiddenTests()).toBe(0);
+  });
+
+  it('Mark as test sends the tags with "test" added and hides the card; Not a test brings it back', () => {
+    const { api, screen } = screenWith(() => lib([tpl(1, { tags: ['wound'] }), tpl(2)]));
+    screen.markTest(screen.visible().find(t => t.templateId === 'T1')!, true);
+    expect(api.setTags).toHaveBeenCalledWith('T1', ['wound', 'test'], 3);
+    expect(screen.visible().map(t => t.templateId)).toEqual(['T2']);
+    expect(screen.rows().find(t => t.templateId === 'T1')!.rowVersion).toBe(4);
+    screen.setHidden('tests', true);
+    screen.markTest(screen.rows().find(t => t.templateId === 'T1')!, false);
+    expect(api.setTags).toHaveBeenLastCalledWith('T1', ['wound'], 4);
+    screen.setHidden('tests', false);
+    expect(screen.visible().map(t => t.templateId).sort()).toEqual(['T1', 'T2']);
+  });
+
+  it('facets narrow the cards; Clear keeps what Hidden shows; an empty workspace is told apart from no match', () => {
+    const { screen } = screenWith(() => lib([tpl(1), tpl(2, { category: 'Imaging', status: 'DRAFT', currentPublishedVersion: null, hasDraft: true })]));
+    screen.toggle('status', 'draftOnly');
+    expect(screen.visible().map(t => t.templateId)).toEqual(['T2']);
+    screen.toggle('category', 'Clinical quality');
+    expect(screen.visible()).toEqual([]);
+    expect(screen.noTemplates()).toBe(false);
+    screen.setHidden('starters', true);
+    screen.clearFilters();
+    expect(screen.filtering()).toBe(false);
+    expect(screen.filters().starters).toBe(true);
+    expect(screen.shownStarters().map(s => s.key)).toEqual(['a']);
+    const empty = screenWith(() => lib([]));
+    expect(empty.screen.noTemplates()).toBe(true);
   });
 });

@@ -114,7 +114,7 @@ describe('A template\'s data contract sorts (owner 2026-10-27)', () => {
       published: { version: 1, definition: { template: { dataContract: { fields: [
         { path: 'site', type: 'string', required: false }, { path: 'area', type: 'number', required: true }, { path: 'when', type: 'date', required: true }] } } } } };
     TestBed.resetTestingModule();
-    TestBed.configureTestingModule({ providers: providers({ template: vi.fn(() => of(t)) }) });
+    TestBed.configureTestingModule({ providers: providers({ template: vi.fn(() => of(t)), templatePage: vi.fn(() => NEVER) }) });
     TestBed.overrideComponent(ReportTemplatePage, { set: { template: '', imports: [] } });
     const fixture = TestBed.createComponent(ReportTemplatePage);
     fixture.componentRef.setInput('templateId', 'T1');

@@ -544,4 +544,19 @@ export class ReportStudioApi {
       return () => inner.unsubscribe();
     });
   }
+
+  // ---------------------------------------------------------------- reports redesign (templates gallery, a template's page)
+
+  /** A template's tags alone, no draft made (Mark as test and its undo); answers the template. */
+  setTags(templateId: string, tags: string[], rowVersion?: number | null): Observable<TemplateDetail> {
+    return ReportStudioApi.data$(this.http.post<ApiResponse<TemplateDetail>>(`${this.templates}/tags`,
+      { templateId, tags, ...(rowVersion != null ? { rowVersion } : {}) }));
+  }
+
+  /** One page of a template version filled with its test sample, 720 px wide; X-Report-Pages says how many; past the end is 404. */
+  templatePage(templateId: string, version: string | null, page: number, tenantId?: number | null): Observable<HttpResponse<Blob>> {
+    return this.http.get(`${this.templates}/thumbnail`, {
+      params: { templateId, ...(version ? { version } : {}), page: String(page), wide: 'true', ...ReportStudioApi.scope(tenantId) },
+      responseType: 'blob', observe: 'response' });
+  }
 }

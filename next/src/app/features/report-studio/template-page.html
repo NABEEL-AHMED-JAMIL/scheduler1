@@ -10,32 +10,37 @@
             <h1 class="page-title">{{ t.name }}</h1>
             <span pills class="flex flex-wrap gap-1">
               @if (t.currentPublishedVersion) { <span class="pill pill-ok">Published v{{ t.currentPublishedVersion }}</span> }
-              @if (t.draft) { <span class="pill pill-info">Draft v{{ t.draft.version }} · revision {{ t.draft.revision }}</span> }
+              @if (t.draft) { <span class="pill pill-info" [title]="'Revision ' + t.draft.revision">Draft v{{ t.draft.version }}</span> }
               @if (t.status === 'ARCHIVED') { <span class="pill pill-neutral">Archived</span> }
+              @if (isTest()) { <span class="pill pill-warn" title="Tagged test: hidden in the gallery and the library unless asked for">Test template</span> }
             </span>
           </div>
           <p class="page-subtitle">{{ t.description || 'No description.' }}</p>
           <p class="text-xs text-[color:var(--text-muted)] mt-1">
-            {{ originWord(t) }} · {{ t.reports }} report{{ t.reports === 1 ? '' : 's' }} · updated {{ t.updatedAt | rsTime: 'recent' }}
+            {{ t.category || 'No category' }} · used by {{ t.reports }} report{{ t.reports === 1 ? '' : 's' }}@if (pipelines().length) {, {{ pipelines().length }} pipeline step{{ pipelines().length === 1 ? '' : 's' }}}
+            · {{ originWord(t) }} · updated {{ t.updatedAt | rsTime: 'recent' }}
           </p>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex flex-wrap items-center gap-2">
           <app-refresh-button [loading]="loading()" (refresh)="load()" />
           <button type="button" class="btn btn-default btn-sm" (click)="test()"><app-icon name="play" />Test with data</button>
-          @if (canGenerate() && t.currentPublishedVersion && t.status !== 'ARCHIVED') {
-            <a class="btn btn-default btn-sm" routerLink="/reports/new" [queryParams]="{ templateId: t.templateId }"><app-icon name="file" />Create report</a>
+          @if (canEdit()) {
+            <button type="button" class="btn btn-default btn-sm" (click)="copy(null)"><app-icon name="copy" />Make a copy</button>
           }
-          @if (t.status !== 'ARCHIVED') {
-            <a class="btn btn-default btn-sm" [routerLink]="['/reports/templates', t.templateId, 'design']"><app-icon name="layers" />{{ canEdit() && t.draft ? 'Open the designer' : 'View in the designer' }}</a>
-          }
-          <button type="button" class="btn btn-ghost btn-icon btn-sm" data-overflow [cdkMenuTriggerFor]="more" aria-label="More actions">
+          <button type="button" class="btn btn-default btn-icon btn-sm" data-overflow [cdkMenuTriggerFor]="more" aria-label="More actions">
             <app-icon name="dots" size="1.05em" />
           </button>
           <ng-template #more>
             <div cdkMenu class="card shadow-xl py-1 min-w-56 text-sm">
               <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="exportJson(t.draft ? 'draft' : '' + t.currentPublishedVersion)"><app-icon name="download" />Export JSON</button>
+              @if (canEdit() || canDelete()) {
+                @if (isTest()) {
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="markTest(false)" data-test="not-a-test"><app-icon name="tag" />Not a test</button>
+                } @else {
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="markTest(true)" data-test="mark-as-test"><app-icon name="tag" />Mark as test</button>
+                }
+              }
               @if (canEdit()) {
-                <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="copy(null)"><app-icon name="copy" />Make a copy (new template)</button>
                 @if (t.draft && t.currentPublishedVersion) {
                   <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="discard()"><app-icon name="undo" />Discard the draft</button>
                 }
@@ -46,49 +51,160 @@
               }
             </div>
           </ng-template>
+          @if (canEdit()) {
+            <button type="button" class="btn btn-default btn-sm" (click)="editInDesigner()" data-test="edit-in-designer">
+              <app-icon name="edit" />{{ t.draft ? 'Edit draft v' + t.draft.version : 'New draft v' + ((t.currentPublishedVersion ?? 0) + 1) }}</button>
+          } @else if (t.status !== 'ARCHIVED') {
+            <a class="btn btn-default btn-sm" [routerLink]="['/reports/templates', t.templateId, 'design']"><app-icon name="layers" />View in the designer</a>
+          }
           @if (canPublish() && canEdit() && t.draft) {
-            <button type="button" class="btn btn-primary btn-sm" [disabled]="busy()" (click)="publish()"><app-icon name="check" />Publish v{{ t.draft.version }}</button>
+            <button type="button" class="btn btn-sm" [class.btn-primary]="!(canGenerate() && t.currentPublishedVersion)" [class.btn-default]="canGenerate() && t.currentPublishedVersion"
+                    [disabled]="busy()" (click)="publish()"><app-icon name="check" />Publish v{{ t.draft.version }}</button>
+          }
+          @if (canGenerate() && t.currentPublishedVersion && t.status !== 'ARCHIVED') {
+            <a class="btn btn-primary btn-sm" routerLink="/reports/new" [queryParams]="{ templateId: t.templateId }"><app-icon name="plus" />Create report</a>
           }
         </div>
       </div>
     </app-page-header>
 
-    <div class="rs-split rs-split-wide mt-4">
-      <section class="card min-w-0">
-        <div class="rs-head">
-          <div>
-            <h2 class="section-title">{{ t.draft ? 'Draft v' + t.draft.version : 'Published v' + t.currentPublishedVersion }}</h2>
-            <p class="text-xs text-[color:var(--text-muted)]">
-              @if (t.draft) { The template's JSON, for those who prefer it; the designer edits the same draft. Every save is checked against the schema. }
-              @else { Published versions never change. Start a new draft to edit. }
-            </p>
-          </div>
-          <div class="flex flex-wrap items-center gap-2">
-            @if (dirty()) { <span class="pill pill-warn">Unsaved changes</span> }
-            @if (t.draft && canEdit()) {
-              <button type="button" class="btn btn-default btn-sm" [disabled]="busy()" (click)="validate()"><app-icon name="check" />Check</button>
-              <button type="button" class="btn btn-default btn-sm" [disabled]="busy()" (click)="test(null, true)"><app-icon name="play" />Test unsaved</button>
-              <button type="button" class="btn btn-primary btn-sm" [disabled]="busy() || !dirty()" (click)="save()"><app-icon name="save" />Save draft</button>
-            } @else if (canEdit() && t.currentPublishedVersion) {
-              <button type="button" class="btn btn-primary btn-sm" (click)="newDraft(t.currentPublishedVersion)"><app-icon name="edit" />New draft from v{{ t.currentPublishedVersion }}</button>
-            }
-          </div>
-        </div>
-        <div class="p-4 flex flex-col gap-3">
-          <textarea class="input mono text-xs rs-json" spellcheck="false" [readonly]="!t.draft || !canEdit()" aria-label="Template JSON"
-                    [ngModel]="text()" (ngModelChange)="edited($event)"></textarea>
-          @if (saveError()) { <p class="field-note text-[color:var(--crit-text)]" role="alert">{{ saveError() }}</p> }
-          @if (checked()) { <app-report-problems [problems]="problems()" /> }
-        </div>
-      </section>
+    <div class="tabs mt-2" role="tablist" aria-label="Template sections">
+      <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'overview'" [attr.aria-selected]="tab() === 'overview'" (click)="tabTo('overview')">Overview</button>
+      <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'data'" [attr.aria-selected]="tab() === 'data'" (click)="tabTo('data')">Data it needs <span class="tp-count">{{ contract().length }}</span></button>
+      <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'versions'" [attr.aria-selected]="tab() === 'versions'" (click)="tabTo('versions')">Versions <span class="tp-count">{{ t.versions.length }}</span></button>
+      <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'used'" [attr.aria-selected]="tab() === 'used'" (click)="tabTo('used')">Used by <span class="tp-count">{{ usedCount() }}</span></button>
+      <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'samples'" [attr.aria-selected]="tab() === 'samples'" (click)="tabTo('samples')">Test samples <span class="tp-count">{{ t.samples.length }}</span></button>
+      <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'json'" [attr.aria-selected]="tab() === 'json'" (click)="tabTo('json')"><app-icon name="code" />JSON @if (dirty()) { <span class="pill pill-warn">unsaved</span> }</button>
+    </div>
 
-      <aside class="flex flex-col gap-4 min-w-0">
-        <section class="card">
-          <div class="rs-head"><h2 class="section-title">Versions</h2></div>
+    @switch (tab()) {
+      @case ('overview') {
+        <div class="rs-split rs-split-wide mt-4">
+          <section class="card min-w-0 self-start" aria-label="What it makes">
+            <div class="rs-head">
+              <div>
+                <h2 class="section-title">What it makes</h2>
+                <p class="text-xs text-[color:var(--text-muted)]">
+                  {{ compare() ? 'published v' + t.currentPublishedVersion + ' and draft v' + t.draft?.version : versionLabel(shownWhich()) }} ·
+                  @if (sampleName(); as s) { filled with the test sample “{{ s }}” } @else { no test sample kept yet, so the data fields are empty }
+                </p>
+              </div>
+              @if (whichOptions().length) {
+                <div class="flex flex-wrap items-center gap-2">
+                  @if (!compare()) { <app-segmented [options]="whichOptions()" [value]="shownWhich()" (valueChange)="which.set($event)" ariaLabel="Version shown" /> }
+                  <button type="button" class="btn btn-default btn-sm" [attr.aria-pressed]="compare()" (click)="compare.set(!compare())" data-test="compare">
+                    <app-icon name="columns" />{{ compare() ? 'One version' : 'Compare v' + t.currentPublishedVersion + ' and v' + t.draft?.version }}</button>
+                </div>
+              }
+            </div>
+            <div class="tp-pages-wrap">
+              @for (s of shownSets(); track s.label) {
+                @if (s.set?.error) { <p class="text-sm text-[color:var(--crit-text)]" role="alert">{{ s.label }}: {{ s.set!.error }}</p> }
+              }
+              @if (shownSets()[0]?.set?.loading) {
+                <app-loading shape="cards" label="Drawing the pages…" [count]="3" />
+              } @else if (compare()) {
+                @for (row of pageRows(); track row.page) {
+                  <div class="tp-compare">
+                    @for (c of row.cells; track c.label) {
+                      <figure class="tp-page">
+                        @if (c.url) { <img [src]="c.url" [alt]="'Page ' + row.page + ', ' + c.label" /> }
+                        @else if (c.past) { <span class="tp-none">No page {{ row.page }}</span> } @else { <span class="tp-wait" aria-hidden="true"></span> }
+                        <figcaption>{{ c.label }} · page {{ row.page }}</figcaption>
+                      </figure>
+                    }
+                  </div>
+                }
+              } @else {
+                <div class="tp-pages">
+                  @for (row of pageRows(); track row.page) {
+                    <figure class="tp-page">
+                      @if (row.cells[0].url; as url) { <img [src]="url" [alt]="'Page ' + row.page + ' of ' + t.name" /> } @else { <span class="tp-wait" aria-hidden="true"></span> }
+                      <figcaption>Page {{ row.page }}</figcaption>
+                    </figure>
+                  }
+                </div>
+              }
+              @for (s of shownSets(); track s.label) {
+                @if (s.set && s.set.count > s.set.urls.length) {
+                  <p class="text-xs text-[color:var(--text-muted)]">{{ s.label }} has {{ s.set.count }} pages; the first {{ s.set.urls.length }} are shown. Test with data for all of them.</p>
+                }
+              }
+            </div>
+          </section>
+
+          <aside class="flex flex-col gap-4 min-w-0">
+            <section class="card" aria-label="At a glance">
+              <div class="rs-head"><h2 class="section-title">At a glance</h2>
+                @if (t.draft && t.currentPublishedVersion) { <span class="text-xs text-[color:var(--text-muted)]">draft v{{ t.draft.version }}</span> }</div>
+              @if (facts().length) {
+                <dl class="tp-facts">
+                  @for (f of facts(); track f.label) { <div><dt>{{ f.label }}</dt><dd>{{ f.value }}</dd></div> }
+                </dl>
+              } @else { <p class="p-3 text-sm text-[color:var(--text-muted)]">Nothing to say until the template has a version.</p> }
+            </section>
+
+            <section class="card" aria-label="Data it needs">
+              <div class="rs-head">
+                <div><h2 class="section-title">Data it needs</h2>
+                  <p class="text-xs text-[color:var(--text-muted)]">{{ requiredCount() }} required of {{ contract().length }}</p></div>
+                @if (contract().length) { <button type="button" class="link-inline text-sm" (click)="tabTo('data')">All {{ contract().length }}</button> }
+              </div>
+              @if (!contract().length) {
+                <p class="p-3 text-sm text-[color:var(--text-muted)]">No data contract: every bound path must be in the data.</p>
+              } @else {
+                <table class="table-modern">
+                  <thead><tr><th>Field</th><th>Type</th><th>Needed</th></tr></thead>
+                  <tbody>
+                    @for (f of contractPreview(); track f.path) {
+                      <tr><td class="mono text-xs">{{ f.path }}</td><td class="text-xs">{{ f.type }}</td>
+                        <td class="text-xs">@if (f.required) { <span class="pill pill-neutral">Required</span> } @else { optional }</td></tr>
+                    }
+                  </tbody>
+                </table>
+              }
+            </section>
+
+            <section class="card" aria-label="Used by">
+              <div class="rs-head">
+                <h2 class="section-title">Used by</h2>
+                @if (t.draft) { <span class="text-xs text-[color:var(--text-muted)]">check before you publish v{{ t.draft.version }}</span> }
+              </div>
+              <ng-container *ngTemplateOutlet="usedList; context: { $implicit: t }" />
+            </section>
+          </aside>
+        </div>
+      }
+
+      @case ('data') {
+        <section class="card mt-4">
+          <div class="rs-head"><div><h2 class="section-title">Data it needs</h2>
+            <p class="text-xs text-[color:var(--text-muted)]">The data contract of {{ t.draft ? 'draft v' + t.draft.version : 'v' + t.currentPublishedVersion }}: a required field missing blocks a report; nothing is filled in.</p></div></div>
+          @if (!contract().length) {
+            <p class="p-3 text-sm text-[color:var(--text-muted)]">No data contract: every bound path must be in the data.</p>
+          } @else {
+            <table class="table-modern">
+              <thead><tr><th appSort="path" [sortBy]="contractSort">Path</th><th appSort="type" [sortBy]="contractSort">Type</th>
+                <th appSort="required" [sortBy]="contractSort">Required</th><th>Label</th></tr></thead>
+              <tbody>
+                @for (f of sortedContract(); track f.path) {
+                  <tr><td class="mono text-xs">{{ f.path }}</td><td class="text-xs">{{ f.type }}</td><td class="text-xs">{{ f.required ? 'Yes' : 'No' }}</td>
+                    <td class="text-xs">{{ f.label || '—' }}</td></tr>
+                }
+              </tbody>
+            </table>
+          }
+        </section>
+      }
+
+      @case ('versions') {
+        <section class="card mt-4">
+          <div class="rs-head"><div><h2 class="section-title">Versions</h2>
+            <p class="text-xs text-[color:var(--text-muted)]">Published versions never change. Every report keeps the exact version it was made from.</p></div></div>
           <ul class="divide-y divide-[color:var(--border-subtle)]">
             @for (v of t.versions; track v.versionId) {
-              <li class="p-3 flex flex-col gap-1">
-                <div class="flex flex-wrap items-center gap-1.5">
+              <li class="p-3 flex flex-wrap items-center gap-x-4 gap-y-1">
+                <div class="flex flex-wrap items-center gap-1.5 min-w-40">
                   <span class="font-medium">v{{ v.version }}</span>
                   @switch (v.state) {
                     @case ('DRAFT') { <span class="pill pill-info">Draft · revision {{ v.revision }}</span> }
@@ -97,7 +213,7 @@
                   }
                   @if (v.basedOnVersion) { <span class="text-xs text-[color:var(--text-muted)]">from v{{ v.basedOnVersion }}</span> }
                 </div>
-                <span class="text-xs text-[color:var(--text-muted)]">
+                <span class="text-xs text-[color:var(--text-muted)] flex-1 min-w-48">
                   @if (v.publishedAt) { Published {{ v.publishedAt | rsTime: 'recent' }} } @else { Saved {{ v.updatedAt | rsTime: 'recent' }} }
                   @if (v.changeSummary) { · {{ v.changeSummary }} }
                 </span>
@@ -115,10 +231,21 @@
             }
           </ul>
         </section>
+      }
 
-        <section class="card">
+      @case ('used') {
+        <section class="card mt-4">
+          <div class="rs-head"><div><h2 class="section-title">Used by</h2>
+            <p class="text-xs text-[color:var(--text-muted)]">The pipeline steps that made reports from it and the reports it made@if (t.draft) {, to check before you publish v{{ t.draft.version }}}.</p></div></div>
+          <ng-container *ngTemplateOutlet="usedList; context: { $implicit: t }" />
+        </section>
+      }
+
+      @case ('samples') {
+        <section class="card mt-4">
           <div class="rs-head">
-            <div><h2 class="section-title">Test samples</h2><p class="text-xs text-[color:var(--text-muted)]">Data kept with the template for testing.</p></div>
+            <div><h2 class="section-title">Test samples</h2><p class="text-xs text-[color:var(--text-muted)]">Data kept with the template for testing; the first pasted one fills the Overview's pages.</p></div>
+            <button type="button" class="btn btn-default btn-sm" (click)="test()"><app-icon name="play" />Test with data</button>
           </div>
           @if (!t.samples.length) {
             <p class="p-3 text-sm text-[color:var(--text-muted)]">None yet. Test with data, then "Keep as a test sample".</p>
@@ -130,6 +257,7 @@
                     <div class="font-medium truncate">{{ s.name }}</div>
                     <div class="text-xs text-[color:var(--text-muted)]">
                       @if (s.kind === 'RUN_OUTPUT') { Run #{{ s.jobQueueId }}'s output, read again each time } @else { Pasted {{ s.format }} · {{ size(s.bytes) }} }
+                      @if (s.createdAt) { · kept {{ s.createdAt | rsTime: 'recent' }} }
                     </div>
                   </div>
                   @if (canEdit()) {
@@ -142,25 +270,68 @@
             </ul>
           }
         </section>
+      }
 
-        <section class="card">
-          <div class="rs-head"><div><h2 class="section-title">Data it needs</h2><p class="text-xs text-[color:var(--text-muted)]">The data contract: a required field missing blocks a report; nothing is filled in.</p></div></div>
-          @if (!contract().length) {
-            <p class="p-3 text-sm text-[color:var(--text-muted)]">No data contract: every bound path must be in the data.</p>
-          } @else {
-            <table class="table-modern">
-              <thead><tr><th appSort="path" [sortBy]="contractSort">Path</th><th appSort="type" [sortBy]="contractSort">Type</th>
-                <th appSort="required" [sortBy]="contractSort">Required</th></tr></thead>
-              <tbody>
-                @for (f of sortedContract(); track f.path) {
-                  <tr><td class="mono text-xs">{{ f.path }}</td><td class="text-xs">{{ f.type }}</td><td class="text-xs">{{ f.required ? 'Yes' : 'No' }}</td></tr>
-                }
-              </tbody>
-            </table>
-          }
+      @case ('json') {
+        <section class="card min-w-0 mt-4">
+          <div class="rs-head">
+            <div>
+              <h2 class="section-title">{{ t.draft ? 'Draft v' + t.draft.version : 'Published v' + t.currentPublishedVersion }}</h2>
+              <p class="text-xs text-[color:var(--text-muted)]">
+                @if (t.draft) { The template's JSON, for those who prefer it; the designer edits the same draft. Every save is checked against the schema. }
+                @else { Published versions never change. Start a new draft to edit. }
+              </p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              @if (dirty()) { <span class="pill pill-warn">Unsaved changes</span> }
+              @if (t.draft && canEdit()) {
+                <button type="button" class="btn btn-default btn-sm" [disabled]="busy()" (click)="validate()"><app-icon name="check" />Check</button>
+                <button type="button" class="btn btn-default btn-sm" [disabled]="busy()" (click)="test(null, true)"><app-icon name="play" />Test unsaved</button>
+                <button type="button" class="btn btn-primary btn-sm" [disabled]="busy() || !dirty()" (click)="save()"><app-icon name="save" />Save draft</button>
+              } @else if (canEdit() && t.currentPublishedVersion) {
+                <button type="button" class="btn btn-primary btn-sm" (click)="newDraft(t.currentPublishedVersion)"><app-icon name="edit" />New draft from v{{ t.currentPublishedVersion }}</button>
+              }
+            </div>
+          </div>
+          <div class="p-4 flex flex-col gap-3">
+            <textarea class="input mono text-xs rs-json" spellcheck="false" [readonly]="!t.draft || !canEdit()" aria-label="Template JSON"
+                      [ngModel]="text()" (ngModelChange)="edited($event)"></textarea>
+            @if (saveError()) { <p class="field-note text-[color:var(--crit-text)]" role="alert">{{ saveError() }}</p> }
+            @if (checked()) { <app-report-problems [problems]="problems()" /> }
+          </div>
         </section>
-      </aside>
-    </div>
+      }
+    }
+
+    <ng-template #usedList let-t>
+      <ul class="tp-used">
+        @for (p of pipelines(); track p.pipelineJobId + p.stepKey) {
+          <li data-test="used-pipeline">
+            <app-icon name="zap" class="shrink-0" />
+            <div class="min-w-0 flex-1">
+              <div class="truncate">Pipeline · {{ p.pipelineName || 'Pipeline ' + p.pipelineJobId }} · step {{ p.stepKey }}</div>
+              <div class="text-xs text-[color:var(--text-muted)]">{{ p.runs }} run{{ p.runs === 1 ? '' : 's' }}@if (p.lastRunAt) { · last {{ p.lastRunAt | rsTime: 'recent' }} }</div>
+            </div>
+            @if (p.version) { <span class="pill pill-neutral whitespace-nowrap">used v{{ p.version }} last run</span> }
+          </li>
+        }
+        @if (pipelines().length) {
+          <li class="text-xs text-[color:var(--text-muted)]"><app-icon name="info" class="shrink-0" />
+            <span>A step set to “latest” switches to a new version when you publish; a step pinned to a version keeps it.</span></li>
+        }
+        <li>
+          <app-icon name="file" class="shrink-0" />
+          <div class="min-w-0 flex-1">
+            <div>{{ t.reports }} report{{ t.reports === 1 ? '' : 's' }}</div>
+            <div class="text-xs text-[color:var(--text-muted)]">{{ t.reports === 1 ? 'keeps' : 'keep' }} the version {{ t.reports === 1 ? 'it was' : 'they were' }} made with</div>
+          </div>
+          @if (t.reports) { <a class="link-inline text-sm" routerLink="/reports/library" [queryParams]="reportsQuery()">Open</a> }
+        </li>
+        @if (!pipelines().length) {
+          <li class="text-xs text-[color:var(--text-muted)]"><app-icon name="info" class="shrink-0" /><span>No pipeline step has made a report from it yet.</span></li>
+        }
+      </ul>
+    </ng-template>
   } @else {
     <app-page-header title="Template" />
     <app-loading shape="panel" label="Loading the template…" [count]="6" />

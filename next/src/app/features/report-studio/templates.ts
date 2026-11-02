@@ -1,17 +1,17 @@
 import { TEMPLATE_DELETE_WORDS } from './template-page';
-import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
+import { NgTemplateOutlet } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { Observable, forkJoin, of, switchMap } from 'rxjs';
 import { PageHeader } from '../../shared/ui/page-header';
 import { RefreshButton } from '../../shared/ui/refresh-button';
 import { Icon } from '../../shared/ui/icon';
-import { TableShell } from '../../shared/ui/data-table';
-import { StatusPill } from '../../shared/ui/status-pill';
 import { Segmented, SegmentOption } from '../../shared/ui/segmented';
 import { ListView, ViewToggle } from '../../shared/ui/view-toggle';
-import { Pagination } from '../../shared/ui/pagination';
-import { PAGE_SIZES } from '../../shared/ui/pager';
+import { LoadError } from '../../shared/ui/load-error';
+import { AppLoading } from '../../shared/ui/loading';
 import { RsTimePipe } from './rs-time.pipe';
 import { ToastService } from '../../shared/ui/toast.service';
 import { confirmWith } from '../../shared/ui/confirm';
@@ -19,41 +19,38 @@ import { sidePanelConfig } from '../../shared/ui/side-panel';
 import { AuthService } from '../../core/auth/auth.service';
 import { WorkspaceDirectory } from '../../core/workspaces/workspace-directory';
 import { WorkspaceSelect } from '../../shared/ui/workspace-select';
-import { ReportStudioApi, TemplateQuery, studioError } from './report-studio.api';
-import { StarterRow, TemplateDetail, TemplateRow, chipWord, originWord } from './report-studio.model';
+import { ReportStudioApi, studioError } from './report-studio.api';
+import { StarterRow, TemplateDetail, TemplateRow } from './report-studio.model';
 import { ImportTemplatePanel, NewTemplateData, NewTemplatePanel } from './template-panels';
 import { TestPanel, TestPanelData } from './test-panel';
 import { downloadJson } from './report-files';
 import { RsTabCounts } from './rs-tab-counts';
 import { SortHeader } from '../../shared/ui/sort-header';
-import { SortState, createTableSort, sortRows } from '../../shared/ui/sort';
-import { AdvancedOption, AdvancedSelect } from '../../shared/ui/advanced-select';
+import { createTableSort } from '../../shared/ui/sort';
+import {
+  GalleryFilters, GallerySort, HasFacet, NO_FILTERS, StatusFacet, facetCounts, featureChips, groupByCategory, isTest, sortTemplates,
+  visibleStarters, visibleTemplates, withTestTag,
+} from './templates-gallery';
 
-/** Which templates the library shows (Figma frame 2's tabs). */
-type Group = 'all' | 'workspace' | 'starters' | 'shared';
+/** The service's largest page; a workspace has tens of templates, so the gallery reads them all and pages on past 200. */
+export const GALLERY_PAGE = 200;
+/** At most this many pages of each list (2,000 templates); more than that is said on the page. */
+const MAX_PAGES = 10;
 
-/** One card or row of the library: a workspace template, or a platform starter. */
-export interface LibraryItem {
-  kind: 'template' | 'starter';
-  id: string;
-  name: string;
-  description?: string | null;
-  category?: string | null;
-  template?: TemplateRow;
-  starter?: StarterRow;
-}
+interface AllTemplates { templates: TemplateRow[]; starters: StarterRow[]; total: number; }
 
 /**
- * See results › Reports › Templates (MIG-403, MIG-404; the owner-approved screen 2, Figma frame 2; page report-templates,
- * read by report-generate too): the workspace's templates and the platform's starters as cards with their first page, or
- * as a table; All, This workspace, Starters and Shared with me; search, category, state and owner. A starter is copied into
- * the workspace, never shared live; "Make a copy" makes a new template with its own history; Import takes a template's
- * JSON. Published versions never change: edits go into a draft, in the designer.
+ * See results › Reports › Report templates (reports redesign, owner 2026-11-02; before it MIG-403/404's library). Every
+ * template of the workspace, read at once and grouped by category as compact cards that say what each has (approvers,
+ * QR, charts, images, conditional and repeated sections), how many reports it made and when the newest was, and its
+ * state (vN published, draft vN+1). A facet column with counts -- Status, Category, Has, and Hidden: test templates
+ * (tag "test") and the platform's starters -- the search, three orders (Name, Most used, Recently changed) and a table.
+ * A starter is copied into the workspace, never shared live; Import takes a template's JSON; ?new=1 opens New template.
  */
 @Component({
   selector: 'app-report-templates',
-  imports: [PageHeader, WorkspaceSelect, RefreshButton, Icon, TableShell, StatusPill, RsTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger,
-    Segmented, ViewToggle, Pagination, SortHeader, AdvancedSelect],
+  imports: [PageHeader, WorkspaceSelect, RefreshButton, Icon, RsTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger,
+    Segmented, ViewToggle, SortHeader, LoadError, AppLoading, NgTemplateOutlet],
   templateUrl: './templates.html',
   styleUrl: './templates.css',
   host: { '[style.--rst-brand]': 'brandColour()' },
@@ -70,115 +67,70 @@ export class ReportTemplates implements OnInit {
   /** A platform administrator's pick (the one workspace selector, owner #5); null is every workspace. Members: their own. */
   readonly tenantId = signal<number | null>(this.workspaces.remembered());
 
-  /** One page of the workspace's templates, as the service answers it; the starters are all of them (a handful, from the code). */
-  readonly templates = signal<TemplateRow[]>([]);
+  /** Every template of the scope, archived ones included (the Archived facet), and the platform's starters. */
+  readonly rows = signal<TemplateRow[]>([]);
   readonly starters = signal<StarterRow[]>([]);
-  /** How many templates the filters match in all, and how many the scope has before them. */
-  readonly templateTotal = signal(0);
-  readonly templateCount = signal(0);
-  readonly serverCategories = signal<string[]>([]);
-  readonly page = signal(1);
-  readonly size = signal(PAGE_SIZES[0]);
+  /** More templates than the gallery reads (MAX_PAGES pages): said on the page. */
+  readonly capped = signal(false);
   readonly loading = signal(true);
+  readonly loaded = signal(false);
   readonly error = signal('');
-  readonly search = signal('');
-  readonly state = signal('');
-  readonly category = signal('');
-  readonly owner = signal('');
-  readonly group = signal<Group>('all');
+  readonly filters = signal<GalleryFilters>({ ...NO_FILTERS });
   readonly view = signal<ListView>('cards');
-  readonly archived = signal(false);
-  /** Each template's first page (an object URL) and how many pages it has, as the thumbnails arrive. */
+  /** The facet column below 1100 px opens from the Filters button. */
+  readonly facetsOpen = signal(false);
+  /** Each template's first page (an object URL), as the pictures arrive. */
   readonly thumbs = signal<Record<string, string>>({});
-  readonly pages = signal<Record<string, number>>({});
-  readonly chipWord = chipWord;
-  readonly originWord = originWord;
+  private readonly asked = new Set<string>();
+  readonly featureChips = featureChips;
+  readonly isTest = isTest;
 
   /** Editing is report-templates' and a workspace member's (a platform administrator reads). */
   readonly canEdit = computed(() => this.auth.canOpen('report-templates') && !this.auth.isPlatformAdmin());
   readonly canGenerate = computed(() => this.auth.canOpen('report-generate') && !this.auth.isPlatformAdmin());
   readonly isPlatformAdmin = computed(() => this.auth.isPlatformAdmin());
-  readonly isAdmin = computed(() => this.auth.role() === 'TENANT_ADMIN' || this.auth.isPlatformAdmin());
-  private readonly me = computed(() => this.auth.user()?.appUserId ?? null);
 
-  /** The starters the filters let through (the old client rules: a starter reads as published and as "from a starter"). */
-  readonly starterMatches = computed<StarterRow[]>(() => {
-    const q = this.search().trim().toLowerCase();
-    return this.starters().filter(s => (!this.category() || s.category === this.category())
-      && (!this.state() || this.state() === 'PUBLISHED') && (!this.owner() || this.owner() === 'starter')
-      && (!q || [s.name, s.description, s.category].some(v => (v ?? '').toLowerCase().includes(q))));
-  });
   /**
-   * Owner 2026-10-27 ("add a sort on each table"): the table's headings sort on the server (reportTemplate.json/fetchAll's
-   * sort and dir), so a sort covers every one of the workspace's templates, not only the page shown. The templates arrive
-   * newest change first -- Updated, newest first, the table's own order -- and the request names no sort until another
-   * one is picked. The starters are not the service's to sort (they come whole with every answer): they stay in their
-   * own block after the templates, sorted here by the same column -- by name or category; they have no maker or change
-   * time, so by From or Updated they keep their order. The cards show the same order. A new order goes back to page 1.
+   * One order for the cards and the table: Most used first (the design's), Name or Recently changed from the segmented
+   * control, or any table heading (Category too). Remembered per browser like every table's sort.
    */
-  private static readonly OWN_ORDER: SortState = { key: 'updated', direction: 'desc' };
-  readonly sort = createTableSort<LibraryItem>({
-    id: 'report-templates', server: true, initial: ReportTemplates.OWN_ORDER,
-    note: 'Sorts all of the workspace\'s templates; the starters follow them',
+  readonly sort = createTableSort<TemplateRow>({
+    id: 'report-templates-gallery', initial: { key: 'used', direction: 'desc' },
     columns: {
-      template: { value: i => i.name, kind: 'text', param: 'name' },
-      category: { value: i => i.category, kind: 'text', param: 'category' },
-      from: { value: i => (i.template ? this.ownerOf(i.template) : ''), kind: 'text', param: 'from' },
-      updated: { value: i => i.template?.updatedAt, kind: 'date', param: 'updatedAt' },
+      name: { value: t => t.name, kind: 'text' },
+      category: { value: t => t.category, kind: 'text' },
+      used: { value: t => t.reportCount ?? 0, kind: 'number', first: 'desc' },
+      changed: { value: t => t.updatedAt, kind: 'date', first: 'desc' },
     },
-    onChange: () => { this.page.set(1); this.read(); },
   });
-  /** The matching starters in the order of the column picked (see sort): by name or category; otherwise as they come. */
-  readonly sortedStarters = computed<StarterRow[]>(() => {
-    const rows = this.starterMatches();
+  readonly sortOptions: SegmentOption<GallerySort>[] = [
+    { id: 'name', label: 'Name' }, { id: 'used', label: 'Most used' }, { id: 'changed', label: 'Recently changed' },
+  ];
+  readonly sortPick = computed(() => this.sort.key() as GallerySort);
+
+  readonly counts = computed(() => facetCounts(this.rows(), this.starters(), this.filters()));
+  readonly visible = computed(() => {
+    const rows = visibleTemplates(this.rows(), this.filters());
     const key = this.sort.key();
-    const value = key === 'template' ? (s: StarterRow) => s.name : key === 'category' ? (s: StarterRow) => s.category : null;
-    return value ? sortRows(rows, value, this.sort.direction(), 'text') : rows;
+    if (key === 'name' || key === 'used' || key === 'changed') return sortTemplates(rows, key, this.sort.direction());
+    return this.sort.apply(sortTemplates(rows, 'name'));
   });
-  /** What a read carries for the sort: nothing for the table's own order (so the service keeps it), else sort and dir. */
-  private sortParams(): { sort?: string; dir?: 'asc' | 'desc' } {
-    const p = this.sort.param();
-    const s = this.sort.state();
-    if (!p || (s.key === ReportTemplates.OWN_ORDER.key && s.direction === ReportTemplates.OWN_ORDER.direction)) return {};
-    return { sort: p.sort, dir: p.dir };
-  }
-  private readonly withTemplates = computed(() => this.group() === 'all' || this.group() === 'workspace');
-  private readonly withStarters = computed(() => this.group() === 'all' || this.group() === 'starters');
-  /**
-   * Owner 2026-10-20: the library pages on the server. One list -- the workspace's templates (newest change first, a page
-   * at a time from the service), then the matching starters -- cut into pages: page p shows its window of both.
-   */
-  readonly total = computed(() => (this.withTemplates() ? this.templateTotal() : 0) + (this.withStarters() ? this.starterMatches().length : 0));
-  readonly filtered = computed<LibraryItem[]>(() => {
-    if (this.group() === 'shared') return [];
-    const start = (this.page() - 1) * this.size();
-    const end = start + this.size();
-    const before = this.withTemplates() ? this.templateTotal() : 0;
-    const rows = this.withTemplates() ? this.templates() : [];
-    const starters = this.withStarters() ? this.sortedStarters().slice(Math.max(0, start - before), Math.max(0, end - before)) : [];
-    return [
-      ...rows.map(t => ({ kind: 'template' as const, id: t.templateId, name: t.name, description: t.description, category: t.category, template: t })),
-      ...starters.map(s => ({ kind: 'starter' as const, id: 'starter:' + s.key, name: s.name, description: s.description, category: s.category, starter: s })),
-    ];
+  readonly groups = computed(() => groupByCategory(this.visible()));
+  readonly shownStarters = computed(() => visibleStarters(this.starters(), this.filters()));
+  /** The workspace has no template at all (archived ones aside). */
+  readonly noTemplates = computed(() => this.loaded() && !this.rows().some(t => t.status !== 'ARCHIVED'));
+  readonly filtering = computed(() => {
+    const f = this.filters();
+    return !!(f.q.trim() || f.status.length || f.category.length || f.has.length);
   });
-  readonly groups = computed<SegmentOption<Group>[]>(() => [
-    { id: 'all', label: `All ${this.templateCount() + this.starters().length}` },
-    { id: 'workspace', label: `This workspace ${this.templateCount()}` },
-    { id: 'starters', label: `Starters ${this.starters().length}` },
-    { id: 'shared', label: 'Shared with me 0', title: 'Sharing between workspaces comes with Teams' },
-  ]);
-  readonly categories = computed(() => [...new Set([...this.serverCategories(), ...this.starters().map(s => s.category)]
-    .filter((c): c is string => !!c))].sort());
-  readonly categoryOptions = computed<AdvancedOption[]>(() => this.categories().map(c => ({ value: c, label: c })));
-  readonly filtering = computed(() => !!(this.search().trim() || this.state() || this.category() || this.owner()));
-  private searchTimer: ReturnType<typeof setTimeout> | null = null;
-  /** Answers come back in any order: only the latest read's is kept. */
-  private asked = 0;
+  readonly hiddenTests = computed(() => (this.filters().tests ? 0 : this.counts().tests));
 
   constructor() {
-    inject(DestroyRef).onDestroy(() => {
-      Object.values(this.thumbs()).forEach(u => URL.revokeObjectURL(u));
-      if (this.searchTimer) clearTimeout(this.searchTimer);
+    inject(DestroyRef).onDestroy(() => Object.values(this.thumbs()).forEach(u => URL.revokeObjectURL(u)));
+    // The first page of each template on show, once per change of the template.
+    effect(() => {
+      const rows = this.visible();
+      untracked(() => rows.forEach(t => this.thumb(t)));
     });
   }
 
@@ -187,7 +139,7 @@ export class ReportTemplates implements OnInit {
     if (this.route.snapshot.queryParamMap.get('new') && this.canEdit()) this.create(null);
   }
 
-  /** The workspace's own brand colour for the starters' page sketches (drawing 2), from its default brand profile. */
+  /** The workspace's own brand colour for the starters' page sketches, from its default brand profile. */
   readonly brandColour = signal<string | null>(null);
 
   private loadBrand(scope: number | null): void {
@@ -207,103 +159,112 @@ export class ReportTemplates implements OnInit {
     });
   }
 
-  /** Another workspace picked (and the first read): the brand, the tab counts and the list again, from the first page. */
+  /** Another workspace picked (and the first read): the brand, the tab counts and every template again. */
   load(): void {
-    this.page.set(1);
-    this.refresh();
-  }
-
-  /** The refresh button: the brand, the tab counts and the page the reader is on. */
-  refresh(): void {
     const scope = this.scope();
     this.tabCounts.refresh(scope);
     this.loadBrand(scope);
     this.read();
   }
 
-  /** The current page, with its filters, as the service answers it (the starters come with every answer). */
+  /** The refresh button. */
+  refresh(): void {
+    this.load();
+  }
+
+  private generation = 0;
+
+  /** Every template, the live ones and the archived ones side by side, each read 200 at a time. */
   read(): void {
     this.loading.set(true);
     this.error.set('');
-    const asked = ++this.asked;
+    const asked = ++this.generation;
     const scope = this.scope();
-    const start = (this.page() - 1) * this.size();
-    const owner = this.owner() === 'starter' ? 'STARTER' : this.owner() === 'copy' ? 'COPY' : this.owner() === 'me' ? 'ME' : '';
-    const query: TemplateQuery = { archived: this.archived(), q: this.search(), category: this.category(), state: this.state(), owner,
-      limit: this.size(), offset: start, ...this.sortParams() };
-    this.api.list(query, scope).subscribe({
-      next: lib => {
-        if (asked !== this.asked) return;
-        this.starters.set(lib.starters);
-        this.templateTotal.set(lib.total);
-        this.templateCount.set(lib.counts.templates);
-        this.serverCategories.set(lib.categories);
-        // A page emptied under the reader (templates archived or deleted): the last page that still has rows.
-        if (this.page() > 1 && start >= this.total() && this.total() > 0) {
-          this.page.set(Math.ceil(this.total() / this.size()));
-          this.read();
-          return;
-        }
-        this.templates.set(this.withTemplates() ? lib.templates : []);
+    forkJoin([this.all(false, scope), this.all(true, scope)]).subscribe({
+      next: ([live, archived]) => {
+        if (asked !== this.generation) return;
+        this.rows.set([...live.templates, ...archived.templates]);
+        this.starters.set(live.starters);
+        this.capped.set(live.templates.length < live.total || archived.templates.length < archived.total);
         this.loading.set(false);
-        if (this.withTemplates()) lib.templates.forEach(t => this.thumb(t, scope));
+        this.loaded.set(true);
       },
       error: e => {
-        if (asked !== this.asked) return;
+        if (asked !== this.generation) return;
         this.error.set(studioError(e, 'The templates could not be read.').message);
         this.loading.set(false);
       },
     });
   }
 
+  private all(archived: boolean, scope: number | null): Observable<AllTemplates> {
+    const step = (offset: number, got: TemplateRow[]): Observable<AllTemplates> =>
+      this.api.list({ archived, limit: GALLERY_PAGE, offset }, scope).pipe(switchMap(lib => {
+        const rows = [...got, ...lib.templates];
+        const more = lib.templates.length > 0 && rows.length < lib.total && offset / GALLERY_PAGE < MAX_PAGES - 1;
+        return more ? step(offset + GALLERY_PAGE, rows) : of({ templates: rows, starters: lib.starters ?? [], total: lib.total });
+      }));
+    return step(0, []);
+  }
+
   private scope(): number | null {
     return this.isPlatformAdmin() ? this.tenantId() : null;
   }
 
-  setGroup(g: Group): void { this.group.set(g); this.page.set(1); this.read(); }
-  setCategory(c: string): void { this.category.set(c); this.page.set(1); this.read(); }
-  setState(v: string): void { this.state.set(v); this.page.set(1); this.read(); }
-  setOwner(v: string): void { this.owner.set(v); this.page.set(1); this.read(); }
-  goTo(page: number): void { this.page.set(page); this.read(); }
-  setSize(size: number): void { this.size.set(size); this.page.set(1); this.read(); }
+  // ---------------------------------------------------------------- facets
 
-  /** The service searches: wait for the typing to stop, then ask again from the first page. */
-  onSearch(value: string): void {
-    this.search.set(value);
-    if (this.searchTimer) clearTimeout(this.searchTimer);
-    this.searchTimer = setTimeout(() => { this.searchTimer = null; this.page.set(1); this.read(); }, 300);
+  isOn(group: 'status' | 'category' | 'has', value: string): boolean {
+    return (this.filters()[group] as string[]).includes(value);
   }
 
-  /** A template's first page as a picture (drawn by the server once per version), and its page count. */
-  private thumb(t: TemplateRow, scope: number | null): void {
-    if (this.thumbs()[t.templateId + ':' + t.updatedAt]) return;
-    this.api.templateThumbnail(t.templateId, null, scope ?? (this.isPlatformAdmin() ? t.tenantId : null)).subscribe({
+  toggle(group: 'status', value: StatusFacet): void;
+  toggle(group: 'has', value: HasFacet): void;
+  toggle(group: 'category', value: string): void;
+  toggle(group: 'status' | 'category' | 'has', value: string): void {
+    this.filters.update(f => {
+      const list = f[group] as string[];
+      return { ...f, [group]: list.includes(value) ? list.filter(v => v !== value) : [...list, value] };
+    });
+  }
+
+  setHidden(which: 'tests' | 'starters', on: boolean): void {
+    this.filters.update(f => ({ ...f, [which]: on }));
+  }
+
+  onSearch(q: string): void {
+    this.filters.update(f => ({ ...f, q }));
+  }
+
+  /** Clears the search and the facets; what Hidden shows stays as it is. */
+  clearFilters(): void {
+    this.filters.update(f => ({ ...NO_FILTERS, tests: f.tests, starters: f.starters }));
+  }
+
+  setSort(by: GallerySort): void {
+    this.sort.set({ key: by, direction: by === 'name' ? 'asc' : 'desc' });
+  }
+
+  // ---------------------------------------------------------------- one template
+
+  /** A template's first page as a picture (drawn by the server once per version). */
+  private thumb(t: TemplateRow): void {
+    const key = t.templateId + ':' + (t.updatedAt ?? '');
+    if (this.asked.has(key)) return;
+    this.asked.add(key);
+    const scope = this.scope() ?? (this.isPlatformAdmin() ? t.tenantId : null);
+    this.api.templateThumbnail(t.templateId, null, scope).subscribe({
       next: r => {
         if (!r.body || !(r.headers.get('Content-Type') ?? '').includes('png')) return;
         const url = URL.createObjectURL(r.body);
         this.thumbs.update(m => { if (m[t.templateId]) URL.revokeObjectURL(m[t.templateId]); return { ...m, [t.templateId]: url }; });
-        const n = Number(r.headers.get('X-Report-Pages'));
-        if (n > 0) this.pages.update(m => ({ ...m, [t.templateId]: n }));
       },
-      error: () => { /* the card shows its page outline instead */ },
+      error: () => { /* the card shows a page outline instead */ },
     });
   }
 
-  showArchived(on: boolean): void {
-    this.archived.set(on);
-    this.page.set(1);
-    this.read();
-  }
-
-  pagesOf(t: TemplateRow): string {
-    const n = this.pages()[t.templateId];
-    return n ? `${n} page${n === 1 ? '' : 's'}` : '';
-  }
-
-  /** Who made it, as the card says it: you, a starter, a copy, an import, or the workspace. */
-  ownerOf(t: TemplateRow): string {
-    if (t.createdBy && t.createdBy === this.me()) return 'You';
-    return t.origin === 'STARTER' ? originWord(t).replace(/^From the /, 'From ') : t.origin === 'BLANK' ? 'This workspace' : originWord(t);
+  /** "v2 published · draft v3": the pills a card and a row show. */
+  draftVersion(t: TemplateRow): number {
+    return (t.currentPublishedVersion ?? 0) + 1;
   }
 
   create(starter: StarterRow | null): void {
@@ -324,7 +285,7 @@ export class ReportTemplates implements OnInit {
       .subscribe(t => { if (t) void this.router.navigate(['/reports/templates', t.templateId, 'design']); });
   }
 
-  /** "Edit draft": the designer, starting a draft from the newest version when there is none. */
+  /** "Edit": the designer, starting a draft from the newest version when there is none. */
   edit(t: TemplateRow): void {
     if (t.hasDraft || !t.currentPublishedVersion) { void this.router.navigate(['/reports/templates', t.templateId, 'design']); return; }
     this.api.newDraft(t.templateId, t.currentPublishedVersion).subscribe({
@@ -354,8 +315,21 @@ export class ReportTemplates implements OnInit {
     });
   }
 
+  /** Mark as test / Not a test: the tag "test" alone, no draft; the card hides (or comes back) at once. */
+  markTest(t: TemplateRow, on: boolean): void {
+    this.api.setTags(t.templateId, withTestTag(t.tags, on), t.rowVersion).subscribe({
+      next: d => {
+        this.rows.update(rows => rows.map(r => (r.templateId === t.templateId
+          ? { ...r, tags: d.tags ?? withTestTag(t.tags, on), test: d.test ?? on, rowVersion: d.rowVersion ?? r.rowVersion, updatedAt: d.updatedAt ?? r.updatedAt }
+          : r)));
+        this.toast.success(on ? `${t.name} is a test template now: hidden unless "Test templates" is ticked.` : `${t.name} is no longer a test template.`);
+      },
+      error: e => this.toast.error(studioError(e).message),
+    });
+  }
+
   archive(t: TemplateRow): void {
-    void confirmWith(this.dialog, { title: `Archive ${t.name}?`, body: 'It leaves the library and no new report can be made from it. '
+    void confirmWith(this.dialog, { title: `Archive ${t.name}?`, body: 'It leaves the gallery and no new report can be made from it. '
       + 'Its versions and the reports made from it are kept.', confirmLabel: 'Archive' }).then(ok => {
       if (!ok) return;
       this.api.archive(t.templateId).subscribe({

@@ -3,6 +3,8 @@
  * with serverTime, 24-hour. Ids are ULIDs. Storage keys never reach the browser.
  */
 
+import type { TemplateFeatures } from './report-library.api';
+
 export interface Problem {
   severity: 'ERROR' | 'WARNING';
   stage: string;
@@ -36,6 +38,11 @@ export interface TemplateRow {
   /** MIG-406: who made it and who changed it last, by name (Identity). */
   ownerName?: string | null;
   updatedByName?: string | null;
+  /** Reports redesign (2026-11-02): what the shown version has, the reports made from it, the newest one's time, tag "test". */
+  features?: TemplateFeatures | null;
+  reportCount?: number;
+  lastReportAt?: string | null;
+  test?: boolean;
 }
 
 export interface StarterRow { key: string; name: string; description?: string | null; category?: string | null; components: number; }
@@ -107,7 +114,13 @@ export interface TemplateDetail extends TemplateRow {
   approval?: ApprovalRequest | null;
   /** Phase 7: the workspace publishes by a second person (nobody publishes a draft they edited last or asked about). */
   publishNeedsSecondPerson?: boolean;
+  /** Reports redesign: the pipeline steps that made reports from it (from the generation jobs), each with the version it last used. */
+  usedBy?: { pipelines: TemplateUse[] } | null;
 }
+
+/** A pipeline step that makes reports from a template: its runs, its last run and the version that run used. */
+export interface TemplateUse { pipelineJobId: string; pipelineName?: string | null; stepKey: string; runs: number; lastRunAt?: string | null;
+  version?: number | null; }
 
 /** A template's data contract, as the Data tab and Create report read it (MIG-404): paths only. */
 export interface ContractField { path: string; type: string; required: boolean; label?: string | null; }
