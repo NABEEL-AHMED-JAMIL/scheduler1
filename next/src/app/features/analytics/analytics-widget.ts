@@ -59,6 +59,13 @@ export type WidgetState = 'idle' | 'queued' | 'running' | 'failed' | 'stopped' |
             <div class="widget-state">
               <app-icon name="alert" size="1.2rem" class="icon-crit" />
               <p class="text-xs text-crit-500">{{ error() || 'This widget could not run.' }}</p>
+              <!-- Owner 2026-11-02: the engine's own words only here, closed -- the sentence above is what a reader reads. -->
+              @if (errorDetail()) {
+                <details class="widget-detail" data-test="widget-error-detail">
+                  <summary class="text-xs">Technical detail</summary>
+                  <pre class="text-xs">{{ errorDetail() }}</pre>
+                </details>
+              }
               @if (refreshable()) { <button type="button" class="btn btn-default btn-xs" (click)="refresh.emit()"><app-icon name="refresh" />Try again</button> }
             </div>
           }
@@ -88,6 +95,10 @@ export type WidgetState = 'idle' | 'queued' | 'running' | 'failed' | 'stopped' |
     .widget-body { min-width: 0; }
     .widget-note { font-size: 12px; color: var(--text-muted); }
     .widget-state { display: flex; flex-direction: column; align-items: center; gap: 0.35rem; text-align: center; padding: 1.25rem 0.5rem; }
+    .widget-detail { max-width: 100%; text-align: left; color: var(--text-muted); }
+    .widget-detail > summary { cursor: pointer; text-align: center; }
+    .widget-detail > pre { margin: 0.25rem 0 0; max-height: 8rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere;
+      padding: 0.5rem; border-radius: var(--radius-sm); background: var(--surface-sunken); font-family: var(--font-mono, monospace); }
     .widget-busy { opacity: 0.92; }
     .kpi-reserve { visibility: hidden; }
     .kpi-reserve-lines { position: absolute; inset: 0.75rem 0 auto 0; }
@@ -116,6 +127,8 @@ export class AnalyticsWidget {
    */
   readonly reserveKpi = input<'lg' | 'md' | null>(null);
   readonly error = input('');
+  /** The engine's message behind the sentence (analytics' data.detail), shown only under "Technical detail". */
+  readonly errorDetail = input('');
   readonly emptyMessage = input('No rows in this result.');
   readonly refreshable = input(true);
   readonly refresh = output<void>();

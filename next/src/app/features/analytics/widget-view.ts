@@ -1103,6 +1103,8 @@ export interface WidgetRun {
   state: WidgetState;
   /** The server's own sentence when it refused. Never paraphrased. */
   error: string;
+  /** The engine's words behind that sentence (data.detail, 2026-11-02): the tile's "Technical detail", closed. */
+  errorDetail?: string;
   view: WidgetView | null;
   /** Minted here so the run can be stopped; the server keys its registry on (tenant, user, id). */
   queryId: string;

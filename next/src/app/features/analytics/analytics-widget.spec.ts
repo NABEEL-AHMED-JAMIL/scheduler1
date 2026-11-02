@@ -16,6 +16,38 @@ function mount(state: WidgetState) {
   return { fixture, text: () => ((fixture.nativeElement as HTMLElement).textContent ?? '').replace(/\s+/g, ' ') };
 }
 
+/** Owner 2026-11-02: a refused query's sentence on the tile, DuckDB's own words only under a closed "Technical detail". */
+@Component({ imports: [AnalyticsWidget], template: `<app-analytics-widget title="SpO2 by day" state="failed" [error]="error" [errorDetail]="detail" />` })
+class Refused {
+  error = 'This query uses substr() on a date and time, which substr() does not take. Edit the query.';
+  detail = '';
+}
+
+function refused(detail: string) {
+  TestBed.resetTestingModule();
+  TestBed.configureTestingModule({ imports: [Refused] });
+  const fixture = TestBed.createComponent(Refused);
+  fixture.componentInstance.detail = detail;
+  fixture.detectChanges();
+  return fixture.nativeElement as HTMLElement;
+}
+
+describe('AnalyticsWidget -- a refused query', () => {
+  it('says the sentence, and keeps the engine\'s words closed under Technical detail', () => {
+    const tile = refused('Binder Error: No function matches the given name and argument types \'substr(TIMESTAMP, INTEGER_LITERAL, INTEGER_LITERAL)\'');
+    expect(tile.textContent).toContain('This query uses substr() on a date and time');
+    const detail = tile.querySelector('details[data-test="widget-error-detail"]') as HTMLDetailsElement;
+    expect(detail).toBeTruthy();
+    expect(detail.open).toBe(false);
+    expect(detail.querySelector('summary')!.textContent).toContain('Technical detail');
+    expect(detail.querySelector('pre')!.textContent).toContain('Binder Error');
+  });
+
+  it('has no Technical detail when the server sent none', () => {
+    expect(refused('').querySelector('details')).toBeNull();
+  });
+});
+
 describe('AnalyticsWidget', () => {
   it('shows the chart only when ready, and names every other state', () => {
     expect(mount('ready').text()).toContain('THE CHART');

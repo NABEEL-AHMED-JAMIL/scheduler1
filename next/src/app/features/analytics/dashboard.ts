@@ -48,6 +48,12 @@ import { Mark, widgetConfigOf, widgetConfigString, WidgetView, combineFilters, a
 import { formatDuration } from '../../shared/ui/time-format';
 import { AdvancedOption, AdvancedSelect } from '../../shared/ui/advanced-select';
 
+/** Owner 2026-11-02: the engine's words a refused query's sentence stands for (analytics' data.detail), for the tile's "Technical detail". */
+function detailOf(data: unknown): string | undefined {
+  const detail = (data as { detail?: unknown } | null | undefined)?.detail;
+  return typeof detail === 'string' && detail ? detail : undefined;
+}
+
 /**
  * How many of a board's tiles run at once (owner 2026-10-12: tiles load in parallel). Three of the four permits the
  * analytics governor admits, so one board never holds them all.
@@ -2192,7 +2198,7 @@ export class Dashboards implements OnInit, OnDestroy {
       next: response => {
         if (response.status !== API_SUCCESS || !response.data) {
           done({ state: 'failed', view: null, queryId,
-            error: response.message || 'That query could not be run.' });
+            error: response.message || 'That query could not be run.', errorDetail: detailOf(response.data) });
           return;
         }
         done({ state: 'done', error: '', queryId, outcomes: response.data.boardFilters,
@@ -2200,7 +2206,7 @@ export class Dashboards implements OnInit, OnDestroy {
       },
       error: err => {
         done({ state: 'failed', view: null, queryId,
-          error: err?.error?.message || 'That query could not be run.' });
+          error: err?.error?.message || 'That query could not be run.', errorDetail: detailOf(err?.error?.data) });
       },
     });
   }
