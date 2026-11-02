@@ -219,11 +219,13 @@ describe('Generated reports layout (UX final RP1, CV1)', () => {
     expect(el.querySelector('app-table-shell .table-toolbar')!.textContent).not.toContain('Refresh');
   });
 
-  it('names its primary as the converter\'s mode, and opens the converter on it', () => {
-    const { fixture } = page();
-    const link = (fixture.nativeElement as HTMLElement).querySelector<HTMLAnchorElement>('[data-test="pdf-from-dataset"]')!;
-    expect(link.textContent!.trim()).toBe('PDF from a dataset');
-    expect(link.getAttribute('href')).toBe('/tools/converter?mode=dataset');
+  it('makes a PDF from a dataset or a run here, in a panel (the tools redesign took it out of the converter)', () => {
+    const { fixture, p } = page();
+    const open = vi.spyOn(p, 'makePdf').mockImplementation(() => {});
+    const button = (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('[data-test="pdf-from-dataset"]')!;
+    expect(button.textContent!.trim()).toBe('PDF from a dataset or a run');
+    button.click();
+    expect(open).toHaveBeenCalled();
   });
 
   it('keeps each row\'s actions in one ⋮ menu named after the row', () => {

@@ -1,0 +1,16 @@
+/* New transcript (tools redesign): the drop zone, the recordings to send, their options. */
+.tr-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.625rem; padding: 0.875rem 1rem; border-bottom: 1px solid var(--border-subtle); }
+.nt-drop { display: grid; justify-items: center; gap: 0.5rem; text-align: center; padding: 1.75rem; border: 1.5px dashed var(--border-strong);
+           border-radius: var(--radius-card); background: var(--surface-inset); }
+.nt-drop-on { border-color: var(--color-info-600); background: var(--info-soft); }
+.nt-glyph { display: grid; place-items: center; width: 3.25rem; height: 3.25rem; border-radius: var(--radius-card); background: var(--surface-raised);
+            border: 1px solid var(--border-subtle); color: var(--text-secondary); font-size: 1.25rem; }
+.nt-file { display: grid; grid-template-columns: 2.25rem minmax(0, 1fr) auto; gap: 0.75rem; align-items: center; padding: 0.75rem;
+           border: 1px solid var(--border-subtle); border-radius: var(--radius-card); background: var(--surface-raised); }
+.nt-ficon { display: grid; place-items: center; width: 2.25rem; height: 2.25rem; border-radius: var(--radius-lg); background: var(--accent-soft); color: var(--accent-text); }
+.nt-opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 1rem; }
+.nt-opts .field { margin: 0; }
+.nt-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; justify-content: space-between; padding-top: 1rem;
+           border-top: 1px solid var(--border-subtle); }
+
+

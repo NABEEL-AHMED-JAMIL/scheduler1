@@ -1,194 +1,416 @@
 <div class="page-tool">
   <app-page-header title="Audio Transcript"
-                   subtitle="Speech-to-text for .mp3 and .m4a, transcribed the same way a scheduled run does it." />
+                   subtitle="Speech to text for visit recordings, dictations and calls: who said what, and when. Recordings never leave this platform.">
+    <button type="button" class="btn btn-primary btn-sm" (click)="choose(null)" data-test="new-transcript-button"><app-icon name="plus" />New transcript</button>
+  </app-page-header>
 
-  <!-- Owner #27 (2026-10-19): one full-width card, as the converter; what the tool takes is one compact line in it. -->
-    <app-section [card]="true" title="Choose the recording" sub="Upload one from this computer, or use one already in a bucket.">
-      <div class="limits-strip" data-test="transcript-limits" aria-label="What it takes">
-        <span><b>Formats</b> {{ limits().formats.join(', ') }}</span>
-        <span><b>Upload</b> up to {{ limits().uploadMaxMb }} MB</span>
-        <span><b>From a bucket</b> up to {{ limits().bucketMaxMb }} MB</span>
-        <span><b>Time</b> up to {{ limits().timeoutMinutes }} minutes a recording</span>
-        <span class="limits-note">Billed by the minute of audio. If the transcriber is busy you're told so; nothing is lost, try again in about {{ limits().retryAfterSeconds }} seconds. A file over the upload limit can go to a bucket first.</span>
+  <!-- Below a wide screen the rail is a picker at the top. -->
+  <div class="railpick">
+    <app-icon name="history" class="icon-muted" />
+    <select class="input input-sm" aria-label="Choose a recording" (change)="onRailPick($any($event.target).value)">
+      <option value="new" [selected]="chosenId() == null">New transcript</option>
+      @for (r of rail(); track r.recordingId) {
+        <option [value]="r.recordingId" [selected]="chosenId() === r.recordingId">{{ r.name }} · {{ clock(r.durationSeconds) }} · {{ statusPill(r).label }}</option>
+      }
+    </select>
+    <span class="text-xs text-[color:var(--text-muted)]">{{ railTotal() }} {{ railTotal() === 1 ? 'recording' : 'recordings' }} in the last 30 days</span>
+  </div>
+
+  <div class="tr">
+    <!-- Recordings: everything transcribed in 30 days. -->
+    <section class="card p-0 rail" aria-labelledby="rail-h" data-test="recordings-rail">
+      <header class="tr-head"><h2 id="rail-h" class="text-base font-semibold m-0">Recordings</h2>
+        <span class="text-xs text-[color:var(--text-muted)] ml-auto">last 30 days</span></header>
+      <div class="rail-tools">
+        <div class="search-field">
+          <app-icon name="search" size="0.95em" />
+          <input class="input input-sm" placeholder="Search names and transcript text" [value]="railQuery()" aria-label="Search recordings"
+                 (input)="setRailQuery($any($event.target).value)" />
+        </div>
+        <app-segmented [value]="railView()" (valueChange)="setRailView($event)" [options]="railOptions()" ariaLabel="Whose recordings" />
       </div>
-      <div class="space-y-4">
-        @if (ownSignIn) {
-          <p class="text-sm text-[color:var(--text-muted)]" data-test="bucket-in-workspace">A recording in a workspace's bucket is transcribed in "Work in this workspace", opened from Platform › Workspaces.</p>
-        } @else {
-          <app-segmented [value]="mode()" (valueChange)="setMode($event)" [options]="modeOptions" ariaLabel="Choose a source" />
-        }
-
-        @if (mode() === 'upload') {
-          <app-file-dropzone [file]="file()" (fileChange)="onFile($event)" accept=".mp3,.m4a"
-                             prompt="Drop an audio file here" [hint]="'.mp3 or .m4a, up to ' + limits().uploadMaxMb + ' MB'" />
-        } @else {
-          <!-- The console's one file picker: buckets, folders, search, type filter, paging, the selection kept. -->
-          @if (selectedKey()) {
-            <div class="picked-file" data-test="picked-file">
-              <app-icon name="volume" size="1.5rem" class="icon-info shrink-0" />
-              <div class="min-w-0 flex-1">
-                <div class="text-sm font-medium truncate" [title]="selectedKey()">{{ picked()?.name || selectedKey() }}</div>
-                <div class="mono text-xs text-[color:var(--text-muted)] truncate" [title]="bucket() + '/' + selectedKey()">{{ bucket() }}/{{ folderOf(selectedKey()) }}</div>
-                @if (pickedMeta(); as meta) { <div class="text-xs text-[color:var(--text-secondary)] tabular">{{ meta }}</div> }
-              </div>
-              <button type="button" class="btn btn-default btn-sm" (click)="chooseFile()"><app-icon name="folder" />Change…</button>
-              <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Clear the chosen file" title="Clear" (click)="clearPick()"><app-icon name="close" /></button>
-            </div>
-          } @else {
-            <div class="picked-file picked-empty">
-              <app-icon name="folder" size="1.5rem" class="icon-muted shrink-0" />
-              <div class="min-w-0 flex-1 text-sm text-[color:var(--text-muted)]">No file chosen yet. Search, filter by type and page through any bucket you can see.</div>
-              <button type="button" class="btn btn-default btn-sm" (click)="chooseFile()"><app-icon name="folder" />Choose an audio file…</button>
-            </div>
-          }
-        }
-
-        @if (problem()) {
-          <p class="text-sm text-warn-500 flex items-center gap-2" role="alert" data-test="audio-problem"><app-icon name="alert" class="shrink-0" />{{ problem() }}</p>
-        }
-
-        <label class="flex items-center gap-2 text-sm">
-          <input type="checkbox" class="checkbox" [checked]="timestamps()"
-                 (change)="timestamps.set($any($event.target).checked)" />
-          Include timestamps before each segment
-        </label>
-      </div>
-
-      <!-- UX review 2026-10-12 (A5, TR1): the primary at the bottom right, in the card's actions bar. -->
-      <app-actions-bar class="-mx-5 -mb-5 mt-5 rounded-b-card" [dialog]="true" label="Transcribe"
-                       [state]="extracting() ? 'Transcription runs on the server and can take a few minutes for a long recording.' : ''">
-        <button type="button" class="btn btn-primary" [disabled]="!canExtract() || extracting()"
-                (click)="extract()" data-test="transcribe">
-          <app-icon name="volume" [busy]="extracting()" />
-          {{ extracting() ? 'Transcribing…' : 'Extract transcript' }}
-        </button>
-      </app-actions-bar>
-    </app-section>
-
-  @if (error()) {
-    <div class="card p-4 flex flex-wrap items-center gap-2" role="alert" [attr.data-busy]="busy() || null" data-test="transcript-error">
-      @if (busy()) { <app-icon name="clock" class="icon-warn shrink-0" /> } @else { <app-icon name="alert" class="icon-crit shrink-0" /> }
-      <p class="text-sm flex-1 min-w-0" [class.text-crit-500]="!busy()" [class.text-warn-500]="busy()">{{ error() }}</p>
-      <button type="button" class="btn btn-default btn-sm" (click)="extract()" [disabled]="extracting()">
-        <app-icon name="refresh" />Try again
+      <button type="button" class="rec" [class.rec-sel]="chosenId() == null" (click)="choose(null)">
+        <span class="rec-name">New transcript</span><span></span>
+        <span class="rec-meta">Drop a recording to start</span>
       </button>
-    </div>
-  }
-
-  @if (transcript()) {
-    <div class="card overflow-hidden">
-      <div class="flex flex-wrap items-center gap-2 px-4 py-2.5 border-b border-subtle"
-          >
-        <span class="text-sm font-semibold">Transcript</span>
-        <span class="text-xs text-[color:var(--text-muted)]">
-          {{ segments().length }} {{ segments().length === 1 ? 'segment' : 'segments' }} ·
-          {{ transcript().length }} chars
-        </span>
-
-        <app-segmented class="ml-auto" [(value)]="view" [options]="views"
-                       ariaLabel="Choose how to read the transcript" />
-
-        @if (reader.supported) {
-          <!-- The visible words name it: an aria-label saying "Read the transcript aloud" over a
-               button that says "Resume" is two names for one control (WCAG 2.5.3). -->
-          <button type="button" class="btn btn-default btn-sm" (click)="toggleReading()">
-            <app-icon [name]="reader.state() === 'playing' ? 'pause' : 'play'" />
-            {{ reader.state() === 'idle' ? 'Read aloud' : reader.state() === 'playing' ? 'Pause' : 'Resume' }}
+      @if (railState.error() && !rail().length) {
+        <div class="p-3"><app-inline-status [error]="railState.error()" (retry)="loadRail()" /></div>
+      } @else if (railState.pending() && !rail().length) {
+        <div class="p-3"><app-loading shape="list" [count]="4" label="Loading recordings…" /></div>
+      } @else {
+        @for (r of rail(); track r.recordingId) {
+          @let pill = statusPill(r);
+          <button type="button" class="rec" [class.rec-sel]="chosenId() === r.recordingId" (click)="choose(r.recordingId)" [attr.data-recording]="r.recordingId">
+            <span class="rec-name">{{ r.name }}</span>
+            <span class="text-xs text-[color:var(--text-muted)] tabular">{{ clock(r.durationSeconds) }}</span>
+            <span class="rec-meta">
+              <span class="pill" [class.pill-ok]="pill.tone === 'ok'" [class.pill-info]="pill.tone === 'info'" [class.pill-warn]="pill.tone === 'warn'"
+                    [class.pill-crit]="pill.tone === 'crit'" [class.pill-neutral]="pill.tone === 'neutral'">
+                @if (r.status === 'RUNNING') { <app-icon name="refresh" [busy]="true" size="0.85em" /> }{{ pill.label }}</span>
+              <span class="truncate">{{ railLine(r) }}</span>
+            </span>
           </button>
-          @if (reader.state() !== 'idle') {
-            <button type="button" class="btn btn-default btn-sm" (click)="reader.stop()"
-                    aria-label="Stop reading">
-              <app-icon name="stop" />Stop
-            </button>
-            <app-segmented [value]="speedId()" (valueChange)="setSpeed($event)"
-                           [options]="speeds" ariaLabel="Reading speed" />
-          }
-        }
-
-        <button type="button" class="btn btn-default btn-sm" (click)="copy()">
-          <app-icon name="copy" />Copy
-        </button>
-      </div>
-
-      @switch (view()) {
-        @case ('timeline') {
-          <div class="max-h-96 overflow-auto p-4">
-            @for (segment of segments(); track $index) {
-              @if (segment.time) {
-                <p class="ts-line" [attr.data-read-index]="$index"
-                   [class.ts-reading]="$index === readingIndex()">
-                  <!-- Two controls, not one with a double-click: a double-click fired the copy twice
-                       before reading, and had no keyboard or touch route at all. -->
-                  <button type="button" class="ts-mark" title="Copy this timestamp"
-                          (click)="copyStamp(segment.time)">{{ segment.time }}</button>
-                  <button type="button" class="btn btn-ghost btn-icon btn-xs align-middle"
-                          [attr.aria-label]="'Read aloud from ' + segment.time" title="Read aloud from here"
-                          (click)="readFrom($index)"><app-icon name="play" size="0.8em" /></button>
-                  <span class="ts-text">
-                    <app-read-along-text [text]="segment.text"
-                      [at]="$index === readingIndex() ? readingAt() : null" />
-                  </span>
-                </p>
-              } @else {
-                <p class="ts-text whitespace-pre-wrap break-words" [attr.data-read-index]="$index"
-                   [class.ts-reading]="$index === readingIndex()">
-                  <app-read-along-text [text]="segment.text"
-                    [at]="$index === readingIndex() ? readingAt() : null" />
-                </p>
-              }
-            }
-          </div>
-        }
-
-        @case ('table') {
-          <div class="max-h-96 overflow-auto">
-            <table class="table-modern">
-              <thead>
-                <tr>
-                  <th class="w-12 text-right">#</th>
-                  @if (hasTimes()) { <th class="w-28">Time</th> }
-                  <th>Text</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (segment of segments(); track $index) {
-                  <tr [attr.data-read-index]="$index"
-                      [class.ts-reading]="$index === readingIndex()">
-                    <td class="text-right tabular text-[color:var(--text-muted)]">{{ $index + 1 }}</td>
-                    @if (hasTimes()) {
-                      <td class="tabular whitespace-nowrap">
-                        @if (segment.time) {
-                          <button type="button" class="ts-mark" title="Copy this timestamp"
-                                  (click)="copyStamp(segment.time)">{{ segment.time }}</button>
-                        } @else { <span class="text-[color:var(--text-muted)]">—</span> }
-                      </td>
-                    }
-                    <td class="break-words">
-                      <app-read-along-text [text]="segment.text"
-                        [at]="$index === readingIndex() ? readingAt() : null" />
-                    </td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          </div>
-        }
-
-        @case ('console') {
-          <div class="log-console max-h-96">
-            @for (segment of segments(); track $index) {
-              <div class="log-console-line" [attr.data-read-index]="$index"
-                   [class.ts-reading]="$index === readingIndex()">
-                @if (segment.time) { <span class="log-console-time">[{{ segment.time }}]</span> }
-                <span>
-                  <app-read-along-text [text]="segment.text"
-                    [at]="$index === readingIndex() ? readingAt() : null" />
-                </span>
-              </div>
-            }
-          </div>
+        } @empty {
+          <p class="p-4 text-sm text-[color:var(--text-muted)] m-0">{{ railQuery() ? 'Nothing here matches.' : 'Nothing transcribed in the last 30 days.' }}</p>
         }
       }
+    </section>
+
+    <!-- The middle: a new transcript, one in progress, a failure, or a finished one. -->
+    <div class="tr-main">
+      @if (chosenId() == null) {
+        <app-new-transcript [limits]="limits()" [canSend]="canSend()" [bucketAllowed]="!ownSignIn"
+                            (created)="onCreated($event)" (rejected)="onRejected($event)" />
+        @for (r of myActive(); track r.recordingId) {
+          <ng-container *ngTemplateOutlet="progressCard; context: { $implicit: activeDetail(r) }" />
+        }
+        @if (problems().length || rejects().length) {
+          <section class="card p-0" aria-labelledby="cnt-h" data-test="could-not">
+            <header class="tr-head"><h2 id="cnt-h" class="text-base font-semibold m-0">Could not be transcribed</h2>
+              <span class="text-xs text-[color:var(--text-muted)]">said in plain words, with what to do next</span></header>
+            @for (a of rejects(); track $index) {
+              <div class="err-row">
+                <app-icon [name]="a.icon" class="icon-crit" />
+                <div><div class="text-sm font-medium">{{ a.title }}</div><div class="text-sm text-[color:var(--text-secondary)]">{{ a.text }}</div></div>
+                <a class="btn btn-default btn-sm" routerLink="/tools/converter">{{ a.actionLabel }}</a>
+              </div>
+            }
+            @for (p of problems(); track p.r.recordingId) {
+              <div class="err-row" [attr.data-problem]="p.r.errorCode || p.r.status">
+                <app-icon [name]="p.advice!.icon" [class.icon-crit]="p.r.status !== 'QUEUED'" [class.icon-warn]="p.r.status === 'QUEUED'" />
+                <div><div class="text-sm font-medium">{{ p.advice!.title }}</div><div class="text-sm text-[color:var(--text-secondary)]">{{ p.advice!.text }}</div></div>
+                @if (p.r.status === 'QUEUED') {
+                  <span class="pill pill-warn">{{ statusPill(p.r).label }}</span>
+                } @else if (p.advice!.action) {
+                  <button type="button" class="btn btn-default btn-sm" (click)="act(p.r, p.advice!)">{{ p.advice!.actionLabel }}</button>
+                }
+              </div>
+            }
+          </section>
+        }
+      } @else if (detail(); as d) {
+        @if (d.status === 'QUEUED' || d.status === 'RUNNING') {
+          <ng-container *ngTemplateOutlet="progressCard; context: { $implicit: d }" />
+        } @else if (d.status !== 'DONE') {
+          @if (adviceOf(d); as a) {
+            <section class="card p-0" data-test="recording-failed">
+              <header class="tr-head"><h2 class="text-base font-semibold m-0 truncate">{{ d.name }}</h2>
+                <button type="button" class="btn btn-default btn-intent-crit btn-sm ml-auto" (click)="remove(d)"><app-icon name="trash" />Delete</button></header>
+              <div class="err-row">
+                <app-icon [name]="a.icon" class="icon-crit" />
+                <div><div class="text-sm font-medium">{{ a.title }}</div><div class="text-sm text-[color:var(--text-secondary)]">{{ a.text }}</div></div>
+                @if (a.action) { <button type="button" class="btn btn-default btn-sm" (click)="act(d, a)">{{ a.actionLabel }}</button> }
+              </div>
+            </section>
+          }
+        } @else {
+          <!-- The player: waveform, speed, keys, one lane per speaker. -->
+          <section class="card p-0 player" data-test="player">
+            <header class="tr-head">
+              <div class="min-w-0 flex-1">
+                <h2 class="text-lg font-semibold m-0 truncate" data-test="recording-title">{{ d.name }}</h2>
+                <div class="text-xs text-[color:var(--text-muted)] tabular">
+                  {{ clock(d.durationSeconds) }}@if (d.language) { · {{ languageLabel(d.language) }} (detected) }@if (hasSpeakers()) { · {{ speakers().length }} speakers } · {{ segments().length }} segments
+                  · <span class="mono">{{ d.fileName }}</span>@if (d.partCount) { · part {{ d.partIndex }} of {{ d.partCount }} }
+                </div>
+              </div>
+              @if (!editing()) {
+                <button type="button" class="btn btn-default btn-sm" (click)="startEditing()" data-test="correct-text"><app-icon name="edit" />Correct text</button>
+              }
+              <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="recMenu" aria-label="More actions for this recording"><app-icon name="dots" /></button>
+              <ng-template #recMenu>
+                <div cdkMenu class="card shadow-xl py-1 min-w-52 text-sm">
+                  <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="remove(d)"><app-icon name="trash" class="icon-crit" />Delete recording</button>
+                </div>
+              </ng-template>
+            </header>
+            <div class="px-4 py-3">
+              @if (audioUrl(); as src) {
+                <audio #audio [src]="src" preload="auto" (timeupdate)="onTime()" (loadedmetadata)="onLoaded()"
+                       (play)="playing.set(true)" (pause)="playing.set(false)" (ended)="playing.set(false)"></audio>
+              }
+              <div class="ctl">
+                <button type="button" class="btn btn-default btn-icon btn-sm" aria-label="Back 5 seconds" title="Back 5 s (J)" [disabled]="!audioUrl()" (click)="skip(-5)"><app-icon name="undo" /></button>
+                <button type="button" class="play" [attr.aria-label]="playing() ? 'Pause' : 'Play'" [disabled]="!audioUrl()" (click)="toggle()" data-test="play">
+                  <app-icon [name]="playing() ? 'pause' : 'play'" /></button>
+                <button type="button" class="btn btn-default btn-icon btn-sm" aria-label="Forward 5 seconds" title="Forward 5 s (L)" [disabled]="!audioUrl()" (click)="skip(5)"><app-icon name="redo" /></button>
+                <span class="tabular text-base font-semibold" data-test="time">{{ clock(current()) }}</span>
+                <span class="tabular text-[color:var(--text-muted)]">/ {{ clock(d.durationSeconds) }}</span>
+                <div class="seg" role="group" aria-label="Playback speed">
+                  @for (r of rates; track r) {
+                    <button type="button" class="seg-btn" [class.seg-on]="rate() === r" [attr.aria-pressed]="rate() === r" (click)="setRate(r)">{{ r }}×</button>
+                  }
+                </div>
+                <span class="keys"><kbd>Space</kbd> play · <kbd>J</kbd> <kbd>L</kbd> 5 s · <kbd>/</kbd> search</span>
+              </div>
+              @if (!d.recordingKept) {
+                <p class="text-xs text-[color:var(--text-muted)] mt-2 mb-0" data-test="no-recording">The recording was not kept (or its 30 days are over), so it cannot be played; the transcript is all here.</p>
+              } @else if (audioLoading()) {
+                <p class="text-xs text-[color:var(--text-muted)] mt-2 mb-0">Loading the recording…</p>
+              } @else if (audioError()) {
+                <p class="text-xs text-[color:var(--warn-text)] mt-2 mb-0">{{ audioError() }}</p>
+              }
+              <app-waveform class="mt-3" [peaks]="d.peaks ?? []" [position]="position()" [hits]="hitMarks()" (seek)="seekFraction($event)" />
+              @if (hasSpeakers()) {
+                <div class="lanes">
+                  @for (lane of lanes(); track lane.key) {
+                    <div class="lane"><span class="lane-name"><span [class]="'dot ' + speakerTone(lane.key)"></span>{{ speakerName(lane.key) }}</span>
+                      <span class="trk">@for (s of lane.spans; track $index) { <i [class]="speakerTone(lane.key)" [style.left.%]="s.left" [style.width.%]="s.width"></i> }</span></div>
+                  }
+                </div>
+              }
+            </div>
+          </section>
+
+          <!-- The transcript: search, speaker chips, follow, three views. -->
+          <section class="card p-0" data-test="transcript-card">
+            <div class="t-tools">
+              <div class="search-field t-search">
+                <app-icon name="search" size="0.95em" />
+                <input #search class="input input-sm" placeholder="Search what was said" [value]="query()" aria-label="Search the transcript"
+                       (input)="setQuery($any($event.target).value)" (keydown.enter)="goToHit(hitAt() + 1)" data-test="transcript-search" />
+              </div>
+              @if (query()) {
+                <span class="text-sm tabular" data-test="hit-count">{{ hits().length ? (hitAt() + 1) + ' of ' + hits().length : 'Not said' }}</span>
+                <button type="button" class="btn btn-default btn-icon btn-xs" aria-label="Previous match" [disabled]="!hits().length" (click)="goToHit(hitAt() - 1)"><app-icon name="chevronUp" /></button>
+                <button type="button" class="btn btn-default btn-icon btn-xs" aria-label="Next match" [disabled]="!hits().length" (click)="goToHit(hitAt() + 1)"><app-icon name="chevronDown" /></button>
+              }
+              @for (s of speakers(); track s.key) {
+                <button type="button" class="chipf" [class.chipf-off]="hiddenHas(s.key)" [attr.aria-pressed]="!hiddenHas(s.key)" (click)="toggleSpeaker(s.key)">
+                  <span [class]="'dot ' + speakerTone(s.key)"></span>{{ speakerName(s.key) }}</button>
+              }
+              <div class="t-tools-end">
+                <label class="sw-row"><input type="checkbox" role="switch" class="sw" [checked]="follow()" (change)="follow.set($any($event.target).checked)" />Follow playback</label>
+                <app-segmented [value]="mode()" (valueChange)="mode.set($event)" [options]="modeOptions" ariaLabel="How to show the transcript" />
+              </div>
+            </div>
+            @if (editing()) {
+              <div class="edit-bar">
+                <span class="text-sm">Correct the words, then save. Corrections are kept as a new version; the original stays.</span>
+                <button type="button" class="btn btn-default btn-sm ml-auto" (click)="editing.set(false)" [disabled]="saving()">Cancel</button>
+                <button type="button" class="btn btn-primary btn-sm" (click)="saveEdits()" [disabled]="saving()" data-test="save-corrections">Save corrections</button>
+              </div>
+            }
+            @switch (mode()) {
+              @case ('table') {
+                <div class="scroll-table">
+                  <table class="table-modern">
+                    <thead><tr><th>Time</th>@if (hasSpeakers()) { <th>Speaker</th> }<th>What was said</th></tr></thead>
+                    <tbody>
+                      @for (s of shownSegments(); track s.i) {
+                        <tr [class.row-selected]="playingIndex() === segments().indexOf(s)" [attr.data-seg]="segments().indexOf(s)">
+                          <td class="mono whitespace-nowrap"><button type="button" class="ts" (click)="playFrom(s)" [attr.aria-label]="'Play from ' + clock(s.startMs / 1000)"><app-icon name="play" size="0.8em" />{{ clock(s.startMs / 1000) }}</button></td>
+                          @if (hasSpeakers()) { <td class="whitespace-nowrap">{{ speakerName(s.speaker) }}</td> }
+                          <td>{{ s.text }}</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              }
+              @case ('plain') {
+                <pre class="plain" data-test="plain-text">{{ plain() }}</pre>
+              }
+              @default {
+                <div class="segs" data-test="segments">
+                  @for (s of shownSegments(); track s.i) {
+                    @let idx = segments().indexOf(s);
+                    <div class="seg-l" [class.now]="playingIndex() === idx" [attr.data-seg]="idx">
+                      <button type="button" class="ts" (click)="playFrom(s)" [attr.aria-label]="'Play from ' + clock(s.startMs / 1000)">
+                        <app-icon [name]="playingIndex() === idx && playing() ? 'pause' : 'play'" size="0.8em" />{{ clock(s.startMs / 1000) }}</button>
+                      <div class="min-w-0">
+                        @if (s.speaker != null || playingIndex() === idx || s.edited) {
+                          <div class="spk">
+                            @if (s.speaker != null) { <span [class]="'dot ' + speakerTone(s.speaker)"></span><span [class]="'spk-name ' + speakerTone(s.speaker)">{{ speakerName(s.speaker) }}</span> }
+                            @if (playingIndex() === idx && playing()) { <span class="pill pill-info">Playing</span> }
+                            @if (s.edited) { <span class="pill pill-neutral" [title]="'Heard: ' + (s.original || '')">Corrected</span> }
+                          </div>
+                        }
+                        @if (editing()) {
+                          <textarea class="input t-edit" rows="2" [value]="drafts()[s.i] ?? s.text" [attr.aria-label]="'Words at ' + clock(s.startMs / 1000)"
+                                    (input)="draft(s.i, $any($event.target).value)"></textarea>
+                        } @else {
+                          <p class="txt">@for (p of parts(s, idx); track $index) {@if (p.hit >= 0) {<mark [class.cur]="p.hit === hitAt()">{{ p.text }}</mark>} @else {<span>{{ p.text }}</span>}}</p>
+                        }
+                      </div>
+                    </div>
+                  } @empty {
+                    <p class="p-4 text-sm text-[color:var(--text-muted)] m-0">No segment of the speakers chosen.</p>
+                  }
+                </div>
+              }
+            }
+            <div class="t-foot">
+              <span>Times are where each part starts; the playing part is highlighted.</span>
+              <span>Corrections are kept as a new version; the original stays.@if (d.version && d.version > 1) { This is version {{ d.version }}. }</span>
+            </div>
+          </section>
+        }
+      } @else if (detailState.error()) {
+        <section class="card p-4"><app-inline-status [error]="detailState.error()" (retry)="reload()" /></section>
+      } @else {
+        <section class="card p-4"><app-loading shape="panel" [count]="4" label="Loading the recording…" /></section>
+      }
     </div>
-  }
+
+    <!-- The right: what it takes (new), or how to use this transcript. -->
+    <aside class="tr-side">
+      @if (chosenId() == null) {
+        <section class="card p-0" data-test="what-it-takes">
+          <header class="tr-head"><h2 class="text-base font-semibold m-0">What it takes</h2></header>
+          <dl class="kv p-4 m-0">
+            <dt>Formats</dt><dd>{{ formats() }}</dd>
+            <dt>Upload</dt><dd>up to {{ limits().uploadMaxMb }} MB a file</dd>
+            <dt>From a bucket</dt><dd>up to {{ limits().bucketMaxMb }} MB</dd>
+            <dt>Length</dt><dd>up to {{ limits().maxMinutes ?? 30 }} minutes</dd>
+            <dt>Billing</dt><dd>by the minute of audio</dd>
+            @if (limits().running != null) {
+              <dt>Right now</dt><dd><span class="pill pill-info">{{ limits().running }} transcribing, {{ limits().waiting ?? 0 }} waiting</span></dd>
+            }
+          </dl>
+        </section>
+        <section class="card p-0">
+          <header class="tr-head"><h2 class="text-base font-semibold m-0">For a better transcript</h2></header>
+          <ul class="tips">
+            <li><app-icon name="mic" class="icon-muted" />Keep the phone within an arm's length of whoever speaks most.</li>
+            <li><app-icon name="users" class="icon-muted" />Say names and roles at the start ("This is Alex, the wound nurse"): naming speakers is then one click.</li>
+            <li><app-icon name="hash" class="icon-muted" />Spell out measurements and doses: "two point nine centimetres".</li>
+          </ul>
+        </section>
+      } @else if (detail(); as d) {
+        @if (d.status === 'DONE') {
+          <section class="card p-0" data-test="use-transcript">
+            <header class="tr-head"><h2 class="text-base font-semibold m-0">Use this transcript</h2></header>
+            <div class="p-4 flex flex-col gap-2">
+              <div class="flex gap-2">
+                <button type="button" class="btn btn-primary flex-1 justify-center" (click)="download('txt')" data-test="download-txt"><app-icon name="download" />Download</button>
+                <button type="button" class="btn btn-default btn-icon" [cdkMenuTriggerFor]="dlMenu" aria-label="Choose what to download"><app-icon name="chevronDown" /></button>
+                <ng-template #dlMenu>
+                  <div cdkMenu class="card shadow-xl py-1 min-w-64 text-sm">
+                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="download('txt')"><app-icon name="file" />Text with speakers and times<span class="menu-ext">.txt</span></button>
+                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="download('vtt')"><app-icon name="file" />Subtitles<span class="menu-ext">.vtt</span></button>
+                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="download('srt')"><app-icon name="file" />Subtitles<span class="menu-ext">.srt</span></button>
+                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="download('json')"><app-icon name="code" />Segments and speakers<span class="menu-ext">.json</span></button>
+                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="download('pdf')"><app-icon name="file" />Printable transcript<span class="menu-ext">.pdf</span></button>
+                  </div>
+                </ng-template>
+              </div>
+              @if (d.maskExports) { <p class="text-xs text-[color:var(--text-muted)] m-0">Downloads replace personal details with [NAME], [DOB] and [PHONE].</p> }
+              @if (canSend()) {
+                <button type="button" class="btn btn-default justify-start" (click)="sendToDocuments()" [disabled]="!!d.documents?.ocrDocumentId" data-test="send-documents">
+                  <app-icon name="inbox" />{{ d.documents?.ocrDocumentId ? 'Sent to Documents (document ' + d.documents.ocrDocumentId + ')' : 'Send to Documents as a visit note…' }}</button>
+              }
+              <button type="button" class="btn btn-default justify-start" (click)="startPipeline()"><app-icon name="layers" />Start a pipeline…</button>
+              <button type="button" class="btn btn-default justify-start" (click)="copy()"><app-icon name="copy" />Copy text</button>
+            </div>
+          </section>
+
+          <section class="card p-0" data-test="speakers-card">
+            <header class="tr-head"><h2 class="text-base font-semibold m-0">Speakers</h2>
+              @if (hasSpeakers()) { <span class="text-xs text-[color:var(--text-muted)] ml-auto">name them once; every export uses the names</span> }</header>
+            @if (hasSpeakers()) {
+              <div class="p-4 flex flex-col gap-3">
+                @for (s of speakers(); track s.key) {
+                  <div class="spk-row">
+                    <div class="flex items-center gap-2">
+                      <span [class]="'dot ' + speakerTone(s.key)"></span>
+                      @if (renaming() === s.key) {
+                        <input class="input input-sm flex-1" [value]="s.name || ''" [placeholder]="s.label" [attr.aria-label]="'Name ' + s.label"
+                               (keydown.enter)="renameSpeaker(s.key, $any($event.target).value)" (blur)="renameSpeaker(s.key, $any($event.target).value)" />
+                      } @else {
+                        <span class="text-sm font-medium flex-1 truncate">{{ speakerName(s.key) }}</span>
+                      }
+                      <span class="text-xs tabular text-[color:var(--text-muted)]">{{ s.talkPct ?? 0 }}%</span>
+                      <button type="button" class="btn btn-default btn-icon btn-xs" [attr.aria-label]="'Name ' + speakerName(s.key)" (click)="renaming.set(s.key)"><app-icon name="edit" /></button>
+                    </div>
+                    <div class="flex items-center gap-2 mt-1.5">
+                      <span class="talk"><i [class]="speakerTone(s.key)" [style.width.%]="s.talkPct ?? 0"></i></span>
+                      @if (s.name) { <span class="text-xs text-[color:var(--text-muted)]">was {{ s.label }}</span> }
+                    </div>
+                  </div>
+                }
+                @if (speakers().length > 1) {
+                  <button type="button" class="link-inline text-sm text-left" [cdkMenuTriggerFor]="mergeMenu">Two speakers are one person? Merge them</button>
+                  <ng-template #mergeMenu>
+                    <div cdkMenu class="card shadow-xl py-1 min-w-64 text-sm">
+                      @for (a of speakers(); track a.key) {
+                        @for (b of speakers(); track b.key) {
+                          @if (a.key !== b.key) {
+                            <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="merge(a.key, b.key)">{{ speakerName(a.key) }} into {{ speakerName(b.key) }}</button>
+                          }
+                        }
+                      }
+                    </div>
+                  </ng-template>
+                }
+              </div>
+            } @else {
+              <p class="p-4 m-0 text-sm text-[color:var(--text-secondary)]" data-test="speakers-unavailable">
+                {{ limits().speakers?.available ? 'This recording was transcribed as one speaker.' : (limits().speakers?.reason || "Speaker labels aren't installed on this platform.") }}</p>
+            }
+          </section>
+        }
+
+        <section class="card p-0" data-test="details-card">
+          <header class="tr-head"><h2 class="text-base font-semibold m-0">Details</h2></header>
+          <dl class="kv p-4 m-0">
+            <dt>Source</dt><dd>Uploaded@if (d.fileSize != null) { · {{ size(d.fileSize) }} }</dd>
+            <dt>Length</dt><dd>{{ d.durationSeconds != null ? lengthText(d.durationSeconds) : '—' }}</dd>
+            @if (d.status === 'DONE') {
+              <dt>Language</dt><dd>{{ d.language ? languageLabel(d.language) + ', detected' : '—' }}</dd>
+              <dt>Model</dt><dd>{{ modelLabel(d.model) }}</dd>
+              <dt>Took</dt><dd>{{ tookText(d) }}</dd>
+              <dt>Billed</dt><dd>{{ d.billedMinutes ?? '—' }} audio {{ d.billedMinutes === 1 ? 'minute' : 'minutes' }}</dd>
+            }
+            <dt>By</dt><dd>{{ byLine(d) }}</dd>
+            <dt>Kept</dt><dd>{{ keptText(d) }}</dd>
+          </dl>
+        </section>
+
+        @if (d.status === 'DONE' && personal()) {
+          <section class="card p-4 personal" data-test="personal-card">
+            <p class="text-sm m-0 flex gap-2"><app-icon name="shield" class="shrink-0 mt-0.5" />
+              <span><b>Personal details heard:</b> {{ personal() }}. They stay in your download; turn on <b>Mask in exports</b> to replace them with [NAME], [DOB], [PHONE].</span></p>
+            <label class="sw-row mt-3"><input type="checkbox" role="switch" class="sw" [checked]="!!d.maskExports" [disabled]="saving()"
+                                              (change)="setMask($any($event.target).checked)" data-test="mask-exports" />Mask in exports</label>
+          </section>
+        }
+      }
+    </aside>
+  </div>
 </div>
+
+<!-- A recording in progress: its stages, how much was heard, time left, and the words so far. -->
+<ng-template #progressCard let-d>
+  <section class="card p-0" data-test="progress-card" [attr.data-recording]="d.recordingId">
+    <header class="tr-head">
+      <div class="min-w-0 flex-1">
+        <h2 class="text-base font-semibold m-0 truncate">{{ d.name }}</h2>
+        <div class="text-xs text-[color:var(--text-muted)]">@if (d.durationSeconds) { {{ clock(d.durationSeconds) }} · }{{ uploadedLine(d) }} · you can leave this page; it keeps going</div>
+      </div>
+      <button type="button" class="btn btn-default btn-sm" (click)="stop(d)" data-test="stop"><app-icon name="close" />Stop</button>
+    </header>
+    <div class="p-4">
+      @if (d.status === 'QUEUED') {
+        <p class="text-sm m-0" data-test="queued"><b>{{ statusPill(d).label }}</b>, starts by itself. @if ((d.queuePosition ?? 0) > 1) { {{ (d.queuePosition ?? 1) - 1 }} ahead of it. }Nothing is lost if you close this page.</p>
+      } @else {
+        <p class="text-sm m-0"><b>Transcribing… {{ progressOf(d) }}%</b>
+          <span class="text-[color:var(--text-secondary)]">@if (d.heardSeconds != null && d.durationSeconds) { {{ clock(d.heardSeconds) }} of {{ clock(d.durationSeconds) }} heard }@if (timeLeft(d.etaSeconds); as left) { · {{ left }} }</span></p>
+        <div class="progress mt-2" role="progressbar" aria-label="Transcribed" aria-valuemin="0" aria-valuemax="100" [attr.aria-valuenow]="progressOf(d)">
+          <div class="progress-bar" [style.width.%]="progressOf(d)"></div></div>
+      }
+      <ol class="steps">
+        @for (s of stagesFor(d); track s.key) { <li [class.done]="s.state === 'done'" [class.now]="s.state === 'now'">{{ s.label }}</li> }
+      </ol>
+    </div>
+    @if (d.segments?.length) {
+      <div class="live">
+        @for (s of d.segments!.slice(-4); track s.i) {
+          <div class="seg-l"><span class="ts">{{ clock(s.startMs / 1000) }}</span>
+            <div class="min-w-0">@if (s.speaker != null) { <div class="spk">{{ 'Speaker ' + (s.speaker + 1) }}</div> }<p class="txt">{{ s.text }}</p></div></div>
+        }
+        @if (d.speakersAsked !== 'one' && d.speakersAvailable) { <p class="text-xs text-[color:var(--text-muted)] px-4 pb-3 m-0">Speakers are named when the whole recording is done.</p> }
+      </div>
+    }
+  </section>
+</ng-template>

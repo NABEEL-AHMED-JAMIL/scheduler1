@@ -1,181 +1,99 @@
 import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import { HttpClient } from '@angular/common/http';
-import { Subject, of } from 'rxjs';
 import { Dialog } from '@angular/cdk/dialog';
-import { ObjectPicker, PickedObject } from '../../../shared/ui/object-picker';
+import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
+import { BehaviorSubject, NEVER, of } from 'rxjs';
 import { Transcript } from './transcript';
-import { StorageService } from '../../objects/storage.service';
+import { TranscriptApi } from './transcript.api';
 import { ToastService } from '../../../shared/ui/toast.service';
+import { StorageService } from '../../objects/storage.service';
+import { DEFAULT_TRANSCRIPT_LIMITS, RecordingDetail } from './transcript.model';
 
-/**
- * Exercises the real `segments` computed on the real component, constructed in an injection
- * context rather than rendered -- the rules under test are the parsing logic, not the markup.
- *
- * A previous version of this file re-implemented segments() as a standalone `parse()` function
- * and tested that copy instead of the component. It had already drifted from the real behaviour
- * (it collapsed a no-timestamp, multi-line transcript into a single segment; the component splits
- * one per non-empty line) and gave zero protection against a regression in transcript.ts itself.
- * `ngOnInit` is never invoked here (constructing via runInInjectionContext skips Angular's
- * lifecycle), so the mocked HttpClient/StorageService below only need to satisfy the injector,
- * not answer a real request.
- */
-function transcriptFor() {
+const DONE: RecordingDetail = {
+  recordingId: 41, name: 'Ward round · bay 3', fileName: 'ward-round-note.m4a', fileSize: 120_000, durationSeconds: 13, status: 'DONE',
+  stage: 'done', language: 'en', model: 'whisper-small', processingSeconds: 2.1, billedMinutes: 1, speakers: [], speakersAsked: 'auto',
+  speakersAvailable: false, recordingKept: true, keepRecording: true, maskExports: false, version: 1, createdBy: 1015,
+  createdAt: '2026-11-02T09:02:00', peaks: [0.1, 0.5, 0.3],
+  segments: [{ i: 0, startMs: 0, endMs: 6000, text: 'Blood pressure is stable this morning.' },
+    { i: 1, startMs: 6500, endMs: 12000, text: 'Check the blood sugar again at noon.' }],
+  personal: { names: 1, datesOfBirth: 0, phones: 0 },
+};
+
+function page(query: Record<string, string>, detail: RecordingDetail | null = DONE) {
   TestBed.resetTestingModule();
-  TestBed.configureTestingModule({
-    providers: [
-      { provide: HttpClient, useValue: { get: () => new Subject() } },
-      { provide: StorageService, useValue: {} },
-      { provide: ToastService, useValue: { success: () => {}, error: () => {}, info: () => {} } },
-    ],
-  });
-  return TestBed.runInInjectionContext(() => new Transcript());
+  const params = new BehaviorSubject(convertToParamMap(query));
+  const api = {
+    limits: () => of({ status: 'SUCCESS', data: DEFAULT_TRANSCRIPT_LIMITS }),
+    list: vi.fn(() => of({ status: 'SUCCESS', data: { rows: detail ? [detail] : [], failedCount: 0, total: detail ? 1 : 0 } })),
+    one: vi.fn(() => (detail ? of({ status: 'SUCCESS', data: detail }) : NEVER)),
+    audio: vi.fn(() => NEVER),
+    change: vi.fn(() => of({ status: 'SUCCESS', data: { ...DONE, maskExports: true } })),
+  };
+  TestBed.configureTestingModule({ providers: [
+    provideRouter([]),
+    { provide: TranscriptApi, useValue: api },
+    { provide: Dialog, useValue: { open: () => ({ closed: of(undefined) }) } },
+    { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn() } },
+    { provide: StorageService, useValue: { buckets: () => of({ status: 'SUCCESS', data: [] }) } },
+    { provide: ActivatedRoute, useValue: { queryParamMap: params, snapshot: { queryParamMap: params.value } } },
+  ] });
+  const fixture = TestBed.createComponent(Transcript);
+  fixture.detectChanges();
+  const el = fixture.nativeElement as HTMLElement;
+  return { fixture, t: fixture.componentInstance, el, api, text: () => el.textContent!.replace(/\s+/g, ' ') };
 }
 
-describe('Transcript segments', () => {
-  it('splits on the [HH:MM:SS.mmm] markers the extractor emits', () => {
-    const t = transcriptFor();
-    t.transcript.set('[00:00:03.550] Hello there. [00:00:07.120] Second bit.');
-    expect(t.segments()).toEqual([
-      { time: '00:00:03.550', text: 'Hello there.' },
-      { time: '00:00:07.120', text: 'Second bit.' },
-    ]);
+describe('Audio Transcript page (tools redesign)', () => {
+  it('opens on a new transcript, with what it takes and the speakers note when they are not installed', () => {
+    const { el, text } = page({ new: '1' });
+    expect(el.querySelector('[data-test=new-transcript]')).not.toBeNull();
+    expect(text()).toContain('.mp3, .m4a, .wav, .ogg');
+    expect(el.querySelector('[data-test=speakers-note]')!.textContent).toContain("Speaker labels aren't installed on this platform.");
+    expect((el.querySelector('#nt-spk') as HTMLSelectElement).disabled).toBe(true);
+    expect(el.querySelector('[data-test=recordings-rail]')!.textContent).toContain('Ward round · bay 3');
   });
 
-  it('accepts a marker with no milliseconds', () => {
-    const t = transcriptFor();
-    t.transcript.set('[00:01:02] Words');
-    expect(t.segments()).toEqual([{ time: '00:01:02', text: 'Words' }]);
+  it('shows a finished recording: its segments, the player, details, and no speaker lanes', () => {
+    const { el, text } = page({ id: '41' });
+    expect(el.querySelector('[data-test=player]')).not.toBeNull();
+    expect(el.querySelectorAll('[data-test=segments] .seg-l')).toHaveLength(2);
+    expect(el.querySelector('.lanes')).toBeNull();
+    expect(el.querySelector('[data-test=speakers-unavailable]')!.textContent).toContain("Speaker labels aren't installed");
+    expect(text()).toContain('Whisper small, on this platform');
+    expect(text()).toContain('1 audio minute');
+    expect(text()).toContain('Personal details heard: 1 name');
   });
 
-  it('splits an untimed transcript one segment per non-empty line', () => {
-    // The real behaviour: a no-marker transcript is split on line breaks, not collapsed into a
-    // single block -- otherwise the table/timeline views would have nothing to number.
-    const t = transcriptFor();
-    t.transcript.set('First line.\nSecond line.\n\nThird line after a blank one.');
-    expect(t.segments()).toEqual([
-      { time: '', text: 'First line.' },
-      { time: '', text: 'Second line.' },
-      { time: '', text: 'Third line after a blank one.' },
-    ]);
-  });
-
-  it('returns one untimed block for a single-line transcript with no markers', () => {
-    const t = transcriptFor();
-    t.transcript.set('Just a merged block of speech.');
-    expect(t.segments()).toEqual([{ time: '', text: 'Just a merged block of speech.' }]);
-  });
-
-  it('keeps text that appears before the first marker', () => {
-    // Dropping it would silently lose the opening words.
-    const t = transcriptFor();
-    t.transcript.set('Preamble. [00:00:01.000] After');
-    expect(t.segments()).toEqual([
-      { time: '', text: 'Preamble.' },
-      { time: '00:00:01.000', text: 'After' },
-    ]);
-  });
-
-  it('keeps a marker with no speech after it rather than dropping the entry', () => {
-    const t = transcriptFor();
-    t.transcript.set('[00:00:01.000] [00:00:02.000] Second');
-    expect(t.segments()).toEqual([
-      { time: '00:00:01.000', text: '' },
-      { time: '00:00:02.000', text: 'Second' },
-    ]);
-  });
-
-  it('handles an empty transcript', () => {
-    const t = transcriptFor();
-    expect(t.segments()).toEqual([]);
-  });
-
-  it('does not treat a bracketed non-timestamp as a marker', () => {
-    const t = transcriptFor();
-    t.transcript.set('[inaudible] some words');
-    expect(t.segments()).toEqual([{ time: '', text: '[inaudible] some words' }]);
-  });
-
-  it('reports hasTimes only when at least one segment carries a timestamp', () => {
-    const t = transcriptFor();
-    t.transcript.set('No markers here.');
-    expect(t.hasTimes()).toBe(false);
-    t.transcript.set('[00:00:01.000] Timed.');
-    expect(t.hasTimes()).toBe(true);
-  });
-
-  it('onFile stores the picked file and clears any previous transcript', () => {
-    const t = transcriptFor();
-    t.transcript.set('Stale result from a previous file.');
-    const file = new File(['audio'], 'clip.mp3', { type: 'audio/mpeg' });
-    t.onFile(file);
-    expect(t.file()).toBe(file);
-    expect(t.transcript()).toBe('');
-  });
-});
-
-/**
- * Audio from a bucket is chosen in the console's one ObjectPicker. Browsing, paging, stale answers
- * and read failures are the picker's, pinned in object-picker.spec.ts; the hand-rolled copy this
- * tool had (and its own tests of paging and failed folders) went with it.
- */
-describe('Transcript source from a bucket', () => {
-  function picking(picked: PickedObject | undefined) {
-    const open = vi.fn((_component: unknown, _config: any) => ({ closed: of(picked) }));
-    TestBed.resetTestingModule();
-    TestBed.configureTestingModule({ providers: [
-      { provide: HttpClient, useValue: { get: () => new Subject() } },
-      { provide: StorageService, useValue: {} },
-      { provide: Dialog, useValue: { open } },
-      { provide: ToastService, useValue: { success: () => {}, error: () => {}, info: () => {} } },
-    ] });
-    return { t: TestBed.runInInjectionContext(() => new Transcript()), open };
-  }
-
-  it('opens the shared ObjectPicker for mp3 and m4a files', () => {
-    const { t, open } = picking(undefined);
-    t.chooseFile();
-    expect(open.mock.calls[0][0]).toBe(ObjectPicker);
-    expect(open.mock.calls[0][1].data.extensions).toEqual(['mp3', 'm4a']);
-  });
-
-  it('takes the picked bucket and key, and reopens in that folder next time', () => {
-    const { t, open } = picking({ bucket: 'audio', key: 'calls/2026/one.mp3', name: 'one.mp3' });
-    t.mode.set('bucket');
-    t.chooseFile();
-    expect(t.bucket()).toBe('audio');
-    expect(t.selectedKey()).toBe('calls/2026/one.mp3');
-    expect(t.canExtract()).toBe(true);
-    t.chooseFile();
-    expect(open.mock.calls[1][1].data).toMatchObject({ bucket: 'audio', selectedKey: 'calls/2026/one.mp3' });
-  });
-});
-
-/**
- * "Read aloud from here" was a double-click on the timestamp: no keyboard or touch route, and the
- * double-click fired the timestamp's copy twice before reading began.
- */
-describe('Transcript timeline controls', () => {
-  it('reads aloud from a line with its own button, without copying anything', () => {
-    TestBed.resetTestingModule();
-    const success = vi.fn();
-    TestBed.configureTestingModule({ providers: [
-      { provide: HttpClient, useValue: { get: () => new Subject(), post: () => new Subject() } },
-      { provide: StorageService, useValue: { buckets: () => new Subject(), listObjects: () => new Subject() } },
-      { provide: ToastService, useValue: { success, error: () => {}, info: () => {} } },
-    ] });
-    const fixture = TestBed.createComponent(Transcript);
-    const t = fixture.componentInstance;
-    t.transcript.set('[00:00:03.550] Hello there. [00:00:07.120] Second bit.');
-    const readFrom = vi.spyOn(t, 'readFrom').mockImplementation(() => {});
+  it('searches what was said: n of N, and the next match', () => {
+    const { t, fixture, el } = page({ id: '41' });
+    t.setQuery('blood');
     fixture.detectChanges();
+    expect(el.querySelector('[data-test=hit-count]')!.textContent).toContain('1 of 2');
+    expect(el.querySelectorAll('mark')).toHaveLength(2);
+    t.goToHit(1);
+    fixture.detectChanges();
+    expect(el.querySelector('[data-test=hit-count]')!.textContent).toContain('2 of 2');
+    expect(t.current()).toBe(6.5);
+  });
 
-    const read = (fixture.nativeElement as HTMLElement)
-      .querySelector<HTMLButtonElement>('button[aria-label="Read aloud from 00:00:07.120"]');
-    expect(read).toBeTruthy();
-    read!.click();
+  it('turns masking on for exports from the personal details card', () => {
+    const { t, api } = page({ id: '41' });
+    t.setMask(true);
+    expect(api.change).toHaveBeenCalledWith(41, { maskExports: true });
+    expect(t.detail()!.maskExports).toBe(true);
+  });
 
-    expect(readFrom).toHaveBeenCalledWith(1);
-    expect(success).not.toHaveBeenCalled();
+  it('polls a recording while it is being transcribed', () => {
+    const { api } = page({ id: '41' }, { ...DONE, status: 'RUNNING', stage: 'transcribing', heardSeconds: 6, progressPct: 46 });
+    expect(api.one).toHaveBeenCalledTimes(1);
+  });
+
+  it('collects a file that is not a recording under Could not be transcribed, with the converter', () => {
+    const { t, fixture, el } = page({ new: '1' });
+    t.onRejected({ title: 'visit_notes.docx is not a recording', text: 'Use the converter.', icon: 'file', action: 'converter', actionLabel: 'Open converter' });
+    fixture.detectChanges();
+    const box = el.querySelector('[data-test=could-not]')!;
+    expect(box.textContent).toContain('visit_notes.docx is not a recording');
+    expect(box.querySelector('a')!.getAttribute('href')).toBe('/tools/converter');
   });
 });
