@@ -81,7 +81,7 @@
             }
           }
           @if (embedded()) {
-            <button type="button" class="btn btn-ghost btn-sm shrink-0" data-test="new-conversation" [disabled]="!!working() || !conversation()"
+            <button type="button" class="btn btn-default btn-sm shrink-0" data-test="new-conversation" [disabled]="!!working() || !conversation()"
                     (click)="newChat()"><app-icon name="plus" />New</button>
           }
           @if (conversation(); as c) {

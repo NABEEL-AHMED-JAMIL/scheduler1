@@ -139,7 +139,8 @@ export const PINNED: Record<string, unknown> = {
     "buttons": [
       "Add a widget",
       "Chart theme: Console",
-      "More actions"
+      "More actions",
+      "Who can see this: Everyone in the workspace"
     ],
     "columns": [],
     "fields": [],

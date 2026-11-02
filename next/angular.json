@@ -72,7 +72,8 @@
         "test": {
           "builder": "@angular/build:unit-test",
           "options": {
-            "setupFiles": ["src/test-storage.setup.ts"]
+            "setupFiles": ["src/test-storage.setup.ts"],
+            "isolate": true
           }
         }
       }
