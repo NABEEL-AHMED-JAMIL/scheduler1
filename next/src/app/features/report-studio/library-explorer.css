@@ -41,11 +41,15 @@
 .lx-table.is-loading tbody { opacity: 0.55; }
 .lx-table th { text-align: left; font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted);
   padding: 0.5rem 0.625rem; border-bottom: 1px solid var(--border-subtle); white-space: nowrap; }
-.lx-table th:nth-child(1), .lx-table th:nth-child(2) { width: 2.25rem; }
+.lx-table th:nth-child(1) { width: 2.25rem; }
+.lx-table th:nth-child(2) { width: 2.75rem; }
+.lx-table td:nth-child(-n + 2) { text-overflow: clip; }
 .lx-table th:nth-child(5) { width: 4.5rem; }
 .lx-table th:nth-child(6) { width: 8.5rem; }
 .lx-table th:nth-child(8) { width: 7.5rem; }
 .lx-c-template { width: 22%; }
+.has-panel .lx-c-template { width: 17%; }
+.has-panel .lx-c-by { display: none; }
 .lx-c-by { width: 9.5rem; }
 .lx-sort { font: inherit; letter-spacing: inherit; text-transform: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
 .lx-table th[aria-sort="ascending"] .lx-sort::after { content: " ↑"; }

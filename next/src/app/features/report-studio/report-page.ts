@@ -140,7 +140,9 @@ export class ReportPage implements OnInit {
   readonly justMade = computed(() => {
     const j = this.newestJob();
     const v = this.current();
-    return j?.status === 'SUCCEEDED' && v && j.resultVersion === v.version && v.version > 1 ? j : null;
+    // Only a version made in the last ten minutes is news; an old report does not keep saying it is ready.
+    const recent = !!j?.finishedAt && Date.now() - new Date(j.finishedAt).getTime() < 10 * 60_000;
+    return j?.status === 'SUCCEEDED' && v && recent && j.resultVersion === v.version && v.version > 1 ? j : null;
   });
   /** Owner 2026-10-21: the job failed for the page limit (its own next steps then, not Fix field mapping). */
   overLimit(j: JobRow): boolean {

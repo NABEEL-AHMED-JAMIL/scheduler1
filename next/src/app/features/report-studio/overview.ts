@@ -211,7 +211,8 @@ export class ReportOverview implements OnInit {
       const mapping = MAPPING_CODES.has(j.errorCode ?? '');
       out.push({
         kind: 'failed', primary: false, title: `Generation failed · ${j.reportName}`,
-        detail: `${this.plain(j.error)} No version was made; the report's last version is unchanged.`,
+        detail: /no (report )?version was made/i.test(j.error ?? '') ? this.plain(j.error)
+          : `${this.plain(j.error)} No version was made; the report's last version is unchanged.`,
         action: mapping && this.canGenerate() ? 'Fix field mapping' : 'Open the report',
         link: mapping && this.canGenerate() ? ['/reports/new'] : ['/reports/library', j.reportId],
         query: mapping && this.canGenerate() ? { reportId: j.reportId } : undefined,

@@ -215,7 +215,7 @@
         </div>
         <dl class="lx-facts">
           @if (current(); as v) {
-            <dt>Data</dt><dd>{{ v.snapshot?.label || '—' }} · frozen {{ v.snapshot?.takenAt | rsTime: 'date' }}@if (v.snapshot?.records != null) { · {{ v.snapshot!.records }} rows }</dd>
+            <dt>Data</dt><dd>{{ v.snapshot?.label || '—' }} · frozen {{ v.snapshot?.takenAt | rsTime: 'date' }}@if (v.snapshot?.records != null) { · {{ v.snapshot!.records }} row{{ v.snapshot!.records === 1 ? '' : 's' }} }</dd>
             <dt>Made by</dt><dd>{{ madeByWords[r.madeBy] }}@if (v.jobLabel) { · job {{ v.jobLabel }} }</dd>
           }
           <dt>Template</dt><dd><a class="link-inline" [routerLink]="['/reports/templates', r.templateId]">{{ r.templateName }}</a></dd>
