@@ -54,6 +54,14 @@ export class AssetPage implements OnInit {
    */
   readonly state = createLoadState();
   readonly error = this.state.error;
+  /**
+   * Owner 2026-11-02: an asset that is not here -- another workspace's link, or deleted -- is said as that, with the way
+   * back, as a dashboard does; "No such asset." with Try again only failed the same way again.
+   */
+  readonly missing = signal(false);
+  /** The grants in force now, and the ended ones (kept for the record, shown folded). */
+  readonly activeGrants = computed(() => (this.a()?.grants ?? []).filter(g => g.active));
+  readonly endedGrants = computed(() => (this.a()?.grants ?? []).filter(g => !g.active));
   /** The pickers' reads (grant to, template, stamp): each says it is loading or why it failed, never an empty choice. */
   readonly peopleState = createLoadState(false);
   readonly templatesState = createLoadState(false);
@@ -138,6 +146,14 @@ export class AssetPage implements OnInit {
     },
   });
   readonly sortedUsage = computed(() => this.usageSort.apply(this.a()?.usage ?? []));
+  /** How a template version prints it: the latest approved version, a pinned one, or both (placed twice). */
+  usageVersion(u: AssetUse): string {
+    const now = this.a()?.currentVersion ? ` (v${this.a()!.currentVersion} now)` : '';
+    if (u.kind !== 'TEMPLATE') return 'Latest approved';
+    if (u.pinned && u.follows) return `Latest approved${now} and v${u.assetVersion} (pinned)`;
+    if (u.pinned) return `v${u.assetVersion} (pinned)`;
+    return `Latest approved${now}`;
+  }
   readonly usageKey = (u: AssetUse) => `${u.kind}:${u.templateId ?? u.name}:${u.templateVersion ?? ''}`;
   readonly versionWord = versionStateWord;
   readonly versionTone = versionStateTone;
@@ -166,6 +182,11 @@ export class AssetPage implements OnInit {
       },
       error: e => {
         if (kept) { this.state.done(); this.toast.error(studioError(e, 'The asset could not be read again; what is shown may be out of date.').message); return; }
+        if (studioError(e).code === 'NO_SUCH_ASSET' || (e as { status?: number })?.status === 404) {
+          this.state.done();
+          this.missing.set(true);
+          return;
+        }
         this.state.fail(e, 'The asset could not be read.');
       },
     });

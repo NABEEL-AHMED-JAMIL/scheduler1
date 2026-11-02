@@ -3,7 +3,8 @@ import { provideZonelessChangeDetection, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { DIALOG_DATA, Dialog, DialogRef } from '@angular/cdk/dialog';
 import { provideRouter } from '@angular/router';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
 import { AuthService } from '../../../core/auth/auth.service';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { ReportStudioApi } from '../report-studio.api';
@@ -28,11 +29,11 @@ const stamp = (versions: AssetVersion[], currentVersion: number | null): AssetDe
   you: { userId: 7, owner: false, workspaceAdmin: true, mayPlace: true, mayGrant: true },
 } as unknown as AssetDetail);
 
-function page(a: AssetDetail) {
+function page(a: AssetDetail, asset = vi.fn(() => of(a))) {
   const open = vi.fn();
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({ providers: [provideZonelessChangeDetection(), provideRouter([]),
-    { provide: ReportStudioApi, useValue: { asset: vi.fn(() => of(a)), people: vi.fn(() => of([])), list: vi.fn(() => of({ templates: [], total: 0 })),
+    { provide: ReportStudioApi, useValue: { asset, people: vi.fn(() => of([])), list: vi.fn(() => of({ templates: [], total: 0 })),
       usable: vi.fn(() => of({ assets: [], total: 0 })) } },
     { provide: AuthService, useValue: { isPlatformAdmin: () => false, canOpen: () => true, user: signal({ appUserId: 7 }) } },
     { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn(), info: vi.fn() } },
@@ -88,5 +89,32 @@ describe('One version\'s panel', () => {
     const panel = TestBed.runInInjectionContext(() => new AssetVersionPanel());
     expect(panel.pinnedHere().map(u => u.name)).toEqual(['Discharge summary']);
     expect(panel.current()?.version).toBe(2);
+  });
+});
+
+describe('The asset page, owner 2026-11-02 review', () => {
+  const grant = (id: string, active: boolean) => ({ grantId: id, granteeUserId: 1, granteeName: 'Summit admin', grantedBy: 1, active,
+    revokedAt: active ? null : '2026-10-30T21:05:00Z' });
+
+  it('counts only the grants in force; ended ones are kept apart', () => {
+    const a = { ...stamp([version(2, { state: 'APPROVED' })], 2), grants: [grant('G1', false), grant('G2', false), grant('G3', true)] } as AssetDetail;
+    const { p } = page(a);
+    expect(p.activeGrants().map(g => g.grantId)).toEqual(['G3']);
+    expect(p.endedGrants().map(g => g.grantId)).toEqual(['G1', 'G2']);
+  });
+
+  it('says how each template version prints it, pinned, following or both', () => {
+    const { p } = page(stamp([version(2, { state: 'APPROVED' })], 2));
+    expect(p.usageVersion({ kind: 'TEMPLATE', name: 'T', pinned: false, follows: true, assetVersion: 2 })).toBe('Latest approved (v2 now)');
+    expect(p.usageVersion({ kind: 'TEMPLATE', name: 'T', pinned: true, follows: false, assetVersion: 1 })).toBe('v1 (pinned)');
+    expect(p.usageVersion({ kind: 'TEMPLATE', name: 'T', pinned: true, follows: true, assetVersion: 1, placements: 2 }))
+      .toBe('Latest approved (v2 now) and v1 (pinned)');
+  });
+
+  it('says an asset of another workspace is not here, with no retry', () => {
+    const notHere = vi.fn(() => throwError(() => new HttpErrorResponse({ status: 404, error: { code: 'NO_SUCH_ASSET', message: 'No such asset.' } })));
+    const { p } = page(stamp([], null), notHere as never);
+    expect(p.missing()).toBe(true);
+    expect(p.error()).toBe('');
   });
 });

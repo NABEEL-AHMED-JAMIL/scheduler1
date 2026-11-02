@@ -1,5 +1,14 @@
 <div class="page">
-  @if (error()) {
+  @if (missing()) {
+    <app-page-header title="Asset" />
+    <div class="card p-8 flex flex-col items-center text-center gap-2" data-test="asset-missing">
+      <span class="stat-glyph"><app-icon name="search" /></span>
+      <h2 class="text-base font-semibold">This asset isn't here</h2>
+      <p class="text-sm text-[color:var(--text-secondary)] max-w-md">It may have been deleted, or the link belongs to another workspace.
+        Ask a workspace administrator if you need it.</p>
+      <a class="btn btn-default btn-sm mt-2" routerLink="/reports/assets"><app-icon name="arrowLeft" />Back to assets</a>
+    </div>
+  } @else if (error()) {
     <app-page-header title="Asset" />
     <app-load-error [message]="error()" (retry)="load()" />
   } @else if (a(); as a) {
@@ -127,7 +136,7 @@
                   <td [class.rsa-muted]="v.state === 'PENDING'">{{ reviewOf(v) }}@if (v.reviewedAt) { · {{ v.reviewedAt | rsTime: 'recent' }} }
                     @if (v.reviewNote) { <div class="text-xs text-[color:var(--text-muted)]">{{ v.reviewNote }}</div> }</td>
                   <td class="whitespace-nowrap">{{ v.uploadedAt | rsTime: 'recent' }}</td>
-                  <td class="text-right"><button type="button" class="btn btn-default btn-sm" (click)="openVersion(v)">Open v{{ v.version }}</button></td>
+                  <td class="text-right"><button type="button" class="btn btn-default btn-sm whitespace-nowrap" (click)="openVersion(v)">Open v{{ v.version }}</button></td>
                 </tr>
               }
             </tbody>
@@ -150,8 +159,7 @@
                 <tr>
                   <td>@if (u.templateId) { <a class="link-inline" [routerLink]="['/reports/templates', u.templateId]">{{ u.name }} · v{{ u.templateVersion }}</a>@if (u.templateVersionState === 'DRAFT') { <span class="text-xs text-[color:var(--text-muted)]"> (draft)</span> } }
                       @else { {{ u.name }} (brand profile) }</td>
-                  <td>@if (u.kind === 'TEMPLATE' && !u.pinned) { Latest approved@if (a.currentVersion) { <span class="text-xs text-[color:var(--text-muted)]"> (v{{ a.currentVersion }} now)</span> } }
-                      @else if (u.assetVersion) { v{{ u.assetVersion }}@if (u.pinned) { <span class="text-xs text-[color:var(--text-muted)]"> (pinned)</span> } } @else { Latest approved }</td>
+                  <td>{{ usageVersion(u) }}@if ((u.placements ?? 1) > 1) { <span class="text-xs text-[color:var(--text-muted)]"> · placed {{ u.placements }} times</span> }</td>
                   <td>@if (u.kind === 'TEMPLATE') { {{ u.reports }} report{{ u.reports === 1 ? '' : 's' }} } @else { Approved choice }</td>
                 </tr>
               } @empty { <tr><td colspan="3" class="text-sm text-[color:var(--text-muted)]">Not used yet.</td></tr> }
@@ -179,7 +187,8 @@
             <li><app-icon [name]="a.you.mayPlace ? 'checkCircle' : 'lock'" [class]="a.you.mayPlace ? 'icon-ok' : 'text-[color:var(--text-muted)]'" />
               <span><b>Place it on a template</b><br><span class="text-xs text-[color:var(--text-muted)]">
                 @if (a.kind === 'SIGNATURE') { {{ a.ownerName || 'Its owner' }}, or someone they grant it to. } @else if (a.restricted) { Whoever is granted it. } @else { Every editor of the workspace. }
-                @if (a.grants.length) { Granted to {{ a.grants.length }} {{ a.grants.length === 1 ? 'person' : 'people' }}. }</span></span></li>
+                @if (activeGrants().length) { Granted to {{ activeGrants().length }} {{ activeGrants().length === 1 ? 'person' : 'people' }} now. }
+                @else if (a.restricted && a.kind !== 'SIGNATURE') { No one has a grant now. }</span></span></li>
             <li><app-icon name="lock" class="text-[color:var(--text-muted)]" /><span><b>Upload, replace, retire</b><br>
               <span class="text-xs text-[color:var(--text-muted)]">{{ a.restricted ? 'Workspace admins only.' : 'Editors of Assets & branding.' }}</span></span></li>
             @if (a.restricted) {
@@ -190,13 +199,22 @@
           @if (a.restricted) {
             <div class="flex flex-col gap-1.5">
               <span class="label">Grants</span>
-              @for (g of a.grants; track g.grantId) {
+              @for (g of activeGrants(); track g.grantId) {
                 <div class="rs-side-row text-xs">
-                  <span class="min-w-0">{{ g.granteeName }} · {{ g.templateId ? 'one template' : 'any template' }} · by {{ g.grantedByName }}
-                    @if (!g.active) { <span class="pill pill-neutral ml-1">Ended</span> }</span>
-                  @if (g.active && (a.you.mayGrant)) { <button type="button" class="link-inline" (click)="revoke(g.grantId)">End</button> }
+                  <span class="min-w-0">{{ g.granteeName }} · {{ g.templateId ? 'one template' : 'any template' }} · by {{ g.grantedByName }}</span>
+                  @if (a.you.mayGrant) { <button type="button" class="link-inline" (click)="revoke(g.grantId)">End</button> }
                 </div>
-              } @empty { <span class="text-xs text-[color:var(--text-muted)]">No grants.</span> }
+              } @empty { <span class="text-xs text-[color:var(--text-muted)]" data-test="no-live-grants">No one has a grant now.</span> }
+              <!-- Owner 2026-11-02: ended grants are the record, not who may place it: folded, after the live ones. -->
+              @if (endedGrants().length) {
+                <details class="text-xs text-[color:var(--text-muted)]" data-test="ended-grants">
+                  <summary class="cursor-pointer">Ended grants ({{ endedGrants().length }})</summary>
+                  @for (g of endedGrants(); track g.grantId) {
+                    <div class="rs-side-row">{{ g.granteeName }} · {{ g.templateId ? 'one template' : 'any template' }} · by {{ g.grantedByName }}
+                      @if (g.revokedAt) { · ended {{ g.revokedAt | rsTime: 'recent' }} } @else if (g.expiresAt) { · expired {{ g.expiresAt | rsTime: 'recent' }} }</div>
+                  }
+                </details>
+              }
               @if (a.you.mayGrant && a.status === 'ACTIVE') {
                 <div class="flex flex-wrap gap-2 items-end">
                   <app-advanced-select class="min-w-56" ariaLabel="Grant to" [compact]="true" [options]="grantOptions()" [value]="idValue(grantTo())"

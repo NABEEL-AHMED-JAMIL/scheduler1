@@ -77,6 +77,10 @@ export interface AssetUse {
   reports?: number;
   /** The template pins assetVersion on purpose; false: it prints the asset's latest approved version (2026-11-02). */
   pinned?: boolean;
+  /** It (also) places the asset following the latest approved version. */
+  follows?: boolean;
+  /** How many times this template version places it (one row per template version). */
+  placements?: number;
 }
 
 export interface AssetGrant {
