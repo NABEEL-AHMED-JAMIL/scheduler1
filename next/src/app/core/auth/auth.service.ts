@@ -312,8 +312,13 @@ export class AuthService {
 
   /**
    * Called by the interceptor on a 401. Returns the new access token so the failed request can
-   * be retried; anything other than success clears the session, since a refresh token the
-   * server rejects is not recoverable by trying again.
+   * be retried. A refused refresh is not recoverable by trying again: its callers (the interceptor,
+   * the idle guard) sign out on it -- which forgets the session AND goes to Sign in.
+   *
+   * Owner 2026-11-02: this used to clear the session itself, so the logout() that followed found it
+   * already gone, took it for a second sign-out and did not navigate. A platform administrator whose
+   * session Identity ended (deleting a workspace they had worked in) stayed on Platform › Workspaces
+   * with no session: every read answered 401, "Tenants could not be loaded", until a reload.
    */
   refresh(): Observable<ApiResponse<AuthUser>> {
     const refreshToken = this.currentUser()?.refreshToken ?? '';
@@ -323,8 +328,6 @@ export class AuthService {
       .pipe(tap(response => {
         if (response.status === API_SUCCESS && response.data) {
           this.persist({ ...this.currentUser(), ...response.data } as AuthUser);
-        } else {
-          this.clear();
         }
       }));
   }

@@ -59,6 +59,18 @@ describe('Sign out', () => {
     expect(navigated[0]).toEqual([['/login'], { queryParams: { reason: 'idle' } }]);
   });
 
+  // Owner 2026-11-02: a refused refresh (the session was ended on the server) goes to Sign in -- it used to leave the page
+  // up with no session, every request answering 401, because the refresh had already forgotten the session.
+  it('goes to Sign in when the server refuses the refresh and the caller signs out', () => {
+    const { auth, navigated } = signedIn(url => of(url.includes('/refresh')
+      ? { status: 'ERROR', message: 'Refresh token is invalid or expired — please log in again.' } : { status: 'SUCCESS' }));
+    auth.refresh().subscribe(response => { if (response.status !== 'SUCCESS') auth.logout(); });
+    expect(auth.isLoggedIn()).toBe(false);
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+    expect(navigated).toHaveLength(1);
+    expect(navigated[0][0]).toEqual(['/login']);
+  });
+
   it('follows another tab that signed out', () => {
     const { auth, navigated } = signedIn(() => of({}));
     localStorage.removeItem(STORAGE_KEY);
