@@ -1,7 +1,7 @@
 ---
 id: ai-transcription
 title: Turn recordings into text
-summary: The Transcribe audio step and the Audio Transcript tool: recordings to text, with or without times, and what is billed.
+summary: The Transcribe audio step and the Audio Transcript tool: recordings to text with their times, kept, played back and searched, and what is billed.
 section: AI at work
 who: Workspace administrators add the step to a pipeline; anyone whose page access includes Tools › Audio Transcript uses the tool
 where: See results › Tools › Audio Transcript (/tools/transcript); Build › Pipelines (/pipelines/list)
@@ -11,14 +11,21 @@ Recordings (care calls, telehealth visits, dictated notes) become text with the 
 in a pipeline and on the tool page. A pipeline can then summarise the text with an [AI prompt step](#ai-steps), write a
 report for each call, or search it in Ask your data.
 
-## Transcribe one recording by hand
-1. Open **See results › Tools › Audio Transcript**.
-2. Choose **Upload a file** and drop an .mp3 or .m4a, or choose **From a bucket** and pick one you can see.
-3. Tick **Include timestamps before each segment** if you want each stretch of speech with its time.
-4. Choose **Extract transcript**. Transcription runs on the server and can take a few minutes for a long recording.
-5. Read the **Transcript**: **Copy** it, **Read aloud**, or copy a timestamp to point a colleague at a moment.
+## Transcribe recordings by hand
+1. Open **See results › Tools › Audio Transcript** and choose **New transcript**.
+2. Drop one or more recordings (.mp3, .m4a, .wav or .ogg), or pick one **From a bucket…**. Each recording's length is read
+   before it is uploaded, and the page says about how long it takes and how many audio minutes are billed.
+3. Choose **Transcribe**. It runs on the server: the card shows how much has been heard and the time left, and you can
+   leave the page.
+4. When it is ready, play it back with the transcript beside it: each part has its time, search marks every match on
+   the waveform, and **Use this transcript** downloads it (text, subtitles, JSON or PDF), sends it to Documents as a visit
+   note, or starts a pipeline with it.
 
-![The Audio Transcript tool](ai-transcript "See results › Tools › Audio Transcript: the formats and limits above the drop zone")
+Every recording of the last 30 days is listed under **Recordings**; the transcripts stay until you delete them (or your
+workspace's retention removes them), and the recording itself is kept 30 days for playback if you chose to keep it. See
+[Tools: Document Converter and Audio Transcript](#dash-tools) for the player, speakers and masking.
+
+![The Audio Transcript tool](ai-transcript "See results › Tools › Audio Transcript: a finished recording with the player, the transcript and how to use it")
 
 ## Transcribe in a pipeline
 1. In the pipeline's **Steps**, add **Transcribe audio** from **Add step from the Task Registry…**.
@@ -39,7 +46,7 @@ Each recording is an item of the run, so the run's **Items** tab shows how each 
 
 ## When the transcriber is busy
 A busy transcriber is waited for and asked again, up to six tries, waiting at most five minutes between two tries. On the
-tool page you are told it is busy; nothing is lost, and you try again in about 30 seconds.
+tool page a recording waits in line ("Queued · 3rd") and starts by itself; nothing is lost if you close the page.
 
 ## Example
 Summit Valley Home Health drops each care call (`call-*.m4a`) into the workspace inbox. *Care-call insight, one report per
@@ -50,8 +57,9 @@ Tamara Brooks (Home health nurses) reads the transcript beside the insight befor
 | What | Limit |
 |---|---|
 | Formats in a pipeline | mp3, m4a, wav, ogg, flac, webm |
-| Formats on the tool page | mp3, m4a |
+| Formats on the tool page | mp3, m4a, wav, ogg |
 | Size | Upload up to 250 MB on the tool page; a recording in a bucket up to 500 MB |
-| Time on the tool page | Up to 30 minutes a recording |
+| Length on the tool page | Up to 30 minutes a recording (longer ones can be split into parts) |
+| Kept on the tool page | The transcript until deleted; the recording 30 days, for playback |
 | At most files in a step | Default 20 |
 | Billed | By the minute of audio (see [What AI costs](#ai-costs)) |
