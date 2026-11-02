@@ -311,9 +311,10 @@ export class ReportStudioApi {
    * Approve a report version (report-approve; never the person who generated it): its PDF is certified in the approver's
    * name. Phase 7: with a second approver, the first approval answers stage FIRST and the PDF is signed at the second.
    */
-  approve(reportId: string, version: number, note = '', taskId?: number | null): Observable<ApprovalAnswer> {
+  approve(reportId: string, version: number, note = '', taskId?: number | null, meaning?: string | null): Observable<ApprovalAnswer> {
+    // Reports redesign (feature 2): what the approval means (a code from reportApprove.json/meanings); none is the step's default.
     return ReportStudioApi.data$(this.http.post<ApiResponse<ApprovalAnswer>>(`${this.approving}/approve`,
-      { reportId, version, note, ...(taskId ? { taskId } : {}) }));
+      { reportId, version, note, ...(taskId ? { taskId } : {}), ...(meaning ? { meaning } : {}) }));
   }
 
   // ---------------------------------------------------------------- phase 7: reviews in the Task inbox

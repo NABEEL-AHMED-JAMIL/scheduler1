@@ -48,46 +48,6 @@ function screenWith(view?: string) {
 beforeEach(() => { try { localStorage.clear(); } catch { /* none */ } });
 
 describe('ReportLibrary -- server-side sort (owner 2026-10-27)', () => {
-  it('names no sort before a heading is picked; Updated, newest first, is the reports\' own order', () => {
-    const { api, screen } = screenWith();
-    const q = api.reports.mock.calls[0][0];
-    expect(q.sort).toBeUndefined();
-    expect(q.dir).toBeUndefined();
-    expect(screen.reportSort.ariaSort('updated')).toBe('descending');
-  });
-
-  it('a reports heading sends its column both ways and goes back to page 1', () => {
-    const { api, screen } = screenWith();
-    screen.goTo(3);
-    screen.reportSort.toggle('report');
-    expect(screen.page()).toBe(1);
-    expect(api.reports).toHaveBeenLastCalledWith(expect.objectContaining({ sort: 'name', dir: 'asc', offset: 0 }), null);
-    screen.reportSort.toggle('report');
-    expect(api.reports).toHaveBeenLastCalledWith(expect.objectContaining({ sort: 'name', dir: 'desc', offset: 0 }), null);
-    screen.reportSort.toggle('version');
-    expect(api.reports).toHaveBeenLastCalledWith(expect.objectContaining({ sort: 'version', dir: 'desc' }), null);
-    // Updated, newest first, is the reports' own order again: the read names no sort and the service keeps it.
-    screen.reportSort.toggle('updated');
-    expect(api.reports.mock.calls.at(-1)![0].sort).toBeUndefined();
-    expect(screen.reportSort.ariaSort('updated')).toBe('descending');
-  });
-
-  it('flipping Updated asks for the oldest first; going back to the own order names no sort again', () => {
-    const { api, screen } = screenWith();
-    screen.reportSort.toggle('updated');
-    expect(api.reports).toHaveBeenLastCalledWith(expect.objectContaining({ sort: 'updatedAt', dir: 'asc' }), null);
-    screen.reportSort.reset();
-    const q = api.reports.mock.calls.at(-1)![0];
-    expect(q.sort).toBeUndefined();
-  });
-
-  it('the paging keeps the sort: the next page asks for the same column', () => {
-    const { api, screen } = screenWith();
-    screen.reportSort.toggle('status');
-    screen.goTo(2);
-    expect(api.reports).toHaveBeenLastCalledWith(expect.objectContaining({ sort: 'status', dir: 'asc', offset: 50 }), null);
-  });
-
   it('the jobs have their own sort, sent from page 1, and none before a pick', () => {
     const { api, screen } = screenWith('jobs');
     expect(api.jobs.mock.calls[0][0].sort).toBeUndefined();
@@ -102,7 +62,7 @@ describe('ReportLibrary -- server-side sort (owner 2026-10-27)', () => {
     expect(api.jobs).toHaveBeenLastCalledWith(expect.objectContaining({ sort: 'status', dir: 'asc' }), null);
     screen.jobSort.toggle('job');
     expect(api.jobs).toHaveBeenLastCalledWith(expect.objectContaining({ sort: 'job', dir: 'desc' }), null);
-    // The reports' sort is untouched, and a jobs pick never reads the reports.
+    // Reports redesign: the reports are the explorer's; this page never reads them.
     expect(api.reports).not.toHaveBeenCalled();
   });
 });

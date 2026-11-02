@@ -1,14 +1,11 @@
 import { plainHint } from '../../shared/ui/plain-words';
 import { Component, DestroyRef, OnInit, computed, inject, input, signal } from '@angular/core';
 import { Dialog } from '@angular/cdk/dialog';
-import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { Subscription, interval, switchMap } from 'rxjs';
 import { PageHeader } from '../../shared/ui/page-header';
-import { RefreshButton } from '../../shared/ui/refresh-button';
 import { Icon } from '../../shared/ui/icon';
-import { StatusPill } from '../../shared/ui/status-pill';
 import { RsTimePipe, zoneCity, rsTime } from './rs-time.pipe';
 import { ToastService } from '../../shared/ui/toast.service';
 import { LoadError } from '../../shared/ui/load-error';
@@ -33,11 +30,15 @@ import { formatDuration } from '../../shared/ui/time-format';
 import { PageLimitActions } from './page-limit-actions';
 import { AppLoading, InlineStatus, createLoadState, loadErrorText } from '../../shared/ui/loading';
 import { createTableSort } from '../../shared/ui/sort';
-import { SortHeader } from '../../shared/ui/sort-header';
 import { AdvancedOption, AdvancedSelect } from '../../shared/ui/advanced-select';
 import { idOf, idValue } from '../../shared/ui/advanced-options';
+import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
+import { askReason } from '../../shared/ui/reason';
+import { ReportViewer } from './report-viewer';
+import { Meaning, ReportLibraryApi } from './report-library.api';
+import { Stage, findQr, reportStages } from './report-stages';
 
-type Tab = 'details' | 'versions' | 'activity' | 'access';
+type Tab = 'approval' | 'details' | 'activity' | 'access' | 'again';
 
 /**
  * One report (MIG-403, MIG-404; the owner-approved screen 6, Figma frame 6; page report-library): the current version --
@@ -48,7 +49,8 @@ type Tab = 'details' | 'versions' | 'activity' | 'access';
  */
 @Component({
   selector: 'app-report-page',
-  imports: [PageHeader, RefreshButton, Icon, StatusPill, RsTimePipe, LoadError, ProblemList, RouterLink, FormsModule, NgTemplateOutlet, PageLimitActions, AppLoading, InlineStatus, SortHeader, AdvancedSelect],
+  imports: [PageHeader, Icon, RsTimePipe, LoadError, ProblemList, RouterLink, FormsModule, PageLimitActions, AppLoading, InlineStatus, AdvancedSelect,
+    CdkMenu, CdkMenuItem, CdkMenuTrigger, ReportViewer],
   templateUrl: './report-page.html',
   styleUrl: './report-page.css',
 })
@@ -64,18 +66,27 @@ export class ReportPage implements OnInit {
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
+  private readonly library = inject(ReportLibraryApi);
 
   readonly r = signal<ReportDetail | null>(null);
   readonly loading = signal(true);
   readonly error = signal('');
-  readonly tab = signal<Tab>('details');
+  /** Reports redesign: the side card's tab -- Approval first; Generate again is the menu's, in the same card. */
+  readonly tab = signal<Tab>('approval');
   readonly downloading = signal('');
-  readonly thumb = signal<string | null>(null);
-  /** The page the small view shows (owner 2026-10-20: Back and Next). */
-  readonly thumbPage = signal(1);
-  readonly thumbLoading = signal(false);
-  /** Owner 2026-10-27: the small view says when its page could not be drawn, instead of an empty paper. */
-  readonly thumbError = signal('');
+  /** The version the viewer shows: the current one, or another picked in Versions. */
+  readonly shown = signal<number | null>(null);
+  readonly shownVersion = computed(() => {
+    const r = this.r();
+    const n = this.shown() ?? r?.currentVersion ?? null;
+    return r?.versions.find(v => v.version === n) ?? null;
+  });
+  /** What an approval may mean (feature 2), and the one picked; null keeps the step's default. */
+  readonly meanings = signal<Meaning[]>([]);
+  readonly meaningDefaults = signal<{ first: string; final: string }>({ first: 'REVIEWED', final: 'RELEASE' });
+  readonly meaning = signal<string | null>(null);
+  /** The QR code the version's template prints, when it has one (its content mode). */
+  readonly qr = signal<{ content: string; sizeMm?: number } | null>(null);
   /** The template's versions a report can be made from (published, and the ones superseded since). */
   readonly templateVersions = signal<VersionRow[]>([]);
   /** The Template version choices' read: loading, none, or why it failed (owner 2026-10-27). */
@@ -158,15 +169,17 @@ export class ReportPage implements OnInit {
   readonly sortedVersions = computed(() => this.versionSort.apply(this.r()?.versions ?? []));
 
   constructor() {
-    inject(DestroyRef).onDestroy(() => {
-      this.poll?.unsubscribe();
-      const t = this.thumb();
-      if (t) URL.revokeObjectURL(t);
-    });
+    inject(DestroyRef).onDestroy(() => this.poll?.unsubscribe());
   }
 
   ngOnInit(): void {
     this.load();
+    if (this.canApprove()) {
+      this.library.meanings().subscribe({
+        next: m => { this.meanings.set(m.meanings); this.meaningDefaults.set({ first: m.firstDefault, final: m.finalDefault }); },
+        error: () => { /* the step's default meaning applies */ },
+      });
+    }
     if (!this.askedPeople && (this.auth.canOpen('report-assets') || this.auth.canOpen('report-approve'))) {
       this.askedPeople = true;
       this.api.people().subscribe({ next: p => this.people.set(p), error: () => { /* names from the entries alone */ } });
@@ -180,8 +193,9 @@ export class ReportPage implements OnInit {
       next: r => {
         this.r.set(r);
         this.loading.set(false);
-        this.loadThumb(r);
+        if (this.shown() != null && !r.versions.some(v => v.version === this.shown())) this.shown.set(null);
         if (this.canGenerate()) this.loadVersions(r.templateId);
+        this.loadQr(r);
         const asked = Number(this.version());
         const v = this.verify() === '1' && !this.verifyOpened ? r.versions.find(x => x.version === asked) : undefined;
         if (v) {
@@ -193,29 +207,6 @@ export class ReportPage implements OnInit {
     });
   }
 
-  private loadThumb(r: ReportDetail, page = 1): void {
-    if (!r.currentVersion || !this.current()?.outputs.some(o => o.format === 'PDF')) return;
-    this.thumbLoading.set(true);
-    this.thumbError.set('');
-    this.api.reportThumbnail(r.reportId, r.currentVersion, this.auth.isPlatformAdmin() ? r.tenantId : null, page).subscribe({
-      next: res => {
-        this.thumbLoading.set(false);
-        if (!res.body || !(res.headers.get('Content-Type') ?? '').includes('png')) return;
-        const old = this.thumb();
-        if (old) URL.revokeObjectURL(old);
-        this.thumb.set(URL.createObjectURL(res.body));
-        this.thumbPage.set(page);
-      },
-      // The card keeps the page it had, and says this one could not be drawn.
-      error: e => { this.thumbLoading.set(false); this.thumbError.set(loadErrorText(e, 'The page preview is not available right now.')); },
-    });
-  }
-
-  retryThumb(): void {
-    const r = this.r();
-    if (r) this.loadThumb(r, this.thumb() ? this.thumbPage() : 1);
-  }
-
   /** The Signed column's word for a version, as the cell shows it (for its sort). */
   signedWord(v: ReportVersionRow): string | null {
     if (v.approval?.signed) return 'Signed';
@@ -223,15 +214,6 @@ export class ReportPage implements OnInit {
     if (this.waiting(v)) return 'Waiting';
     if (this.superseded(v)) return 'Superseded';
     return null;
-  }
-
-  /** Back (-1) or Next (+1) in the small view, within the version's pages. */
-  turn(step: number): void {
-    const r = this.r();
-    const pages = this.current()?.pages ?? 1;
-    const next = this.thumbPage() + step;
-    if (!r || next < 1 || next > pages || this.thumbLoading()) return;
-    this.loadThumb(r, next);
   }
 
   /** Owner 2026-10-20: a version's PDF or HTML read in place, through the same signed and audited download. */
@@ -320,11 +302,14 @@ export class ReportPage implements OnInit {
   async approve(v: ReportVersionRow): Promise<void> {
     const r = this.r();
     if (!r) return;
+    const meaning = this.meaningWords(v);
     const ok = await confirmWith(this.dialog, { title: `Approve ${r.label} v${v.version}?`, confirmLabel: 'Approve and sign',
-      body: 'Its PDF is digitally signed in your name with the time. Any later change to the file breaks the signature. A new version needs its own approval.' });
+      body: `Your approval says: “${meaning}”. ` + (this.firstOfTwo(v)
+        ? 'It is the first of two approvals: a second person approves it next, and its PDF is signed then.'
+        : 'Its PDF is digitally signed in your name with the time. Any later change to the file breaks the signature. A new version needs its own approval.') });
     if (!ok) return;
     this.approving.set(true);
-    this.api.approve(r.reportId, v.version).subscribe({
+    this.api.approve(r.reportId, v.version, '', null, this.meaning()).subscribe({
       next: a => {
         this.approving.set(false);
         if (a.stage === 'FIRST') {
@@ -336,6 +321,86 @@ export class ReportPage implements OnInit {
       },
       error: e => { this.approving.set(false); this.toast.error(studioError(e).message); },
     });
+  }
+
+  /** The approval this person would give now is the first of two (the workspace asks for a second approver). */
+  firstOfTwo(v: ReportVersionRow): boolean {
+    return !!v.review && v.review.state === 'OPEN' && v.review.needsSecond && !v.review.firstApproval;
+  }
+
+  /** The meaning this approval states: the one picked, else the step's default, in words. */
+  meaningWords(v: ReportVersionRow): string {
+    const code = this.meaning() ?? (this.firstOfTwo(v) ? this.meaningDefaults().first : this.meaningDefaults().final);
+    return this.meanings().find(m => m.code === code)?.words ?? (this.firstOfTwo(v) ? 'Reviewed for clinical accuracy' : 'Approved for release');
+  }
+
+  /** The meaning's code the select shows (the default until one is picked). */
+  meaningCode(v: ReportVersionRow): string {
+    return this.meaning() ?? (this.firstOfTwo(v) ? this.meaningDefaults().first : this.meaningDefaults().final);
+  }
+
+  /** Send back: the version waiting for approval is rejected with the reason the person who asked reads. */
+  async sendBack(v: ReportVersionRow): Promise<void> {
+    const r = this.r();
+    if (!r) return;
+    const note = await askReason(this.dialog, { title: `Send ${r.label} v${v.version} back?`, label: 'Why',
+      hint: 'The person who asked for the approval reads it; the version stays as it is and is not signed.', confirmLabel: 'Send back', required: true });
+    if (!note) return;
+    this.approving.set(true);
+    this.api.rejectVersion(r.reportId, v.version, note).subscribe({
+      next: () => { this.approving.set(false); this.toast.success(`v${v.version} was sent back; ${v.review?.requestedByName ?? 'the person who asked'} is told why.`); this.load(); },
+      error: e => { this.approving.set(false); this.toast.error(studioError(e).message); },
+    });
+  }
+
+  /** The life-cycle strip: Generated, Checked, the approvals, Delivered. */
+  readonly stages = computed<Stage[]>(() => {
+    const v = this.current();
+    return v ? reportStages(v, this.took.bind(this)) : [];
+  });
+
+  /** May this person void a version (the people who generate reports). */
+  readonly canVoid = computed(() => this.canGenerate());
+
+  /** The version's QR code, read from its template version (once per report). */
+  private loadQr(r: ReportDetail): void {
+    const v = r.versions.find(x => x.version === r.currentVersion);
+    if (!v || this.qrFor === r.templateId + ':' + v.templateVersion || typeof this.api.version !== 'function') return;
+    this.qrFor = r.templateId + ':' + v.templateVersion;
+    this.api.version(r.templateId, String(v.templateVersion)).subscribe({
+      next: tv => this.qr.set(findQr(tv.definition)),
+      error: () => this.qr.set(null),
+    });
+  }
+  private qrFor = '';
+
+  /** The verify link a scan opens today (signed in only): the console's report page for that version. */
+  verifyLink(v: ReportVersionRow): string {
+    return `${window.location.origin}/reports/library/${v.reportId}?version=${v.version}&verify=1`;
+  }
+
+  copyVerify(v: ReportVersionRow): void {
+    void copyText(this.verifyLink(v)).then(ok => this.toast[ok ? 'success' : 'error'](ok ? 'Verify link copied.' : 'The link could not be copied.'));
+  }
+
+  /** Show a version in the viewer (another than the current one: its own files). */
+  showVersion(v: ReportVersionRow): void {
+    this.shown.set(v.version === this.r()?.currentVersion ? null : v.version);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  /** The viewer's note beside the size: whether this PDF is signed. */
+  viewerNote(v: ReportVersionRow): string {
+    if (v.void) return 'VOID copy';
+    if (v.approval?.signed) return 'signed';
+    if (v.approval) return 'approved, not signed';
+    return this.hasPdf(v) ? 'signed after approval' : '';
+  }
+
+  /** Initials for an approver's round badge. */
+  initials(name: string | null | undefined): string {
+    const parts = (name ?? '').replace(/,.*$/, '').trim().split(/\s+/).filter(Boolean);
+    return ((parts[0]?.[0] ?? '?') + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase();
   }
 
   /** Phase 4: marks a version VOID after the person says why. */
@@ -479,6 +544,10 @@ export class ReportPage implements OnInit {
   outputsOf(v: ReportVersionRow): OutputRow[] {
     // Phase 7: a version whose files retention removed has nothing to open or download.
     return openableOutputs(v);
+  }
+
+  hasHtml(v: ReportVersionRow): boolean {
+    return v.outputs.some(o => o.format === 'HTML');
   }
 
   hasPdf(v: ReportVersionRow): boolean {

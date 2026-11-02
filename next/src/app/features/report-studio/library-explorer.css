@@ -1,0 +1,98 @@
+/* The report library as an explorer (reports redesign, owner 2026-11-02; design library.html): facets | list | side panel. */
+:host { display: block; }
+.lx { display: grid; grid-template-columns: 14.5rem minmax(0, 1fr); border: 1px solid var(--border-subtle); border-radius: var(--radius-xl, 10px);
+  background: var(--surface-raised); position: relative; min-height: 36rem; }
+.lx.has-panel { grid-template-columns: 14.5rem minmax(0, 1fr) 31rem; }
+.lx-facets { padding: 1rem 0.875rem; border-right: 1px solid var(--border-subtle); font-size: 0.875rem; }
+.lx-fh { display: flex; align-items: center; gap: 0.375rem; margin: 1.125rem 0 0.375rem; }
+.lx-fh:first-child { margin-top: 0; }
+.lx-fh h2 { font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); margin: 0; }
+.lx-f { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 0.5rem; padding: 0.1875rem 0; cursor: pointer; }
+.lx-f span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lx-f b { font-weight: 400; color: var(--text-muted); font-size: 0.8125rem; font-variant-numeric: tabular-nums; }
+.lx-none { font-size: 0.8125rem; color: var(--text-muted); margin: 0; }
+.lx-badge { display: inline-grid; place-items: center; min-width: 1.125rem; height: 1.125rem; padding: 0 0.25rem; border-radius: 99px; font-size: 0.6875rem;
+  background: var(--accent-mark, #f5c400); color: #111; font-weight: 600; }
+.lx-main { min-width: 0; display: flex; flex-direction: column; }
+.lx-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; padding: 0.75rem 0.875rem; }
+.lx-bar .grow { flex: 1; }
+.lx-search { flex: 1 1 16rem; max-width: 20rem; }
+.lx-filters-btn { display: none; }
+.lx-chip { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.125rem 0.125rem 0.125rem 0.5rem; border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md); background: var(--surface-inset); font-size: 0.8125rem; }
+.lx-hist { padding: 0 0.875rem 0.75rem; }
+.lx-hist-head { display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.375rem; }
+.lx-bars { display: flex; align-items: flex-end; gap: 2px; height: 3.25rem; }
+.lx-col { flex: 1 1 0; min-width: 2px; height: 100%; display: flex; flex-direction: column-reverse; }
+.lx-col i { display: block; width: 100%; }
+.lx-col i:last-child { border-radius: 2px 2px 0 0; }
+.s-APPROVED { background: var(--ok-500, #16803c); }
+.s-WAITING { background: var(--warn-500, #c2410c); }
+.s-READY { background: color-mix(in oklab, var(--text-muted) 55%, transparent); }
+.s-FAILED { background: var(--crit-500, #b91c1c); }
+.s-VOID { background: var(--text-primary); }
+.lx-bulk { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; padding: 0.5rem 0.875rem; background: var(--surface-inverse, #1f2937);
+  color: var(--text-inverse, #fff); font-size: 0.875rem; position: sticky; top: 3.5rem; z-index: 3; }
+.lx-on-dark { background: transparent; color: inherit; border: 1px solid color-mix(in oklab, currentColor 35%, transparent); }
+.lx-on-dark:hover:not(:disabled) { background: color-mix(in oklab, currentColor 12%, transparent); }
+.lx-meaning { max-width: 16rem; }
+.lx-table-wrap { overflow-x: auto; }
+.lx-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; table-layout: fixed; }
+.lx-table.is-loading tbody { opacity: 0.55; }
+.lx-table th { text-align: left; font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted);
+  padding: 0.5rem 0.625rem; border-bottom: 1px solid var(--border-subtle); white-space: nowrap; }
+.lx-table th:nth-child(1), .lx-table th:nth-child(2) { width: 2.25rem; }
+.lx-table th:nth-child(5) { width: 4.5rem; }
+.lx-table th:nth-child(6) { width: 8.5rem; }
+.lx-table th:nth-child(8) { width: 7.5rem; }
+.lx-c-template { width: 22%; }
+.lx-c-by { width: 9.5rem; }
+.lx-sort { font: inherit; letter-spacing: inherit; text-transform: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+.lx-table th[aria-sort="ascending"] .lx-sort::after { content: " ↑"; }
+.lx-table th[aria-sort="descending"] .lx-sort::after { content: " ↓"; }
+.lx-table td { padding: 0.5rem 0.625rem; border-bottom: 1px solid var(--border-subtle); vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lx-table tbody tr { cursor: pointer; }
+.lx-table tbody tr:hover > td { background: color-mix(in oklab, var(--surface-sunken) 60%, transparent); }
+.lx-table tbody tr.is-picked > td, .lx-table tbody tr.is-open > td { background: var(--surface-sunken); }
+.lx-table tbody tr.is-open > td:first-child { box-shadow: inset 3px 0 0 var(--text-primary); }
+.lx-table tbody tr:focus-visible { outline: 2px solid var(--accent-text); outline-offset: -2px; }
+.lx-name { line-height: 1.25; }
+.lx-doc { display: inline-flex; flex-direction: column; gap: 2px; width: 1.25rem; height: 1.6rem; padding: 3px; border: 1px solid var(--border-strong); background: #fff; }
+.lx-doc i { height: 2px; background: #cbd5e1; }
+.lx-doc i:first-child { background: #0f766e; }
+.lx-foot { display: flex; justify-content: space-between; gap: 1rem; padding: 0.625rem 0.875rem; font-size: 0.75rem; color: var(--text-muted); }
+.lx-panel { border-left: 1px solid var(--border-subtle); min-width: 0; background: var(--surface-raised); border-radius: 0 var(--radius-xl, 10px) var(--radius-xl, 10px) 0; }
+.lx-ph { padding: 0.875rem 1rem 0.5rem; }
+.lx-title { font-size: 1.125rem; font-weight: 600; margin: 0.5rem 0; line-height: 1.3; }
+.lx-tags { display: flex; flex-wrap: wrap; gap: 0.375rem; }
+.lx-tag { font-size: 0.75rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 0.125rem 0.375rem; color: var(--text-muted); }
+.lx-tag b { color: var(--text-primary); font-weight: 500; }
+.lx-pb { padding: 0.875rem 1rem 1rem; background: var(--surface-sunken); min-height: 20rem; }
+.lx-paper { background: #fff; box-shadow: 0 1px 4px color-mix(in oklab, var(--text-primary) 16%, transparent); min-height: 12rem; }
+.lx-paper img { width: 100%; display: block; }
+.lx-next { margin-top: 1rem; padding: 0.75rem 0.875rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); background: var(--surface-raised); }
+.lx-next h3 { font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); margin: 0 0 0.25rem; }
+.lx-next p { font-size: 0.875rem; margin: 0; }
+.lx-facts { display: grid; grid-template-columns: 6rem minmax(0, 1fr); gap: 0.375rem 0.75rem; margin: 1rem 0 0; font-size: 0.8125rem; }
+.lx-facts dt { color: var(--text-muted); }
+.lx-facts dd { margin: 0; }
+.rsp-meaning { font-size: 0.75rem; border: 1px solid var(--border-subtle); background: var(--surface-inset); border-radius: var(--radius-md); padding: 0.375rem 0.5rem; margin-top: 0.375rem; }
+.rsp-versions { list-style: none; margin: 0; padding: 0; }
+.rsp-versions > li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 0.25rem 0.625rem; align-items: center; padding: 0.5rem 0; border-bottom: 1px solid var(--border-subtle); font-size: 0.8125rem; }
+.lx-keys { white-space: nowrap; }
+
+/* Under 1500 px the panel lies over the list; under 1280 px the facets go behind "Filters". */
+@media (max-width: 1499px) {
+  .lx.has-panel { grid-template-columns: 14.5rem minmax(0, 1fr); }
+  .lx-panel { position: absolute; top: 0; right: 0; bottom: 0; width: min(29rem, 100%); z-index: 6; overflow: auto;
+    box-shadow: -12px 0 32px -16px var(--shadow-color, rgba(0,0,0,.35)); }
+}
+@media (max-width: 1279px) {
+  .lx, .lx.has-panel { grid-template-columns: minmax(0, 1fr); }
+  .lx-facets { display: none; }
+  .lx.facets-open .lx-facets { display: block; position: absolute; top: 3.5rem; left: 0.75rem; z-index: 7; width: 16rem; max-height: 75vh; overflow: auto;
+    background: var(--surface-raised); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); box-shadow: 0 12px 32px -12px var(--shadow-color, rgba(0,0,0,.35)); }
+  .lx-filters-btn { display: inline-flex; }
+  .lx-c-by { display: none; }
+  .lx-keys { display: none; }
+}

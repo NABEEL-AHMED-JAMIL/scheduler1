@@ -10,6 +10,7 @@ import { ToastService } from '../../shared/ui/toast.service';
 import { ReportStudioApi } from './report-studio.api';
 import { ReportDetail } from './report-studio.model';
 import { ReportPage } from './report-page';
+import { ReportLibraryApi } from './report-library.api';
 
 /**
  * Owner 2026-10-27: a report's Versions table sorts; Generate again's template versions say they are loading, or why they
@@ -31,7 +32,8 @@ function page(api: Record<string, unknown>) {
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({ providers: [provideZonelessChangeDetection(), provideRouter([]),
     // people(): the approvers' names upstream reads on open (an empty list here).
-    { provide: ReportStudioApi, useValue: { people: () => of([]), ...api } },
+    { provide: ReportStudioApi, useValue: { people: () => of([]), version: () => NEVER, ...api } },
+    { provide: ReportLibraryApi, useValue: { meanings: () => of({ meanings: [], firstDefault: 'REVIEWED', finalDefault: 'RELEASE' }) } },
     { provide: AuthService, useValue: { canOpen: () => true, isPlatformAdmin: () => false, user: signal({ appUserId: 4640, tenantName: 'Riverside' }) } },
     { provide: Dialog, useValue: { open: vi.fn() } },
     { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }] });
@@ -80,11 +82,9 @@ describe('Report page -- Generate again\'s template versions: loading, empty, er
     expect(p.templateVersions()).toEqual([]);
   });
 
-  it('says the versions could not be read, and the page preview too', () => {
+  it('says the versions could not be read', () => {
     const p = page(withVersions(failed, failed));
     expect(p.versionsState.loading()).toBe(false);
     expect(p.versionsState.error()).toBe('The template\'s versions could not be read.');
-    expect(p.thumbLoading()).toBe(false);
-    expect(p.thumbError()).toBe('The page preview is not available right now.');
   });
 });

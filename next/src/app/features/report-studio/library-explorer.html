@@ -1,0 +1,226 @@
+<div class="lx" [class.has-panel]="!!selected()" [class.facets-open]="facetsOpen()">
+  <aside class="lx-facets" aria-label="Filters">
+    <div class="lx-fh"><h2>Status</h2>@if (filters().state.length) { <span class="lx-badge">{{ filters().state.length }}</span> }</div>
+    @for (f of stateFacets(); track f.value) {
+      <label class="lx-f"><input type="checkbox" class="checkbox" [checked]="isOn('state', f.value)" (change)="toggle('state', f.value)" />
+        <span>{{ stateWord(f.value) }}</span><b>{{ f.count }}</b></label>
+    }
+    <div class="lx-fh"><h2>Template</h2></div>
+    @for (f of templateFacets(); track f.value) {
+      <label class="lx-f"><input type="checkbox" class="checkbox" [checked]="isOn('templateId', f.value)" (change)="toggle('templateId', f.value)" />
+        <span [title]="f.label || ''">{{ f.label }}</span><b>{{ f.count }}</b></label>
+    } @empty { <p class="lx-none">None</p> }
+    @if ((facets()?.template?.length ?? 0) > 5) {
+      <button type="button" class="link-inline text-xs" (click)="templatesAll.set(!templatesAll())">{{ templatesAll() ? 'fewer' : (facets()!.template.length - 5) + ' more' }}</button>
+    }
+    <div class="lx-fh"><h2>Category</h2></div>
+    @for (f of facets()?.category ?? []; track f.value) {
+      <label class="lx-f"><input type="checkbox" class="checkbox" [checked]="isOn('category', f.value)" (change)="toggle('category', f.value)" />
+        <span>{{ f.value || 'No category' }}</span><b>{{ f.count }}</b></label>
+    } @empty { <p class="lx-none">None</p> }
+    <div class="lx-fh"><h2>Made by</h2></div>
+    @for (f of facets()?.madeBy ?? []; track f.value) {
+      <label class="lx-f"><input type="checkbox" class="checkbox" [checked]="isOn('madeBy', f.value)" (change)="toggle('madeBy', f.value)" />
+        <span><app-icon [name]="f.value === 'PIPELINE' ? 'zap' : f.value === 'SCHEDULE' ? 'calendar' : 'user'" size="0.9em" /> {{ madeByWord(f.value) }}</span><b>{{ f.count }}</b></label>
+    }
+    <div class="lx-fh"><h2>Approver</h2></div>
+    @for (f of facets()?.approver ?? []; track f.value) {
+      <label class="lx-f"><input type="checkbox" class="checkbox" [checked]="isOn('approver', f.value)" (change)="toggle('approver', f.value)" />
+        <span>{{ f.value === 'me' ? 'Waiting for me' : f.label }}</span><b>{{ f.count }}</b></label>
+    }
+    <div class="lx-fh"><h2>Hidden</h2></div>
+    <label class="lx-f"><input type="checkbox" class="checkbox" [checked]="tests()" (change)="setTests($any($event.target).checked)" data-test="show-tests" />
+      <span>Test reports (tag: test)</span><b>{{ facets()?.tests ?? 0 }}</b></label>
+  </aside>
+
+  <section class="lx-main" aria-label="Reports">
+    <div class="lx-bar">
+      <button type="button" class="btn btn-default btn-sm lx-filters-btn" (click)="facetsOpen.set(!facetsOpen())" [attr.aria-expanded]="facetsOpen()">
+        <app-icon name="filter" />Filters@if (chips().length) { <span class="lx-badge">{{ chips().length }}</span> }</button>
+      <div class="search-field lx-search">
+        <app-icon name="search" size="0.95em" />
+        <input class="input" placeholder="Search report, template, RPT number" aria-label="Search reports" [value]="q()" (input)="onSearch($any($event.target).value)" />
+      </div>
+      @for (c of chips(); track c.facet + c.value) {
+        <span class="lx-chip"><b>{{ c.name }}</b> {{ c.label }}<button type="button" class="btn btn-ghost btn-icon btn-xs" (click)="toggle(c.facet, c.value)" [attr.aria-label]="'Remove ' + c.name + ' ' + c.label"><app-icon name="close" /></button></span>
+      }
+      <span class="grow"></span>
+      <app-date-range [value]="range()" [storageKey]="rangeStore" [presets]="['7d', '30d', '90d', '12m', 'all']" [maxSpanDays]="400" label="Date range for reports" (rangeChange)="applyRange($event)" />
+    </div>
+
+    <div class="lx-hist" aria-label="Reports a day, by status">
+      <div class="lx-hist-head"><span>Reports a day, by status</span><span>{{ rows().length }} of {{ total() }} shown</span></div>
+      <div class="lx-bars" role="img" [attr.aria-label]="'Reports a day over ' + bars().length + ' days'">
+        @for (b of bars(); track b.day) {
+          <div class="lx-col" [title]="barTitle(b)">
+            @for (p of b.parts; track p.state) { <i [class]="'s-' + p.state" [style.height.%]="(p.n / barMax()) * 100"></i> }
+          </div>
+        }
+      </div>
+    </div>
+
+    @if (picked().size) {
+      <div class="lx-bulk" role="region" aria-label="The selected reports" data-bulk-bar>
+        <label class="flex items-center gap-2"><input type="checkbox" class="checkbox" [checked]="allPicked()" (change)="togglePage($any($event.target).checked)" aria-label="Select this page" />
+          <b>{{ picked().size }} selected</b></label>
+        @if (canApprove()) {
+          @if (meanings().length) {
+            <select class="input input-sm lx-meaning" aria-label="What your approvals mean" [value]="bulkMeaning() ?? ''" (change)="bulkMeaning.set($any($event.target).value || null)">
+              <option value="">Meaning: each step's default</option>
+              @for (m of meanings(); track m.code) { <option [value]="m.code">Meaning: {{ m.words }}</option> }
+            </select>
+          }
+          <button type="button" class="btn btn-sm lx-on-dark" [disabled]="!approvable().length || !!busy()" (click)="approvePicked()" data-bulk-approve>
+            <app-icon name="sign" />Approve and sign {{ approvable().length }}</button>
+        }
+        <button type="button" class="btn btn-sm lx-on-dark" [disabled]="!!busy()" (click)="zipPicked()" data-bulk-zip>
+          @if (busy() === 'zip') { <span class="spinner"></span> } @else { <app-icon name="download" /> }Download as ZIP</button>
+        @if (canGenerate()) {
+          <button type="button" class="btn btn-sm lx-on-dark" [disabled]="!!busy()" (click)="archivePicked()"><app-icon name="inbox" />Archive</button>
+          <button type="button" class="btn btn-sm lx-on-dark" [disabled]="!deletable().length || !!busy()" (click)="deletePicked()" data-delete-picked
+                  [title]="deletable().length < picked().size ? 'Approved reports are kept records and are not deleted.' : ''"><app-icon name="trash" />Delete {{ deletable().length }}</button>
+        }
+        <button type="button" class="btn btn-ghost btn-sm lx-on-dark ml-auto" (click)="clearPicked()">Clear</button>
+      </div>
+    }
+
+    @if (error()) {
+      <div class="p-6 text-sm" role="alert"><p class="text-[color:var(--crit-text)]">{{ error() }}</p>
+        <button type="button" class="btn btn-default btn-sm mt-2" (click)="read()"><app-icon name="refresh" />Try again</button></div>
+    } @else {
+      <div class="lx-table-wrap">
+        <table class="lx-table" [class.is-loading]="loading()">
+          <thead><tr>
+            <th class="w-8"><input type="checkbox" class="checkbox" [checked]="allPicked()" [disabled]="!rows().length" (change)="togglePage($any($event.target).checked)" aria-label="Select this page" data-pick-page /></th>
+            <th class="w-8"><span class="sr-only">Page</span></th>
+            <th [attr.aria-sort]="sortMark('name')"><button type="button" class="lx-sort" (click)="sortBy('name')">Report</button></th>
+            <th class="lx-c-template" [attr.aria-sort]="sortMark('template')"><button type="button" class="lx-sort" (click)="sortBy('template')">Template</button></th>
+            <th [attr.aria-sort]="sortMark('version')"><button type="button" class="lx-sort" (click)="sortBy('version')">Version</button></th>
+            <th [attr.aria-sort]="sortMark('state')"><button type="button" class="lx-sort" (click)="sortBy('state')">Status</button></th>
+            <th class="lx-c-by">Made by</th>
+            <th [attr.aria-sort]="sortMark('madeAt')"><button type="button" class="lx-sort" (click)="sortBy('madeAt')">Made</button></th>
+          </tr></thead>
+          <tbody>
+            @for (r of rows(); track r.reportId) {
+              <tr [class.is-open]="selected()?.reportId === r.reportId" [class.is-picked]="isPicked(r)" tabindex="0" [attr.data-row]="r.reportId"
+                  (click)="open(r, panelTab())" (keydown)="key($event, r)" [attr.aria-selected]="selected()?.reportId === r.reportId">
+                <td (click)="$event.stopPropagation()"><input type="checkbox" class="checkbox" [checked]="isPicked(r)" (change)="togglePick(r)" [attr.aria-label]="'Select ' + r.name" data-pick-report /></td>
+                <td><span class="lx-doc" aria-hidden="true"><i></i><i></i><i></i><i></i></span></td>
+                <td class="lx-name"><span class="truncate block font-medium" [title]="r.name">{{ r.name }}</span><span class="mono text-xs text-[color:var(--text-muted)]">{{ r.label }}@if (r.test) { · test }</span></td>
+                <td class="lx-c-template"><span class="truncate block" [title]="r.templateName">{{ r.templateName }}</span></td>
+                <td class="tabular">@if (r.currentVersion) { v{{ r.currentVersion }} } @else { — }</td>
+                <td><span class="pill" [class]="'pill-' + stateTone(r.state)">@if (r.state === 'WAITING') { <app-icon name="clock" /> }@if (r.state === 'APPROVED' && r.signed) { <app-icon name="check" /> }{{ stateChip(r) }}</span></td>
+                <td class="lx-c-by text-sm"><app-icon [name]="r.madeBy === 'PIPELINE' ? 'zap' : r.madeBy === 'SCHEDULE' ? 'calendar' : 'user'" size="0.85em" /> {{ madeByWords[r.madeBy] }}</td>
+                <td class="text-xs whitespace-nowrap">{{ r.madeAt | rsTime: 'recent' }}</td>
+              </tr>
+            } @empty {
+              @if (!loading()) { <tr><td colspan="8" class="p-6 text-sm text-[color:var(--text-muted)]">{{ anyFilter() ? 'No report matches the filters.' : 'No reports in this date range.' }}</td></tr> }
+            }
+          </tbody>
+        </table>
+      </div>
+      <div class="lx-foot">
+        <span>{{ rows().length }} of {{ total() }}@if (anyFilter()) { · <button type="button" class="link-inline" (click)="clearFilters()">clear filters</button> }</span>
+        <span class="lx-keys">↑ ↓ to move · Enter to open · Space to select</span>
+      </div>
+      @if (total() > size()) { <app-pagination [total]="total()" [page]="page()" [size]="size()" (goTo)="goTo($event)" (setSize)="setSize($event)" /> }
+    }
+  </section>
+
+  @if (selected(); as r) {
+    <aside class="lx-panel" aria-label="The open report">
+      <div class="lx-ph">
+        <div class="flex flex-wrap items-center gap-2 text-xs text-[color:var(--text-muted)]">
+          <span class="pill" [class]="'pill-' + stateTone(r.state)">{{ r.state === 'WAITING' && r.firstApprovedBy ? 'Waiting for 2nd approval' : stateWords[r.state] }}</span>
+          @if (r.currentVersion) { <span>v{{ r.currentVersion }} · {{ r.madeAt | rsTime: 'recent' }} · {{ ago(r.madeAt) }}</span> }
+          <span class="grow"></span>
+          <a class="btn btn-ghost btn-icon btn-sm" [routerLink]="['/reports/library', r.reportId]" aria-label="Open the report's page" title="Open the report"><app-icon name="maximize" /></a>
+          <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="close()" aria-label="Close the panel"><app-icon name="close" /></button>
+        </div>
+        <h2 class="lx-title">{{ r.name }}</h2>
+        <div class="lx-tags">
+          <span class="lx-tag">template <b>{{ r.templateName }}</b></span>
+          @if (r.category) { <span class="lx-tag">category <b>{{ r.category }}</b></span> }
+          @if (r.pages) { <span class="lx-tag">pages <b>{{ r.pages }}</b></span> }
+          @if (detail()?.versions?.length) { <span class="lx-tag">versions <b>{{ detail()!.versions.length }}</b></span> }
+          @if (r.test) { <span class="lx-tag">tag <b>test</b></span> }
+        </div>
+      </div>
+      <div class="tabs px-4" role="tablist" aria-label="The open report">
+        @for (t of [['preview', 'Preview'], ['approval', 'Approval'], ['versions', 'Versions'], ['activity', 'Activity']]; track t[0]) {
+          <button type="button" role="tab" class="tab" [class.tab-active]="panelTab() === t[0]" [attr.aria-selected]="panelTab() === t[0]" (click)="panelTab.set($any(t[0]))">{{ t[1] }}@if (t[0] === 'versions' && detail()) { <span class="rs-count">{{ detail()!.versions.length }}</span> }@if (t[0] === 'activity' && detail()) { <span class="rs-count">{{ detail()!.activity.length }}</span> }</button>
+        }
+      </div>
+      <div class="lx-pb">
+        @if (detailError()) { <p class="text-sm text-[color:var(--crit-text)]" role="alert">{{ detailError() }}</p> }
+        @switch (panelTab()) {
+          @case ('preview') {
+            <div class="lx-paper">
+              @if (pageImage(); as src) { <img [src]="src" [alt]="'Page ' + panelPage() + ' of ' + r.name" /> }
+              @else if (r.state === 'FAILED' || !r.currentVersion) { <p class="text-sm text-[color:var(--text-muted)] p-6">No pages: the report has no version yet.</p> }
+              @else if (pageError()) { <p class="text-sm text-[color:var(--text-muted)] p-6">{{ pageError() }}</p> }
+              @else { <div class="spinner mx-auto my-24" role="status" aria-label="Drawing the page"></div> }
+            </div>
+            <div class="flex items-center gap-2 mt-2 text-sm">
+              <button type="button" class="btn btn-default btn-icon btn-sm" [disabled]="panelPage() <= 1" (click)="turn(-1)" aria-label="Previous page"><app-icon name="chevronLeft" /></button>
+              <span class="tabular">Page {{ panelPage() }} of {{ r.pages ?? 1 }}</span>
+              <button type="button" class="btn btn-default btn-icon btn-sm" [disabled]="panelPage() >= (r.pages ?? 1)" (click)="turn(1)" aria-label="Next page"><app-icon name="chevronRight" /></button>
+              <a class="link-inline ml-auto" [routerLink]="['/reports/library', r.reportId]">Open the report <app-icon name="arrowRight" size="0.9em" /></a>
+            </div>
+          }
+          @case ('approval') {
+            @if (current(); as v) {
+              @if (v.approval; as ap) {
+                <p class="text-sm"><b>{{ ap.signed ? 'Approved and signed' : 'Approved' }}</b> by {{ ap.approverName }} · {{ ap.approvedAt | rsTime: 'recent' }}</p>
+                @for (s of ap.signers ?? []; track s.slot) { <p class="text-xs text-[color:var(--text-muted)]">{{ s.slot === 1 && (ap.signers?.length ?? 0) > 1 ? '1st' : (ap.signers?.length ?? 0) > 1 ? '2nd' : '' }} {{ s.name }}@if (s.meaning) { · {{ s.meaning }} }</p> }
+                @if (ap.meaning) { <div class="rsp-meaning"><b>Meaning:</b> {{ ap.meaning }}</div> }
+              } @else if (v.review?.state === 'OPEN') {
+                <p class="text-sm">Waiting for approval · asked by {{ v.review!.requestedByName }} {{ v.review!.requestedAt | rsTime: 'recent' }}</p>
+                @if (v.review!.firstApproval; as f) { <p class="text-xs text-[color:var(--text-muted)]">1st: {{ f.byName }}@if (f.meaning) { · {{ f.meaning }} } · {{ f.at | rsTime: 'recent' }}</p> }
+              } @else { <p class="text-sm">Not approved yet.</p> }
+            } @else if (!detailError()) { <div class="spinner" role="status" aria-label="Loading"></div> }
+          }
+          @case ('versions') {
+            @if (detail(); as d) {
+              <ul class="rsp-versions !px-0">
+                @for (v of versionsOf(d); track v.versionId) {
+                  <li><span class="pill pill-neutral">v{{ v.version }}</span>
+                    <div class="min-w-0"><div class="font-medium truncate">{{ v.reason || (v.version === 1 ? 'First version' : 'Version ' + v.version) }}</div>
+                      <div class="text-xs text-[color:var(--text-muted)]">{{ v.createdAt | rsTime: 'recent' }} · template v{{ v.templateVersion }}@if (v.void) { · VOID }@if (v.approval?.signed) { · signed }</div></div>
+                    <span></span></li>
+                }
+              </ul>
+            }
+          }
+          @case ('activity') {
+            @if (detail(); as d) {
+              <ul class="text-sm flex flex-col gap-2">
+                @for (a of d.activity.slice(0, 12); track $index) { <li class="flex gap-2"><span class="mono text-xs">{{ a.action }}</span><span class="text-xs text-[color:var(--text-muted)] ml-auto whitespace-nowrap">{{ a.at | rsTime: 'recent' }}</span></li> }
+                @empty { <li class="text-[color:var(--text-muted)]">Nothing yet.</li> }
+              </ul>
+              <a class="link-inline text-xs mt-2 inline-block" [routerLink]="['/reports/library', r.reportId]">All activity on the report's page</a>
+            }
+          }
+        }
+
+        <div class="lx-next">
+          <h3>Next steps</h3>
+          <p>{{ nextSteps(r) }}</p>
+          <div class="flex flex-wrap gap-2 mt-2">
+            @if (mayApprove(r)) {
+              <button type="button" class="btn btn-primary btn-sm" [disabled]="!!busy()" (click)="approveOpen()" data-panel-approve><app-icon name="sign" />Approve and sign v{{ r.currentVersion }}</button>
+            }
+            <a class="btn btn-default btn-sm" [routerLink]="['/reports/library', r.reportId]"><app-icon name="eye" />Open the report</a>
+          </div>
+        </div>
+        <dl class="lx-facts">
+          @if (current(); as v) {
+            <dt>Data</dt><dd>{{ v.snapshot?.label || '—' }} · frozen {{ v.snapshot?.takenAt | rsTime: 'date' }}@if (v.snapshot?.records != null) { · {{ v.snapshot!.records }} rows }</dd>
+            <dt>Made by</dt><dd>{{ madeByWords[r.madeBy] }}@if (v.jobLabel) { · job {{ v.jobLabel }} }</dd>
+          }
+          <dt>Template</dt><dd><a class="link-inline" [routerLink]="['/reports/templates', r.templateId]">{{ r.templateName }}</a></dd>
+        </dl>
+      </div>
+    </aside>
+  }
+</div>

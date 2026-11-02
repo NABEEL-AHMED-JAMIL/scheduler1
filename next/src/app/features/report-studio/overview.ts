@@ -1,127 +1,183 @@
 import { plainHint } from '../../shared/ui/plain-words';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { PageHeader } from '../../shared/ui/page-header';
 import { RefreshButton } from '../../shared/ui/refresh-button';
 import { Icon } from '../../shared/ui/icon';
-import { StatStrip, StatStripItem } from '../../shared/ui/stat-strip';
-import { StatusPill } from '../../shared/ui/status-pill';
-import { RsTimePipe, rsTime } from './rs-time.pipe';
-import { instantOf } from '../../core/instant';
+import { RsTimePipe } from './rs-time.pipe';
 import { LoadError } from '../../shared/ui/load-error';
 import { AuthService } from '../../core/auth/auth.service';
 import { WorkspaceDirectory } from '../../core/workspaces/workspace-directory';
 import { WorkspaceSelect } from '../../shared/ui/workspace-select';
 import { ReportStudioApi, studioError } from './report-studio.api';
-import { JobRow, ReportRow, StudioOverview, chipWord, isRunning, stageWord } from './report-studio.model';
-import { GeneratedService, pipelineOf } from '../documents/generated/generated.service';
-import { RunRow } from '../tasks/steps/steps.model';
+import { JobRow, StudioOverview } from './report-studio.model';
 import { RsTabCounts } from './rs-tab-counts';
-import { formatDuration } from '../../shared/ui/time-format';
-import { PageLimitActions } from './page-limit-actions';
 import { AppLoading } from '../../shared/ui/loading';
-import { createTableSort } from '../../shared/ui/sort';
-import { SortHeader } from '../../shared/ui/sort-header';
-
-/** A pipeline whose runs fed reports lately (the Overview's "Connected pipelines"), as the person may see it. */
-export interface ConnectedPipeline {
-  jobId: number; name: string; pipeline: string | null; lastRun: RunRow | null; templates: number; usedRun: number;
-}
+import { LibraryRow, LibrarySummary, ReportLibraryApi, stateChip, stateTone } from './report-library.api';
+import { daysAgo } from './report-stages';
 
 /** Error codes that mean the data does not fit the template: the way out is the field mapping. */
 const MAPPING_CODES = new Set(['REQUIRED_FIELD_MISSING', 'BINDING_NOT_RESOLVED', 'DATA_SCHEMA_MISMATCH']);
-/** Why a job failed, in a chip's two words; the code itself is the chip's tooltip. */
-const FAIL_WORDS: Record<string, string> = {
-  REQUIRED_FIELD_MISSING: 'required field', BINDING_NOT_RESOLVED: 'field not found', DATA_SCHEMA_MISMATCH: 'data shape',
-  TEMPLATE_INVALID: 'template problem',
-};
+
+/** One line of "Needs you": what to do, about what, and the one button that does it. */
+export interface NeedItem {
+  kind: 'approve' | 'failed' | 'publish' | 'asked';
+  title: string;
+  detail: string;
+  action: string;
+  link: (string | number)[];
+  query?: Record<string, string>;
+  primary: boolean;
+}
+
+/** The change against the 30 days before, as the tile words it: "+18% on the 30 days before" (none when there were none). */
+export function trendWords(now: number, before: number): string {
+  if (!before) return now ? 'none in the 30 days before' : '';
+  const pct = Math.round(((now - before) / before) * 100);
+  return `${pct >= 0 ? '+' : '−'}${Math.abs(pct)}% on the 30 days before`;
+}
+
+/** The sparkline's points over w x h for the daily counts (oldest first). */
+export function sparkPoints(counts: number[], w = 280, h = 28): string {
+  if (!counts.length) return '';
+  const max = Math.max(1, ...counts);
+  const step = counts.length > 1 ? w / (counts.length - 1) : 0;
+  return counts.map((c, i) => `${(i * step).toFixed(1)},${(h - (c / max) * (h - 2) - 1).toFixed(1)}`).join(' ');
+}
+
+/** The last {@code days} days, oldest first, as yyyy-mm-dd in the reader's calendar. */
+export function lastDays(days: number, today = new Date()): string[] {
+  const out: string[] = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
+    out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+  }
+  return out;
+}
+
+/** The chart's categories, most reports first; at most five named, the rest as "Other". */
+export function topCategories(days: ({ day: string } & Record<string, number | string>)[], keep = 5): string[] {
+  const totals = new Map<string, number>();
+  for (const d of days) for (const [k, v] of Object.entries(d)) if (k !== 'day') totals.set(k, (totals.get(k) ?? 0) + Number(v));
+  const sorted = [...totals.entries()].sort((a, b) => b[1] - a[1]).map(e => e[0]);
+  return sorted.length > keep ? [...sorted.slice(0, keep), 'Other'] : sorted;
+}
 
 /**
- * See results › Reports › Overview (MIG-403, MIG-404; the owner-approved screen 1, Figma frame 1; page report-studio): what
- * was made this month, the templates, the jobs running and failing, the pipelines that feed reports, and where to start. A
- * failed job is named with its code -- it made no version and the report keeps its last good one; a job blocked by the data
- * leads straight to the field mapping.
+ * See results › Reports › Overview (reports redesign, owner 2026-11-02; design overview.html; page report-studio): five
+ * figures over 30 days with a trend instead of "this month" (which read 0 on the 2nd), one "Needs you" list -- approvals
+ * (yours first), failed generations with what to do, templates to publish -- reports made a day by category, what goes out
+ * next, the newest reports as pages, and the most used templates. Test templates and reports are left out everywhere.
  */
 @Component({
   selector: 'app-report-overview',
-  imports: [PageHeader, WorkspaceSelect, RefreshButton, Icon, StatStrip, StatusPill, RsTimePipe, LoadError, RouterLink, PageLimitActions, AppLoading, SortHeader],
+  imports: [PageHeader, WorkspaceSelect, RefreshButton, Icon, RsTimePipe, LoadError, RouterLink, AppLoading],
   templateUrl: './overview.html',
+  styleUrl: './overview.css',
 })
 export class ReportOverview implements OnInit {
-  /** ZT-U8: a job's message in the menu's words (Reports › Settings, not Report Studio › Settings). */
   plain(text: string | null | undefined): string { return plainHint(text ?? ''); }
   private readonly api = inject(ReportStudioApi);
+  private readonly lib = inject(ReportLibraryApi);
   private readonly auth = inject(AuthService);
   private readonly tabCounts = inject(RsTabCounts);
   private readonly router = inject(Router);
-  private readonly generated = inject(GeneratedService);
   private readonly workspaces = inject(WorkspaceDirectory);
   /** A platform administrator's pick (the one workspace selector, owner #5); null is every workspace. Members: their own. */
   readonly tenantId = signal<number | null>(this.workspaces.remembered());
 
   readonly data = signal<StudioOverview | null>(null);
+  readonly summary = signal<LibrarySummary | null>(null);
+  readonly summaryError = signal('');
   readonly loading = signal(true);
   readonly error = signal('');
-  readonly pipelines = signal<ConnectedPipeline[]>([]);
-  /**
-   * Owner 2026-10-27: the Connected pipelines card's reads (the schedules, then each one's newest runs): it says it is
-   * looking while they come, and that they could not be read when they fail -- not "their schedules are not ones you can
-   * open". A refresh keeps the card's list until the new one is complete.
-   */
-  readonly pipelinesLoading = signal(false);
-  readonly pipelinesError = signal('');
-  private connectSeq = 0;
-  /** Owner 2026-10-27: the two recent lists sort by their columns; the service's order (recent first) until one is picked. */
-  readonly reportSort = createTableSort<ReportRow>({
-    id: 'report-overview-reports',
-    note: 'Sorts the recent reports shown here',
-    columns: {
-      report: r => r.name,
-      version: { value: r => r.currentVersion, kind: 'number' },
-      status: { value: r => (r.lastJob && isRunning(r.lastJob.status) ? 'Running' : chipWord(r.status)), kind: 'status' },
-      signed: r => (r.current?.approval?.signed ? 'Signed' : r.current?.approval ? 'Approved' : null),
-      updated: { value: r => r.updatedAt, kind: 'date' },
-    },
-  });
-  readonly sortedReports = computed(() => this.reportSort.apply(this.data()?.recentReports ?? []));
-  readonly jobSort = createTableSort<JobRow>({
-    id: 'report-overview-jobs',
-    note: 'Sorts the recent jobs shown here',
-    columns: {
-      job: j => j.label,
-      startedBy: j => this.startedBy(j),
-      progress: { value: j => (isRunning(j.status) ? 'Running' : j.status === 'SUCCEEDED' ? 'Completed' : j.status === 'FAILED' ? 'Failed' : chipWord(j.status)), kind: 'status' },
-      started: { value: j => j.createdAt, kind: 'date' },
-    },
-  });
-  /** A sorted copy: the blocked-job banner reads the service's own order. */
-  readonly sortedJobs = computed(() => this.jobSort.apply(this.data()?.recentJobs ?? []));
-  readonly chipWord = chipWord;
-  readonly stageWord = stageWord;
-  readonly isRunning = isRunning;
+  /** The chart by day or by week. */
+  readonly chartBy = signal<'day' | 'week'>('day');
+  /** Each recent report's first page (an object URL), by report. */
+  readonly thumbs = signal<Record<string, string>>({});
+  readonly stateChip = stateChip;
+  readonly stateTone = stateTone;
 
   readonly canGenerate = computed(() => this.auth.canOpen('report-generate') && !this.auth.isPlatformAdmin());
   readonly canTemplates = computed(() => this.auth.canOpen('report-templates') && !this.auth.isPlatformAdmin());
-  readonly canPublish = computed(() => this.auth.canOpen('report-publish') && !this.auth.isPlatformAdmin());
-  readonly canData = computed(() => this.auth.canOpen('report-data'));
   readonly canLibrary = computed(() => this.auth.canOpen('report-library'));
-  private readonly me = computed(() => this.auth.user()?.appUserId ?? null);
+  readonly canApprove = computed(() => this.auth.canOpen('report-approve') && !this.auth.isPlatformAdmin());
 
-  readonly kpis = computed((): StatStripItem[] => {
-    const f = this.data()?.figures;
-    return f ? overviewTiles(f) : [];
+  constructor() {
+    inject(DestroyRef).onDestroy(() => Object.values(this.thumbs()).forEach(u => URL.revokeObjectURL(u)));
+  }
+
+  private scope(): number | null {
+    return this.auth.isPlatformAdmin() ? this.tenantId() : null;
+  }
+
+  ngOnInit(): void {
+    this.load();
+  }
+
+  load(): void {
+    this.loading.set(true);
+    this.error.set('');
+    this.summaryError.set('');
+    this.tabCounts.refresh(this.scope());
+    this.api.overview(this.scope()).subscribe({
+      next: d => { this.data.set(d); this.loading.set(false); },
+      error: e => { this.error.set(studioError(e, 'The overview could not be read.').message); this.loading.set(false); },
+    });
+    // The 30-day figures are the library's (report-library): a reader without the library still has the rest.
+    if (this.canLibrary()) {
+      this.lib.summary(this.scope()).subscribe({
+        next: s => { this.summary.set(s); this.loadThumbs(s.recent); },
+        error: e => this.summaryError.set(studioError(e, 'The 30-day figures could not be read.').message),
+      });
+    }
+  }
+
+  private loadThumbs(rows: LibraryRow[]): void {
+    for (const r of rows) {
+      if (!r.currentVersion || r.state === 'FAILED' || this.thumbs()[r.reportId]) continue;
+      this.api.reportThumbnail(r.reportId, r.currentVersion, this.scope()).subscribe({
+        next: res => {
+          if (!res.body || !(res.headers.get('Content-Type') ?? '').includes('png')) return;
+          this.thumbs.set({ ...this.thumbs(), [r.reportId]: URL.createObjectURL(res.body) });
+        },
+        error: () => { /* the tile shows a plain page */ },
+      });
+    }
+  }
+
+  // ------------------------------------------------------------------ the figures
+
+  readonly made = computed(() => {
+    const s = this.summary();
+    if (!s) return null;
+    const byDay = new Map(s.madeDaily.map(d => [d.day, d.count]));
+    const counts = lastDays(30).map(d => byDay.get(d) ?? 0);
+    return { value: s.made30, trend: trendWords(s.made30, s.madeBefore30), up: s.made30 >= s.madeBefore30, points: sparkPoints(counts) };
   });
 
-  /** The newest failed job, when its report made no version since: the banner. */
+  readonly approvedShare = computed(() => {
+    const a = this.summary()?.approved;
+    if (!a) return null;
+    const pct = a.total ? Math.round((a.signed / a.total) * 100) : 0;
+    const median = a.medianHours == null ? '' : a.medianHours < 1 ? `median ${Math.round(a.medianHours * 60)} min to sign`
+      : a.medianHours < 48 ? `median ${Math.round(a.medianHours)} h to sign` : `median ${Math.round(a.medianHours / 24)} days to sign`;
+    return { pct, words: `${a.signed} of ${a.total}${median ? ' · ' + median : ''}` };
+  });
+
+  readonly waitingTile = computed(() => {
+    const w = this.summary()?.waiting;
+    if (!w) return null;
+    const oldest = [...w.reports].map(r => r.askedAt).filter(Boolean).sort()[0];
+    return { count: w.count, mine: w.mine, oldest: oldest ? `oldest asked ${daysAgo(oldest)}` : 'none waiting' };
+  });
+
+  // ------------------------------------------------------------------ Needs you
+
   /**
-   * The newest failed job, while it is still its report's last word: a later success in the recent jobs clears it, and so
-   * does the report's own job list (read when the recent jobs no longer reach back that far), so a report that was made
-   * again since is not shown as blocked.
-   */
-  /**
-   * ZT-R23: what the Overview says waits for a decision. The reader's own to decide (the button opens Approvals, which lists
-   * exactly those), and what they asked for that waits for someone else -- never a count that points at an empty list. A
-   * server without the split (older media) keeps the one figure.
+   * ZT-R23: what waits for a decision, split as Review › Approvals lists it -- the reader's own to decide, and what they asked
+   * for that waits for someone else (and whether anyone else in the workspace can decide it). A server without the split
+   * (older media) keeps the one figure.
    */
   readonly waiting = computed(() => {
     const f = this.data()?.figures;
@@ -137,128 +193,96 @@ export class ReportOverview implements OnInit {
     };
   });
 
-  readonly blocked = computed(() => {
-    const d = this.data();
-    const j = d?.failedJobs[0];
-    if (!j) return null;
-    const later = d!.recentJobs.find(x => x.reportId === j.reportId && x.status === 'SUCCEEDED' && (x.createdAt ?? '') > (j.createdAt ?? ''));
-    if (later) return null;
-    return this.stillBlocked() === j.jobId ? j : null;
+  readonly needs = computed<NeedItem[]>(() => {
+    const out: NeedItem[] = [];
+    const s = this.summary();
+    // Only what is the reader's to decide is theirs to do; what waits for someone else is one line below.
+    for (const r of (s?.waiting.reports ?? []).filter(x => x.waitingForMe && this.canApprove())) {
+      const second = r.needsSecond && !!r.firstApprovedBy;
+      out.push({
+        kind: 'approve', primary: true,
+        title: `Approve and sign · ${r.name} · v${r.currentVersion}`,
+        detail: [second ? `Second approval · first by ${r.firstApproverName}` : '', r.askedAt ? `asked ${daysAgo(r.askedAt)}` : '',
+          r.pages ? `${r.pages} page${r.pages === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · '),
+        action: second ? 'Review and sign' : 'Review', link: ['/reports/library', r.reportId],
+      });
+    }
+    for (const j of this.failed()) {
+      const mapping = MAPPING_CODES.has(j.errorCode ?? '');
+      out.push({
+        kind: 'failed', primary: false, title: `Generation failed · ${j.reportName}`,
+        detail: `${this.plain(j.error)} No version was made; the report's last version is unchanged.`,
+        action: mapping && this.canGenerate() ? 'Fix field mapping' : 'Open the report',
+        link: mapping && this.canGenerate() ? ['/reports/new'] : ['/reports/library', j.reportId],
+        query: mapping && this.canGenerate() ? { reportId: j.reportId } : undefined,
+      });
+    }
+    const w = this.waiting();
+    const publish = w?.forYou.templates ?? 0;
+    if (w && !s && w.forYou.reports > 0) {
+      out.push({ kind: 'approve', primary: true, title: `${w.forYou.reports} report${w.forYou.reports === 1 ? '' : 's'} waiting for ${w.split ? 'you' : 'approval'}`,
+        detail: 'Decide them in Review › Approvals, with the pages beside Approve and sign.', action: 'Open Approvals', link: ['/review/approvals'] });
+    }
+    const asked = (w?.asked.reports ?? 0) + (w?.asked.templates ?? 0);
+    if (asked > 0) {
+      out.push({ kind: 'asked', primary: false, title: `${asked} waiting for another approver: you asked for ${asked === 1 ? 'it' : 'these'}`,
+        detail: w!.nobodyElse > 0
+          ? `No one else in this workspace can approve ${w!.nobodyElse === 1 ? 'it' : w!.nobodyElse + ' of them'}; the platform administrator will decide ${w!.nobodyElse === 1 ? 'it' : 'them'}.`
+          : `Someone else decides ${asked === 1 ? 'it' : 'them'}; you can follow ${asked === 1 ? 'it' : 'them'} in Review › My requests.`,
+        action: 'My requests', link: ['/review/requests'] });
+    }
+    if (publish > 0) {
+      out.push({ kind: 'publish', primary: false, title: `Publish · ${publish} template${publish === 1 ? '' : 's'} waiting`,
+        detail: 'A draft was checked and someone asked for it to be published.', action: 'Open approvals', link: ['/review/approvals'] });
+    }
+    return out;
   });
-  /** The failed job its report's own list confirmed as the latest (null until read). */
-  private readonly stillBlocked = signal<string | null>(null);
 
-  private confirmBlocked(d: StudioOverview): void {
-    const j = d.failedJobs[0];
-    this.stillBlocked.set(null);
-    if (!j) return;
-    this.api.report(j.reportId, this.auth.isPlatformAdmin() ? this.tenantId() : null).subscribe({
-      next: r => this.stillBlocked.set(r.jobs?.[0]?.jobId === j.jobId ? j.jobId : null),
-      error: () => this.stillBlocked.set(null),
+  /** The failed jobs still their report's last word (a report made again since is not one to act on). */
+  readonly failed = computed<JobRow[]>(() => {
+    const d = this.data();
+    if (!d) return [];
+    return d.failedJobs.filter(j => !d.recentJobs.some(x => x.reportId === j.reportId && x.status === 'SUCCEEDED'
+      && (x.createdAt ?? '') > (j.createdAt ?? '')));
+  });
+
+  // ------------------------------------------------------------------ the chart
+
+  readonly categories = computed(() => topCategories(this.summary()?.madeByCategory ?? []));
+
+  /** Columns of the chart: a day (30) or a week (5), each stacked by category. */
+  readonly columns = computed(() => {
+    const cats = this.categories();
+    const named = new Set(cats.filter(c => c !== 'Other'));
+    const byDay = new Map((this.summary()?.madeByCategory ?? []).map(d => [d.day, d]));
+    const days = lastDays(30).map(day => {
+      const d = byDay.get(day);
+      const parts: Record<string, number> = {};
+      if (d) for (const [k, v] of Object.entries(d)) if (k !== 'day') { const key = named.has(k) ? k : 'Other'; parts[key] = (parts[key] ?? 0) + Number(v); }
+      return { label: day, parts };
     });
-  }
-
-  ngOnInit(): void {
-    this.load();
-  }
-
-  load(): void {
-    this.loading.set(true);
-    this.error.set('');
-    this.tabCounts.refresh(this.auth.isPlatformAdmin() ? this.tenantId() : null);
-    this.api.overview(this.auth.isPlatformAdmin() ? this.tenantId() : null).subscribe({
-      next: d => { this.data.set(d); this.loading.set(false); this.connect(d); this.confirmBlocked(d); },
-      error: e => { this.error.set(studioError(e, 'The overview could not be read.').message); this.loading.set(false); },
-    });
-  }
-
-  /**
-   * The pipelines behind the runs reports were made from: the reader's schedules, the newest runs of the most recently run
-   * ones, matched to the runs Report Studio used. A schedule the reader may not see is not listed.
-   */
-  connect(d: StudioOverview): void {
-    const used = d.pipelineRuns ?? [];
-    const seq = ++this.connectSeq;
-    this.pipelinesError.set('');
-    // ZT-R9: the schedules are the Schedules page's (key 'jobs'); a reviewer without it is not asked (it was a 403 in the console).
-    if (!used.length || this.auth.isPlatformAdmin() || !this.auth.canOpen('jobs')) {
-      this.pipelines.set([]);
-      this.pipelinesLoading.set(false);
-      return;
+    if (this.chartBy() === 'day') return days;
+    const weeks: { label: string; parts: Record<string, number> }[] = [];
+    for (let i = days.length % 7; i < days.length; i += 7) {
+      const slice = days.slice(Math.max(0, i), i + 7);
+      const parts: Record<string, number> = {};
+      for (const d of slice) for (const [k, v] of Object.entries(d.parts)) parts[k] = (parts[k] ?? 0) + v;
+      weeks.push({ label: `${slice[0].label} – ${slice[slice.length - 1].label}`, parts });
     }
-    this.pipelinesLoading.set(true);
-    this.generated.schedules().subscribe({
-      next: all => {
-        if (seq !== this.connectSeq) return;
-        const recent = [...all].sort((a, b) => String(b.lastJobRun ?? '').localeCompare(String(a.lastJobRun ?? ''))).slice(0, 10);
-        const found: ConnectedPipeline[] = [];
-        let left = recent.length;
-        let failed = 0;
-        const settle = () => {
-          if (seq !== this.connectSeq || --left > 0) return;
-          this.pipelines.set(found.slice(0, 4));
-          this.pipelinesLoading.set(false);
-          if (recent.length && failed === recent.length) this.pipelinesError.set('The pipelines\' runs could not be read.');
-        };
-        if (!recent.length) { this.pipelines.set([]); this.pipelinesLoading.set(false); return; }
-        for (const job of recent) {
-          this.generated.runs(job.jobId, 15).subscribe({
-            next: runs => {
-              const hits = used.filter(u => runs.some(r => r.jobQueueId === u.pipelineRunId));
-              if (hits.length) {
-                const templates = new Set(hits.flatMap(h => h.templateIds)).size;
-                found.push({ jobId: job.jobId, name: job.jobName ?? `Schedule ${job.jobId}`, pipeline: pipelineOf(job), lastRun: runs[0] ?? null, templates,
-                  usedRun: hits[0].pipelineRunId });
-              }
-              settle();
-            },
-            // A schedule whose runs the reader cannot read is left out; only all of them failing is said.
-            error: () => { failed++; settle(); },
-          });
-        }
-      },
-      error: e => {
-        if (seq !== this.connectSeq) return;
-        this.pipelinesLoading.set(false);
-        this.pipelinesError.set(studioError(e, 'The schedules could not be read.').message);
-      },
-    });
+    return weeks;
+  });
+  readonly columnMax = computed(() => Math.max(1, ...this.columns().map(c => Object.values(c.parts).reduce((a, b) => a + b, 0))));
+
+  colTotal(c: { parts: Record<string, number> }): number {
+    return Object.values(c.parts).reduce((a, b) => a + b, 0);
   }
 
-  /** The run's state as the panel's chip says it ("Ran today", "Running", "Failed"). */
-  runWord(r: RunRow | null): string {
-    if (!r) return 'No runs';
-    const s = String(r.jobStatus ?? '').toLowerCase();
-    if (/run|start|queue/.test(s)) return 'Running';
-    if (/fail|interrupt/.test(s)) return 'Failed';
-    const at = r.endTime ?? r.startTime;
-    return at && rsTime(at, 'day') === 'Today' ? 'Ran today' : 'Completed';
+  colTitle(c: { label: string; parts: Record<string, number> }): string {
+    const parts = Object.entries(c.parts).map(([k, v]) => `${v} ${k}`);
+    return `${c.label}: ${this.colTotal(c)} report${this.colTotal(c) === 1 ? '' : 's'}${parts.length ? ' (' + parts.join(', ') + ')' : ''}`;
   }
 
-  startedBy(j: JobRow): string {
-    if (j.source && j.source !== 'CONSOLE') return 'Pipeline step';
-    if (j.requestedBy && j.requestedBy === this.me()) return 'You';
-    return j.requestedByName || 'A workspace member';
-  }
-
-  /** A finished job's chip as the drawing words it: "Completed · 8.4 sec", "Failed · required field". */
-  jobChip(j: JobRow): string {
-    if (j.status === 'SUCCEEDED') {
-      const ms = j.startedAt && j.finishedAt ? (instantOf(j.finishedAt)?.getTime() ?? 0) - (instantOf(j.startedAt)?.getTime() ?? 0) : 0;
-      return ms > 0 ? `Completed · ${formatDuration(ms / 1000)}` : 'Completed';
-    }
-    if (j.status === 'FAILED') return FAIL_WORDS[j.errorCode ?? ''] ? `Failed · ${FAIL_WORDS[j.errorCode!]}` : 'Failed';
-    return chipWord(j.status);
-  }
-
-  /** Whether a failed job's way out is the field mapping. */
-  isMapping(j: JobRow): boolean {
-    return MAPPING_CODES.has(j.errorCode ?? '');
-  }
-
-  fixMapping(j: JobRow): void {
-    void this.router.navigate(['/reports/new'], { queryParams: { reportId: j.reportId } });
-  }
+  readonly usedMax = computed(() => Math.max(1, ...(this.summary()?.mostUsed ?? []).map(t => t.reports)));
 
   newReport(): void {
     void this.router.navigate(['/reports/new']);
@@ -267,21 +291,4 @@ export class ReportOverview implements OnInit {
   newTemplate(): void {
     void this.router.navigate(['/reports/templates'], { queryParams: { new: 1 } });
   }
-}
-
-/** The overview's four figures (Figma 1's KPIs). */
-export function overviewTiles(f: StudioOverview['figures']): StatStripItem[] {
-  const rate = f.jobsFinishedThisMonth ? `${((f.jobsSucceededThisMonth / f.jobsFinishedThisMonth) * 100).toFixed(1)}%` : '—';
-  return [
-    // ZT-R1: the figure is the versions made this month (every Generate is one), not reports; "174 reports this month ·
-    // 66 reports in all" read as a contradiction.
-    { label: 'Versions this month', value: f.versionsThisMonth, icon: 'file', tone: 'info',
-      foot: `of ${f.reports} report${f.reports === 1 ? '' : 's'} in all` },
-    { label: 'Published templates', value: f.publishedTemplates, icon: 'template', tone: 'info',
-      foot: f.templatesWithDrafts ? `${f.templatesWithDrafts} ha${f.templatesWithDrafts === 1 ? 's' : 've'} draft changes` : `${f.templates} template${f.templates === 1 ? '' : 's'} in all` },
-    { label: 'Generated OK', value: rate, icon: 'checkCircle', tone: 'ok',
-      foot: `${f.jobsSucceededThisMonth} of ${f.jobsFinishedThisMonth} jobs this month` },
-    { label: 'Needs attention', value: f.failedLast7Days, icon: 'alert', tone: f.failedLast7Days ? 'crit' : 'muted',
-      foot: f.running ? `${f.running} running now` : f.failedLast7Days ? 'failed jobs, last 7 days' : 'nothing failed this week' },
-  ];
 }

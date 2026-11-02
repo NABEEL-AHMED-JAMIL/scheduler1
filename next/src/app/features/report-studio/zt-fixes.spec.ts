@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { provideZonelessChangeDetection, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { of } from 'rxjs';
+import { NEVER, of } from 'rxjs';
 import { delay } from 'rxjs/operators';
 import { AuthService } from '../../core/auth/auth.service';
 import { TabCounts } from '../../core/nav/tab-counts';
@@ -13,7 +13,8 @@ import { RsTabCounts } from './rs-tab-counts';
 import { ReportOverview } from './overview';
 import { BrandProfilePage, PLATFORM_PREVIEW } from './assets/brand-profile';
 import { ToastService } from '../../shared/ui/toast.service';
-import { overviewTiles } from './overview';
+import { trendWords } from './overview';
+import { ReportLibraryApi } from './report-library.api';
 import { testChipWords } from './designer/designer';
 import { recordsWord } from './report-studio.model';
 
@@ -31,12 +32,11 @@ async function here(f: string): Promise<string> {
 }
 
 describe('Report Studio screens (zero-tolerance)', () => {
-  it('ZT-R1: the first figure says it counts versions, out of the reports', () => {
-    const [first] = overviewTiles(figures as never);
-    expect(first.label).toBe('Versions this month');
-    expect(first.value).toBe(174);
-    expect(first.foot).toBe('of 66 reports in all');
-    expect(overviewTiles({ ...figures, reports: 1 } as never)[0].foot).toBe('of 1 report in all');
+  it('ZT-R1 (superseded by the reports redesign): the first figure counts 30 days against the 30 before, never "this month"', () => {
+    expect(trendWords(118, 100)).toBe('+18% on the 30 days before');
+    expect(trendWords(80, 100)).toBe('−20% on the 30 days before');
+    expect(trendWords(5, 0)).toBe('none in the 30 days before');
+    expect(trendWords(0, 0)).toBe('');
   });
 
   it('ZT-R2: the test-data chip has its words in a span that is cut with an ellipsis, and names them in full on hover', async () => {
@@ -55,7 +55,8 @@ describe('Report Studio screens (zero-tolerance)', () => {
     expect(recordsWord(null)).toBe('? records');
     const html = await here('report-page.html');
     expect(html).not.toContain('record(s)');
-    expect(html.match(/max-w-36 xl:max-w-60 2xl:max-w-80 truncate/g)?.length).toBe(2);
+    // Reports redesign: the versions are a list beside the viewer; each line says when, the template and the frozen data.
+    expect(html).toContain('template v{{ v.templateVersion }} · data frozen');
     expect(await here('data.ts')).not.toContain('record(s)');
   });
 
@@ -66,11 +67,13 @@ describe('Report Studio screens (zero-tolerance)', () => {
     const api = { overview: vi.fn(() => of(overview)), assets: vi.fn(() => of({ counts: { all: 5 } })), jobs: vi.fn(() => of({ jobs: [] })),
       report: vi.fn(() => of(null)) };
     const generated = { schedules: vi.fn(() => of([])), runs: vi.fn(() => of([])) };
+    const lib = { summary: vi.fn(() => NEVER) };
     const tabs = { set: vi.fn() };
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({ providers: [provideZonelessChangeDetection(), provideRouter([]), { provide: AuthService, useValue: auth },
       { provide: ReportStudioApi, useValue: api }, { provide: GeneratedService, useValue: generated }, { provide: TabCounts, useValue: tabs },
-      { provide: WorkspaceDirectory, useValue: { remembered: () => null } }] });
+      { provide: WorkspaceDirectory, useValue: { remembered: () => null } },
+      { provide: ReportLibraryApi, useValue: lib }] });
     // The component's logic only: its page (the workspace picker, the tiles) is not what this checks.
     TestBed.overrideComponent(ReportOverview, { set: { template: '', imports: [] } });
     TestBed.inject(RsTabCounts).refresh(null);
@@ -86,7 +89,9 @@ describe('Report Studio screens (zero-tolerance)', () => {
     TestBed.inject(RsTabCounts).refresh(null);
     expect(api.assets).toHaveBeenCalledTimes(1);
     fixture.componentInstance.load();
-    expect(generated.schedules).toHaveBeenCalledTimes(1);
+    // Reports redesign: the Overview no longer lists the pipelines behind reports; the 30-day figures are the library's.
+    expect(generated.schedules).not.toHaveBeenCalled();
+    expect(lib.summary).toHaveBeenCalledTimes(2);
   });
 
   it('ZT-R17: a platform administrator\'s brand profile says the preview is the workspace\'s, and asks for none (no 403)', async () => {

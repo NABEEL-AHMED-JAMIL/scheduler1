@@ -77,7 +77,9 @@ test.describe('Report Studio: create, regenerate, approve and verify a report (l
     await expect(page).toHaveURL(/\/reports\/library\/[0-9A-Z]{26}$/);
     reportId = /library\/([0-9A-Z]{26})$/.exec(page.url())![1];
     await expect(page.getByRole('heading', { level: 1, name: REPORT })).toBeVisible();
-    await expect(page.getByText('Version 1', { exact: true }).first()).toBeVisible();
+    // Reports redesign: the document is the page, with its life cycle above it.
+    await expect(page.getByText('· version 1 of 1')).toBeVisible();
+    await expect(page.locator('[data-stage="generated"]')).toContainText('Generated');
     await expect(page.getByRole('button', { name: 'Download the PDF', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Download the HTML', exact: true })).toBeVisible();
     await page.context().close();
@@ -87,17 +89,20 @@ test.describe('Report Studio: create, regenerate, approve and verify a report (l
     test.skip(!reportId, 'no report was made');
     const page = await view(browser, admin);
     await page.goto(`/reports/library/${reportId}`);
+    // Reports redesign: Generate again is the rare action, in the More menu; it opens in the side card.
+    await page.getByRole('button', { name: 'More actions' }).click();
+    await page.getByRole('menuitem', { name: 'Generate again…' }).click();
     await expect(page.getByRole('heading', { level: 2, name: 'Generate again' })).toBeVisible();
     await expect(page.getByLabel('Data')).toHaveValue('same');
     await page.getByRole('button', { name: 'Check and generate v2' }).click();
-    await expect(page.getByText('Version 2', { exact: true }).first()).toBeVisible({ timeout: 90_000 });
+    await expect(page.getByText('· version 2 of 2')).toBeVisible({ timeout: 90_000 });
+    await page.getByRole('tab', { name: 'Details' }).click();
     await expect(page.getByRole('heading', { level: 2, name: 'Where version 2 came from' })).toBeVisible();
 
-    await page.getByRole('tab', { name: /^Versions/ }).click();
-    const rows = page.locator('table tbody tr');
+    const rows = page.locator('[data-test="versions-card"] li');
     await expect(rows).toHaveCount(2);
     await expect(rows.filter({ hasText: 'v2' }).getByText('Current')).toBeVisible();
-    await expect(rows.filter({ hasText: /^v1/ })).toHaveCount(1);
+    await expect(rows.filter({ hasText: 'First version' })).toHaveCount(1);
     const r = await report(request, admin, reportId);
     expect(r.versions.map((v: { version: number }) => v.version).sort()).toEqual([1, 2]);
     expect(r.currentVersion).toBe(2);
@@ -121,7 +126,10 @@ test.describe('Report Studio: create, regenerate, approve and verify a report (l
     // Read only for the reviewer: no Generate again, no Archive.
     await expect(page.getByRole('heading', { level: 2, name: 'Generate again' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Archive' })).toHaveCount(0);
-    await page.getByRole('button', { name: 'Approve and sign v2' }).click();
+    // The approval states its meaning (feature 2): the default for a single approval is release.
+    await expect(page.getByLabel('What your approval means')).toHaveValue('RELEASE');
+    await page.getByRole('button', { name: 'Approve and sign v2' }).first().click();
+    await expect(page.getByRole('dialog')).toContainText('Your approval says: “Approved for release”.');
     await page.getByRole('dialog').getByRole('button', { name: 'Approve and sign' }).click();
     await expect(page.getByText('v2 approved and its PDF signed.')).toBeVisible({ timeout: 30_000 });
     // The Signed chip shows in the header and on the version's row.
@@ -131,6 +139,8 @@ test.describe('Report Studio: create, regenerate, approve and verify a report (l
     const v2 = r.versions.find((v: { version: number }) => v.version === 2);
     expect(v2.approval.approvedBy).toBe(reviewer.appUserId);
     expect(v2.approval.signed).toBe(true);
+    expect(v2.approval.meaning).toBe('Approved for release');
+    await expect(page.locator('.rsp-meaning').first()).toContainText('Approved for release');
     await page.context().close();
   });
 
@@ -151,7 +161,8 @@ test.describe('Report Studio: create, regenerate, approve and verify a report (l
 
     const page = await view(browser, admin);
     await page.goto(`/reports/library/${reportId}`);
-    await page.getByRole('button', { name: 'Verify signature' }).click();
+    await page.getByRole('button', { name: 'More actions' }).click();
+    await page.getByRole('menuitem', { name: 'Verify signature' }).click();
     const panel = page.getByRole('dialog');
     await expect(panel.getByText('The signature holds.')).toBeVisible({ timeout: 30_000 });
     await expect(panel.getByText(`Yes: ${(await report(request, admin, reportId)).label} v2`)).toBeVisible();

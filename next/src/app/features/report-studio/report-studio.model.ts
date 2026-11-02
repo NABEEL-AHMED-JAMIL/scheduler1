@@ -294,7 +294,7 @@ export interface Review {
   madeByName?: string | null;
   revision?: number | null;
   reviewers?: { kind: string; value: string } | null;
-  firstApproval?: { by: number; byName?: string | null; at?: string | null; note?: string | null } | null;
+  firstApproval?: { by: number; byName?: string | null; at?: string | null; note?: string | null; meaning?: string | null } | null;
   decidedAt?: string | null;
   decidedBy?: number | null;
   decidedByName?: string | null;
@@ -453,6 +453,8 @@ export interface Approval {
   signers?: ApprovalSigner[] | null;
   /** MIG-428: the HTML was filled too (its downloads show the approver's signature). */
   approvedHtml?: boolean;
+  /** Reports redesign (feature 2): what the approval means, as the approver chose it ("Approved for release"). */
+  meaning?: string | null;
 }
 
 /** MIG-428: one approver's signature placed at approval: their own signature picture (ASSET) or their typed name (TYPED). */
@@ -465,6 +467,8 @@ export interface ApprovalSigner {
   signature: 'ASSET' | 'TYPED';
   assetId?: string | null;
   assetVersion?: number | null;
+  /** Reports redesign (feature 2): what this person's approval means. */
+  meaning?: string | null;
 }
 
 /** What Verify signature says (MIG-406): the file's own signature facts and whether it is one of the workspace's approved versions. */

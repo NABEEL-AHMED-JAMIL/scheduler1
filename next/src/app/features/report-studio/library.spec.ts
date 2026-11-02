@@ -59,52 +59,6 @@ function screenWith(opts: { view?: string; platform?: boolean; reports?: Library
 afterEach(() => vi.useRealTimers());
 
 describe('ReportLibrary -- server-side paging', () => {
-  it('asks for the first page of reports and keeps the service\'s total', () => {
-    const { api, tabCounts, screen } = screenWith();
-    screen.ngOnInit();
-    expect(api.reports).toHaveBeenCalledWith({ status: '', q: '', limit: 50, offset: 0 }, null);
-    expect(api.jobs).not.toHaveBeenCalled();
-    expect(tabCounts.refresh).toHaveBeenCalledTimes(1);
-    expect(screen.reports().map(r => r.reportId)).toEqual(['R1', 'R2']);
-    expect(screen.total()).toBe(120);
-    expect(screen.loading()).toBe(false);
-  });
-
-  it('turns pages and sizes on the service; a new size starts at page 1', () => {
-    const { api, screen } = screenWith();
-    screen.ngOnInit();
-    screen.goTo(3);
-    expect(api.reports).toHaveBeenLastCalledWith({ status: '', q: '', limit: 50, offset: 100 }, null);
-    screen.setSize(100);
-    expect(screen.page()).toBe(1);
-    expect(api.reports).toHaveBeenLastCalledWith({ status: '', q: '', limit: 100, offset: 0 }, null);
-  });
-
-  it('searches on the service after the typing stops, from the first page', () => {
-    vi.useFakeTimers();
-    const { api, screen } = screenWith();
-    screen.ngOnInit();
-    screen.goTo(2);
-    api.reports.mockClear();
-    screen.onSearch('kn');
-    screen.onSearch('knee');
-    expect(api.reports).not.toHaveBeenCalled();
-    vi.advanceTimersByTime(350);
-    expect(api.reports).toHaveBeenCalledTimes(1);
-    expect(api.reports).toHaveBeenLastCalledWith({ status: '', q: 'knee', limit: 50, offset: 0 }, null);
-    expect(screen.page()).toBe(1);
-    expect(screen.filtered()).toBe(true);
-  });
-
-  it('a status asks again from page 1', () => {
-    const { api, screen } = screenWith();
-    screen.ngOnInit();
-    screen.goTo(2);
-    screen.setStatus('FAILED');
-    expect(screen.page()).toBe(1);
-    expect(api.reports).toHaveBeenLastCalledWith({ status: 'FAILED', q: '', limit: 50, offset: 0 }, null);
-  });
-
   it('the jobs view reads jobs from page 1 with its own status, and ?view=jobs opens on it', () => {
     const { api, screen } = screenWith();
     screen.ngOnInit();
@@ -139,38 +93,13 @@ describe('ReportLibrary -- server-side paging', () => {
     expect(busy.api.jobs).toHaveBeenLastCalledWith({ status: '', q: '', limit: 50, offset: 50 }, null);
     expect(busy.api.reports).not.toHaveBeenCalled();
 
+    // Reports redesign: the reports view is the explorer's; this page never polls or reads them.
     const reports = screenWith({ reports: page([report(1, { status: 'QUEUED' })], 1) });
     reports.screen.ngOnInit();
     vi.advanceTimersByTime(5100);
-    expect(reports.api.reports).toHaveBeenCalledTimes(2);
+    expect(reports.api.reports).not.toHaveBeenCalled();
   });
 
-  it('a page emptied under the reader goes back to the last page that has rows', () => {
-    const { api, screen } = screenWith();
-    api.reports.mockImplementation((q: LibraryQuery) => of(q.offset === 100 ? page([], 60) : page([report(51)], 60, 50)));
-    screen.ngOnInit();
-    screen.goTo(3);
-    expect(screen.page()).toBe(2);
-    expect(api.reports).toHaveBeenLastCalledWith({ status: '', q: '', limit: 50, offset: 50 }, null);
-    expect(screen.reports().map(r => r.reportId)).toEqual(['R51']);
-  });
-
-  it('a platform administrator reads the workspace picked, or every one', () => {
-    const { api, screen } = screenWith({ platform: true });
-    screen.ngOnInit();
-    expect(api.reports).toHaveBeenLastCalledWith(expect.anything(), null);
-    screen.tenantId.set(2960);
-    screen.load();
-    expect(api.reports).toHaveBeenLastCalledWith({ status: '', q: '', limit: 50, offset: 0 }, 2960);
-  });
-
-  it('says what went wrong', () => {
-    const { api, screen } = screenWith();
-    api.reports.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 400, error: { message: 'limit is 1 to 200.' } })));
-    screen.ngOnInit();
-    expect(screen.error()).toBe('limit is 1 to 200.');
-    expect(screen.loading()).toBe(false);
-  });
 });
 
 describe('ReportStudioApi -- the library\'s pages', () => {
@@ -209,62 +138,6 @@ describe('ReportStudioApi -- the library\'s pages', () => {
     req.flush(ok({ jobs: [job(1), job(2)] }));
     expect(got!.total).toBe(2);
     http.verify();
-  });
-});
-
-describe('ReportLibrary -- delete (owner 2026-10-20)', () => {
-  const kept = { ...report(3), approved: true } as ReportRow;
-
-  it('never picks a kept record (an approved version), on its own or with the page', () => {
-    const { screen } = screenWith({ reports: page([report(1), report(2), kept], 3) });
-    screen.ngOnInit();
-    screen.togglePick(kept);
-    expect(screen.isPicked(kept)).toBe(false);
-    screen.togglePage(true);
-    expect([...screen.picked()]).toEqual(['R1', 'R2']);
-    expect(screen.allPicked()).toBe(true);
-    screen.togglePage(false);
-    expect(screen.picked().size).toBe(0);
-  });
-
-  it('deletes the picked ones one at a time after the confirm, says how many, and reads the same page again', async () => {
-    const { api, screen, dialog, toast } = screenWith({ reports: page([report(1), report(2), kept], 120) });
-    screen.ngOnInit();
-    screen.goTo(2);
-    screen.togglePick(report(1));
-    screen.togglePick(report(2));
-    api.reports.mockClear();
-    screen.removePicked();
-    await Promise.resolve();
-    await Promise.resolve();
-    expect(dialog.open).toHaveBeenCalledTimes(1);
-    expect(api.deleteReport.mock.calls.map(c => c[0])).toEqual(['R1', 'R2']);
-    expect(toast.success).toHaveBeenCalledWith('2 reports deleted. Their 3 stored files stay in storage until an operator removes them.');
-    expect(screen.picked().size).toBe(0);
-    expect(api.reports).toHaveBeenLastCalledWith({ status: '', q: '', limit: 50, offset: 50 }, null);
-  });
-
-  it('says each refusal on its own (the service still says REPORT_SIGNED for a report signed meanwhile)', async () => {
-    const { api, screen, toast } = screenWith({ reports: page([report(1), report(9)], 2) });
-    screen.ngOnInit();
-    screen.togglePage(true);
-    screen.removePicked();
-    await Promise.resolve();
-    await Promise.resolve();
-    expect(api.deleteReport).toHaveBeenCalledTimes(2);
-    expect(toast.success).toHaveBeenCalledWith('Wound report 1 deleted.');
-    expect(toast.error).toHaveBeenCalledWith('Wound report 9: This report has an approved version.');
-  });
-
-  it('a row\'s own Delete asks first and leaves a kept record alone', async () => {
-    const { api, screen, dialog } = screenWith({ reports: page([report(1), kept], 2) });
-    screen.ngOnInit();
-    screen.removeOne(kept);
-    expect(dialog.open).not.toHaveBeenCalled();
-    screen.removeOne(report(1));
-    await Promise.resolve();
-    await Promise.resolve();
-    expect(api.deleteReport).toHaveBeenCalledWith('R1');
   });
 });
 
