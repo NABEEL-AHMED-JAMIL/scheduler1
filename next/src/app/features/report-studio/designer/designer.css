@@ -61,6 +61,8 @@ button.rsd-chip:hover { border-color: var(--border-strong); color: var(--text-pr
 .rsd-slot { position: relative; flex: none; background: var(--surface-raised); box-shadow: 0 1px 4px color-mix(in oklab, var(--text-primary) 14%, transparent); }
 .rsd-clip { position: absolute; inset: 0; overflow: hidden; }
 .rsd-paper { position: absolute; top: 0; left: 0; transform-origin: top left; }
+/* Show as Fax: the page through the black-and-white filter (show-as.ts, FAX_FILTER_ID). */
+.rsd-fax { filter: url(#rsd-fax-bw); }
 .rsd-selection { position: absolute; pointer-events: none; }
 .rsd-grip { position: absolute; top: -0.25rem; left: -1.875rem; pointer-events: auto; display: inline-flex; align-items: center; justify-content: center;
   width: 1.5rem; height: 1.5rem; border-radius: var(--radius-md); background: var(--accent-mark-strong); color: var(--surface-raised); cursor: grab; }

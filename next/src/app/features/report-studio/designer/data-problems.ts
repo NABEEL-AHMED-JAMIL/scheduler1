@@ -18,7 +18,7 @@ export interface DataProblemRow {
 }
 
 /** What to do about each kind of data problem, in the person's words. */
-const TODO: Record<string, string> = {
+const NEXT_STEP: Record<string, string> = {
   BINDING_NOT_RESOLVED: 'Pick a field the test data has (under Data in the block\'s settings), or check this is the right test data.',
   REQUIRED_FIELD_MISSING: 'Add the field to the source data, or mark it optional in the template\'s data contract.',
   DATA_SCHEMA_MISMATCH: 'Point the block at a list where it needs one, or choose test data of the shape the template expects.',
@@ -47,7 +47,7 @@ export function dataProblems(problems: Problem[], blocks: Block[]): DataProblemR
       message: p.message,
       componentId: at ? at.block.id : null,
       component: at ? `${blockLabel(at.block)} · ${typeWord(at.block.type)}` : null,
-      todo: TODO[p.code] ?? (at ? 'Select the block to change its settings.' : 'Check the test data, or the template\'s data contract.'),
+      todo: NEXT_STEP[p.code] ?? (at ? 'Select the block to change its settings.' : 'Check the test data, or the template\'s data contract.'),
     };
   });
   return [...rows.filter(r => r.severity === 'ERROR'), ...rows.filter(r => r.severity !== 'ERROR')];
@@ -69,7 +69,7 @@ export const SHOWN = 4;
         <div class="dpr-head">
           <app-icon name="alert" [class]="blocking() ? 'icon-crit shrink-0' : 'icon-warn shrink-0'" />
           <h2 class="text-sm font-semibold flex-1 min-w-0">{{ heading() }}</h2>
-          <button type="button" class="btn btn-ghost btn-xs" [attr.aria-expanded]="open()" (click)="open.set(!open())">{{ open() ? 'Hide' : 'Show' }}</button>
+          <button type="button" class="btn btn-default btn-xs" [attr.aria-expanded]="open()" (click)="open.set(!open())">{{ open() ? 'Hide' : 'Show' }}</button>
         </div>
         @if (open()) {
           <ul class="dpr-list">
@@ -77,6 +77,7 @@ export const SHOWN = 4;
               <li>
                 @if (r.componentId) {
                   <button type="button" class="dpr-row" [class.is-on]="selectedId() === r.componentId" (click)="selected.emit(r.componentId)"
+                          [attr.aria-label]="'Select ' + (r.component || 'the block') + ': ' + r.title"
                           [title]="'Select ' + r.component">
                     <ng-container *ngTemplateOutlet="row; context: { $implicit: r }" />
                   </button>

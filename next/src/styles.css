@@ -126,6 +126,9 @@
   --radius-lg:   0.5rem;
   --radius-card: 0.625rem;
   --radius-full: 9999px;
+  /* A printed code (QR, barcode) is black on white in every theme: a scanner reads dark modules on light paper. */
+  --qr-ink: #000000;
+  --qr-paper: #ffffff;
 
   /* The semantic roles, registered here so they become real utilities -- bg-raised,
      border-subtle, text-muted -- instead of being reached for as arbitrary values.

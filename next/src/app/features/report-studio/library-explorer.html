@@ -184,7 +184,7 @@
             @if (detail(); as d) {
               <ul class="rsp-versions !px-0">
                 @for (v of versionsOf(d); track v.versionId) {
-                  <li><span class="pill pill-neutral">v{{ v.version }}</span>
+                  <li><span class="pill pill-neutral mono">v{{ v.version }}</span>
                     <div class="min-w-0"><div class="font-medium truncate">{{ v.reason || (v.version === 1 ? 'First version' : 'Version ' + v.version) }}</div>
                       <div class="text-xs text-[color:var(--text-muted)]">{{ v.createdAt | rsTime: 'recent' }} · template v{{ v.templateVersion }}@if (v.void) { · VOID }@if (v.approval?.signed) { · signed }</div></div>
                     <span></span></li>

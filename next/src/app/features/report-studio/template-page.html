@@ -74,7 +74,7 @@
       <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'versions'" [attr.aria-selected]="tab() === 'versions'" (click)="tabTo('versions')">Versions <span class="tp-count">{{ t.versions.length }}</span></button>
       <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'used'" [attr.aria-selected]="tab() === 'used'" (click)="tabTo('used')">Used by <span class="tp-count">{{ usedCount() }}</span></button>
       <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'samples'" [attr.aria-selected]="tab() === 'samples'" (click)="tabTo('samples')">Test samples <span class="tp-count">{{ t.samples.length }}</span></button>
-      <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'json'" [attr.aria-selected]="tab() === 'json'" (click)="tabTo('json')"><app-icon name="code" />JSON @if (dirty()) { <span class="pill pill-warn">unsaved</span> }</button>
+      <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'json'" [attr.aria-selected]="tab() === 'json'" (click)="tabTo('json')"><app-icon name="code" />JSON @if (dirty()) { <span class="pill pill-warn">Unsaved</span> }</button>
     </div>
 
     @switch (tab()) {
@@ -312,7 +312,7 @@
               <div class="truncate">Pipeline · {{ p.pipelineName || 'Pipeline ' + p.pipelineJobId }} · step {{ p.stepKey }}</div>
               <div class="text-xs text-[color:var(--text-muted)]">{{ p.runs }} run{{ p.runs === 1 ? '' : 's' }}@if (p.lastRunAt) { · last {{ p.lastRunAt | rsTime: 'recent' }} }</div>
             </div>
-            @if (p.version) { <span class="pill pill-neutral whitespace-nowrap">used v{{ p.version }} last run</span> }
+            @if (p.version) { <span class="pill pill-neutral whitespace-nowrap">Used v{{ p.version }} last run</span> }
           </li>
         }
         @if (pipelines().length) {

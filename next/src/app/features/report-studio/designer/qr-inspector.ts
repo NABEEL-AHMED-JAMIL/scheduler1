@@ -56,8 +56,8 @@ export function qrPath(dark: boolean[][], quiet: number): string {
         @if (code(); as c) {
           <svg class="qri-svg" role="img" [attr.aria-label]="'QR code preview, ' + size() + ' mm'" [attr.viewBox]="'0 0 ' + check().across + ' ' + check().across"
                [style.width]="size() + 'mm'" [style.height]="size() + 'mm'" shape-rendering="crispEdges">
-            <rect [attr.width]="check().across" [attr.height]="check().across" fill="#FFFFFF" />
-            <path [attr.d]="path()" fill="#000000" />
+            <rect class="qri-light" [attr.width]="check().across" [attr.height]="check().across" />
+            <path class="qri-dark" [attr.d]="path()" />
           </svg>
         }
         <div class="min-w-0 text-xs">
@@ -101,6 +101,8 @@ export function qrPath(dark: boolean[][], quiet: number): string {
     </section>
   `,
   styles: `
+    .qri-light { fill: var(--qr-paper); }
+    .qri-dark { fill: var(--qr-ink); }
     :host { display: block; }
     .qri-muted { color: var(--text-muted); }
     .qri-strong { color: var(--text-primary); }

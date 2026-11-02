@@ -1,6 +1,6 @@
 /* Reports › Overview (reports redesign, owner 2026-11-02; design overview.html). */
 :host { display: block; }
-.ov-kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border: 1px solid var(--border-subtle); border-radius: var(--radius-xl, 10px);
+.ov-kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); border: 1px solid var(--border-subtle); border-radius: var(--radius-card);
   background: var(--surface-raised); }
 .ov-kpi { padding: 1rem 1rem 0.875rem; border-left: 1px solid var(--border-subtle); display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }
 .ov-kpi:first-child { border-left: 0; }
@@ -9,11 +9,11 @@
 .ov-v.is-crit { color: var(--crit-text); }
 .ov-v-sm { font-size: 1.0625rem; }
 .ov-s { font-size: 0.75rem; color: var(--text-muted); }
-.ov-s.is-up { color: var(--ok-text, var(--ok-500)); }
+.ov-s.is-up { color: var(--ok-text); }
 .ov-spark { width: 100%; height: 1.75rem; margin-top: 0.25rem; }
-.ov-spark polyline { fill: none; stroke: var(--ok-500, #16803c); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
-.ov-meter { display: block; height: 0.375rem; border-radius: 99px; background: var(--surface-sunken); margin-top: 0.5rem; overflow: hidden; }
-.ov-meter i { display: block; height: 100%; background: var(--ok-500, #16803c); border-radius: 99px; }
+.ov-spark polyline { fill: none; stroke: var(--ok-text); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.ov-meter { display: block; height: 0.375rem; border-radius: var(--radius-full); background: var(--surface-sunken); margin-top: 0.5rem; overflow: hidden; }
+.ov-meter i { display: block; height: 100%; background: var(--ok-text); border-radius: var(--radius-full); }
 @media (max-width: 1279px) { .ov-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } .ov-kpi:nth-child(4) { border-left: 0; }
   .ov-kpi:nth-child(n + 4) { border-top: 1px solid var(--border-subtle); } }
 .ov-grid { display: grid; gap: 1.25rem; grid-template-columns: minmax(0, 1fr); margin-top: 1.25rem; align-items: start; }
@@ -22,17 +22,17 @@
 .ov-needs > li { display: grid; grid-template-columns: 2rem minmax(0, 1fr) auto; gap: 0.75rem; align-items: center; padding: 0.75rem 1rem;
   border-top: 1px solid var(--border-subtle); font-size: 0.875rem; }
 .ov-ni { width: 2rem; height: 2rem; border-radius: var(--radius-md); display: grid; place-items: center; }
-.ov-ni-approve { background: color-mix(in oklab, var(--info-500, #2563eb) 12%, transparent); color: var(--info-text, #1d4ed8); }
-.ov-ni-failed { background: color-mix(in oklab, var(--crit-500) 12%, transparent); color: var(--crit-text); }
-.ov-ni-publish { background: color-mix(in oklab, var(--ok-500) 12%, transparent); color: var(--ok-text, var(--ok-500)); }
+.ov-ni-approve { background: color-mix(in oklab, var(--info-text) 12%, transparent); color: var(--info-text); }
+.ov-ni-failed { background: color-mix(in oklab, var(--crit-text) 12%, transparent); color: var(--crit-text); }
+.ov-ni-publish { background: color-mix(in oklab, var(--ok-text) 12%, transparent); color: var(--ok-text); }
 .ov-needs > li.ov-none { display: flex; gap: 0.5rem; color: var(--text-muted); }
 .ov-thumbs { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); padding: 0 1rem 1rem; }
 .ov-thumb { display: flex; flex-direction: column; gap: 0.375rem; min-width: 0; color: inherit; text-decoration: none; }
 .ov-paper { display: flex; flex-direction: column; gap: 0.35rem; aspect-ratio: 1 / 0.92; overflow: hidden; border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md); background: var(--surface-sunken); padding: 0.5rem 0.75rem 0; }
-.ov-paper img { width: 100%; background: #fff; box-shadow: 0 1px 3px color-mix(in oklab, var(--text-primary) 16%, transparent); }
-.ov-paper > i { height: 0.3rem; border-radius: 2px; background: var(--border-subtle); }
-.ov-paper > b { height: 2.5rem; border-radius: 2px; background: color-mix(in oklab, var(--accent-mark, #f5c400) 20%, var(--surface-sunken)); }
+.ov-paper img { width: 100%; background: var(--paper); box-shadow: 0 1px 3px color-mix(in oklab, var(--text-primary) 16%, transparent); }
+.ov-paper > i { height: 0.3rem; border-radius: var(--radius-sm); background: var(--border-subtle); }
+.ov-paper > b { height: 2.5rem; border-radius: var(--radius-sm); background: color-mix(in oklab, var(--accent-mark) 20%, var(--surface-sunken)); }
 .ov-thumb:hover .ov-paper { border-color: var(--border-strong); }
 .ov-tname { font-size: 0.875rem; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ov-tmeta { font-size: 0.75rem; color: var(--text-muted); display: flex; gap: 0.375rem; align-items: center; flex-wrap: wrap; }
@@ -41,13 +41,13 @@
 .ov-col i { display: block; width: 100%; }
 .ov-legend { display: flex; flex-wrap: wrap; gap: 0.375rem 1rem; padding: 0.625rem 1rem 1rem; font-size: 0.75rem; color: var(--text-secondary); }
 .ov-legend span { display: inline-flex; align-items: center; gap: 0.375rem; }
-.ov-legend i { width: 0.625rem; height: 0.625rem; border-radius: 99px; display: inline-block; }
-.c0 { background: var(--chart-1, #0f766e); } .c1 { background: var(--chart-2, #2563eb); } .c2 { background: var(--chart-3, #7c3aed); }
-.c3 { background: var(--chart-4, #c2410c); } .c4 { background: var(--chart-5, #be185d); } .c5 { background: color-mix(in oklab, var(--text-muted) 55%, transparent); }
+.ov-legend i { width: 0.625rem; height: 0.625rem; border-radius: var(--radius-full); display: inline-block; }
+.c0 { background: var(--chart-1); } .c1 { background: var(--chart-2); } .c2 { background: var(--chart-3); }
+.c3 { background: var(--chart-4); } .c4 { background: var(--chart-5); } .c5 { background: color-mix(in oklab, var(--text-muted) 55%, transparent); }
 .ov-used { list-style: none; margin: 0; padding: 0 1rem 0.75rem; }
 .ov-used li { display: grid; grid-template-columns: minmax(0, 1fr) 2.5rem 40%; gap: 0.75rem; align-items: center; padding: 0.4375rem 0;
   border-top: 1px solid var(--border-subtle); font-size: 0.875rem; }
 .ov-used li b { font-weight: 500; text-align: right; font-variant-numeric: tabular-nums; }
-.ov-bar { height: 0.375rem; border-radius: 99px; background: var(--surface-sunken); overflow: hidden; }
-.ov-bar i { display: block; height: 100%; background: var(--chart-2, #2563eb); border-radius: 99px; }
+.ov-bar { height: 0.375rem; border-radius: var(--radius-full); background: var(--surface-sunken); overflow: hidden; }
+.ov-bar i { display: block; height: 100%; background: var(--chart-2); border-radius: var(--radius-full); }
 .ov-ni-asked { background: var(--surface-sunken); color: var(--text-muted); }

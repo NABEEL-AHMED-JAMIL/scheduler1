@@ -69,7 +69,7 @@
           <p class="rst-note"><app-icon name="info" />The first 2,000 templates are shown; search or pick a category to find the others.</p>
         }
         @if (!visible().length && !shownStarters().length) {
-          <div class="card p-6 text-sm text-[color:var(--text-secondary)] flex flex-wrap items-center gap-3" data-test="templates-empty">
+          <div class="card p-4 text-sm text-[color:var(--text-secondary)] flex flex-wrap items-center gap-3" data-test="templates-empty">
             @if (noTemplates()) {
               <span>No templates yet. Begin blank, import one, or start from a starter.</span>
               @if (!filters().starters && starters().length) {
@@ -194,9 +194,9 @@
 
 <ng-template #statePills let-t>
   @if (t.status === 'ARCHIVED') { <span class="pill pill-neutral">Archived</span> }
-  @if (t.currentPublishedVersion) { <span class="pill pill-ok" [title]="'Published v' + t.currentPublishedVersion">v{{ t.currentPublishedVersion }}</span> }
-  @if (t.hasDraft) { <span class="pill pill-info">draft v{{ draftVersion(t) }}</span> }
-  @if (isTest(t)) { <span class="pill pill-warn">test</span> }
+  @if (t.currentPublishedVersion) { <span class="pill pill-ok mono" [title]="'Published v' + t.currentPublishedVersion">v{{ t.currentPublishedVersion }}</span> }
+  @if (t.hasDraft) { <span class="pill pill-info">Draft v{{ draftVersion(t) }}</span> }
+  @if (isTest(t)) { <span class="pill pill-warn">Test</span> }
 </ng-template>
 
 <ng-template #tplMenu let-t>

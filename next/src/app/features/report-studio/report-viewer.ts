@@ -51,18 +51,18 @@ const RAIL_PAGES = 24;
       padding: 2px; }
     .rv-th { border: 2px solid transparent; border-radius: var(--radius-md); padding: 3px; background: none; cursor: pointer; text-align: center; }
     .rv-th.is-on { border-color: var(--text-primary); }
-    .rv-th canvas { width: 100%; display: block; background: #fff; box-shadow: 0 1px 3px color-mix(in oklab, var(--text-primary) 18%, transparent); }
+    .rv-th canvas { width: 100%; display: block; background: var(--paper); box-shadow: 0 1px 3px color-mix(in oklab, var(--text-primary) 18%, transparent); }
     .rv-th span { font-size: 0.6875rem; color: var(--text-muted); display: block; margin-top: 0.1875rem; }
-    .rv-box { background: var(--surface-sunken); border: 1px solid var(--border-subtle); border-radius: var(--radius-xl, 10px); min-width: 0; }
+    .rv-box { background: var(--surface-sunken); border: 1px solid var(--border-subtle); border-radius: var(--radius-card); min-width: 0; }
     .rv-box:fullscreen { overflow: auto; border-radius: 0; }
     .rv-bar { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border-subtle);
-      background: var(--surface-raised); border-radius: var(--radius-xl, 10px) var(--radius-xl, 10px) 0 0; position: sticky; top: 3.5rem; z-index: 2; }
+      background: var(--surface-raised); border-radius: var(--radius-card) var(--radius-card) 0 0; position: sticky; top: 3.5rem; z-index: 2; }
     .rv-bar .grow { flex: 1; }
     .rv-find { display: flex; gap: 0.25rem; align-items: center; }
     .rv-find input { width: 11rem; }
     .rv-page { padding: 1.75rem; display: flex; justify-content: safe center; overflow: auto; min-height: 30rem; }
-    .rv-page canvas { background: #fff; box-shadow: 0 2px 10px color-mix(in oklab, var(--text-primary) 14%, transparent); flex: none; }
-    .rv-html { width: 100%; height: 80vh; border: 0; background: #fff; border-radius: 0 0 var(--radius-xl, 10px) var(--radius-xl, 10px); }
+    .rv-page canvas { background: var(--paper); box-shadow: 0 2px 10px color-mix(in oklab, var(--text-primary) 14%, transparent); flex: none; }
+    .rv-html { width: 100%; height: 80vh; border: 0; background: var(--paper); border-radius: 0 0 var(--radius-card) var(--radius-card); }
     .rv-msg { padding: 5rem 1rem; text-align: center; }
   `],
   template: `

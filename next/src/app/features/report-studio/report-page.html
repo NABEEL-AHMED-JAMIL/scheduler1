@@ -112,14 +112,14 @@
               <app-report-viewer [reportId]="r.reportId" [version]="v.version" [hasHtml]="hasHtml(v)" [note]="viewerNote(v)" [attr.data-version]="v.version" />
             }
           } @else {
-            <section class="card p-6 text-sm text-[color:var(--text-muted)]">
+            <section class="card p-4 text-sm text-[color:var(--text-muted)]">
               @if (v.expired) { Its files were removed by the workspace's retention policy; its record stays. }
               @else if (v.downloadable === false) { {{ v.refusal || 'This report is sensitive: its files need Download sensitive files.' }} }
               @else { This version has no PDF to show. }
             </section>
           }
         } @else {
-          <section class="card p-6 text-sm text-[color:var(--text-muted)]">No version yet: the first job has not finished.</section>
+          <section class="card p-4 text-sm text-[color:var(--text-muted)]">No version yet: the first job has not finished.</section>
         }
       </div>
 
@@ -325,7 +325,7 @@
           <ul class="rsp-versions">
             @for (v of sortedVersions(); track v.versionId) {
               <li [class.is-shown]="v.version === (shown() ?? r.currentVersion)">
-                <span class="pill" [class.pill-warn]="v.version === r.currentVersion && !v.approval && !v.void" [class.pill-ok]="!!v.approval && !v.void" [class.pill-neutral]="v.version !== r.currentVersion && !v.approval">v{{ v.version }}</span>
+                <span class="pill mono" [class.pill-warn]="v.version === r.currentVersion && !v.approval && !v.void" [class.pill-ok]="!!v.approval && !v.void" [class.pill-neutral]="v.version !== r.currentVersion && !v.approval">v{{ v.version }}</span>
                 <div class="min-w-0">
                   <div class="flex flex-wrap items-center gap-1.5">
                     <button type="button" class="link-inline text-left font-medium" (click)="showVersion(v)" [attr.aria-label]="'Show version ' + v.version">{{ v.reason || (v.version === 1 ? 'First version' : 'Version ' + v.version) }}</button>

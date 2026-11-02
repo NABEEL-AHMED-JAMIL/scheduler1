@@ -249,7 +249,7 @@
             <div #pageSlot class="rsd-slot" [id]="'rsd-page-' + p.index" cdkDropList cdkDropListSortingDisabled [cdkDropListDisabled]="!editable()"
                  (cdkDropListDropped)="dropOnPage($event)" [style.width.px]="pageWidthPx() * zoom()" [style.height.px]="slotHeight(i)">
               <div class="rsd-clip">
-                <div class="rsd-paper" [style.width.px]="pageWidthPx()" [style.transform]="'scale(' + zoom() + ')'" [style.filter]="paperFilter()">
+                <div class="rsd-paper" [style.width.px]="pageWidthPx()" [style.transform]="'scale(' + zoom() + ')'" [class.rsd-fax]="showAs() === 'fax'">
                   <app-rs-page-frame [html]="doc.pages[i] ?? ''" [css]="doc.css" [page]="i + 1" [pages]="pages().length" [heightMm]="page().height"
                                      [selected]="selected()" [dropInto]="dropInto()?.page === i ? dropInto()!.id : null" [proposed]="previewIds()" [mode]="showAs()"
                                      (picked)="pick($event)" (measured)="measured(i, $event)" />
