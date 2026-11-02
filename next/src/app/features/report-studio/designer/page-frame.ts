@@ -1,5 +1,6 @@
 import { Component, DestroyRef, ElementRef, effect, inject, input, output } from '@angular/core';
 import { CANVAS_ID, canvasCss, idOf } from './canvas-doc';
+import { ShowAs, frameCss } from './show-as';
 
 /** A class name escaped for a selector (CSS.escape where the browser has it; a test's DOM may not). */
 function cssName(name: string): string {
@@ -32,6 +33,8 @@ export class PageFrame {
   readonly proposed = input<string[]>([]);
   /** Report data and mapping (2026-10-27): blocks that print a field still needing a source, outlined in red. */
   readonly flagged = input<string[]>([]);
+  /** Show as Screen, Print or Fax: printed and faxed, the blocks this data hides are left out and nothing outlines on hover. */
+  readonly mode = input<ShowAs>('screen');
   /** The component clicked, or null for the page itself. */
   readonly picked = output<string | null>();
   /** The content's height in CSS pixels, unscaled. */
@@ -54,7 +57,7 @@ export class PageFrame {
       // A later page's sheet is not the first of its type (the empty div before it), so the report's first-page rules -- a
       // letterhead, a tint on the first page only -- hold on page 1 alone, as in the PDF.
       const later = this.page() > 1 ? '<div hidden></div>' : '';
-      this.root.innerHTML = `<style>${this.css()}\n${canvasCss(this.page(), this.pages(), this.heightMm())}</style>${later}<div class="rs-sheet">${this.html()}</div>`;
+      this.root.innerHTML = `<style>${this.css()}\n${canvasCss(this.page(), this.pages(), this.heightMm())}\n${frameCss(this.mode())}</style>${later}<div class="rs-sheet">${this.html()}</div>`;
       this.marked = null;
       this.target = null;
       this.mark(this.selected());

@@ -29,6 +29,9 @@ import {
   rootPathOf, rulerMarks, typeIcon, typeWord, walk, looksLikePicture,
 } from './designer-model';
 import { PageFrame } from './page-frame';
+import { Palette, groupPalette } from './palette';
+import { DataProblems, isDataProblem } from './data-problems';
+import { ShowAs, ShowAsSwitch, paperFilter, showAsNote } from './show-as';
 import { PropChange, PropertiesPanel, TONES } from './properties';
 import { TestDataChoice, TestDataData, TestDataPanel } from './test-data-panel';
 import { AssetCard, UsableProfile, profileOption } from '../assets.model';
@@ -71,7 +74,7 @@ const DRAW_MS = 300;
 @Component({
   selector: 'app-report-designer',
   imports: [Icon, LoadError, ProblemList, PropertiesPanel, PageFrame, FormsModule, RouterLink, UpperCasePipe, CdkDrag, CdkDragPreview, CdkDropList,
-    CdkDropListGroup, WorkspaceSelect, AiPanel, AppLoading, InlineStatus, AdvancedSelect],
+    CdkDropListGroup, WorkspaceSelect, AiPanel, AppLoading, InlineStatus, AdvancedSelect, Palette, DataProblems, ShowAsSwitch],
   templateUrl: './designer.html',
   styleUrl: './designer.css',
 })
@@ -234,17 +237,14 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
   readonly draftRevision = signal(0);
   readonly sample = computed(() => firstRecord(this.inspect()));
   readonly dropTargets = computed(() => [...this.pages().map(p => `rsd-page-${p.index}`), 'rsd-layers']);
-  readonly paletteGroups = computed(() => {
-    const q = this.search().trim().toLowerCase();
-    const shown = this.palette().filter(e => e.group !== 'Page' && e.type !== 'column'
-      && (!q || e.label.toLowerCase().includes(q) || e.description.toLowerCase().includes(q)));
-    const groups: { group: string; entries: PaletteEntry[] }[] = [];
-    for (const e of shown) {
-      const g = groups.find(x => x.group === e.group) ?? groups[groups.push({ group: e.group, entries: [] }) - 1];
-      g.entries.push(e);
-    }
-    return groups;
-  });
+  readonly paletteGroups = computed(() => groupPalette(this.palette(), this.search()));
+  /** Reports redesign: the page shown as on screen, as printed, or as a black-and-white fax. */
+  readonly showAs = signal<ShowAs>('screen');
+  readonly paperFilter = computed(() => paperFilter(this.showAs()));
+  readonly showAsNote = computed(() => showAsNote(this.showAs()));
+  /** The problems listed over the canvas (the data's), and the other checks (in the status bar's Checks). */
+  readonly dataProblemCount = computed(() => this.problems().filter(isDataProblem).length);
+  readonly otherProblemCount = computed(() => this.problems().length - this.dataProblemCount());
   readonly pageParts = computed(() => {
     const p = parts(this.blocks());
     return [

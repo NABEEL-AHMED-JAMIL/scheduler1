@@ -96,6 +96,7 @@
         <app-icon name="database" />
         <span class="min-w-0 truncate">{{ testChipText() }}</span>
       </button>
+      <app-rs-show-as [(mode)]="showAs" />
       <span class="text-xs text-[color:var(--text-secondary)] px-1">{{ pageLabel() }}</span>
       <div class="seg rsd-zoom" role="group" aria-label="Zoom">
         <button type="button" class="seg-btn seg-icon" aria-label="Zoom out" title="Zoom out" (click)="zoomBy(-1)"><app-icon name="minus" /></button>
@@ -123,19 +124,10 @@
                 <app-icon name="search" class="text-[color:var(--text-muted)]" />
                 <input class="input" type="search" [ngModel]="search()" (ngModelChange)="search.set($event)" placeholder="Find a component" aria-label="Find a component" />
               </label>
-              @for (g of paletteGroups(); track g.group) {
-                <h3 class="rsd-eyebrow">{{ g.group }}</h3>
-                <div class="rsd-palette" cdkDropList cdkDropListSortingDisabled [cdkDropListConnectedTo]="dropTargets()" [cdkDropListDisabled]="!editable()">
-                  @for (e of g.entries; track e.label) {
-                    <button type="button" class="rsd-comp" cdkDrag [cdkDragData]="{ add: e }" [cdkDragDisabled]="!editable()" [title]="e.description"
-                            [disabled]="!editable()" (cdkDragStarted)="dragStarted({ add: e })" (cdkDragMoved)="dragMoved($event)" (cdkDragEnded)="dragEnded()"
-                            (click)="add(e)">
-                      <app-icon [name]="typeIcon(e.type)" size="1.1rem" />
-                      <span>{{ e.label }}</span>
-                    </button>
-                  }
-                </div>
-              } @empty {
+              @if (paletteGroups().length) {
+                <app-rs-palette [groups]="paletteGroups()" [editable]="editable()" [dropTargets]="dropTargets()" (added)="add($event)"
+                                (dragStarted)="dragStarted({ add: $event })" (dragMoved)="dragMoved($event)" (dragEnded)="dragEnded()" />
+              } @else {
                 @if (paletteState.error()) {
                   <app-inline-status [error]="paletteState.error()" (retry)="loadPalette()" />
                 } @else if (paletteState.pending()) {
@@ -236,6 +228,10 @@
           <div class="rs-banner rs-banner-crit rsd-canvas-note" role="alert"><app-icon name="alert" class="icon-crit shrink-0" /><span class="text-sm min-w-0 flex-1">{{ drawError() }}</span>
             <button type="button" class="btn btn-default btn-sm shrink-0" (click)="draw(true)"><app-icon name="refresh" />Try again</button></div>
         }
+        <app-rs-data-problems [problems]="problems()" [blocks]="blocks()" [withData]="!!testSource()" [selectedId]="selected()" (selected)="select($event)" />
+        @if (showAsNote(); as note) {
+          <div class="rs-banner rs-banner-info rsd-canvas-note" role="status" data-show-as-note><app-icon name="info" class="shrink-0" /><span class="min-w-0 flex-1 text-sm">{{ note }}</span></div>
+        }
         @if (previewDef()) {
           <div class="rs-banner rs-banner-info rsd-canvas-note" role="status" data-ai-preview-banner><app-icon name="sparkle" class="shrink-0" />
             <span class="min-w-0 flex-1 text-sm">The AI's proposal, shown on the page. Nothing in the draft changes until you accept it; outlined blocks are new or changed.</span></div>
@@ -253,9 +249,9 @@
             <div #pageSlot class="rsd-slot" [id]="'rsd-page-' + p.index" cdkDropList cdkDropListSortingDisabled [cdkDropListDisabled]="!editable()"
                  (cdkDropListDropped)="dropOnPage($event)" [style.width.px]="pageWidthPx() * zoom()" [style.height.px]="slotHeight(i)">
               <div class="rsd-clip">
-                <div class="rsd-paper" [style.width.px]="pageWidthPx()" [style.transform]="'scale(' + zoom() + ')'">
+                <div class="rsd-paper" [style.width.px]="pageWidthPx()" [style.transform]="'scale(' + zoom() + ')'" [style.filter]="paperFilter()">
                   <app-rs-page-frame [html]="doc.pages[i] ?? ''" [css]="doc.css" [page]="i + 1" [pages]="pages().length" [heightMm]="page().height"
-                                     [selected]="selected()" [dropInto]="dropInto()?.page === i ? dropInto()!.id : null" [proposed]="previewIds()"
+                                     [selected]="selected()" [dropInto]="dropInto()?.page === i ? dropInto()!.id : null" [proposed]="previewIds()" [mode]="showAs()"
                                      (picked)="pick($event)" (measured)="measured(i, $event)" />
                 </div>
               </div>
@@ -297,7 +293,7 @@
       <aside class="rsd-right" aria-label="Properties">
         @if (selectedBlock()) {
           <app-rs-properties [block]="selectedBlock()" [label]="selectedLabel()" [definitions]="definitions()" [readonly]="!editable()"
-                             [fields]="dataFields()" [sample]="sample()" [tree]="inspect()?.tree" [names]="names()"
+                             [fields]="dataFields()" [sample]="sample()" [tree]="inspect()?.tree" [names]="names()" [blocks]="blocks()"
                              [assets]="usableAssets()" [assetsTotal]="usableTotal()" [assetTotals]="usableTotals()" (findAssets)="findAssets($event)"
                              [templateAssets]="templateAssets()" (assetPicked)="pickAsset($event)"
                              (changed)="setProperty($event)" (duplicate)="duplicateSelected()" (remove)="removeSelected()" />
@@ -430,8 +426,11 @@
       <button type="button" class="rsd-status-check" [class.is-bad]="!structureValid()" (click)="showProblems.set(!showProblems())" [attr.aria-expanded]="showProblems()">
         <app-icon [name]="structureValid() ? 'checkCircle' : 'alert'" />
         {{ structureValid() ? 'Template structure valid' : 'Template has errors' }}
-        @if (structureValid() && (errors().length || warnings().length)) {
-          <span class="rsd-status-data">· {{ errors().length + warnings().length }} problem{{ errors().length + warnings().length === 1 ? '' : 's' }} with {{ testSource() ? 'this data' : 'the bindings' }}</span>
+        @if (structureValid() && dataProblemCount()) {
+          <span class="rsd-status-data">· {{ dataProblemCount() }} problem{{ dataProblemCount() === 1 ? '' : 's' }} with {{ testSource() ? 'the test data' : 'the bindings' }} (listed over the page)</span>
+        }
+        @if (structureValid() && otherProblemCount()) {
+          <span class="rsd-status-data">· {{ otherProblemCount() }} other check{{ otherProblemCount() === 1 ? '' : 's' }} to look at</span>
         }
         · {{ statusLine() }}
       </button>

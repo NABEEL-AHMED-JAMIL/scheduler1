@@ -8,6 +8,7 @@ import {
   Block, collections, innerPath, itemFields, lengthAt, sampleText, scalars, typeIcon, typeWord, valueAt,
 } from './designer-model';
 import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
+import { QrInspector } from './qr-inspector';
 
 /** One setting of a component, as the form draws it. */
 export interface PropField {
@@ -186,6 +187,18 @@ export function fieldsFor(type: string, definitions: Record<string, JsonSchema>)
   return out;
 }
 
+/**
+ * A QR code's settings the generic form still draws: the QR inspector draws what it opens, its size, error correction and
+ * quiet zone; the text and the data field show only for the source that reads them.
+ */
+export function qrFieldShown(key: string, b: Block): boolean {
+  if (['content', 'sizeMm', 'errorCorrection', 'quietZone'].includes(key)) return false;
+  const source = b['content'] ?? 'verifyLink';
+  if (key === 'text') return source === 'text';
+  if (key === 'binding') return source === 'binding';
+  return true;
+}
+
 /** A component's row filter (the schema's rowFilter): a field, and the value it equals, does not equal, or the values it is one of. */
 export interface RowFilter { field: string; equals?: string; notEquals?: string; in?: string[]; }
 export type FilterOp = 'equals' | 'notEquals' | 'in';
@@ -231,7 +244,7 @@ export function filterRows(rows: unknown[], f: RowFilter | null): unknown[] {
  */
 @Component({
   selector: 'app-rs-properties',
-  imports: [Icon, NgTemplateOutlet, RsPickSearch, AdvancedSelect],
+  imports: [Icon, NgTemplateOutlet, RsPickSearch, AdvancedSelect, QrInspector],
   template: `
     @if (block(); as b) {
       <div class="rsd-props-head">
@@ -245,6 +258,9 @@ export function filterRows(rows: unknown[], f: RowFilter | null): unknown[] {
           <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Delete (Delete)" title="Delete (Delete)" (click)="remove.emit()"><app-icon name="trash" class="icon-crit" /></button>
         }
       </div>
+      @if (b.type === 'qrCode') {
+        <app-rs-qr-inspector [block]="b" [readonly]="readonly()" [sample]="sample()" [names]="names()" [blocks]="blocks()" (changed)="changed.emit($event)" />
+      }
       @for (g of groups(); track g.id) {
         <section class="rsd-props-group" [attr.aria-label]="g.label">
           <h3 class="rsd-eyebrow">{{ g.label }}</h3>
@@ -679,6 +695,8 @@ export class PropertiesPanel {
   readonly tree = input<TreeNode | undefined>(undefined);
   /** The primary dataset's names (its id, and its alias when it starts at the root); the first is written in new bindings. */
   readonly names = input<string[]>(['primary']);
+  /** The template's blocks (the QR inspector reads a repeated item's value from them). */
+  readonly blocks = input<Block[]>([]);
   /** MIG-406: what this person may place (approved assets, their own or granted), and the template's asset entries. */
   readonly assets = input<AssetCard[]>([]);
   /**
@@ -732,7 +750,7 @@ export class PropertiesPanel {
   readonly groups = computed(() => {
     const b = this.block();
     if (!b) return [];
-    const all = fieldsFor(b.type, this.definitions());
+    const all = fieldsFor(b.type, this.definitions()).filter(f => b.type !== 'qrCode' || qrFieldShown(f.key, b));
     const order: { id: PropField['group']; label: string }[] = [
       { id: 'content', label: 'Content' }, { id: 'data', label: 'Data' }, { id: 'format', label: 'Format' },
       { id: 'style', label: 'Style' }, { id: 'layout', label: 'Layout' },

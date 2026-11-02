@@ -72,7 +72,9 @@ export function roleOf(b: Block): string {
 export function blockLabel(b: Block): string {
   if (typeof b['name'] === 'string' && b['name'].trim()) return b['name'].trim();
   if (b.type === 'section' && roleOf(b) !== 'body') return roleOf(b) === 'header' ? 'Header' : 'Footer';
-  for (const key of ['title', 'content', 'label', 'binding', 'dataset']) {
+  // A QR code's content is what it opens (verifyLink, binding ...), not words: it is named by its caption.
+  const keys = b.type === 'qrCode' ? ['caption'] : ['title', 'content', 'label', 'binding', 'dataset'];
+  for (const key of keys) {
     const v = b[key];
     if (typeof v === 'string' && v.trim()) {
       const t = v.trim().replace(/\s+/g, ' ');
