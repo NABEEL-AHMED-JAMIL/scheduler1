@@ -497,6 +497,18 @@ describe('DocumentIntelligence -- loading, empty, error (owner 2026-10-27)', () 
     expect(cell.textContent).not.toContain('Nothing yet');
   });
 
+  // Owner 2026-11-02 (/documents/approved-data): the header's Refresh kept spinning -- it read the overview's `loading`,
+  // which only the overview clears.
+  it('stops the header Refresh spinning once the approved data is read, on every view', async () => {
+    for (const tab of ['dataset', 'types', 'overview']) {
+      const { fixture, el, screen } = screenWith({ tab: tab as never });
+      await fixture.whenStable();
+      fixture.detectChanges();
+      expect(screen.refreshing()).toBe(false);
+      expect(el.querySelector('app-refresh-button .spin')).toBeNull();
+    }
+  });
+
   it('counts the approved data as loading while the types are still on the way', async () => {
     const { fixture, screen } = screenWith({ tab: 'dataset', answers: { types: () => NEVER } });
     await fixture.whenStable();

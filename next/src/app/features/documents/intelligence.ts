@@ -242,6 +242,17 @@ export class DocumentIntelligence implements OnInit {
     onChange: () => { this.datasetPage.set(1); this.loadDataset(); },
   });
   /**
+   * The header's Refresh spins for what the open view is reading (owner 2026-11-02: on Approved data it spun for ever --
+   * `loading` is the overview's and only the overview ever clears it).
+   */
+  readonly refreshing = computed(() => {
+    const tab = this.tab();
+    if (tab === 'dataset') return this.datasetBusy();
+    if (tab === 'upload' || tab === 'email') return this.intakeLoading();
+    if (tab === 'types') return this.typesState.loading();
+    return this.loading();
+  });
+  /**
    * Owner 2026-10-27: the dataset is read only once the types have named its type, so until then it is loading too --
    * it showed "No approved documents of this type yet" while the stats and the types were still on the way.
    */

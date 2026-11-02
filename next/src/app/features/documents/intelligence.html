@@ -4,7 +4,7 @@
     <app-page-header [title]="heading()"
                      subtitle="Documents read into fields against their document type; values it is unsure of go to Review › Documents.">
       @if (!noWorkspace()) {
-        <app-refresh-button [loading]="loading() || datasetLoading()" (refresh)="refresh()" />
+        <app-refresh-button [loading]="refreshing()" (refresh)="refresh()" />
         <button type="button" class="btn btn-ghost btn-icon btn-sm" data-overflow data-test="intelligence-more" [cdkMenuTriggerFor]="headerMenu" aria-label="More actions">
           <app-icon name="dots" size="1.05em" />
         </button>
