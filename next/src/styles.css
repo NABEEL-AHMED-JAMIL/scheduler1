@@ -2939,6 +2939,16 @@ button.connector-card:hover { border-color: var(--focus-ring); }
 .connect-tables li { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.5rem 0.75rem; }
 .connect-tables li + li { border-top: 1px solid var(--border-subtle); }
 .toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; font-size: 0.875rem; }
+/* A switch: a checkbox with role="switch" (Audio Transcript's options; shared, not one component's). */
+.sw-row { display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; cursor: pointer; }
+.sw { appearance: none; position: relative; width: 2.25rem; height: 1.25rem; border-radius: var(--radius-full); background: var(--border-strong);
+      cursor: pointer; flex-shrink: 0; transition: background 120ms; margin: 0; }
+.sw::before { content: ""; position: absolute; top: 0.125rem; left: 0.125rem; width: 1rem; height: 1rem; border-radius: var(--radius-full);
+              background: var(--surface-raised); transition: transform 120ms; }
+.sw:checked { background: var(--btn-primary-bg); }
+.sw:checked::before { transform: translateX(1rem); }
+.sw:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.sw:disabled { opacity: 0.5; cursor: default; }
 .hub-note { padding: 0.625rem 0.75rem; background: var(--info-soft); border-radius: var(--radius-lg); color: var(--text-primary); }
 .hub-note-crit { background: var(--crit-soft); }
 .hub-note-warn { background: var(--surface-sunken); border: 1px solid var(--border-strong); }

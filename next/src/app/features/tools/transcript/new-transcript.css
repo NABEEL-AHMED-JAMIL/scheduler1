@@ -13,14 +13,4 @@
 .nt-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; justify-content: space-between; padding-top: 1rem;
            border-top: 1px solid var(--border-subtle); }
 
-/* A switch: a checkbox with role="switch". */
-.sw-row { display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; cursor: pointer; }
-.sw { appearance: none; position: relative; width: 2.25rem; height: 1.25rem; border-radius: var(--radius-full); background: var(--border-strong);
-      cursor: pointer; flex-shrink: 0; transition: background 120ms; margin: 0; }
-.sw::before { content: ""; position: absolute; top: 0.125rem; left: 0.125rem; width: 1rem; height: 1rem; border-radius: var(--radius-full);
-              background: var(--surface-raised); transition: transform 120ms; }
-.sw:checked { background: var(--btn-primary-bg); }
-.sw:checked::before { transform: translateX(1rem); }
-.sw:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
-.sw:disabled { opacity: 0.5; cursor: default; }
 

@@ -23,16 +23,6 @@
 .rec-name { font-size: 0.8125rem; font-weight: 500; }
 .rec-meta { grid-column: 1 / -1; display: flex; align-items: center; gap: 0.375rem; font-size: 0.75rem; color: var(--text-muted); min-width: 0; }
 
-/* A switch: a checkbox with role="switch". */
-.sw-row { display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; cursor: pointer; }
-.sw { appearance: none; position: relative; width: 2.25rem; height: 1.25rem; border-radius: var(--radius-full); background: var(--border-strong);
-      cursor: pointer; flex-shrink: 0; transition: background 120ms; margin: 0; }
-.sw::before { content: ""; position: absolute; top: 0.125rem; left: 0.125rem; width: 1rem; height: 1rem; border-radius: var(--radius-full);
-              background: var(--surface-raised); transition: transform 120ms; }
-.sw:checked { background: var(--btn-primary-bg); }
-.sw:checked::before { transform: translateX(1rem); }
-.sw:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
-.sw:disabled { opacity: 0.5; cursor: default; }
 
 /* Progress */
 .steps { display: flex; list-style: none; margin: 0.75rem 0 0; padding: 0; }
@@ -60,14 +50,10 @@ kbd { font-family: var(--font-mono); font-size: 0.6875rem; padding: 0 0.25rem; b
 
 /* Speaker colours, from the chart tokens: a dot, a lane, a talk bar and the speaker's name. */
 .dot { display: inline-block; width: 0.5rem; height: 0.5rem; border-radius: var(--radius-full); flex-shrink: 0; }
-.dot.spk-0, .trk i.spk-0, .talk i.spk-0 { background: var(--chart-0); }
-.dot.spk-1, .trk i.spk-1, .talk i.spk-1 { background: var(--chart-2); }
-.dot.spk-2, .trk i.spk-2, .talk i.spk-2 { background: var(--chart-4); }
-.dot.spk-3, .trk i.spk-3, .talk i.spk-3 { background: var(--chart-3); }
-.dot.spk-4, .trk i.spk-4, .talk i.spk-4 { background: var(--chart-5); }
-.dot.spk-5, .trk i.spk-5, .talk i.spk-5 { background: var(--chart-6); }
-.spk-name.spk-0 { color: var(--chart-0); } .spk-name.spk-1 { color: var(--chart-2); } .spk-name.spk-2 { color: var(--chart-4); }
-.spk-name.spk-3 { color: var(--chart-3); } .spk-name.spk-4 { color: var(--chart-5); } .spk-name.spk-5 { color: var(--chart-6); }
+.spk-0 { --spk: var(--chart-0); } .spk-1 { --spk: var(--chart-2); } .spk-2 { --spk: var(--chart-4); }
+.spk-3 { --spk: var(--chart-3); } .spk-4 { --spk: var(--chart-5); } .spk-5 { --spk: var(--chart-6); }
+.dot[class*="spk-"], .trk i[class*="spk-"], .talk i[class*="spk-"] { background: var(--spk); }
+.spk-name[class*="spk-"] { color: var(--spk); }
 
 /* Transcript */
 .t-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; padding: 0.75rem 1rem; border-bottom: 1px solid var(--border-subtle); }
