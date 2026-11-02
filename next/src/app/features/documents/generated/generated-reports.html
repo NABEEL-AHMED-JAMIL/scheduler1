@@ -7,13 +7,13 @@
           Documents and files made from your data: renders saved to a bucket, and what recent runs put out.
         </p>
       </div>
-      <!-- UX final RP1/CV1: Refresh first as an icon, the primary rightmost. "PDF from a dataset" is the converter's
-           own mode of that name, opened on it. -->
+      <!-- UX final RP1/CV1: Refresh first as an icon, the primary rightmost. The tools redesign (2026-11-02): a PDF from a
+           dataset or a run is made here, in a panel, no longer in the Document Converter. -->
       <div class="flex items-center gap-2">
         <app-refresh-button [loading]="loading()" (refresh)="load(true)" />
-        <a class="btn btn-primary btn-sm" routerLink="/tools/converter" [queryParams]="{ mode: 'dataset' }" data-test="pdf-from-dataset">
-          <app-icon name="plus" />PDF from a dataset
-        </a>
+        <button type="button" class="btn btn-primary btn-sm" (click)="makePdf()" data-test="pdf-from-dataset">
+          <app-icon name="plus" />PDF from a dataset or a run
+        </button>
       </div>
     </div>
   </app-page-header>
@@ -21,7 +21,7 @@
   <app-table-shell heading="Generated outputs" [shown]="paged().length" [total]="filtered().length"
                    [loading]="loading()" [error]="objectsError() && runsError() ? objectsError() : ''" (retry)="load(true)"
                    [isEmpty]="!filtered().length" emptyIcon="file"
-                   [emptyMessage]="query() ? 'Nothing here matches that.' : 'Nothing generated yet. Make a PDF from a dataset in the converter and save it to a bucket, or run a pipeline that writes files.'">
+                   [emptyMessage]="query() ? 'Nothing here matches that.' : 'Nothing generated yet. Make a PDF from a dataset or a run here and save it to a bucket, or run a pipeline that writes files.'">
     <!-- UX final RP1: the filters sit in the toolbar, left-aligned straight after the heading (review 2.2), not on a
          grey band of their own inside the card. -->
     <ng-container toolbar>

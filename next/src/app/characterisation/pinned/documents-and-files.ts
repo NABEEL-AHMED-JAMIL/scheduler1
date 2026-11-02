@@ -131,57 +131,39 @@ export const PINNED: Record<string, unknown> = {
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
-      "GET /documentConverter.json/fetchAllTasks",
-      "GET /storage.json/buckets",
       "GET /documentConverter.json/supportedFormats",
-      "GET /documentConverter.json/limits"
+      "GET /documentConverter.json/limits",
+      "GET /documentConverter.json/conversions?days=30&page=1&size=50&view=everyone"
     ],
     "headings": [
       "Document Converter",
-      "Convert",
-      "Recent conversions (1 of 1)"
+      "Convert files",
+      "Recent conversions (0 of 0)"
     ],
     "buttons": [
       "30 days",
       "7 days",
       "90 days",
-      "All time",
-      "Columns",
-      "Conversion",
-      "Created",
-      "Custom",
-      "Delete this conversion",
-      "From a bucket",
-      "Location",
-      "Name",
-      "PDF from a dataset",
-      "PDF from a run",
-      "Read the limits and queue again",
-      "Refresh",
-      "Size",
-      "Supported formats 2",
-      "Upload a file",
-      "View the converted file",
-      "View the original file"
+      "Clear finished",
+      "Convert",
+      "Download selected",
+      "Everyone",
+      "Failed",
+      "From a bucket…",
+      "Limits",
+      "Mine",
+      "Not kept · 30 days in Recent conversions",
+      "Supported formats 2 families"
     ],
-    "columns": [
-      [
-        "Name",
-        "Conversion",
-        "Size",
-        "Location",
-        "Created",
-        "Actions"
-      ]
-    ],
+    "columns": [],
     "fields": [
-      "Choose a file",
-      "Search name, file or format",
+      "Choose files…",
+      "Convert all to",
+      "Search file name or format",
       "Search recent conversions"
     ],
     "links": [
-      "/data/files?bucket=ui-review-s3&prefix=UI-REVIEW%20converted%2F1034%2Foutput%2F",
-      "/data/reports",
+      "/reports/from-pipelines",
       "/tools",
       "/tools/converter",
       "/tools/transcript"

@@ -1,12 +1,12 @@
 import { describe, it, afterEach } from 'vitest';
 import { useMemoryStorage } from '../shared/testing/memory-storage';
-import { TU_PAGES, click, overlay, pin, restoreClock, surfaceOf, visit } from './harness';
+import { TU_PAGES, click, overlay, pin, restoreClock, visit } from './harness';
 import { LIVE_IDS } from './fixtures.live';
 import { PINNED } from './pinned/documents-generated';
 
 /**
- * MIG-253 characterisation baseline: Documents' generated outputs -- the converter's Dataset → PDF and
- * From an execution modes, Documents › Reports, and Storage's file details panel.
+ * MIG-253 characterisation baseline: Documents' generated outputs -- a PDF from a dataset or a run (Reports › From
+ * pipelines' panel since the tools redesign), Documents › Reports, and Storage's file details panel.
  *
  * Pins what these screens show and ask for, per role, so a later change to them fails here by name.
  * When a change is meant, re-record (see harness.ts) and let the review read pinned/documents-generated.ts.
@@ -53,16 +53,18 @@ describe('MIG-253: Documents -- the converter\'s render modes, Reports, and a fi
   useMemoryStorage();
   afterEach(() => restoreClock());
 
-  it('the converter, Dataset → PDF', async () => {
-    const v = await visit('/tools/converter', 'TENANT_ADMIN', null, RENDER);
-    const requests = await click(v, 'PDF from a dataset');
-    pin(FILE, 'the converter, Dataset → PDF', { requests, ...surfaceOf(v.main) }, PINNED);
+  // The tools redesign (owner 2026-11-02): a PDF from a dataset or a run is made from Reports › From pipelines, in a panel.
+  it('Reports from pipelines, a PDF from a dataset', async () => {
+    const v = await visit('/reports/from-pipelines', 'TENANT_ADMIN', null, { ...RENDER, ...RUNS, ...REPORTS_FOLDER });
+    const requests = await click(v, 'PDF from a dataset or a run');
+    pin(FILE, 'Reports from pipelines, a PDF from a dataset', { requests, ...overlay() }, PINNED);
   });
 
-  it('the converter, From an execution', async () => {
-    const v = await visit('/tools/converter', 'TENANT_ADMIN', null, { ...RENDER, ...RUNS });
-    const requests = await click(v, 'PDF from a run');
-    pin(FILE, 'the converter, From an execution', { requests, ...surfaceOf(v.main) }, PINNED);
+  it('Reports from pipelines, a PDF from a run', async () => {
+    const v = await visit('/reports/from-pipelines', 'TENANT_ADMIN', null, { ...RENDER, ...RUNS, ...REPORTS_FOLDER });
+    await click(v, 'PDF from a dataset or a run');
+    const requests = await click(v, 'From a run');
+    pin(FILE, 'Reports from pipelines, a PDF from a run', { requests, ...overlay() }, PINNED);
   });
 
   it('Reports, as a workspace administrator', async () => {
