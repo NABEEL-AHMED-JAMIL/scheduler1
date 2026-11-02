@@ -182,7 +182,7 @@ import { RetentionPlatformPanel } from './retention-platform-panel';
                   </div>
                 </details>
               </div>
-              <button type="button" class="btn btn-default btn-sm" (click)="openHold()" data-retention-place-hold><app-icon name="lock" />Place a hold</button>
+              <button type="button" class="btn btn-default btn-sm self-start" (click)="openHold()" data-retention-place-hold><app-icon name="lock" />Place a hold</button>
             </div>
             @if (activeHolds().length) {
               <ul class="flex flex-col gap-1.5">

@@ -241,7 +241,8 @@ export class DataPolicies implements OnInit {
       const why = ruleBlocks(d.modelRule, c);
       return {
         value: c.value, label: c.label, group: c.connectionName, sample: c.model ?? undefined, mono: false,
-        description: c.model ? (c.local ? 'Local' : c.baa ? 'Hosted, BAA-marked connection' : 'Hosted') : 'Every model on the list this connection runs',
+        description: c.model ? (c.local ? undefined : c.baa ? 'Hosted, on a connection marked as covered by a BAA' : 'Hosted, on a connection with no BAA')
+          : 'Every model on the list this connection runs',
         badge: why ?? (c.local ? 'Local' : c.baa ? 'BAA' : 'Hosted'), badgeTone: why ? 'warn' : c.local ? 'ok' : 'info',
         keywords: `${c.connectionName} ${c.model ?? ''}`, disabled: !!why,
       } as AdvancedOption;

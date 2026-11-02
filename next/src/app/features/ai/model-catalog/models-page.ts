@@ -120,7 +120,7 @@ const MODEL_NAME = /^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,254}$/;
       </div>
       <div class="overflow-x-auto mt-3">
         <table class="table-modern">
-          <thead><tr><th>Model</th><th>Model name</th><th>Runs on</th><th>Where</th><th>Note</th><th>Status</th><th>Last changed</th><th class="th-actions w-40">Actions</th></tr></thead>
+          <thead><tr><th>Model</th><th>Model name</th><th>Runs on</th><th>Where</th><th>Note</th><th>Status</th><th>Last changed</th><th class="th-actions">Actions</th></tr></thead>
           <tbody>
             @if (state.pending()) {
               <tr><td colspan="8" class="p-0"><app-loading shape="rows" label="Loading the list of models…" [count]="3" /></td></tr>
@@ -129,15 +129,15 @@ const MODEL_NAME = /^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,254}$/;
             }
             @for (m of models(); track m.catalogId) {
               <tr [attr.data-model]="m.modelName" [class.opacity-70]="!m.active">
-                <td class="font-medium">{{ m.displayName }}</td>
-                <td class="mono text-xs">{{ m.modelName }}</td>
-                <td><span [class]="pill(m.provider)">{{ providerLabel(m.provider) }}</span></td>
+                <td class="font-medium whitespace-nowrap">{{ m.displayName }}</td>
+                <td class="mono text-xs whitespace-nowrap">{{ m.modelName }}</td>
+                <td class="whitespace-nowrap"><span [class]="pill(m.provider)">{{ providerLabel(m.provider) }}</span></td>
                 <td><span class="pill" [class.pill-ok]="m.local" [class.pill-info]="!m.local">{{ where(m) }}</span></td>
                 <td class="text-xs text-[color:var(--text-secondary)] max-w-72">{{ m.note || '—' }}</td>
                 <td>@if (m.active) { <span class="pill pill-ok"><app-icon name="check" size="0.9em" />On</span> } @else { <span class="pill pill-warn"><app-icon name="pause" size="0.9em" />Off</span> }</td>
                 <td class="text-xs text-[color:var(--text-secondary)] whitespace-nowrap">{{ m.dateUpdated | serverTime:'recent' }}</td>
                 <td>
-                  <div class="flex items-center justify-end gap-1">
+                  <div class="flex items-center justify-end gap-1 whitespace-nowrap">
                     <button type="button" class="btn btn-default btn-sm" (click)="startEdit(m)" [disabled]="!!draft()" [attr.aria-label]="'Change ' + m.displayName"><app-icon name="edit" />Change</button>
                     <button type="button" class="btn btn-default btn-sm" [class.btn-intent-crit]="m.active" (click)="toggle(m)" [disabled]="busy() === m.catalogId"
                             [attr.aria-label]="(m.active ? 'Switch off ' : 'Switch on ') + m.displayName">{{ m.active ? 'Switch off' : 'Switch on' }}</button>
@@ -167,11 +167,11 @@ const MODEL_NAME = /^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,254}$/;
             @for (h of history(); track $index) {
               <tr>
                 <td class="text-xs whitespace-nowrap">{{ h.at | serverTime:'recent' }}</td>
-                <td class="text-sm">{{ h.note }}</td>
-                <td class="text-sm">{{ actionText(h.action) }}</td>
-                <td class="mono text-xs">{{ h.from || '—' }}</td>
-                <td class="mono text-xs">{{ h.to || '—' }}</td>
-                <td class="text-sm">{{ h.byName || (h.by ? 'User ' + h.by : '—') }}</td>
+                <td>{{ h.note }}</td>
+                <td>{{ actionText(h.action) }}</td>
+                <td class="text-xs">{{ stateText(h.from) }}</td>
+                <td class="text-xs">{{ stateText(h.to) }}</td>
+                <td>{{ h.byName || (h.by ? 'User ' + h.by : '—') }}</td>
               </tr>
             }
           </tbody>
@@ -301,6 +301,14 @@ export class ModelsPage implements OnInit {
   pill(provider: string): string { return providerPill(provider); }
   providerLabel(provider: string): string { return providerOf(provider).key === provider ? providerOf(provider).label : provider; }
   where(m: CatalogModel): string { return whereText(m); }
+  /** An audit line's state ("on,local,qwen3:8b") as a person reads it: "On · Local · qwen3:8b". */
+  stateText(state: string | null): string {
+    if (!state) return '—';
+    const [on, where, ...name] = state.split(',');
+    return [on === 'on' ? 'On' : on === 'off' ? 'Off' : on, where === 'local' ? 'Local' : where === 'hosted' ? 'Hosted' : where, name.join(',')]
+      .filter(Boolean).join(' · ');
+  }
+
   actionText(action: string): string {
     return ({ added: 'Added', edited: 'Changed', activate: 'Switched on', deactivate: 'Switched off' } as Record<string, string>)[action] ?? action;
   }
