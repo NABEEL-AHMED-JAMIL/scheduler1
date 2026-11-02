@@ -363,6 +363,16 @@ export class Tenants implements OnInit {
     });
   }
 
+  /**
+   * A workspace was added, renamed, suspended, deleted or switched: this list, the managed-by-me badges and the workspace
+   * selector every other screen uses (read once a session) are read again (2026-11-02: "every list updates").
+   */
+  private workspacesChanged(): void {
+    this.listTenants();
+    this.readManaged();
+    this.injector.get(WorkspaceDirectory).refresh().subscribe();
+  }
+
   resourceTotal(tenant: Tenant): number {
     return this.resources.reduce((sum, res) => sum + (Number(tenant[res.key]) || 0), 0);
   }
@@ -396,13 +406,13 @@ export class Tenants implements OnInit {
 
   addTenant(): void {
     this.dialog.open<boolean>(TenantDialog, { data: {} }).closed.subscribe(saved => {
-      if (saved) this.listTenants();
+      if (saved) this.workspacesChanged();
     });
   }
 
   editTenant(tenant: Tenant): void {
     this.dialog.open<boolean>(TenantDialog, { data: { tenant } }).closed.subscribe(saved => {
-      if (saved) this.listTenants();
+      if (saved) this.workspacesChanged();
     });
   }
 
@@ -449,7 +459,7 @@ export class Tenants implements OnInit {
         this.busy.set(null);
         if (response.status === API_SUCCESS) {
           this.toast.success(response.message || `${response.data?.tenantName ?? 'The sandbox'} is made.`);
-          this.listTenants();
+          this.workspacesChanged();
         } else {
           this.toast.error(response.message || 'The sandbox could not be made.');
         }
@@ -526,7 +536,7 @@ export class Tenants implements OnInit {
         this.busy.set(null);
         if (response.status === API_SUCCESS) {
           this.toast.success(response.message);
-          this.listTenants();
+          this.workspacesChanged();
         } else {
           this.toast.error(response.message);
         }
@@ -556,8 +566,13 @@ export class Tenants implements OnInit {
       next: response => {
         this.busy.set(null);
         if (response.status === API_SUCCESS) {
-          this.toast.success(response.message);
-          this.listTenants();
+          if (status === 'Delete') {
+            // 2026-11-02: gone from this list, the tiles and every workspace selector at once, not after the next read.
+            this.tenants.set(this.tenants().filter(t => t.tenantId !== tenant.tenantId));
+            this.injector.get(WorkspaceDirectory).forget(tenant.tenantId);
+          }
+          this.toast.success(response.message || (status === 'Delete' ? `Workspace "${tenant.tenantName}" deleted.` : 'Saved.'));
+          this.workspacesChanged();
         } else {
           this.toast.error(response.message);
         }

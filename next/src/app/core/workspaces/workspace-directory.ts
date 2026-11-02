@@ -83,6 +83,9 @@ export class WorkspaceDirectory {
             managementMode: t.managementMode, sandboxOf: t.sandboxOf ?? null })));
           this.loaded.set(true);
           this.error.set('');
+          // 2026-11-02: a workspace deleted since it was picked is not offered again, nor asked for by the next screen.
+          const listed = new Set(list.map(t => t.tenantId));
+          for (const id of [this.chosen(), ...this.recent()]) if (id !== null && !listed.has(id)) this.forget(id);
         }),
         catchError(() => {
           this.error.set('The workspaces could not be read.');
@@ -119,6 +122,23 @@ export class WorkspaceDirectory {
     write(CHOSEN_KEY, tenantId === null ? null : String(tenantId));
     if (tenantId !== null) {
       const next = [tenantId, ...this.recent().filter(id => id !== tenantId)].slice(0, RECENT_MAX);
+      this.recent.set(next);
+      write(RECENT_KEY, JSON.stringify(next));
+    }
+  }
+
+  /**
+   * A workspace that is gone (deleted, 2026-11-02): out of the list at once, and no longer the session's choice or among
+   * the recent ones -- a screen opened next asked for the deleted workspace and showed its errors.
+   */
+  forget(tenantId: number): void {
+    if (this.workspaces().some(w => w.tenantId === tenantId)) this.workspaces.set(this.workspaces().filter(w => w.tenantId !== tenantId));
+    if (this.chosen() === tenantId) {
+      this.chosen.set(null);
+      write(CHOSEN_KEY, null);
+    }
+    if (this.recent().includes(tenantId)) {
+      const next = this.recent().filter(id => id !== tenantId);
       this.recent.set(next);
       write(RECENT_KEY, JSON.stringify(next));
     }
