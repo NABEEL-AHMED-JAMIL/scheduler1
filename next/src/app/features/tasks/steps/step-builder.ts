@@ -1,3 +1,4 @@
+import { branchNames, branchOfSteps, branchRefs } from '../../../shared/flow-graph/routes';
 import { Component, ComponentRef, DestroyRef, OnInit, ViewContainerRef, WritableSignal, computed, effect, inject, input, linkedSignal, output, signal, untracked, viewChild } from '@angular/core';
 import { Observable } from 'rxjs';
 import { Dialog } from '@angular/cdk/dialog';
@@ -69,6 +70,9 @@ type Tone = 'ok' | 'warn' | 'crit';
   templateUrl: './step-builder.html',
   // UX review 2026-10-12 (B2/B3): this screen's own rules, in its lazy chunk rather than the console's first download.
   styles: `
+/* MIG-450: a step in a Route's branch is set in, with the branch it is in. */
+.step-card.in-branch { margin-left: 1.25rem; border-left: 2px dashed var(--border-strong); }
+.step-branch { display: inline-flex; align-items: center; gap: 0.25rem; margin-top: 0.125rem; font-size: 0.75rem; color: var(--text-secondary); }
 /* UX review 2026-10-12 (B2, P5): the steps grouped by stage -- a run of one stage under its own small heading, a rule
    in the stage's tone at the left so read, check, AI, review and write are told apart at a glance. */
 .step-stages { display: flex; flex-direction: column; gap: 0.875rem; }
@@ -305,6 +309,15 @@ export class StepBuilder implements OnInit {
 
   earlierKeys(index: number): string[] { return this.draft().steps.slice(0, index).map(s => s.key); }
 
+  /** MIG-450: which Route branch each step is in ("<route>.<branch>"), as the engine reads it. */
+  readonly branchOf = computed(() => branchOfSteps(this.draft().steps));
+
+  /** "Branches: urgent, routine (otherwise)": a Route's card line. */
+  routeWords(step: Step): string {
+    const names = branchNames(step);
+    return `Branches: ${names.slice(0, -1).join(', ') || 'none yet'}, otherwise ${names[names.length - 1]}`;
+  }
+
   taskOf(step: Step): StepTaskEntry | undefined { return taskEntry(this.tasks(), step.task, step); }
 
   taskName(step: Step): string { return taskLabel(this.taskOf(step), step.task); }
@@ -435,6 +448,7 @@ export class StepBuilder implements OnInit {
     if (!step) return;
     const data: StepPanelData = {
       step, index, task: this.taskOf(step), earlierKeys: this.earlierKeys(index),
+      branchKeys: [...branchRefs(this.draft().steps.slice(0, index)).keys()],
       columns: inputColumns(this.draft(), index, this.tasks()),
       problems: this.stepProblems(index), warnings: problemsByStep(this.warnings()).steps[index] ?? [], defaultOnError: this.draft().settings?.defaultOnError,
       canManage: this.canManage() && step.task !== 'legacy',

@@ -1,3 +1,4 @@
+import { branchRefs, isMerge, mergeHeads } from './routes';
 import { FlowEdge, FlowMetric, FlowNode, FlowNodeKind, FlowTone } from './flow-graph.model';
 import { formatDuration } from '../ui/time-format';
 
@@ -96,6 +97,8 @@ const TASK_ICONS: Record<string, string> = {
   write_database: 'database', legacy: 'history',
   // Owner #16 (2026-10-19): the common tasks added to the registry.
   dedupe: 'layers', split_column: 'code', pivot: 'table', unpivot: 'list', fill_missing: 'check',
+  // MIG-450: a Route forks the rows; a Merge brings the branches together.
+  route: 'branch', merge: 'layers',
   // Files a run reads, turned into rows (media-service; kind Process, so stepKind's fallback leaves them 'process'): a
   // recording's text under the microphone, and a file in another format under the turning arrows -- 'file' already
   // stands for Read file, Render PDF and Generate report, so a conversion beside them would not read as one.
@@ -185,18 +188,30 @@ export function pipelineEdges(steps: readonly PipelineStepLike[], opts: Pipeline
   const seen = new Set<string>();
   const edges: FlowEdge[] = [];
   const keys = new Set<string>();
+  // MIG-450: a Route's branches, read as "<route>.<branch>": an edge from the route, labelled with the branch.
+  const routeRefs = branchRefs(steps);
   steps.forEach((step, i) => {
     const entry = byCode.get(step.task) ?? null;
     const previous = i > 0 ? steps[i - 1].key : null;
-    const refs = stepRefs(step, entry).filter(r => keys.has(r.key));
+    const refs = isMerge(step) ? [] : stepRefs(step, entry).filter(r => keys.has(r.key));
     const linked = new Set<string>();
-    const push = (from: string, edge: Omit<FlowEdge, 'from' | 'to'>) => {
-      const id = from + '>' + step.key;
+    const push = (from: string, edge: Omit<FlowEdge, 'from' | 'to'>, branch = false) => {
+      const id = from + '>' + step.key + (branch ? '#' + edge.label : '');
       if (seen.has(id)) return;
       seen.add(id); linked.add(from);
       edges.push({ from, to: step.key, ...edge });
     };
-    if (readsInput(step, entry)) {
+    const branch = step.input ? routeRefs.get(step.input) : undefined;
+    if (isMerge(step)) {
+      // Each branch's last step comes in, labelled with its branch; a branch with no step comes straight from the route.
+      for (const head of mergeHeads(steps, i, String(step.config?.['route'] ?? ''))) {
+        const ref = routeRefs.get(head.reads);
+        const from = ref ? ref.route : head.reads;
+        if (keys.has(from)) push(from, { label: head.branch }, true);
+      }
+    } else if (branch && keys.has(branch.route)) {
+      push(branch.route, { label: branch.branch }, true);
+    } else if (readsInput(step, entry)) {
       // The step before needs no word; an input named from further back says it reads that step's rows.
       const named = !!step.input && keys.has(step.input) && step.input !== previous;
       const from = named ? step.input! : previous;

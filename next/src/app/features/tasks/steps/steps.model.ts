@@ -1,6 +1,7 @@
 import { plainHint } from '../../../shared/ui/plain-words';
 import type { RunParameter } from '../../jobs/run-parameters/run-parameters';
 import { formatDuration } from '../../../shared/ui/time-format';
+import { branchRefs, mergeHeads, routeColumn } from '../../../shared/flow-graph/routes';
 
 /**
  * MIG-249: the step builder's shapes and the pure rules behind them.
@@ -666,6 +667,21 @@ export function outputColumns(definition: Definition, index: number, tasks: Step
       const right = definition.steps.findIndex(s => s.key === config['with']);
       return union(input(), right >= 0 && right < index ? outputColumns(definition, right, tasks) : null);
     }
+    // MIG-450: a Route adds its branch column; a Merge has every branch's columns and the branch column.
+    case 'route':
+      return union(input(), [routeColumn(step)]);
+    case 'merge': {
+      const routeKey = String(config['route'] ?? '');
+      const route = definition.steps.find(s => s.key === routeKey);
+      const heads = mergeHeads(definition.steps, index, routeKey);
+      if (!route || !heads.length) return null;
+      const refs = branchRefs(definition.steps);
+      const lists = heads.map(h => {
+        const at = definition.steps.findIndex(s => s.key === (refs.get(h.reads)?.route ?? h.reads));
+        return at >= 0 && at < index ? outputColumns(definition, at, tasks) : null;
+      });
+      return lists.some(l => l === null) ? null : union(...lists, [typeof config['column'] === 'string' && config['column'] ? config['column'] as string : routeColumn(route)]);
+    }
     case 'filter': case 'save_file': case 'upload_bucket': case 'send_notification': case 'validate':
     case 'dedupe': case 'fill_missing': case 'sort': case 'limit':
       return input();
@@ -738,7 +754,9 @@ export function outputColumns(definition: Definition, index: number, tasks: Step
 function inputIndex(definition: Definition, index: number): number {
   const step = definition.steps[index];
   if (!step) return -1;
-  const from = step.input ? definition.steps.findIndex(s => s.key === step.input) : index - 1;
+  // MIG-450: a branch ("<route>.<branch>") has its route's columns.
+  const named = step.input ? branchRefs(definition.steps).get(step.input)?.route ?? step.input : null;
+  const from = named ? definition.steps.findIndex(s => s.key === named) : index - 1;
   return from >= 0 && from < index ? from : -1;
 }
 

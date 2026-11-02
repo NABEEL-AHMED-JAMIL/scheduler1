@@ -20,6 +20,8 @@ export interface StepPanelData {
   task?: StepTaskEntry;
   /** The keys of the steps before it: what it may read, and what a `step` setting offers. */
   earlierKeys: string[];
+  /** MIG-450: the branches of the routes before it ("<route>.<branch>"), which it may read too. */
+  branchKeys?: string[];
   /** The columns the step reads, when the definition tells them: what a `column` setting suggests. */
   columns?: string[] | null;
   /** MIG-245: the workspace's active prompts, for a task whose settings name one. */
@@ -87,7 +89,9 @@ export class StepPanel {
   readonly hasForm = !!this.formSchema && fieldsOf(this.formSchema).length > 0;
   /** The step the report reads: the one its input names, else the one before it. */
   /** The steps before this one, nearest last, as the Input picker lists them. */
-  readonly inputOptions: AdvancedOption[] = this.data.earlierKeys.map(k => ({ value: k, label: k, mono: true }));
+  readonly inputOptions: AdvancedOption[] = [...this.data.earlierKeys.map(k => ({ value: k, label: k, mono: true })),
+    ...(this.data.branchKeys ?? []).map(k => ({ value: k, label: k, mono: true, group: 'Branches of a Route',
+      description: `The rows of branch ${k.slice(k.indexOf('.') + 1)} of ${k.slice(0, k.indexOf('.'))}` }))];
   readonly upstreamKey = this.data.step.input ?? (this.data.earlierKeys.length ? this.data.earlierKeys[this.data.earlierKeys.length - 1] : null);
   readonly configMode = signal<ConfigMode>(this.hasForm ? 'form' : 'json');
   readonly configText = signal(this.jsonOf(this.data.step.config));

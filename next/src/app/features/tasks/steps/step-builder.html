@@ -237,7 +237,8 @@
                     @let step = item.step;
                     @let i = item.index;
                     @let last = i === draft().steps.length - 1;
-                    <li class="step-card" [attr.data-step]="step.key"
+                    <li class="step-card" [attr.data-step]="step.key" [attr.data-branch]="branchOf().get(step.key) ?? null"
+                        [class.in-branch]="branchOf().has(step.key)"
                         [class.is-selected]="selected() === step.key" [class.has-problems]="!!stepProblems(i).length"
                         [class.is-dragging]="dragFrom() === i" [class.is-drop-target]="dropAt() === i && dragFrom() !== i"
                         (dragover)="dragOver(i, $event)" (drop)="drop(i, $event)">
@@ -256,6 +257,12 @@
                         <span class="block text-xs text-[color:var(--text-secondary)] truncate">
                           <span class="mono">{{ step.task }}</span>@if (taskName(step) !== step.task) { · {{ taskName(step) }} }@if (summary(step); as sum) { · {{ sum }} }
                         </span>
+                        <!-- MIG-450: a step in a Route's branch says which; a Route lists its branches. -->
+                        @if (branchOf().get(step.key); as b) {
+                          <span class="step-branch" data-test="step-branch"><app-icon name="branch" />Branch <b>{{ b.slice(b.indexOf('.') + 1) }}</b> of {{ b.slice(0, b.indexOf('.')) }}</span>
+                        } @else if (step.task === 'route') {
+                          <span class="step-branch" data-test="route-branches"><app-icon name="branch" />{{ routeWords(step) }}</span>
+                        }
                         @for (p of stepProblems(i); track $index) {
                           <span class="block text-xs text-crit-500 mt-0.5"><span class="mono">{{ p.field || 'step' }}</span>: {{ p.message }}</span>
                         }

@@ -112,6 +112,8 @@ const PATHS: Record<string, string> = {
   sign:      'M3 21h18M15.5 4.5a2.12 2.12 0 0 1 3 3L9 17l-4 1 1-4Z',
   printer:   'M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v7H6z',
   split:     'M3 4h7v16H3zM14 4h7v16h-7z',
+  // MIG-450: a Route's branches (a line that forks).
+  branch:    'M6 3v12 M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z M18 9a9 9 0 0 1-9 9',
   barcode:   'M3 5v14M6 5v14M10 5v14M12 5v14M15 5v14M19 5v14M21 5v14',
   spacer:    'M12 3v18M8 7l4-4 4 4M8 17l4 4 4-4',
 };
