@@ -111,8 +111,10 @@ test.describe('Tools redesign: Document Converter and Audio Transcript (live)', 
     // Keep the result in a bucket: the row then links to its folder.
     await page.setViewportSize({ width: 1920, height: 1080 });
     await preview.getByTestId('preview-keep').click();
-    await page.locator('input#keep-bucket').fill(BUCKET);
-    await page.getByRole('option').filter({ hasText: BUCKET }).first().click();
+    // The workspace's bucket, by its alias or, when it has one, its label (the combobox shows the label).
+    await page.locator('input#keep-bucket').click();
+    const byAlias = page.getByRole('option').filter({ hasText: BUCKET });
+    await (await byAlias.count() ? byAlias.first() : page.getByRole('option').first()).click();
     await page.locator('#keep-folder').fill('e2e/tools/converted/');
     await page.getByRole('button', { name: 'Keep it', exact: true }).click();
     await expect(recent.locator('a', { hasText: 'e2e/tools/converted/' }).first()).toBeVisible({ timeout: 30_000 });
@@ -126,7 +128,10 @@ test.describe('Tools redesign: Document Converter and Audio Transcript (live)', 
     await page.route('**/documentConverter.json/conversions', async route => {
       if (route.request().method() !== 'POST' || !busy) return route.continue();
       busy = false;
-      await route.fulfill({ status: 429, headers: { 'Retry-After': '30' }, json: { status: 'ERROR', message: 'The converter is busy.' } });
+      // The console calls the gateway on another origin: a stand-in answer carries the CORS headers the gateway's would.
+      const origin = route.request().headers()['origin'] ?? '*';
+      await route.fulfill({ status: 429, headers: { 'Retry-After': '30', 'Access-Control-Allow-Origin': origin,
+        'Access-Control-Allow-Credentials': 'true' }, json: { status: 'ERROR', message: 'The converter is busy.' } });
     });
     await page.goto('/tools/converter');
     await page.getByTestId('converter-files').setInputFiles(join(FIX, 'discharge-note.txt'));
@@ -153,7 +158,7 @@ test.describe('Tools redesign: Document Converter and Audio Transcript (live)', 
     const page = await signedIn(browser);
     await page.goto('/tools/converter?mode=dataset');
     await expect(page).toHaveURL(/\/reports\/from-pipelines/);
-    await expect(page.getByRole('group', { name: 'Where the rows come from' })).toBeVisible();
+    await expect(page.getByRole('group', { name: 'Where the rows come from' }).first()).toBeVisible();
     await page.context().close();
   });
 
