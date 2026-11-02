@@ -1,4 +1,5 @@
-<div class="page">
+<div [class.page]="!embedded()">
+  @if (!embedded()) {
   <app-page-header>
     <div class="page-head">
       <div class="min-w-0">
@@ -42,9 +43,11 @@
   <!-- UX final MG1: Create pipeline is a build action, so a MANAGED workspace sees the same notice the build screens
        show (and no Create pipeline); asking, and drawing a flow, still work. -->
   <app-managed-banner what="pipelines" still="You can still ask about runs, sources and files, and draw a pipeline here." />
+  }
 
-  <div class="ai-grid">
+  <div [class.ai-grid]="!embedded()">
 
+    @if (!embedded()) {
     <!-- History: beside the thread on wide screens; over it, on asking, below -- with a backdrop that closes it. -->
     @if (historyOpen()) { <div class="ai-history-backdrop" data-test="history-backdrop" (click)="historyOpen.set(false)"></div> }
     <aside class="ai-history card p-0" aria-labelledby="assistant-recent" [class.open]="historyOpen()" [class.shadow-xl]="historyOpen()">
@@ -52,9 +55,11 @@
                              (opened)="open($event)" (remove)="remove($event)" (closed)="historyOpen.set(false)"
                              (renamed)="conversation()?.conversationId === $event.conversationId && conversation.set($event)" />
     </aside>
+    }
 
-    <!-- The conversation. -->
-    <section class="ai-pane ai-thread card p-0 flex flex-col" aria-label="Conversation">
+    <!-- The conversation. Embedded (a schedule's assistant, owner 2026-11-02): the same messages, with no pane height of its own. -->
+    <section class="ai-pane card p-0 flex flex-col" [class.ai-thread]="!embedded()" [class.ai-embedded]="embedded()" aria-label="Conversation"
+             [attr.data-embedded]="embedded() ? 'schedule' : null">
       <header class="flex items-center gap-2 px-4 py-2.5 border-b border-subtle shrink-0 min-w-0">
         @if (renaming()) {
           <input class="input flex-1 min-w-0" aria-label="Conversation title" maxlength="200" [value]="renameText()"
@@ -65,6 +70,20 @@
           <app-icon name="chat" class="shrink-0 text-[color:var(--text-muted)]" />
           <!-- Coordinator 2026-10-12: the conversation's short title (a renamed one wins), the first question in full beneath it. -->
           <h2 class="font-semibold truncate flex-1 min-w-0" data-test="thread-title" [title]="tip(threadTip())">{{ threadTitle() }}</h2>
+          @if (conversation()?.scopeJobId; as job) {
+            @if (embedded()) {
+              <a class="btn btn-default btn-sm shrink-0" data-test="open-in-assistant" routerLink="/ai/assistant"
+                 [queryParams]="{ c: conversation()!.conversationId }"><app-icon name="external" />Open in AI Assistant</a>
+            } @else {
+              <!-- Owner 2026-11-02: a schedule's assistant conversation says which schedule it is limited to. -->
+              <a class="pill pill-neutral shrink-0" data-test="scope-pill" [routerLink]="['/pipelines/schedules', job, 'assistant']"
+                 title="This conversation reads this schedule only">Schedule #{{ job }}</a>
+            }
+          }
+          @if (embedded()) {
+            <button type="button" class="btn btn-ghost btn-sm shrink-0" data-test="new-conversation" [disabled]="!!working() || !conversation()"
+                    (click)="newChat()"><app-icon name="plus" />New</button>
+          }
           @if (conversation(); as c) {
             <button type="button" class="btn btn-ghost btn-icon btn-sm" [disabled]="!!working()" aria-label="Rename this conversation" (click)="startRename()">
               <app-icon name="edit" />
@@ -86,6 +105,11 @@
           </div>
         } @else if (threadError()) {
           <app-load-error [message]="threadError()" (retry)="retryOpen()" />
+        } @else if (!messages().length && !working() && embedded()) {
+          <p class="m-auto text-sm text-[color:var(--text-secondary)] text-center max-w-md py-3" data-test="embedded-empty">
+            Ask anything about this schedule above: the AI Assistant reads its runs, files and failures, explains what happened and
+            suggests a fix. It reads this schedule only, and asks before it runs or changes anything.
+          </p>
         } @else if (!messages().length && !working()) {
           <div class="m-auto flex flex-col gap-4 py-4" data-suggestions>
             <div class="flex items-center gap-3">
@@ -324,7 +348,9 @@
           </div>
         }
       </div>
-      <!-- UX review B6 (AI1): one composer for the three chats (.chat-composer): the box, then Send at its foot, right. -->
+      <!-- UX review B6 (AI1): one composer for the three chats (.chat-composer): the box, then Send at its foot, right. Embedded, the
+           schedule's page has the composer. -->
+      @if (!embedded()) {
       <div class="chat-composer px-3.5 py-2.5 border-t border-subtle shrink-0" data-test="chat-composer">
         <textarea class="input text-sm" rows="2" placeholder="Describe a pipeline, or ask about runs, sources or files…"
                   aria-label="Message the assistant" maxlength="4000" [value]="draft()"
@@ -337,8 +363,10 @@
           </button>
         }
       </div>
+      }
     </section>
 
+    @if (!embedded()) {
     <!-- The result: the flow drawn, each run's tool calls, and what the assistant works under. -->
     <section class="ai-pane ai-result card p-0 flex flex-col" aria-label="Result">
       <div class="tabs px-3 shrink-0" role="tablist" aria-label="Result">
@@ -450,5 +478,6 @@
         }
       </div>
     </section>
+    }
   </div>
 </div>

@@ -6,12 +6,12 @@ export const PINNED: Record<string, unknown> = {
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
-      "GET /aiPrompt.json/assistant/conversationList?limit=50&zone=America/Chicago",
       "GET /aiPrompt.json/assistant/conversations?limit=30",
       "GET /aiPrompt.json/tools/list",
       "GET /appUser.json/me",
       "GET /aiPrompt.json/dataPolicy",
-      "GET /aiConnection.json/list"
+      "GET /aiConnection.json/list",
+      "GET /aiPrompt.json/assistant/conversationList?limit=50&zone=America/Chicago"
     ],
     "headings": [
       "AI Assistant",
@@ -71,13 +71,13 @@ export const PINNED: Record<string, unknown> = {
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
-      "GET /aiPrompt.json/assistant/conversationList?limit=50&zone=America/Chicago",
       "GET /aiPrompt.json/assistant/conversations?limit=30",
       "GET /aiPrompt.json/tools/list",
       "GET /appUser.json/me",
       "GET /aiPrompt.json/dataPolicy",
       "GET /aiConnection.json/list",
       "GET /aiPrompt.json/assistant/conversation?conversationId=1000",
+      "GET /aiPrompt.json/assistant/conversationList?limit=50&zone=America/Chicago",
       "GET /aiPrompt.json/tools/trace?toolRunId=1004",
       "GET /sourceJob.json/stepExecutions?jobQueueId=7404",
       "GET /analyticsWorkspace.json/fetchAllDashboards"
@@ -159,11 +159,11 @@ export const PINNED: Record<string, unknown> = {
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
-      "GET /aiPrompt.json/assistant/conversationList?limit=50&zone=America/Chicago",
       "GET /aiPrompt.json/assistant/conversations?limit=30",
       "GET /aiPrompt.json/tools/list",
       "GET /appUser.json/me",
-      "GET /aiPrompt.json/dataPolicy"
+      "GET /aiPrompt.json/dataPolicy",
+      "GET /aiPrompt.json/assistant/conversationList?limit=50&zone=America/Chicago"
     ],
     "headings": [
       "AI Assistant",

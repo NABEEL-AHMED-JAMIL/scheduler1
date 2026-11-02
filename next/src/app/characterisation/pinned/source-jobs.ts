@@ -392,28 +392,29 @@ export const PINNED: Record<string, unknown> = {
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
-      "GET /aiAgent.json/fetchAllAgents",
       "GET /sourceJob.json/fetchSourceJobDetailWithSourceJobId?jobId=2833",
-      "GET /sourceJob.json/fetchSourceJobQueueListWithJobId?jobId=2833&limit=500"
+      "GET /sourceJob.json/fetchSourceJobQueueListWithJobId?jobId=2833&limit=500",
+      "GET /aiPrompt.json/tools/list",
+      "GET /aiPrompt.json/assistant/conversations?limit=1&scopeJobId=2833"
     ],
     "headings": [
-      "Schedule assistant — Reference CSV check (e2e)"
+      "Schedule assistant — Reference CSV check (e2e)",
+      "AI Assistant · this schedule"
     ],
     "buttons": [
       "Ask",
       "Failures",
+      "New",
       "Quick stats",
       "Recent runs",
       "Schedule",
       "Summary",
-      "UI-REVIEW Summarise a CSV run in one paragraph",
       "Where it writes"
     ],
     "columns": [],
     "fields": [
       "Ask about this schedule",
-      "Ask about this schedule — when it runs, its files, failures or history",
-      "Other questions are answered by"
+      "Ask the AI Assistant about this schedule — why a run failed, what it read, how to fix it"
     ],
     "links": [
       "/pipelines",

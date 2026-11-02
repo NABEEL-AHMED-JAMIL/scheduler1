@@ -1,7 +1,7 @@
 ---
 id: ai-assistant
 title: Design a pipeline with the AI Assistant
-summary: Describe a pipeline in plain words, check the flow it draws, create it; ask about runs, sources and files; what it can and cannot reach.
+summary: Describe a pipeline in plain words, check the flow it draws, create it; ask about runs, sources and files, or about one schedule; what it can and cannot reach.
 section: Ask and assist
 who: Anyone whose page access includes Prompts › AI Assistant; creating a pipeline and choosing the model are a workspace administrator's
 where: Build › AI Assistant (/ai/assistant)
@@ -60,6 +60,24 @@ It cannot reach another workspace, a page your access does not open, or anything
 
 > **Note:** A local model can take a minute to plan. **Stop** ends the run on the server; whatever it said before it
 > stopped stays in the conversation, and **Retry** asks the same question again.
+
+## Ask about one schedule
+Each schedule has its own assistant: open the schedule in **Pipelines › Schedules & triggers** and choose **Assistant**
+(`/pipelines/schedules/<id>/assistant`), or open it beside the schedule's runs.
+
+- The quick buttons (**Summary**, **Recent runs**, **Failures**, **Quick stats**, **Schedule**, **Where it writes**) answer at
+  once from the schedule's own record and runs, with no model.
+- A question you type goes to the **AI Assistant**, limited to that one schedule: it reads its runs, a run's steps, its
+  failures and the files in its task's folders with tools, then explains what happened and suggests a fix. It never reads
+  another schedule or workspace, and never makes up a run, a step or a file: a run of another schedule is refused by name.
+- Running, retrying or rescheduling it is offered only where your access and the data policy allow the write tools, and even
+  then it asks first, with the same card as above.
+- The conversation stays in your history here, marked **Schedule #id**. **Open in AI Assistant** continues it on the full page;
+  **New** starts another one about the same schedule.
+
+```A question for a schedule's assistant
+Why did the last run fail, and how do I fix it?
+```
 
 ## Your conversations
 The list on the left keeps your conversations, newest first, with whether each made a pipeline (**Pipeline created**,

@@ -1,7 +1,7 @@
 import { ConversationRow, titleOf } from './conversation.model';
 import { ModelSetupBanner } from '../model-setup-banner';
 import { ManagedBanner } from '../../../shared/ui/managed-banner';
-import { Component, DestroyRef, LOCALE_ID, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, LOCALE_ID, OnInit, computed, inject, input, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Dialog } from '@angular/cdk/dialog';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -114,6 +114,8 @@ export const PROGRESS_MS = [1000, 2000] as const;
     @media (prefers-reduced-motion: reduce) { .ai-history.open { animation: none; } }
     .ai-list { padding: 0.375rem; min-height: 0; }
     .ai-thread { min-height: 30rem; }
+    /* Owner 2026-11-02: inside a schedule's assistant the conversation is a card of its own height, scrolling past 34rem. */
+    .ai-embedded { max-height: 34rem; }
     .ai-result { min-height: 34rem; }
     .ai-indent { margin-left: 2rem; }
     .ai-model { max-width: 26rem; }
@@ -139,6 +141,14 @@ export class Assistant implements OnInit {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+
+  /**
+   * Owner 2026-11-02 ("Use the AI Assistant (Recommended)"): the conversation alone, inside a schedule's assistant -- no page header,
+   * history, result pane or composer of its own (the schedule's page asks through send()), the address left alone. With scopeJobId
+   * every new conversation is about that one schedule, and the person's newest one about it opens first.
+   */
+  readonly embedded = input(false);
+  readonly scopeJobId = input<number | null>(null);
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);
   private readonly handoff = inject(PipelineDraftHandoff);
@@ -342,6 +352,12 @@ export class Assistant implements OnInit {
   }
 
   ngOnInit(): void {
+    if (this.embedded()) {
+      // The tools name a card's action and a call's title; the history, policy and model pickers are the full page's.
+      this.loadTools();
+      this.openNewestScoped();
+      return;
+    }
     this.loadConversations();
     this.loadTools();
     this.loadWorkspace();
@@ -359,6 +375,22 @@ export class Assistant implements OnInit {
   }
 
   // ----------------------------------------------------------------------------------------- loading
+
+  /** Embedded: the person's newest conversation about the schedule, if there is one; else an empty one to start. */
+  openNewestScoped(): void {
+    const job = this.scopeJobId();
+    if (job == null) return;
+    this.threadLoading.set(true);
+    this.api.conversations(1, job).subscribe({
+      next: r => {
+        this.threadLoading.set(false);
+        const newest = r.status === API_SUCCESS ? (r.data ?? [])[0] : undefined;
+        if (newest) this.open(newest.conversationId);
+      },
+      // Nothing to reopen is the same as a new conversation: the first question starts one.
+      error: () => this.threadLoading.set(false),
+    });
+  }
 
   loadConversations(): void {
     this.conversationsLoading.set(true);
@@ -497,7 +529,7 @@ export class Assistant implements OnInit {
     this.draft.set('');
     this.waitingFor.set(message);
     const conversationId = this.conversation()?.conversationId ?? null;
-    this.wait('send', this.api.sendAsync(message, conversationId, this.pickedConnection()), message, {
+    this.wait('send', this.api.sendAsync(message, conversationId, this.pickedConnection(), this.scopeJobId()), message, {
       failed: () => this.draft.set(message),
     });
   }
@@ -857,7 +889,8 @@ export class Assistant implements OnInit {
   });
   readonly threadTitle = computed(() => {
     const c = this.threadRow();
-    if (!c) return 'New conversation';
+    // A schedule's assistant (owner 2026-11-02) names what it is before its first question.
+    if (!c) return this.embedded() ? 'AI Assistant · this schedule' : 'New conversation';
     return c.renamed ? (c.title || 'Untitled conversation').trim() : titleOf(c);
   });
   readonly threadTip = computed(() => {
@@ -890,6 +923,8 @@ export class Assistant implements OnInit {
   liveCalls(): ToolCall[] { return this.live()?.calls ?? []; }
 
   private remember(conversationId: number | null): void {
+    // Embedded in a schedule's page, the address is that page's: the conversation is the schedule's newest anyway.
+    if (this.embedded()) return;
     this.router.navigate([], { relativeTo: this.route, queryParams: { c: conversationId }, queryParamsHandling: 'merge', replaceUrl: true });
   }
 }

@@ -23,8 +23,11 @@ const BASE = () => `${API_BASE}/aiPrompt.json`;
 export class AssistantApi {
   private readonly http = inject(HttpClient);
 
-  conversations(limit = 30): Observable<ApiResponse<Conversation[]>> {
-    return this.http.get<ApiResponse<Conversation[]>>(`${BASE()}/assistant/conversations`, { params: { limit } });
+  /** `scopeJobId`: only the person's conversations about that schedule (its assistant, owner 2026-11-02), newest first. */
+  conversations(limit = 30, scopeJobId: number | null = null): Observable<ApiResponse<Conversation[]>> {
+    const params: Record<string, number> = { limit };
+    if (scopeJobId != null) params['scopeJobId'] = scopeJobId;
+    return this.http.get<ApiResponse<Conversation[]>>(`${BASE()}/assistant/conversations`, { params });
   }
 
   conversation(conversationId: number): Observable<ApiResponse<{ conversation: Conversation; messages: AssistantMessage[] }>> {
@@ -43,10 +46,13 @@ export class AssistantApi {
    * AI workflow review: answers at once with the run's id (data.run) and the person's message; the loop works on the
    * server, watched through progress and stopped through cancel.
    */
-  sendAsync(message: string, conversationId: number | null, connectionId: number | null): Observable<ApiResponse<AssistantAnswer>> {
+  sendAsync(message: string, conversationId: number | null, connectionId: number | null, scopeJobId: number | null = null):
+    Observable<ApiResponse<AssistantAnswer>> {
     const body: Record<string, unknown> = { message, async: true };
     if (conversationId != null) body['conversationId'] = conversationId;
     if (connectionId != null) body['connectionId'] = connectionId;
+    // Owner 2026-11-02: a new conversation from a schedule's assistant is about that schedule only (the server holds it to it).
+    if (scopeJobId != null && conversationId == null) body['scopeJobId'] = scopeJobId;
     return this.answered(this.http.post<ApiResponse<AssistantAnswer>>(`${BASE()}/assistant/send`, body));
   }
 

@@ -20,6 +20,8 @@ export interface Conversation {
   createdBy?: number;
   dateCreated?: string;
   dateUpdated?: string;
+  /** Owner 2026-11-02: the one schedule (job id) a schedule's assistant conversation is about; none for an ordinary one. */
+  scopeJobId?: number | null;
 }
 
 /** A write the assistant wants to make: nothing runs until the person decides. */

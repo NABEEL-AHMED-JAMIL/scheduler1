@@ -119,7 +119,7 @@ describe('AI Assistant -- a conversation', () => {
     const { screen, api } = screenWith({ query: { c: '1000' } });
     screen.draft.set('  Which jobs?  ');
     screen.send();
-    expect(api.sendAsync).toHaveBeenCalledWith('Which jobs?', 1000, null);
+    expect(api.sendAsync).toHaveBeenCalledWith('Which jobs?', 1000, null, null);
     expect(api.progress).toHaveBeenCalledWith(1010, 1000, 6);
     expect(screen.draft()).toBe('');
     expect(screen.messages().map(x => x.messageId)).toEqual([1000, 1002, 2000, 2001]);
@@ -156,7 +156,7 @@ describe('AI Assistant -- a conversation', () => {
     screen.connectionId.set(1049);
     screen.draft.set('Hi');
     screen.send();
-    expect(api.sendAsync).toHaveBeenCalledWith('Hi', null, 1049);
+    expect(api.sendAsync).toHaveBeenCalledWith('Hi', null, 1049, null);
     expect(screen.conversation()?.conversationId).toBe(1000);
   });
 

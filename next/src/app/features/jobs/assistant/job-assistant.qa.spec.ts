@@ -278,8 +278,11 @@ describe('QA — the assistant component', () => {
     http = TestBed.inject(HttpTestingController);
   });
 
-  /** Builds the component and settles the job's two requests, leaving agents in flight. */
-  function mount() {
+  /**
+   * Builds the component and settles the job's two requests and the embedded AI Assistant's two: the tools it names a card with, and
+   * the person's newest conversation about this schedule (none, unless `existing` is given).
+   */
+  function mount(existing: { conversationId: number; title: string } | null = null) {
     const fixture = TestBed.createComponent(JobAssistant);
     fixture.componentRef.setInput('jobId', String(JOB));
     fixture.detectChanges();
@@ -289,90 +292,69 @@ describe('QA — the assistant component', () => {
     http.expectOne(r => r.url.includes('fetchSourceJobQueueListWithJobId'))
       .flush(ok({ jobQueues: runs }));
     fixture.detectChanges();
-    return { fixture, component: fixture.componentInstance };
-  }
-
-  /**
-   * Lets the agent list land, which is what used to re-trigger the whole load.
-   *
-   * The change detection afterwards is load-bearing, not tidiness. A zoneless TestBed runs an
-   * effect only when something pumps it, so flushing the response and asserting immediately
-   * proves nothing -- the re-run this suite exists to rule out would not have happened yet
-   * either. Without this line the fix passed its own test with the bug put back.
-   */
-  function landAgents(fixture: { detectChanges: () => void }) {
-    http.expectOne(r => r.url.includes('fetchAllAgents'))
-      .flush(ok([{ aiAgentId: 1022, agentName: 'Vision Assistant' }]));
+    settleThread(existing);
     fixture.detectChanges();
+    return { fixture, component: fixture.componentInstance, el: fixture.nativeElement as HTMLElement };
   }
 
-  // 50. The bug a reader sees as "it forgot what I asked". The reload effect read agents(), so
-  // the agent response made it a dependency change: the job detail and the whole run history
-  // were fetched a second time on every load, and the effect clears turns on the way through.
-  it('reads the job once, not again when the agent list arrives', () => {
-    const { fixture } = mount();
-    landAgents(fixture);
-    http.expectNone(r => r.url.includes('fetchSourceJobDetailWithSourceJobId'));
-    http.expectNone(r => r.url.includes('fetchSourceJobQueueListWithJobId'));
+  function settleThread(existing: { conversationId: number; title: string } | null) {
+    http.match(r => r.url.includes('/tools/list')).forEach(r => r.flush(ok([])));
+    const list = http.expectOne(r => r.url.includes('/assistant/conversations'));
+    expect(list.request.params.get('scopeJobId')).toBe(String(JOB));
+    list.flush(ok(existing ? [{ ...existing, scopeJobId: JOB }] : []));
+  }
+
+  // Owner 2026-11-02: no prompt picker, no saved prompt -- nothing asks for the agent list or the old prompt endpoint any more.
+  it('never reads saved prompts, and opens the person\'s newest conversation about this schedule', () => {
+    const { el } = mount();
+    http.expectNone(r => r.url.includes('fetchAllAgents'));
+    expect(el.querySelector('[data-test="agent-picker"]')).toBeNull();
+    expect(el.querySelector('[data-embedded="schedule"]')).not.toBeNull();
   });
 
-  // 51. The same defect, stated as what it cost: an answer already on screen was wiped, and so
-  // was a half-typed question, at whatever moment the agent request happened to land.
-  it('keeps an answer already on screen when the agent list arrives', () => {
+  // A typed question is the AI Assistant's, about this schedule only: the scope rides with the new conversation and the server
+  // holds every tool call to it.
+  it('sends a typed question to the AI Assistant, scoped to this schedule', () => {
     const { fixture, component } = mount();
-    component.askPreset('summary', 'Summarise this job');
-    component.question.set('half typed');
-    landAgents(fixture);
-    expect(component.turns().length).toBe(1);
-    expect(component.question()).toBe('half typed');
-  });
-
-  // 52. Scope is enforced here, not in a prompt: a question naming another job is answered
-  // locally with a refusal even when an agent is configured and waiting.
-  it('never hands an out-of-scope question to the agent', () => {
-    const { fixture, component } = mount();
-    landAgents(fixture);
-    component.ask('what about job 12');
+    component.ask('why did the last run fail?');
+    fixture.detectChanges();
+    const send = http.expectOne(r => r.url.includes('/assistant/send'));
+    expect(send.request.body).toEqual({ message: 'why did the last run fail?', async: true, scopeJobId: JOB });
     http.expectNone(r => r.url.includes('askAssistant'));
-    expect(component.turns()[0].answer.refused).toBe(true);
+    expect(component.turns().length).toBe(0);
+    expect(component.question()).toBe('');
   });
 
-  // 53. Nor a greeting, which is the whole reason 'capability' is an intent rather than a
-  // fall-through.
-  it('never hands a greeting to the agent', () => {
-    const { fixture, component } = mount();
-    landAgents(fixture);
-    component.ask('hello');
-    http.expectNone(r => r.url.includes('askAssistant'));
-    expect(component.turns().length).toBe(1);
-  });
-
-  // 54. What the agent is for: the questions the table genuinely does not recognise.
-  it('hands a genuinely unrecognised question to the agent', () => {
-    const { fixture, component } = mount();
-    landAgents(fixture);
-    component.ask('what is 2 plus 2');
-    const call = http.expectOne(r => r.url.includes('askAssistant'));
-    expect(call.request.body.jobId).toBe(JOB);
-    expect(call.request.body.aiAgentId).toBe(1022);
-    expect(component.turns()[0].answer.pending).toBe(true);
-  });
-
-  // 55. The Ask button disables itself while a question is in flight. Enter did not, so holding
-  // the key queued requests behind a single shared `asking` flag that settles once.
+  // The Ask button disables itself while a question is in flight; Enter did not, so holding the key queued requests.
   it('ignores a second question while one is in flight', () => {
     const { fixture, component } = mount();
-    landAgents(fixture);
-    component.ask('what is 2 plus 2');
-    http.expectOne(r => r.url.includes('askAssistant'));
-    component.ask('what is 3 plus 3');
-    http.expectNone(r => r.url.includes('askAssistant'));
-    expect(component.turns().length).toBe(1);
+    component.ask('why did the last run fail?');
+    fixture.detectChanges();
+    http.expectOne(r => r.url.includes('/assistant/send'));
+    expect(component.asking()).toBe(true);
+    component.ask('and the one before?');
+    http.expectNone(r => r.url.includes('/assistant/send'));
   });
 
-  // 56. A success carrying no body is still nothing to show. It used to leave loading false,
-  // error empty and facts null -- which renders neither the assistant nor an error, just a
-  // blank page with no Try again on it.
+  // Kept in the person's history: the next visit opens the same conversation, and a question continues it (the server keeps its scope).
+  it('reopens the newest conversation about this schedule and continues it', () => {
+    const { fixture, component } = mount({ conversationId: 41, title: 'Why did the last run fail?' });
+    http.expectOne(r => r.url.includes('/assistant/conversation') && r.params.get('conversationId') === '41')
+      .flush(ok({ conversation: { conversationId: 41, title: 'Why did the last run fail?', scopeJobId: JOB }, messages: [
+        { messageId: 1, conversationId: 41, seq: 1, role: 'user', content: 'Why did the last run fail?', links: [] },
+        { messageId: 2, conversationId: 41, seq: 2, role: 'assistant', content: 'Run 5527 could not reach the worker queue.', runStatus: 'answered', links: [] }] }));
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.textContent).toContain('Run 5527 could not reach the worker queue.');
+    const open = el.querySelector<HTMLAnchorElement>('[data-test="open-in-assistant"]')!;
+    expect(open.getAttribute('href')).toBe('/ai/assistant?c=41');
+    component.ask('how do I fix it?');
+    fixture.detectChanges();
+    const send = http.expectOne(r => r.url.includes('/assistant/send'));
+    expect(send.request.body).toEqual({ message: 'how do I fix it?', async: true, conversationId: 41 });
+  });
+
+  // A success carrying no body is still nothing to show: an error with Try again, never a blank page.
   it('shows an error rather than a blank page when the detail comes back empty', () => {
     const fixture = TestBed.createComponent(JobAssistant);
     fixture.componentRef.setInput('jobId', String(JOB));
@@ -386,35 +368,10 @@ describe('QA — the assistant component', () => {
     expect(fixture.componentInstance.error()).toBeTruthy();
   });
 
-  // 57. The conversation replayed to the agent has to alternate User/Assistant, and it was
-  // filtered a line at a time: an answer with no prose lost its "Assistant: " line and left the
-  // question standing, so the model read two User turns in a row and attributed the first
-  // question's subject to the second.
-  //
-  // No answer `answerFor` builds today is prose-free -- every case leads with a text block -- so
-  // this sets the turn up directly rather than pretending a preset produces one. AnswerBlock
-  // permits a chart-or-table-only answer, which is the shape being pinned; the assertion is on
-  // the invariant, not on a path that currently reaches it.
-  it('sends the agent an alternating transcript', () => {
+  // Switching job is the panel's normal life: answers about the old job never sit under the new job's name, and the new job's
+  // conversation is its own.
+  it('clears the transcript and opens the new schedule\'s conversation when the job changes', () => {
     const { fixture, component } = mount();
-    landAgents(fixture);
-    component.turns.set([
-      { id: 2, question: 'Summarise this job', at: new Date(),
-        answer: { blocks: [{ kind: 'text', text: 'It runs on demand.' }] } },
-      { id: 1, question: 'Show the recent run history', at: new Date(),
-        answer: { blocks: [{ kind: 'runs', runs }] } },
-    ]);
-    component.ask('what is 2 plus 2');
-    const body = http.expectOne(r => r.url.includes('askAssistant')).request.body;
-    const lines: string[] = body.history;
-    expect(lines).toEqual(['User: Summarise this job', 'Assistant: It runs on demand.']);
-  });
-
-  // 58. Switching job is the panel's normal life, and answers about the old job must not sit
-  // under the new job's name.
-  it('clears the transcript when the job changes', () => {
-    const { fixture, component } = mount();
-    landAgents(fixture);
     component.askPreset('summary', 'Summarise this job');
     expect(component.turns().length).toBe(1);
     fixture.componentRef.setInput('jobId', '2396');
@@ -425,16 +382,13 @@ describe('QA — the assistant component', () => {
   });
 
   afterEach(() => {
-    // The agent list is fetched once at construction and most cases never need it to land.
-    // Settling it here keeps verify() honest about the requests a case actually caused --
-    // including the second job load that used to follow it.
-    http.match(r => r.url.includes('fetchAllAgents')).forEach(r => r.flush(ok([])));
+    http.match(r => r.url.includes('/assistant/conversations') || r.url.includes('/tools/list')).forEach(r => r.flush(ok([])));
     http.verify({ ignoreCancelled: true });
   });
 });
 
 // =============================================================================================
-// 6. UX final SAS1: the shared composer, exports once there is an answer, the agent picker in words
+// 6. UX final SAS1: the shared composer, exports once there is an answer; owner 2026-11-02: no prompt picker
 // =============================================================================================
 describe('Schedule assistant layout (UX final SAS1)', () => {
   let http: HttpTestingController;
@@ -454,22 +408,24 @@ describe('Schedule assistant layout (UX final SAS1)', () => {
       .flush(ok({ jobId: JOB, jobName: facts.jobName, jobStatus: 'Active', execution: 'Manual',
                   priority: 1, taskDetail: { taskName: facts.taskName, bucket: facts.bucket } }));
     http.expectOne(r => r.url.includes('fetchSourceJobQueueListWithJobId')).flush(ok({ jobQueues: runs }));
-    http.expectOne(r => r.url.includes('fetchAllAgents')).flush(ok([{ aiAgentId: 1022, agentName: 'Vision Assistant' }]));
+    fixture.detectChanges();
+    http.match(r => r.url.includes('/assistant/conversations') || r.url.includes('/tools/list')).forEach(r => r.flush(ok([])));
     fixture.detectChanges();
     return { fixture, component: fixture.componentInstance, el: fixture.nativeElement as HTMLElement };
   }
 
-  it('asks from the shared chat composer: Enter asks, Shift+Enter does not', () => {
+  it('asks from the shared chat composer: Enter asks the AI Assistant, Shift+Enter does not', () => {
     const { fixture, component, el } = mount();
     const box = el.querySelector<HTMLTextAreaElement>('[data-test="chat-composer"] textarea')!;
     expect(box.getAttribute('aria-label')).toBe('Ask about this schedule');
     expect(el.querySelector('[data-test="chat-composer"] [data-test="chat-send"]')).not.toBeNull();
     component.question.set('when does it run next?');
     box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', shiftKey: true, cancelable: true }));
-    expect(component.turns().length).toBe(0);
+    http.expectNone(r => r.url.includes('/assistant/send'));
     box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true }));
     fixture.detectChanges();
-    expect(component.turns().length).toBe(1);
+    http.expectOne(r => r.url.includes('/assistant/send'));
+    expect(component.turns().length).toBe(0);
   });
 
   it('shows CSV and Excel only once there is an answer', () => {
@@ -482,13 +438,14 @@ describe('Schedule assistant layout (UX final SAS1)', () => {
     expect(exports.textContent).toContain('Excel');
   });
 
-  it('labels the saved-prompt picker with what it does, and speaks of the schedule, not the job', () => {
+  it('says what the buttons and a typed question each do, with no prompt picker, and speaks of the schedule, not the job', () => {
     const { el } = mount();
-    const picker = el.querySelector('[data-test="agent-picker"]')!;
-    expect(picker.querySelector('label')!.textContent!.trim()).toBe('Other questions are answered by');
-    expect(picker.textContent).toContain('A question they do not cover goes to the saved prompt chosen here.');
-    expect(el.textContent).not.toMatch(/ANYTHING ELSE/i);
-    expect(el.textContent!.replace(/\s+/g, ' ')).toContain(`Ask about schedule #${JOB}, or pick a question above.`);
+    expect(el.querySelector('[data-test="agent-picker"]')).toBeNull();
+    const help = el.querySelector('[data-test="ask-help"]')!.textContent!.replace(/\s+/g, ' ');
+    expect(help).toContain("The buttons answer from this schedule's record and runs.");
+    expect(help).toContain('A question you type goes to the AI Assistant, which reads this schedule only');
+    expect(el.querySelector('[data-test="embedded-empty"]')).not.toBeNull();
+    expect(el.textContent!.replace(/\s+/g, ' ')).toContain(`Pick a question above for an answer from schedule #${JOB}'s own record.`);
     // The schedule's own name may say 'job' (this one does); none of the page's own words do.
     expect(el.textContent!.split(facts.jobName).join('')).not.toMatch(/\bjob\b/i);
   });

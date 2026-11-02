@@ -11,7 +11,7 @@
           @if (facts(); as f) { <span class="font-normal text-[color:var(--text-secondary)]">— {{ f.jobName }}</span> }
         </h1>
         <p class="page-subtitle">
-          Answers about schedule #{{ jobId() }} only, built from its own record and runs.
+          Answers about schedule #{{ jobId() }} only: the buttons from its own record and runs, a typed question from the AI Assistant, limited to it.
         </p>
       </div>
       <!-- UX final SAS1: the run exports appear once there is an answer on the page -- before it they sat beside the
@@ -56,7 +56,7 @@
            the box, then its actions at its foot, right. Enter asks; Shift+Enter starts a new line. -->
       <div class="chat-composer" data-test="chat-composer" [class.mb-3]="!compact()" [class.mb-2]="compact()">
         <textarea class="input text-sm" [rows]="compact() ? 1 : 2" [value]="question()" aria-label="Ask about this schedule"
-                  placeholder="Ask about this schedule — when it runs, its files, failures or history"
+                  placeholder="Ask the AI Assistant about this schedule — why a run failed, what it read, how to fix it"
                   (input)="question.set($any($event.target).value)"
                   (keydown)="onComposerKey($event)"></textarea>
         @if (voiceSupported) {
@@ -75,25 +75,12 @@
         </button>
       </div>
 
-      <!-- Only shown when an agent exists. Everything above answers from the job's own record
-           with no provider at all; the agent is what picks up the questions those patterns do
-           not match, so with none configured there is nothing here to choose. -->
-      @if (agents().length) {
-        <!-- UX final SAS1 (was "ANYTHING ELSE, ASK [picker]"): a labelled control that says what it does -- the
-             buttons answer from the schedule's own record, and a question they do not cover goes to the prompt
-             chosen here. -->
-        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 mb-2.5" data-test="agent-picker">
-          <label class="text-sm font-medium text-[color:var(--text-primary)]"
-                 [attr.for]="'assistant-agent-' + jobId()">Other questions are answered by</label>
-          <app-advanced-select class="w-64 max-w-full shrink-0" [id]="'assistant-agent-' + jobId()"
-                               [describedBy]="'assistant-agent-help-' + jobId()" [options]="agentOptions()"
-                               [value]="agentId() == null ? '0' : '' + agentId()" (valueChange)="agentId.set(+$event || null)"
-                               searchLabel="Search the saved prompts" panelWidth="20rem" />
-          <span class="text-xs text-[color:var(--text-muted)] basis-full" [attr.id]="'assistant-agent-help-' + jobId()">
-            The buttons below answer from this schedule's record and runs. A question they do not cover goes to the saved prompt chosen here.
-          </span>
-        </div>
-      }
+      <!-- Owner 2026-11-02 ("Use the AI Assistant (Recommended)"): no prompt picker. The buttons answer from this schedule's record
+           and runs; a question typed above goes to the AI Assistant, limited to this schedule, and its conversation shows below. -->
+      <p class="text-xs text-[color:var(--text-muted)] mb-2.5" data-test="ask-help">
+        The buttons answer from this schedule's record and runs. A question you type goes to the AI Assistant, which reads this schedule
+        only — its runs, files and failures — and asks before it runs or changes anything.
+      </p>
 
       <div class="flex items-center gap-1.5"
            [class.flex-wrap]="!compact()"
@@ -118,12 +105,20 @@
                          label="Reading this schedule's runs…" (retry)="loadRuns()" />
     </div>
 
+    <!-- Owner 2026-11-02: the AI Assistant's conversation about this schedule -- the same messages as AI › AI Assistant, kept in the
+         person's history (Open in AI Assistant). One per schedule: a new schedule opens its own. -->
+    <div class="shrink-0" data-test="schedule-conversation">
+      @for (id of [numericJobId()]; track id) {
+        @if (id != null) { <app-assistant [embedded]="true" [scopeJobId]="id" /> }
+      }
+    </div>
+
     @if (!turns().length) {
       <div class="text-center" [class.card]="!compact()" [class.p-10]="!compact()"
            [class.px-4]="compact()" [class.py-8]="compact()">
         <app-icon name="chat" [size]="compact() ? '1.4em' : '1.8em'" class="icon-muted" />
         <p class="mt-2 text-sm text-[color:var(--text-secondary)]">
-          Ask about schedule #{{ f.jobId }}, or pick a question above.
+          Pick a question above for an answer from schedule #{{ f.jobId }}'s own record.
         </p>
         <p class="mt-1 text-xs text-[color:var(--text-muted)]">
           This schedule alone — when it runs, where it writes, its runs, failures and statistics.

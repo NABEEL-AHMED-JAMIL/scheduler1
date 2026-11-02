@@ -82,7 +82,8 @@ describe('Schedule assistant -- the run history read (owner 2026-10-27)', () => 
   });
 
   afterEach(() => {
-    http.match(r => r.url.includes('fetchAllAgents')).forEach(r => r.flush(ok([])));
+    // The embedded AI Assistant's own reads (owner 2026-11-02): its tools and the newest conversation about this schedule.
+    http.match(r => r.url.includes('/assistant/conversations') || r.url.includes('/tools/list')).forEach(r => r.flush(ok([])));
     http.verify({ ignoreCancelled: true });
   });
 });
