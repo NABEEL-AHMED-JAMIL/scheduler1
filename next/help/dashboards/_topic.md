@@ -30,8 +30,13 @@ Opening, running and filtering boards needs **Dashboards** in your page access; 
 (or **Analytics Studio**). Ask your workspace administrator. See [Who may do what](#dash-boards--who-may-do-what).
 
 ### Can I share a board with someone?
-Yes, with anyone signed in to your workspace who may open Dashboards: copy the board's address, filters included. It
-never opens without signing in. See [Share a board](#dash-boards--share-a-board).
+Yes, with anyone signed in to your workspace who can see the board: copy the board's address, filters included. It
+never opens without signing in. See [Send a board to a colleague](#dash-boards--send-a-board-to-a-colleague).
+
+### Can I keep a board to one team?
+Yes, if you made it or are a workspace administrator: **Share** › **Only chosen teams and people**, then add the teams
+and people, each **Can view** or **Can edit**. Nobody else finds it, opens its link or reads it through the AI Assistant.
+See [Choose who can see a board](#dash-boards--choose-who-can-see-a-board).
 
 ### Why are some values masked for me?
 Those columns are marked sensitive in the Data Catalog and you have no access to them. Ask for access for a time from

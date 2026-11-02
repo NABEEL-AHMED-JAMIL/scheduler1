@@ -750,7 +750,42 @@ export interface Dashboard {
    * (analytics-service DashboardSources). Read-only; absent from an older server.
    */
   pipelines?: DashboardPipeline[];
+  /**
+   * Owner 2026-11-02: who the board is for -- everyone in the workspace (WORKSPACE, every board made before) or the teams and
+   * people it is shared with (SHARED). Absent from an older server, which read as WORKSPACE.
+   */
+  audience?: DashboardAudience;
+  /** With WORKSPACE: whether everyone may change it (EDIT, as before) or only open it (VIEW). */
+  workspaceAccess?: DashboardShareAccess;
+  /** The teams and people a SHARED board is shared with. */
+  shares?: DashboardShare[];
+  /** What the signed-in person may do with this board (the server's answer): VIEW, EDIT, or MANAGE (change who it is for). */
+  yourAccess?: DashboardYourAccess;
+  createdBy?: number | null;
 }
+
+export type DashboardAudience = 'WORKSPACE' | 'SHARED';
+export type DashboardShareAccess = 'VIEW' | 'EDIT';
+export type DashboardYourAccess = 'VIEW' | 'EDIT' | 'MANAGE';
+/** One team or person a board is shared with (id: the team's, or the person's appUserId). */
+export interface DashboardShare { kind: 'TEAM' | 'PERSON'; id: number; name?: string | null; access: DashboardShareAccess; }
+/** One change of who a board is for, as analytics-service keeps it (newest first). */
+export interface DashboardAccessChange {
+  eventId: number; actorId: number | null; actorName: string | null; action: string; detail: string | null; occurredAt: string | null;
+}
+/** fetchDashboardAccess / saveDashboardAccess: the board's audience, owner, the caller's access and (for its managers) the history. */
+export interface DashboardAccessView {
+  analyticsDashboardId: number;
+  dashboardName: string;
+  audience: DashboardAudience;
+  workspaceAccess: DashboardShareAccess;
+  shares: DashboardShare[];
+  owner: { appUserId: number | null; name: string | null };
+  yourAccess: DashboardYourAccess;
+  history: DashboardAccessChange[];
+}
+/** A person of the workspace the board can be shared with. */
+export interface SharePerson { appUserId: number; fullName?: string | null; username?: string | null; }
 
 /** A pipeline (by its schedule) that feeds a board, and its last run that did. */
 export interface DashboardPipeline { jobId: number; name: string | null; lastRunId: number | null; lastRunAt: string | null; }
@@ -1183,6 +1218,30 @@ export class AnalyticsService {
     // Absent means "leave it as stored"; null or an empty string clears it.
     if (dashboard.dashboardConfig !== undefined) body['dashboardConfig'] = dashboard.dashboardConfig ?? '';
     return this.http.post<ApiResponse<Dashboard>>(`${this.workspace}/saveDashboard`, body);
+  }
+
+  /** Owner 2026-11-02: who a board is for, the caller's access and (for its owner or an admin) the history of changes. */
+  fetchDashboardAccess(analyticsDashboardId: number): Observable<ApiResponse<DashboardAccessView>> {
+    return this.http.get<ApiResponse<DashboardAccessView>>(`${this.workspace}/fetchDashboardAccess`, {
+      params: { analyticsDashboardId: String(analyticsDashboardId) },
+    });
+  }
+
+  /**
+   * Owner 2026-11-02: sets who a board is for -- the whole audience at once. Its owner or a workspace administrator only (the
+   * server answers 403 to anyone else); every change is recorded in the board's history.
+   */
+  saveDashboardAccess(analyticsDashboardId: number, audience: DashboardAudience, workspaceAccess: DashboardShareAccess,
+    shares: DashboardShare[]): Observable<ApiResponse<DashboardAccessView>> {
+    return this.http.post<ApiResponse<DashboardAccessView>>(`${this.workspace}/saveDashboardAccess`, {
+      analyticsDashboardId, audience, workspaceAccess,
+      shares: audience === 'SHARED' ? shares.map(s => ({ kind: s.kind, id: s.id, access: s.access })) : [],
+    });
+  }
+
+  /** Owner 2026-11-02: the workspace's active people, for the Share panel's picker. */
+  fetchSharePeople(): Observable<ApiResponse<SharePerson[]>> {
+    return this.http.get<ApiResponse<SharePerson[]>>(`${this.workspace}/fetchSharePeople`);
   }
 
   /**

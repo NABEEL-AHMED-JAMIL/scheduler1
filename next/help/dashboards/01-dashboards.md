@@ -67,22 +67,42 @@ You can also narrow a board without a filter bar:
 
 The facts line then shows **N filters on**. Choose it to see the filter, or the × beside it to clear it.
 
-## Share a board
-A board belongs to the workspace, so everyone in it whose page access includes **Dashboards** can open it.
+## Choose who can see a board
+A new board is for **everyone in the workspace** whose page access includes **Dashboards**, as every board made before
+this choice existed. Its owner (who made it) or a workspace administrator can keep it to chosen teams and people:
 
+1. Open the board and choose **Share** at the top. Anyone else sees **Who can see this**, which only shows the answer.
+2. Pick **Only chosen teams and people**.
+3. In **Add a team or a person**, search and pick a team (everyone in it) or a person. Each gets **Can view** or
+   **Can edit**; choose ✕ to take one off.
+4. Choose **Save**. The board's facts line and its card say who it is for (**Shared** on the card).
+
+With **Everyone in the workspace** you can still say whether everyone may **View it** or **View and edit it**.
+
+| Who | Sees and does |
+|---|---|
+| The board's owner and workspace administrators | Always see it, change it, and choose who can see it |
+| A team or person given **Can edit** | Open it and change its widgets, filters and theme (with the **Edit dashboards** page); they cannot change who sees it, and cannot delete a board kept to chosen people |
+| A team or person given **Can view** | Open, run and filter it |
+| Anyone else | Nothing: it is not in their list, its link says **This dashboard isn't here**, its widgets do not run for them, and the AI Assistant and Ask your data cannot read or pin to it |
+
+Every change is kept: **Share** › **Changes to who can see it** lists who changed what, and when (the owner and
+administrators see it). A person taken out of a team loses that team's boards within a few seconds.
+
+## Send a board to a colleague
 1. Open the board, filtered the way you want it.
-2. Copy the address from your browser and send it to a colleague.
+2. Copy the address from your browser and send it to a colleague who can see the board.
 3. They sign in and see the same board with the same filters. Their widgets run as them: a column the Data Catalog
    holds sensitive stays masked for anyone without access to it.
 
-> **Privacy:** A board link never works without signing in, and a link to another workspace's board says
-> **This dashboard isn't here**.
+> **Privacy:** A board link never works without signing in. A link to a board kept from you, or to another workspace's
+> board, says **This dashboard isn't here**.
 
 ## Who may do what
 | Who | May |
 |---|---|
-| Page access **Dashboards** | Open, run and filter every board, and export a table widget |
-| **Edit dashboards**, or **Analytics Studio** | Also make, change and delete boards, and pin answers to them |
+| Page access **Dashboards** | Open, run and filter every board they can see (its audience, above), and export a table widget |
+| **Edit dashboards**, or **Analytics Studio** | Also make boards, change and delete the ones they may edit, and pin answers to them |
 | **Analytics Studio** | Also read a file's rows outside a board, and write queries of their own |
 
 Someone with **Dashboards** alone sees: *You can open, run and filter these dashboards. Changing them needs the Edit

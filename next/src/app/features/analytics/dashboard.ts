@@ -19,7 +19,7 @@ import { KINDS } from './widget-kinds';
 import { AnalyticsWidget, WidgetState as TileState } from './analytics-widget';
 import { ECHART_HEIGHT, WidgetChart, WIDGET_HEIGHT, WIDGET_HEIGHT_MAX, WIDGET_HEIGHT_MIN } from './widget-chart';
 import { FilterBuilder, countFilterClauses, describeClause, emptyFilterGroup, pruneFilters } from './filter-builder';
-import { AnalysisRequest, AnalyticsService, Dashboard, DashboardWidget, DatasetColumn, FilterGroup, SavedAnalysis, SavedQuery, WidgetVisualization, EChartKind } from './analytics.service';
+import { AnalysisRequest, AnalyticsService, Dashboard, DashboardAccessView, DashboardWidget, DatasetColumn, FilterGroup, SavedAnalysis, SavedQuery, WidgetVisualization, EChartKind } from './analytics.service';
 import { tableOf } from './charts/chart-table';
 import { rowsDrawn } from './charts/chart-fit';
 import { BoardSettings, ChartSettings, boardSettingsString, parseBoardSettings, parseSettings } from './charts/chart-settings';
@@ -47,6 +47,7 @@ import { CHART_SLOTS } from '../../shared/charts/status-color';
 import { Mark, widgetConfigOf, widgetConfigString, WidgetView, combineFilters, analysisView, queryView, WidgetRun, SavedAnalysisConfig, mintQueryId, TILE_ROWS, WidgetSpan, fillRows, SM_SPAN, LG_SPAN, ROW_KINDS, SEARCH_FROM, fileName, SPANS } from './widget-view';
 import { formatDuration } from '../../shared/ui/time-format';
 import { AdvancedOption, AdvancedSelect } from '../../shared/ui/advanced-select';
+import { DashboardSharePanel, DashboardSharePanelData, audienceWords } from './board/dashboard-share-panel';
 
 /** Owner 2026-11-02: the engine's words a refused query's sentence stands for (analytics' data.detail), for the tile's "Technical detail". */
 function detailOf(data: unknown): string | undefined {
@@ -134,6 +135,18 @@ export class Dashboards implements OnInit, OnDestroy {
    * and filter them, and the gateway refuses every write with a 403 besides.
    */
   readonly canEdit = computed(() => this.auth.canEditDashboards());
+  /**
+   * Owner 2026-11-02: the open board's own answer on top of the page -- a board shared with the reader to view only (or a
+   * board for everyone that everyone may only view) offers no change, whatever their pages. The server refuses the
+   * writes (403) on its own; this keeps the buttons from offering them. An older server sends no yourAccess: the page decides.
+   */
+  readonly canEditBoard = computed(() => this.canEdit() && this.board()?.yourAccess !== 'VIEW');
+  /** Its owner or a workspace administrator: they change who it is for. */
+  readonly canManageBoard = computed(() => this.canEdit() && this.board()?.yourAccess === 'MANAGE');
+  /** A board shared with chosen people is deleted by its owner or an admin; a board everyone edits, by any editor (as before). */
+  readonly canDeleteBoard = computed(() => this.canEditBoard() && (this.board()?.yourAccess === 'MANAGE' || this.board()?.audience !== 'SHARED'));
+  /** "Everyone in the workspace", "Shared with the Reviewer team" -- the board's audience in a few words (card and header). */
+  readonly audienceWords = audienceWords;
 
   // ---- the filter bar (board/board-filters.ts) ----------------------------------------------------------------------
   //
@@ -548,6 +561,28 @@ export class Dashboards implements OnInit, OnDestroy {
   }
 
   /** "Edit filters": what the bar offers every reader, saved on the board. */
+  /**
+   * Owner 2026-11-02: who can see this board -- everyone in the workspace, or chosen teams and people (view or edit). Its
+   * owner or an administrator changes it; anyone else who opens the panel reads it. The saved answer updates the open
+   * board and its card at once.
+   */
+  openShare(): void {
+    const open = this.board();
+    if (!open?.analyticsDashboardId) return;
+    const ref = this.dialog.open<DashboardAccessView | undefined, DashboardSharePanelData>(DashboardSharePanel,
+      sidePanelConfig({ board: open, canAsk: this.canEdit() }, 'narrow', 'right'));
+    ref.closed.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(saved => {
+      if (!saved) return;
+      const patch: Partial<Dashboard> = { audience: saved.audience, workspaceAccess: saved.workspaceAccess, shares: saved.shares,
+        yourAccess: saved.yourAccess };
+      this.board.update(b => b && b.analyticsDashboardId === saved.analyticsDashboardId ? { ...b, ...patch } : b);
+      this.dashboards.update(list => list.map(d => d.analyticsDashboardId === saved.analyticsDashboardId ? { ...d, ...patch } : d));
+      this.toast.success(saved.audience === 'SHARED'
+        ? (saved.shares.length ? `${audienceWords(saved)}.` : 'Only its owner and the workspace administrators can see it now.')
+        : 'Everyone in the workspace can see it now.');
+    });
+  }
+
   openFilterEditor(): void {
     const ref = this.dialog.open<BoardFilterDef[], BoardFilterEditorData>(BoardFilterEditor,
       sidePanelConfig({ defs: this.filterDefs(), sources: this.filterSources() }, 'wide', 'right'));
@@ -1229,6 +1264,8 @@ export class Dashboards implements OnInit, OnDestroy {
         this.boardLoading.set(false);
         // UX review 2026-10-12: a refusal is said as one, not as a failure to retry.
         this.boardRefused.set(err?.status === 403);
+        // Owner 2026-11-02: a board not shared with the reader answers 404, word for word a board that is not there.
+        this.boardMissing.set(err?.status === 404);
         this.boardError.set(err?.error?.message || 'The dashboard could not be read.');
       },
     });

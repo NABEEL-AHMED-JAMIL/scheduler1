@@ -84,3 +84,10 @@ app-analytics-widget.is-held ::ng-deep .widget-body { min-height: 0; overflow: a
 .dash-fav { position: absolute; top: 0.625rem; right: 0.625rem; color: var(--text-muted); }
 .dash-fav:hover { color: var(--text-primary); }
 .dash-fav.is-on { color: var(--warn-text); }
+
+/* Owner 2026-11-02: the Share button keeps its words on a wide screen; narrower, its icon alone (its name is in aria-label), so
+   the title column keeps the width its facts line was laid out for -- a facts line that rewraps when a filter goes on moves
+   every tile below it (e2e board-layout at 1187px). */
+@media (max-width: 1439px) {
+  .dash-share .dash-share-label { display: none; }
+}

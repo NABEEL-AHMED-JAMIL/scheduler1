@@ -29,6 +29,10 @@ Tested by ______ on ______
 | QA-13.05 | The view is in the address | Copy the address with a filter on; open it in a new tab | The board opens with the same filter | ☐ Pass ☐ Fail |
 | QA-13.06 | Share a board with a colleague | Send the address to V; V opens it | V sees the same board and filters, run as V | ☐ Pass ☐ Fail |
 | QA-13.07 | A viewer cannot change a board | As V, look for **New dashboard** and a widget's edit menu | Neither is offered; the page says V can open, run and filter, and that changing boards needs **Edit dashboards** | ☐ Pass ☐ Fail |
+| QA-13.07a | Keep a board to a team | As A, open `QA board`, **Share** › **Only chosen teams and people**, add the **Reviewer** team (**Can view**), **Save** | The facts line says **Shared with the Reviewer team**; the card says **Shared**; **Share** › **Changes to who can see it** names A and the change | ☐ Pass ☐ Fail |
+| QA-13.07b | The team sees it, read-only | As R (in the Reviewer team), **Dashboards** | `QA board` is listed; opened, it says **you can view**; no **Add a widget**, theme or delete | ☐ Pass ☐ Fail |
+| QA-13.07c | Nobody else sees it | As V (not in the team), **Dashboards**; then open `QA board`'s address; then ask the **AI Assistant** for the dashboards | Not listed; the address says **This dashboard isn't here**; the Assistant does not name it | ☐ Pass ☐ Fail |
+| QA-13.07d | Back to everyone | As A, **Share** › **Everyone in the workspace** › **View it**, **Save** | V sees `QA board` again, and cannot change it | ☐ Pass ☐ Fail |
 
 ## Build
 | # | Check | Steps | Expected | Pass / Fail |
@@ -63,7 +67,7 @@ Tested by ______ on ______
 ## Isolation
 | # | Check | Steps | Expected | Pass / Fail |
 |---|---|---|---|---|
-| QA-13.26 | Another workspace cannot open a board | As A, copy `QA board`'s address; as X, open it | **This dashboard isn't here**: it may have been deleted, or the link belongs to another workspace | ☐ Pass ☐ Fail |
+| QA-13.26 | Another workspace cannot open a board | As A, copy `QA board`'s address; as X, open it | **This dashboard isn't here**: it may have been deleted, may not be shared with you, or the link belongs to another workspace | ☐ Pass ☐ Fail |
 | QA-13.27 | Another workspace's catalog | As X, **Data Catalog**, search `patients` | A's `qa/patients.csv` is not listed | ☐ Pass ☐ Fail |
 | QA-13.28 | Another workspace's questions | As X, **Ask your data** about `qa/patients.csv` | Nothing of A's file is found or counted | ☐ Pass ☐ Fail |
 

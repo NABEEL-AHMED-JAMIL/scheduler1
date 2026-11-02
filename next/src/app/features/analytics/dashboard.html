@@ -117,6 +117,12 @@
                     <span class="min-w-0 truncate">
                       {{ item.createdByName || 'Unknown owner' }}@if (item.dateUpdated || item.dateCreated) { · updated {{ (item.dateUpdated || item.dateCreated) | serverTime:'date' }} }
                     </span>
+                    <!-- Owner 2026-11-02: who the board is for, on its card; a board for everyone says nothing extra. -->
+                    @if (item.audience === 'SHARED') {
+                      <span class="pill pill-neutral dash-audience shrink-0 inline-flex items-center gap-1" data-test="card-audience" [title]="audienceWords(item)">
+                        <app-icon name="lock" size="0.85em" />{{ item.shares?.length ? 'Shared' : 'Private' }}
+                      </span>
+                    }
                     <app-icon name="chevronRight" size="0.95em" class="ml-auto shrink-0 text-[color:var(--text-secondary)]" />
                   </span>
                 </a>
@@ -154,7 +160,7 @@
         <div class="card p-8 flex flex-col items-center text-center gap-2" data-test="board-missing">
           <span class="stat-glyph"><app-icon name="search" /></span>
           <h2 class="text-base font-semibold">This dashboard isn't here</h2>
-          <p class="text-sm text-[color:var(--text-secondary)] max-w-md">It may have been deleted, or the link belongs to another workspace.</p>
+          <p class="text-sm text-[color:var(--text-secondary)] max-w-md">It may have been deleted, it may not be shared with you, or the link belongs to another workspace. Ask its owner or a workspace administrator if you need it.</p>
           <a [routerLink]="[]" class="btn btn-default btn-sm mt-2" (click)="leaveBoard()">All dashboards</a>
         </div>
       } @else if (boardError()) {
@@ -166,6 +172,11 @@
           <div class="min-w-0">
             <h1 class="page-title break-words">{{ open.dashboardName }}</h1>
             @if (open.dashboardDescription) { <p class="page-subtitle">{{ open.dashboardDescription }}</p> }
+            <!-- Owner 2026-11-02: who this board is for, and (when it is less) what the reader may do with it. A line of its
+                 own, not in the facts line: the facts line rewraps when a filter goes on, and this would move with it. -->
+            <p class="text-xs text-[color:var(--text-secondary)] mt-1 inline-flex items-center gap-1" data-test="board-audience">
+              <app-icon [name]="open.audience === 'SHARED' ? 'lock' : 'users'" size="0.9em" />{{ audienceWords(open) }}@if (open.yourAccess === 'VIEW') { · you can view, not change it }
+            </p>
             <p class="dash-facts text-xs text-[color:var(--text-muted)] mt-1.5">
               <span>{{ widgets().length }} widget{{ widgets().length === 1 ? '' : 's' }}</span>
               @if (boardFiles().length) { <span>{{ boardFiles().length }} file{{ boardFiles().length === 1 ? '' : 's' }}</span> }
@@ -202,8 +213,13 @@
               <!-- Run and Stop are one width, so swapping them moves nothing beside them. -->
               <button type="button" class="btn btn-primary btn-sm dash-run-button" (click)="runAll()"><app-icon name="refresh" />Run every widget</button>
             }
+            <!-- Owner 2026-11-02: who can see this board. Its owner or an admin changes it; everyone else reads it here. -->
+            <button type="button" class="btn btn-default btn-sm dash-share" data-test="share-board" (click)="openShare()"
+                    [attr.aria-label]="(canManageBoard() ? 'Share: ' : 'Who can see this: ') + audienceWords(open)" [title]="audienceWords(open)">
+              <app-icon [name]="open.audience === 'SHARED' ? 'lock' : 'users'" /><span class="dash-share-label">{{ canManageBoard() ? 'Share' : 'Who can see this' }}</span>
+            </button>
             <!-- The theme every tile draws in. Stored on the board; choosing one runs nothing. -->
-            @if (canEdit()) {
+            @if (canEditBoard()) {
               <button type="button" class="btn btn-default btn-sm dash-theme" [cdkMenuTriggerFor]="themeMenu" [attr.aria-label]="'Chart theme: ' + boardThemeLabel()"><app-icon name="sun" />{{ boardThemeLabel() }}</button>
             }
             <ng-template #themeMenu>
@@ -213,17 +229,17 @@
                 <p class="px-2 pt-2 text-[11px] text-[color:var(--text-muted)]">A widget can override it in its Chart settings. Colours are held to 3:1 against the card in light and dark.</p>
               </div>
             </ng-template>
-            @if (canEdit() || boardDatasets().length) {
+            @if (canEditBoard() || boardDatasets().length) {
               <button type="button" class="btn btn-ghost btn-icon btn-sm" data-overflow [cdkMenuTriggerFor]="boardMenu" aria-label="More actions"><app-icon name="dots" size="1.05em" /></button>
             }
             <ng-template #boardMenu>
               <div cdkMenu class="card shadow-xl py-1 min-w-52 text-sm">
-                @if (canEdit()) { <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="openAdd()"><app-icon name="plus" />Add a widget</button> }
-                @if (canEdit()) { <button cdkMenuItem class="menu-item" data-test="edit-filter-bar" (cdkMenuItemTriggered)="openFilterEditor()"><app-icon name="filter" />{{ filterDefs().length ? 'Edit the filter bar' : 'Add a filter bar' }}</button> }
+                @if (canEditBoard()) { <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="openAdd()"><app-icon name="plus" />Add a widget</button> }
+                @if (canEditBoard()) { <button cdkMenuItem class="menu-item" data-test="edit-filter-bar" (cdkMenuItemTriggered)="openFilterEditor()"><app-icon name="filter" />{{ filterDefs().length ? 'Edit the filter bar' : 'Add a filter bar' }}</button> }
                 @if (boardDatasets().length) {
                   <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="filterOpen.set(!filterOpen())"><app-icon name="filter" />{{ filterOpen() ? 'Hide the board filter' : 'Filter this board' }}</button>
                 }
-                @if (canEdit()) { <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="removeDashboard(open)"><app-icon name="trash" class="icon-crit" />Delete this dashboard</button> }
+                @if (canDeleteBoard()) { <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="removeDashboard(open)"><app-icon name="trash" class="icon-crit" />Delete this dashboard</button> }
               </div>
             </ng-template>
           </div>
@@ -233,7 +249,7 @@
         <!-- The filter bar (board/board-filter-bar.ts): a date range and the dimensions the board's editor chose. Every tile
              runs under it, applied by the server; the state is in the URL and kept for this viewer. -->
         @if (filterDefs().length) {
-          <app-board-filter-bar [defs]="filterDefs()" [state]="filterState()" [canEdit]="canEdit()" [boardId]="board()?.analyticsDashboardId ?? null" (stateChange)="setFilterState($event)" (edit)="openFilterEditor()" />
+          <app-board-filter-bar [defs]="filterDefs()" [state]="filterState()" [canEdit]="canEditBoard()" [boardId]="board()?.analyticsDashboardId ?? null" (stateChange)="setFilterState($event)" (edit)="openFilterEditor()" />
         }
 
         <!-- Reference, not the work: folded away so the widgets start near the top. -->
@@ -342,7 +358,7 @@
           <div class="card p-10 flex flex-col items-center text-center gap-2">
             <app-icon name="layers" size="1.5rem" class="icon-muted" />
             <p class="text-sm text-[color:var(--text-secondary)]">Nothing on this board yet.</p>
-            @if (canEdit()) { <button type="button" class="btn btn-primary btn-sm mt-2" (click)="openAdd()"><app-icon name="plus" />Add a widget</button> }
+            @if (canEditBoard()) { <button type="button" class="btn btn-primary btn-sm mt-2" (click)="openAdd()"><app-icon name="plus" />Add a widget</button> }
           </div>
         } @else {
           <!-- Twelve columns: a single figure takes 3, a chart 6, a table the row (spanOf). -->
@@ -365,14 +381,14 @@
                     <h2 class="dash-section-title">{{ section.title }}</h2>
                     @if (section.subtitle) { <p class="dash-section-sub">{{ section.subtitle }}</p> }
                   </div>
-                  @if (canEdit()) { <button type="button" class="btn btn-ghost btn-icon btn-xs" [attr.aria-label]="'Edit the heading ' + section.title" (click)="editSection(widget)"><app-icon name="edit" size="0.9em" /></button> }
+                  @if (canEditBoard()) { <button type="button" class="btn btn-ghost btn-icon btn-xs" [attr.aria-label]="'Edit the heading ' + section.title" (click)="editSection(widget)"><app-icon name="edit" size="0.9em" /></button> }
                 </div>
               }
               <app-analytics-widget [class]="spanClass(widget)" [attr.data-span]="spanOf(widget)" [attr.data-widget]="widget.analyticsDashboardWidgetId"
                                     [style.height.px]="heldHeight(widget)" [class.is-held]="heldHeight(widget) !== null" [title]="widget.widgetTitle" [subtitle]="shortSourceOf(widget)" [subtitleTitle]="sourceOf(widget)"
                                     [state]="table ? 'ready' : stateOf(run)" [reserve]="table ? null : reserveOf(widget)" [reserveKpi]="table ? null : reserveKpiOf(widget)" [busy]="table ? tableReads()[widget.analyticsDashboardWidgetId!]?.state === 'running' : updating(run)" [error]="run?.error || ''" [errorDetail]="run?.errorDetail || ''" (refresh)="runOne(widget)">
                 <ng-container actions>
-                  @if (canEdit() || (shown && hasMoreRows(shown))) {
+                  @if (canEditBoard() || (shown && hasMoreRows(shown))) {
                     <button type="button" class="btn btn-ghost btn-icon btn-xs" [cdkMenuTriggerFor]="tileMenu" [attr.aria-label]="'Actions for ' + widget.widgetTitle"
                             (cdkMenuOpened)="kindMenuOpened()"><app-icon name="dots" size="1em" /></button>
                   }
@@ -384,9 +400,9 @@
                          the reason in the tooltip and the description -- never as a second line. The search,
                          the suggestions and the actions stay put; only "All charts" scrolls. Arrow keys move
                          across the grid (kindMenuKey), Enter applies, Escape closes, typing searches. -->
-                    <div cdkMenu class="card shadow-xl text-sm dash-tile-menu" [class.has-kinds]="canEdit() && !!shown">
+                    <div cdkMenu class="card shadow-xl text-sm dash-tile-menu" [class.has-kinds]="canEditBoard() && !!shown">
                       <div class="dash-menu-panel" tabindex="-1" (keydown)="kindMenuKey($event)">
-                      @if (canEdit() && shown; as view) {
+                      @if (canEditBoard() && shown; as view) {
                         @let menu = kindMenuOf(widget, view);
                         @let wid = widget.analyticsDashboardWidgetId;
                         <div class="dash-menu-head">
@@ -447,11 +463,11 @@
                           }
                         </div>
                       }
-                      <div class="dash-menu-foot" [class.has-kinds]="canEdit() && !!shown">
+                      <div class="dash-menu-foot" [class.has-kinds]="canEditBoard() && !!shown">
                         @if (shown; as view) {
                           @if (hasMoreRows(view)) { <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="expandTable(widget, view)"><app-icon name="table" />Open every row in a window</button> }
                         }
-                        @if (canEdit()) {
+                        @if (canEditBoard()) {
                           <div cdkMenuGroup class="dash-width" role="group" aria-label="Width">
                             <p class="dash-kinds-heading">Width</p>
                             <div class="dash-width-row">
