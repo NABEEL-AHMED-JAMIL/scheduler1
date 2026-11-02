@@ -132,10 +132,9 @@ test.describe('Documents: converter, Reports and file details (live)', () => {
   test('PDF from a dataset: two pasted rows, the default layout, a PDF preview, and the download', async ({ browser }, info) => {
     const page = await pageAs(browser, s);
     const renders = await recordRenders(page);
-    // The tools redesign (2026-11-02): a PDF from a dataset is made from Reports › From pipelines, in a panel.
-    await page.goto('/reports/from-pipelines');
-    await page.locator('[data-test=pdf-from-dataset]').click();
-    await page.getByRole('group', { name: 'Where the rows come from' }).getByRole('button', { name: 'From a dataset' }).click();
+    await page.goto('/tools/converter');
+    // The source is a pressed button in the "Choose a source" group, named as the Generated reports button is.
+    await page.getByRole('group', { name: 'Choose a source' }).getByRole('button', { name: 'PDF from a dataset' }).click();
     await page.locator('#render-rows').fill('[{"region":"North","revenue":1234.5},{"region":"South","revenue":980}]');
     await expect(page.getByText('2 rows · 2 columns: region, revenue')).toBeVisible();
     await page.locator('#render-title').fill('E2E regions');
@@ -159,9 +158,8 @@ test.describe('Documents: converter, Reports and file details (live)', () => {
 
   /** The schedule → its latest kept run → that run's kept statistics, picked in the converter. */
   async function pickKeptRun(page: Page): Promise<void> {
-    await page.goto('/reports/from-pipelines');
-    await page.locator('[data-test=pdf-from-dataset]').click();
-    await page.getByRole('group', { name: 'Where the rows come from' }).getByRole('button', { name: 'From a run' }).click();
+    await page.goto('/tools/converter');
+    await page.getByRole('group', { name: 'Choose a source' }).getByRole('button', { name: 'PDF from a run' }).click();
     await page.locator('#render-schedule').fill(SCHEDULE.split(' ').slice(0, 2).join(' '));
     await page.getByRole('option', { name: new RegExp(`^${SCHEDULE.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`) }).click();
     await pickOption(page.locator('#render-run'), String(RUN));

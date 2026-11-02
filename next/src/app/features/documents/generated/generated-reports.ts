@@ -1,6 +1,6 @@
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { Dialog } from '@angular/cdk/dialog';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { RouterLink } from '@angular/router';
 import { EMPTY, Observable, catchError, expand, forkJoin, map, of, reduce, switchMap } from 'rxjs';
 import { API_SUCCESS } from '../../../core/api/api.config';
 import { Icon } from '../../../shared/ui/icon';
@@ -23,8 +23,6 @@ import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { createTableSort } from '../../../shared/ui/sort';
 import { SortHeader } from '../../../shared/ui/sort-header';
 import { InlineStatus, createLoadState, loadErrorText } from '../../../shared/ui/loading';
-import { sidePanelConfig } from '../../../shared/ui/side-panel';
-import { MakePdfPanel } from './make-pdf-panel';
 
 /** Subfolders of the reports folder listed too (one level), at most this many. */
 export const SUBFOLDER_CAP = 10;
@@ -142,19 +140,9 @@ export class GeneratedReports implements OnInit {
     return parts.length ? `Showing ${parts.join(', and ')}. Nothing lists every generated file yet.` : '';
   });
 
-  private readonly route = inject(ActivatedRoute, { optional: true });
-
   ngOnInit(): void {
     this.destroyRef.onDestroy(() => { if (this.findTimer) clearTimeout(this.findTimer); });
     this.loadBuckets(true);
-    // The tools redesign (2026-11-02): the converter's old ?mode=dataset|execution links land here with ?make=.
-    const make = this.route?.snapshot?.queryParamMap?.get('make');
-    if (make === 'dataset' || make === 'execution') this.makePdf(make);
-  }
-
-  /** A PDF from a dataset or a run (MIG-253), in a panel over this page; what it saves to a bucket is listed here. */
-  makePdf(source: 'dataset' | 'execution' = 'dataset'): void {
-    this.dialog.open(MakePdfPanel, sidePanelConfig({ source }, 'wide', 'right')).closed.subscribe(() => this.load(true));
   }
 
   /**

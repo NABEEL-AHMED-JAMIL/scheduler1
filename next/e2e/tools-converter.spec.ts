@@ -1,7 +1,9 @@
-import { test, expect, APIRequestContext } from '@playwright/test';
-import { api, authOf, canSignIn, NEEDS, Session, sessionFor } from './support/session';
-import { getJson } from './support/workspace';
-import { hasFixtures, NEEDS_FIXTURES } from './support/fixtures';
+import { test, expect, APIRequestContext, Page, TestInfo } from '@playwright/test';
+import { api, authOf, canSignIn, NEEDS, pageAs, Session, sessionFor } from './support/session';
+import { Browser, BrowserContextOptions } from '@playwright/test';
+import { ensureObject, getJson } from './support/workspace';
+import { hasFixtures, NEEDS_FIXTURES, riverside } from './support/fixtures';
+import { LOCAL_BUILD_USE, useLocalBuild } from './support/local-build';
 import { mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 
@@ -13,8 +15,9 @@ import { join } from 'path';
  * - the synthetic documents under e2e/fixtures/tools/ (a discharge note, lab results, a care plan, a discharge summary,
  *   a vitals chart, a ward-round deck -- invented, no patient data);
  * - the matrix converts with save=false: nothing is stored, nothing is billed (media meters saved conversions only);
- * - the screens (queue, preview, Recent conversions) are tools-converter-transcript.spec.ts's since the tools redesign
- *   (2026-11-02); this file keeps the server's own contract: every pair, the size limit, and a burst answered 429.
+ * - kept in the bucket, overwritten each run: <bucket>/e2e/tools/discharge-summary.html and lab-results.csv (the
+ *   picker's inputs), and the one conversion saved under e2e/tools/converted/ -- its list entry is deleted again by the
+ *   spec (the delete keeps the files, as the screen says).
  *
  * E2E_CONVERTER_MATRIX=0 skips the matrix (several minutes); E2E_SHOTS: a folder the screenshots are also written to.
  */
@@ -28,11 +31,14 @@ const SEED: Record<string, string> = {
  * fixture to convert from: a "Visio" made by the converter was a PDF under that name (the matrix found it, 2026-10-19).
  */
 const NO_FIXTURE = ['wpd', 'sxw', 'sxc', 'sxi', 'vsd', 'vsdx'];
+const FOLDER = 'e2e/tools/';
 
 interface Family { key: string; label: string; inputFormats: string[]; outputFormats: string[] }
 interface Answer { code: number; status?: string; message?: string; base64?: string; retryAfter?: string }
 
 let s: Session;
+let BUCKET = '';
+let BUCKET_LABEL = '';
 let FAMILIES: Family[] = [];
 
 async function convert(request: APIRequestContext, name: string, buffer: Buffer, to: string, tries = 10): Promise<Answer> {
@@ -72,12 +78,29 @@ function looksLike(to: string, bytes: Buffer): boolean {
   }
 }
 
+async function signedIn(browser: Browser, session: Session, options: BrowserContextOptions): Promise<Page> {
+  const page = await pageAs(browser, session, options);
+  await useLocalBuild(page);
+  return page;
+}
+
+async function shot(page: Page, info: TestInfo, name: string): Promise<void> {
+  await page.screenshot({ path: info.outputPath(`${name}.png`), fullPage: true });
+  const extra = process.env['E2E_SHOTS'];
+  if (extra) await page.screenshot({ path: join(extra, `${name}.png`), fullPage: true });
+}
+
+test.use({ ...LOCAL_BUILD_USE, testIdAttribute: 'data-test' });
+
 test.describe('Document Converter (live, owner #26)', () => {
   test.skip(!canSignIn('admin'), NEEDS.admin);
   test.skip(!hasFixtures(), NEEDS_FIXTURES);
 
   test.beforeAll(async ({ request }) => {
     s = await sessionFor(request, 'admin');
+    BUCKET = riverside().storageAlias;
+    const buckets: { bucket: string; label?: string }[] = (await getJson(request, s, '/storage.json/buckets')).data ?? [];
+    BUCKET_LABEL = buckets.find(b => b.bucket === BUCKET)?.label || BUCKET;
     FAMILIES = (await getJson(request, s, '/documentConverter.json/supportedFormats')).data ?? [];
     expect(FAMILIES.length, 'the supported formats').toBeGreaterThan(0);
   });
@@ -136,12 +159,50 @@ test.describe('Document Converter (live, owner #26)', () => {
     expect(failed.map(f => `${f.from} -> ${f.to}: ${f.why}`)).toEqual([]);
   });
 
-  test('TC-C06: a file over its limit is refused in words by the server', async ({ request }) => {
-    // 51 MB of text to PDF, over the 50 MB a LibreOffice conversion takes (a CSV to PDF may be 500 MB).
+  test('TC-C06: a file over its limit is refused in words, on the screen and by the server', async ({ browser, request }, info) => {
+    // The server: 51 MB of text to PDF, over the 50 MB a LibreOffice conversion takes (a CSV to PDF may be 500 MB).
     const big = Buffer.alloc(51 * 1024 * 1024, 'a');
     const refused = await convert(request, 'too-big-note.txt', big, 'pdf');
     expect(refused.status).toBe('ERROR');
     expect(refused.message).toContain('over the 50 MB limit');
+
+    // The screen, before anything is sent: the limits as the server states them, made small so a small file is over.
+    const page = await signedIn(browser, s, { viewport: { width: 1440, height: 900 } });
+    await page.route('**/documentConverter.json/limits', async route => {
+      const response = await route.fetch();
+      const body = await response.json();
+      await route.fulfill({ response, json: { ...body, data: { ...body.data, maxFileSizeMb: 1 } } });
+    });
+    let sent = 0;
+    await page.route('**/documentConverter.json/convert', route => { sent++; return route.abort(); });
+    await page.goto('/tools/converter');
+    await expect(page.getByTestId('converter-limits')).toContainText('up to 1 MB');
+    await page.locator('app-file-dropzone input[type="file"]').setInputFiles({ name: 'long-note.txt', mimeType: 'text/plain', buffer: Buffer.alloc(2 * 1024 * 1024, 'b') });
+    await expect(page.getByRole('alert').filter({ hasText: 'takes up to 1 MB' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Convert', exact: true })).toBeDisabled();
+    expect(sent).toBe(0);
+    await shot(page, info, 'converter-over-limit');
+    await page.context().close();
+  });
+
+  test('TC-C07: a full queue (429) is said as busy, and Try again converts', async ({ browser }, info) => {
+    const page = await signedIn(browser, s, { viewport: { width: 1440, height: 900 } });
+    let busy = true;
+    await page.route('**/documentConverter.json/convert', async route => {
+      if (!busy) return route.continue();
+      busy = false;
+      await route.fulfill({ status: 429, headers: { 'Retry-After': '30' }, json: { status: 'ERROR', message: 'Every converter is busy and the queue is full. Try again in 30 seconds.' } });
+    });
+    await page.goto('/tools/converter');
+    await page.locator('app-file-dropzone input[type="file"]').setInputFiles(join(FIX, 'discharge-note.txt'));
+    await page.locator('#target').selectOption('pdf');
+    await page.getByRole('button', { name: 'Convert', exact: true }).click();
+    const alert = page.getByRole('alert').filter({ hasText: 'busy' });
+    await expect(alert).toContainText('Try again in 30 seconds');
+    await shot(page, info, 'converter-busy');
+    await alert.getByRole('button', { name: 'Try again' }).click();
+    await expect(page.getByText('Ready to download')).toBeVisible({ timeout: 60_000 });
+    await page.context().close();
   });
 
   test('TC-C08: a burst past the slots and the queue is answered 429 with Retry-After, never an error', async ({ request }, info) => {
@@ -162,4 +223,93 @@ test.describe('Document Converter (live, owner #26)', () => {
     info.annotations.push({ type: 'burst', description: `${answers.length} at once: ${answers.length - busy.length} converted, ${busy.length} told busy` });
   });
 
+  test('TC-C09: upload a document, convert it and download the result', async ({ browser }, info) => {
+    const page = await signedIn(browser, s, { viewport: { width: 1920, height: 1000 }, acceptDownloads: true });
+    await page.goto('/tools/converter');
+    await page.locator('app-file-dropzone input[type="file"]').setInputFiles(join(FIX, 'discharge-note.txt'));
+    await expect(page.getByText('Detected as Text Document')).toBeVisible();
+    await page.locator('#target').selectOption('docx');
+    await page.getByRole('button', { name: 'Convert', exact: true }).click();
+    await expect(page.getByText('Ready to download')).toBeVisible({ timeout: 60_000 });
+    const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Download' }).click()]);
+    expect(download.suggestedFilename()).toBe('discharge-note.docx');
+    await shot(page, info, 'converter-upload-done');
+    await page.context().close();
+  });
+
+  test('TC-C10..C13: from a bucket -- the picker searches, filters by type and keeps the selection; saved, listed, detail on the right, deleted',
+    async ({ browser, request }, info) => {
+      test.setTimeout(180_000);
+      await ensureObject(request, s, BUCKET, `${FOLDER}discharge-summary.html`, readFileSync(join(FIX, 'discharge-summary.html')), 'text/html');
+      await ensureObject(request, s, BUCKET, `${FOLDER}lab-results.csv`, readFileSync(join(FIX, 'lab-results.csv')), 'text/csv');
+      await ensureObject(request, s, BUCKET, `${FOLDER}ward-round-note.mp3`, readFileSync(join(FIX, 'ward-round-note.mp3')), 'audio/mpeg');
+      const name = `E2E discharge summary ${Date.now().toString(36)}`;
+      const page = await signedIn(browser, s, { viewport: { width: 1920, height: 1000 } });
+      await page.goto('/tools/converter');
+      await page.getByRole('group', { name: 'Choose a source' }).getByRole('button', { name: 'From a bucket' }).click();
+      await page.getByRole('button', { name: 'Choose a file…' }).click();
+
+      // The picker: the only bucket opens by itself; Enter searches all of it; each match names its folder.
+      const picker = page.getByRole('dialog', { name: 'Pick a document to convert' });
+      await expect(picker.getByTestId('picker-table')).toBeVisible();
+      await picker.getByTestId('picker-search').fill('discharge-summary');
+      await picker.getByTestId('picker-search').press('Enter');
+      await expect(picker.getByTestId('picker-search-note')).toContainText('named like "discharge-summary"');
+      const row = picker.locator(`tr[data-key="${FOLDER}discharge-summary.html"]`);
+      await expect(row).toContainText(FOLDER);
+      await expect(row).toContainText('html');
+      await expect(row.locator('td').nth(2)).toHaveText(/\d+(\.\d+)? (B|KB)/);
+      await expect(row.locator('td').nth(3)).toHaveText(/\d{4}, \d{2}:\d{2}|\d{1,2} \w{3} \d{4}/);
+
+      // Type: the supported types by default -- an mp3 in the same folder is hidden; All files shows it, greyed.
+      await picker.getByTestId('picker-search').fill('');
+      await picker.locator('nav[aria-label="Folder path"]').getByRole('button', { name: BUCKET }).click();
+      await picker.locator(`tr[data-key="e2e/"]`).click();
+      await picker.locator(`tr[data-key="${FOLDER}"]`).click();
+      await expect(picker.locator(`tr[data-key="${FOLDER}ward-round-note.mp3"]`)).toHaveCount(0);
+      await picker.getByRole('group', { name: 'File types' }).getByRole('button', { name: 'All files' }).click();
+      await expect(picker.locator(`tr[data-key="${FOLDER}ward-round-note.mp3"]`)).toHaveAttribute('aria-disabled', 'true');
+      await picker.getByRole('group', { name: 'File types' }).getByRole('button', { name: 'Supported types' }).click();
+
+      // Select, then the selection is kept while the list changes, and Use this file answers it.
+      await row.click();
+      await expect(picker.getByTestId('picker-selection')).toContainText('Selected: discharge-summary.html');
+      await picker.locator('th').filter({ hasText: 'Size' }).getByRole('button').click();
+      await expect(row).toHaveAttribute('aria-selected', 'true');
+      await shot(page, info, 'converter-picker');
+      await picker.getByTestId('picker-use').click();
+      await expect(page.getByTestId('picked-file')).toContainText('discharge-summary.html');
+      await expect(page.getByTestId('picked-file')).toContainText(`${BUCKET}/${FOLDER}`);
+
+      // Reopened, the picker is in that folder with the file marked.
+      await page.getByRole('button', { name: 'Change…' }).click();
+      await expect(picker.locator(`tr[data-key="${FOLDER}discharge-summary.html"]`)).toHaveAttribute('aria-selected', 'true');
+      await picker.getByRole('button', { name: 'Cancel' }).click();
+
+      // Convert to .docx and save it to the bucket.
+      await expect(page.getByText('Detected as Other (HTML)')).toBeVisible();
+      await page.locator('#target').selectOption('docx');
+      await page.getByText('Save the result to a bucket').click();
+      await page.locator('#savebucket').click();
+      await page.getByRole('option', { name: BUCKET_LABEL }).click();
+      await page.locator('#savefolder').fill(`${FOLDER}converted`);
+      await page.locator('#taskname').fill(name);
+      await page.getByRole('button', { name: 'Convert', exact: true }).click();
+      await expect(page.getByText('Ready to download')).toBeVisible({ timeout: 90_000 });
+
+      // Listed in Recent conversions, found by its search; its detail slides over the right.
+      await page.getByRole('textbox', { name: 'Search recent conversions' }).fill(name);
+      const listed = page.locator('app-table-shell tbody tr').filter({ hasText: name });
+      await expect(listed).toHaveCount(1);
+      await listed.locator('td').first().click();
+      const panel = page.locator('.side-panel-right');
+      await expect(panel).toBeVisible();
+      await expect(panel.getByTestId('conversion-facts')).toContainText('discharge-summary.docx');
+      await expect(panel.getByTestId('conversion-facts')).toContainText(`${FOLDER}converted`);
+      await shot(page, info, 'converter-detail-panel');
+      await panel.getByRole('button', { name: 'Delete' }).click();
+      await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click();
+      await expect(listed).toHaveCount(0);
+      await page.context().close();
+    });
 });

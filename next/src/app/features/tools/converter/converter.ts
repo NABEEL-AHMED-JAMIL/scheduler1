@@ -1,496 +1,596 @@
-import { Component, DestroyRef, LOCALE_ID, OnInit, computed, inject, signal } from '@angular/core';
-import { HttpEventType } from '@angular/common/http';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { Dialog } from '@angular/cdk/dialog';
-import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
-import { Subscription } from 'rxjs';
-import { API_SUCCESS } from '../../../core/api/api.config';
-import { AuthService } from '../../../core/auth/auth.service';
-import { isOwnPlatformSignIn } from '../../../core/auth/workspace-data';
-import { instantOf } from '../../../core/instant';
+import { Component, LOCALE_ID, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
+import { Combobox } from '../../../shared/ui/combobox';
+import { HttpClient, HttpEventType } from '@angular/common/http';
+import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { Icon } from '../../../shared/ui/icon';
-import { PageHeader } from '../../../shared/ui/page-header';
-import { Segmented, SegmentOption } from '../../../shared/ui/segmented';
-import { Pagination } from '../../../shared/ui/pagination';
-import { PAGE_SIZES } from '../../../shared/ui/pager';
-import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
-import { AppLoading, InlineStatus, createLoadState } from '../../../shared/ui/loading';
+import { ActivatedRoute, RouterLink } from '@angular/router';
+import { BucketSummary, StorageService } from '../../objects/storage.service';
+import { ObjectPicker, PickedObject, objectPickerConfig } from '../../../shared/ui/object-picker';
+import { PreviewDialog } from '../../objects/preview/preview-dialog';
+import { Dialog } from '@angular/cdk/dialog';
+
 import { confirmWith } from '../../../shared/ui/confirm';
 import { formatSize } from '../../../shared/ui/format-size';
+import { Segmented, SegmentOption } from '../../../shared/ui/segmented';
+import { FileDropzone } from '../../../shared/ui/file-dropzone';
+import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
+import { TableShell } from '../../../shared/ui/data-table';
+import { Pagination } from '../../../shared/ui/pagination';
+import { createPager } from '../../../shared/ui/pager';
+import { RenderPanel } from './render-panel';
+import { PageHeader } from '../../../shared/ui/page-header';
+import { Section } from '../../../shared/ui/section';
 import { sidePanelConfig } from '../../../shared/ui/side-panel';
-import { ObjectPicker, PickedObject, objectPickerConfig } from '../../../shared/ui/object-picker';
-import { StorageService } from '../../objects/storage.service';
-import { KeepChoice, KeepDialog, KeepDialogData, monthFolder } from '../keep-dialog';
-import { saveBlob } from '../tools-shared';
-import { ConverterApi } from './converter.api';
-import { ConversionPreview, PreviewAction } from './conversion-preview';
-import { FormatsSheet } from './formats-sheet';
-import {
-  BUSY_RETRY_MS, ConversionRow, ConverterLimits, FormatFamily, HistoryDays, HistoryView, QUEUE_MAX, QUEUE_PARALLEL, QueueItem,
-  assistantPrompt, badgeTone, defaultTarget, documentsTakes, doneText, dropHint, extensionOf, familyOf, folderOf, kindLabel,
-  notKeptText, problemOf, queueChip, queueProblem, resultText, statusNote, statusOf,
-} from './converter.model';
+import { DateRange, DateRangePicker, rangeKey, restoreRange, saveRange } from '../../../shared/ui/date-range';
+import { localIsoDay } from '../../../shared/ui/local-day';
+import { instantOf } from '../../../core/instant';
+import { AuthService } from '../../../core/auth/auth.service';
+import { ConversionAction, ConversionPanel, ConversionPanelData } from './conversion-panel';
+import { isOwnPlatformSignIn } from '../../../core/auth/workspace-data';
+import { AppLoading, InlineStatus, createLoadState } from '../../../shared/ui/loading';
+import { createTableSort } from '../../../shared/ui/sort';
+import { SortHeader } from '../../../shared/ui/sort-header';
 
-/**
- * The Document Converter (tools redesign, owner-approved 2026-11-02): several files at once, each converted on the server
- * and recorded in Recent conversions for 30 days (failed ones too) unless kept in a bucket; the result beside its original
- * with the converter's checks; and the next step one click away -- Download, Send to Documents, Start a pipeline, Keep in a
- * bucket. A PDF from a dataset or a run is made from Reports › From pipelines (the old ?mode= links land there).
- */
+interface FormatFamily {
+  key: string;
+  label: string;
+  inputFormats: string[];
+  outputFormats: string[];
+}
+
+export interface ConverterTask {
+  documentConverterTaskId: number;
+  taskName: string;
+  inputFileName: string;
+  inputFormat: string;
+  inputFileSize?: number;
+  outputFormat: string;
+  outputFileName: string;
+  outputFileSize?: number;
+  bucketName?: string;
+  targetFolder?: string;
+  inputStorageKey?: string;
+  outputStorageKey?: string;
+  status: string;
+  dateCreated?: string;
+}
+
+/** A file converted (upload, bucket), or rows rendered (MIG-253: dataset, execution). */
+export type ConverterMode = 'upload' | 'bucket' | 'dataset' | 'execution';
+
+interface ConvertResult {
+  outputFileName: string;
+  outputFormat: string;
+  outputContentType: string;
+  outputBase64: string;
+  outputFileSize?: number;
+  /** ADR-027: "table" (drawn without LibreOffice) or "libreoffice". */
+  engine?: string;
+  pageCount?: number | null;
+  /** A table converted to PDF: its data rows, the rows printed, and whether rows were left out. */
+  rowCount?: number | null;
+  rowsShown?: number | null;
+  truncated?: boolean | null;
+}
+
+/** What the converter takes (documentConverter.json/limits, ADR-027), shown before a file is picked. */
+export interface ConverterLimits {
+  maxFileSizeMb: number;
+  tableMaxFileSizeMb: number;
+  xlsxMaxFileSizeMb: number;
+  pdfMaxRows: number;
+  pdfMaxPages: number;
+  maxOutputMb: number;
+  timeoutSeconds: number;
+  slots: number;
+  maxWaiting: number;
+  /** Now: conversions converting and waiting (ADR-027's gate); older servers leave them out. */
+  running?: number;
+  waiting?: number;
+}
+
+/** The size limit for one conversion: a CSV/TSV (or XLSX) to PDF is streamed, everything else goes to LibreOffice. */
+export function limitMbFor(limits: ConverterLimits | null, extension: string, target: string): number | null {
+  if (!limits) return null;
+  if (target === 'pdf' && (extension === 'csv' || extension === 'tsv')) return limits.tableMaxFileSizeMb;
+  if (target === 'pdf' && extension === 'xlsx') return limits.xlsxMaxFileSizeMb;
+  return limits.maxFileSizeMb;
+}
+
+/** The limits in one line for the drop zone. */
+export function limitsHint(limits: ConverterLimits | null): string {
+  if (!limits) return '';
+  return `Up to ${limits.maxFileSizeMb} MB; a CSV or TSV to PDF up to ${limits.tableMaxFileSizeMb} MB, an XLSX to PDF up to `
+    + `${limits.xlsxMaxFileSizeMb} MB. A table's PDF prints its first ${limits.pdfMaxRows.toLocaleString('en-US')} rows.`;
+}
+
+/** Whether a conversion was made inside the range ("yyyy-MM-dd" days, both included; empty ends are open). */
+export function createdIn(task: Pick<ConverterTask, 'dateCreated'>, range: Pick<DateRange, 'from' | 'to'>): boolean {
+  if (!range.from && !range.to) return true;
+  // A row with no readable date is not hidden by a date filter it cannot be judged against.
+  const at = instantOf(task.dateCreated ?? '');
+  if (!at) return true;
+  const day = localIsoDay(at);
+  return (!range.from || day >= range.from) && (!range.to || day <= range.to);
+}
+
 @Component({
   selector: 'app-converter',
-  imports: [PageHeader, Icon, RouterLink, Segmented, Pagination, ServerTimePipe, AppLoading, InlineStatus, ConversionPreview,
-    CdkMenu, CdkMenuItem, CdkMenuTrigger],
+  imports: [PageHeader, Icon, RouterLink, ServerTimePipe, Segmented, FileDropzone, Combobox, TableShell, Pagination, RenderPanel,
+    Section, DateRangePicker, AppLoading, InlineStatus, SortHeader],
   templateUrl: './converter.html',
-  styleUrl: './converter.css',
+  styles: `
+    /* Owner #26: the limits as one wrapping line of facts at the top of the card, not a column beside it. */
+    .limits-strip { display: flex; flex-wrap: wrap; gap: 0.375rem 1.25rem; font-size: 0.8125rem; color: var(--text-secondary);
+                    padding: 0.625rem 0.875rem; margin-bottom: 1rem; border-radius: var(--radius-lg); background: var(--surface-inset);
+                    border: 1px solid var(--border-subtle); font-variant-numeric: tabular-nums; }
+    .limits-strip b { font-weight: 500; color: var(--text-muted); margin-right: 0.25rem; }
+    .limits-note { color: var(--text-muted); flex-basis: 100%; }
+    .formats-grid { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); margin-bottom: 1rem; }
+    .format-family { display: grid; gap: 0.375rem; padding: 0.75rem 0.875rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); }
+    .picked-file { display: flex; align-items: center; gap: 0.75rem; padding: 0.875rem 1rem; border: 1px solid var(--border-subtle);
+                   border-radius: var(--radius-lg); background: var(--surface-sunken); }
+    .picked-empty { border-style: dashed; background: transparent; }
+    .conv-row { cursor: pointer; }
+    .conv-row:hover > td { background: var(--surface-sunken); }
+  `,
 })
 export class Converter implements OnInit {
-  private readonly api = inject(ConverterApi);
-  private readonly storage = inject(StorageService);
-  private readonly dialog = inject(Dialog);
+  private readonly http = inject(HttpClient);
   private readonly toast = inject(ToastService);
-  private readonly router = inject(Router, { optional: true });
-  private readonly route = inject(ActivatedRoute, { optional: true });
-  private readonly auth = inject(AuthService, { optional: true });
-  private readonly when = new ServerTimePipe(inject(LOCALE_ID));
-
-  /** The platform administrator's own sign-in converts uploads only (ZT-A12): a bucket is a workspace's data. */
-  readonly ownSignIn = isOwnPlatformSignIn(this.auth);
-  readonly me = computed(() => (typeof this.auth?.user === 'function' ? this.auth.user()?.appUserId : null) ?? null);
-  /** Send to Documents is offered to whoever may open Documents' intake. */
-  readonly canSend = computed(() => !!this.auth?.canOpen?.('document-intelligence'));
 
   readonly families = signal<FormatFamily[]>([]);
+  readonly file = signal<File | null>(null);
+  readonly outputFormat = signal('');
+  readonly converting = signal(false);
+  readonly result = signal<ConvertResult | null>(null);
+  /** The supported-formats read failed: said as such, not as "this file can't be converted". */
+  readonly formatsError = signal('');
+  /**
+   * Owner 2026-10-27: the reads behind the card each say they are loading -- the formats ("0" and "isn't a format this
+   * can convert" while they were on their way), the limits (which said "could not be read" while loading) and the
+   * buckets a result can be saved to (which read as "No matches").
+   */
   readonly formatsState = createLoadState();
-  readonly limits = signal<ConverterLimits | null>(null);
   readonly limitsState = createLoadState();
-  readonly hint = computed(() => dropHint(this.limits()));
-  readonly allTargets = computed(() => [...new Set(this.families().flatMap(f => f.outputFormats))].sort());
+  readonly bucketsState = createLoadState();
+  readonly showFormats = signal(false);
+  /** ADR-027: the converter's limits, read once; null until read (the screen works without them). */
+  readonly limits = signal<ConverterLimits | null>(null);
+  readonly limitsHint = computed(() => limitsHint(this.limits()));
+  /** Upload progress of the file being converted (0-100), then null while the server converts. */
+  readonly progress = signal<number | null>(null);
+  /** Why the last conversion failed, said where the Convert button is (busy, too big, unreadable). */
+  readonly convertError = signal('');
+  readonly busy = signal(false);
+  /** The picked file is over this conversion's limit: said before it is sent. */
+  readonly overLimit = computed(() => {
+    const file = this.mode() === 'upload' ? this.file() : null;
+    const mb = limitMbFor(this.limits(), this.extension(), this.outputFormat());
+    if (!file || mb == null) return '';
+    return file.size > mb * 1024 * 1024
+      ? `This file is ${this.size(file.size)}; a ${this.extension().toUpperCase()} to ${this.outputFormat().toUpperCase()} takes up to ${mb} MB.`
+      : '';
+  });
 
-  // ------------------------------------------------------------------------------------------------------------ queue
-  readonly queue = signal<QueueItem[]>([]);
-  private nextId = 1;
-  private readonly sending = new Map<number, Subscription>();
-  readonly convertAllTo = signal('pdf');
-  /** Where results are kept: a bucket and folder, or null (30 days in Recent conversions). */
-  readonly keep = signal<KeepChoice | null>(null);
-  readonly dragging = signal(false);
-  readonly chip = computed(() => queueChip(this.queue(), this.limits()));
-  readonly waitingCount = computed(() => this.queue().filter(i => i.state === 'waiting' && !i.asked).length);
-  readonly finishedCount = computed(() => this.queue().filter(i => i.state === 'done' || i.state === 'failed').length);
-  readonly selected = signal<ConversionRow | null>(null);
+  private readonly dialog = inject(Dialog);
+  private readonly storage = inject(StorageService);
 
-  // ---------------------------------------------------------------------------------------------------------- history
-  readonly viewOptions = computed<SegmentOption<HistoryView>[]>(() => [
-    { id: 'everyone', label: 'Everyone' },
-    { id: 'mine', label: 'Mine' },
-    { id: 'failed', label: this.failedCount() ? `Failed ${this.failedCount()}` : 'Failed' },
-  ]);
-  readonly dayOptions: SegmentOption<'7' | '30' | '90'>[] = [
-    { id: '7', label: '7 days' }, { id: '30', label: '30 days' }, { id: '90', label: '90 days' },
+  /** Upload, or pick something already in a bucket -- the endpoint only takes a multipart
+      file, so a bucket choice is fetched and handed over as one. */
+  readonly mode = signal<ConverterMode>('upload');
+  /**
+   * ZT-A12 follow-up (owner 2026-10-21, "Managed session only"): the platform administrator's own sign-in converts an
+   * upload only. A file in a bucket, a dataset and a run are a workspace's data, which media-service answers it 403 on
+   * (listObjects, render); those sources open in "Work in this workspace". Saving to one of the platform's own buckets
+   * (the only buckets the own sign-in is answered) stays.
+   */
+  readonly ownSignIn = isOwnPlatformSignIn(inject(AuthService, { optional: true }));
+  readonly modeOptions: SegmentOption<ConverterMode>[] = this.ownSignIn ? [{ id: 'upload', label: 'Upload a file', icon: 'upload' }] : [
+    { id: 'upload', label: 'Upload a file', icon: 'upload' },
+    { id: 'bucket', label: 'From a bucket', icon: 'folder' },
+    // MIG-253: rows rendered through a template (media-service's render), not a file converted.
+    // UX final CV1: the same job as Generated reports' "PDF from a dataset" button, in the same words; a run, not an
+    // execution (review G12).
+    { id: 'dataset', label: 'PDF from a dataset', icon: 'table' },
+    { id: 'execution', label: 'PDF from a run', icon: 'play' },
   ];
-  readonly view = signal<HistoryView>('everyone');
-  readonly days = signal<'7' | '30' | '90'>('30');
-  readonly query = signal('');
-  readonly page = signal(1);
-  readonly pageSize = signal(PAGE_SIZES[0]);
-  readonly rows = signal<ConversionRow[]>([]);
-  readonly total = signal(0);
-  readonly failedCount = signal(0);
-  readonly historyState = createLoadState();
-  readonly picked = signal<ReadonlySet<number>>(new Set());
-  readonly allPicked = computed(() => this.rows().length > 0 && this.rows().every(r => this.picked().has(r.conversionId)));
-  private historyLoad: Subscription | null = null;
-  private searchTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Converting a file (upload or bucket), as opposed to rendering rows. */
+  readonly fileMode = computed(() => this.mode() === 'upload' || this.mode() === 'bucket');
+  readonly buckets = signal<BucketSummary[]>([]);
+  readonly bucket = signal('');
+  readonly selectedKey = signal('');
+  readonly fetchingSource = signal(false);
 
-  readonly size = formatSize;
-  readonly badgeTone = badgeTone;
-  readonly kindLabel = kindLabel;
-  readonly doneText = doneText;
-  readonly resultText = resultText;
-  readonly statusOf = statusOf;
-  readonly folderOf = folderOf;
-  readonly documentsTakes = documentsTakes;
-  readonly queueMax = QUEUE_MAX;
+  /** Where the output goes, when it should go anywhere but the browser's downloads. */
+  readonly saveToBucket = signal(false);
+  readonly saveBucket = signal('');
+  readonly saveFolder = signal('');
+  readonly taskName = signal('');
 
-  constructor() {
-    inject(DestroyRef).onDestroy(() => {
-      this.sending.forEach(s => s.unsubscribe());
-      if (this.searchTimer) clearTimeout(this.searchTimer);
+  readonly tasks = signal<ConverterTask[]>([]);
+  /** Loading from the start: the list is read on arrival, and "Nothing converted yet" must not show before it answers. */
+  readonly tasksLoading = signal(true);
+  readonly tasksError = signal('');
+  readonly taskPager = createPager<ConverterTask>();
+
+  /** Recent conversions narrowed by the shared date range (remembered per viewer) and a search of names. */
+  private readonly auth = inject(AuthService, { optional: true });
+  readonly rangeStore = rangeKey('converter-tasks', typeof this.auth?.user === 'function' ? this.auth.user()?.appUserId : null);
+  readonly range = signal<DateRange>(restoreRange(this.rangeStore, '30d'));
+  readonly taskQuery = signal('');
+  readonly shownTasks = computed(() => {
+    const q = this.taskQuery().trim().toLowerCase();
+    return this.tasks().filter(t => createdIn(t, this.range())
+      && (!q || [t.taskName, t.inputFileName, t.outputFileName, t.inputFormat, t.outputFormat, t.bucketName]
+        .some(v => (v ?? '').toLowerCase().includes(q))));
+  });
+  /** Owner 2026-10-27: every column that holds a value sorts, before the paging; the API's order until one is picked. */
+  readonly taskSort = createTableSort<ConverterTask>({
+    id: 'converter-tasks',
+    columns: {
+      name: t => t.taskName,
+      conversion: t => `${t.inputFormat} → ${t.outputFormat}`,
+      size: { value: t => t.inputFileSize, kind: 'number' },
+      location: t => t.bucketName,
+      created: { value: t => t.dateCreated, kind: 'date' },
+    },
+  });
+  readonly sortedTasks = computed(() => this.taskSort.apply(this.shownTasks()));
+  readonly pagedTasks = computed(() => this.taskPager.slice(this.sortedTasks()));
+  /** The picked bucket file, with its size and date for the card (the picker's answer). */
+  readonly picked = signal<PickedObject | null>(null);
+
+  readonly extension = computed(() => {
+    const name = this.mode() === 'upload'
+      ? (this.file()?.name ?? '')
+      : this.sourceName();
+    const dot = name.lastIndexOf('.');
+    return dot >= 0 ? name.slice(dot + 1).toLowerCase() : '';
+  });
+
+  readonly family = computed(() =>
+    this.families().find(f => f.inputFormats.includes(this.extension())) ?? null);
+
+  /** Only files the converter can actually read are worth offering. */
+  readonly bucketOptions = computed(() => this.buckets().map(b => ({ value: b.bucket, label: b.label || b.bucket, hint: b.provider })));
+
+  readonly sourceName = computed(() => {
+    if (this.mode() === 'upload') return this.file()?.name ?? '';
+    const key = this.selectedKey();
+    return key ? key.slice(key.lastIndexOf('/') + 1) : '';
+  });
+
+  /** Nothing to convert without a source, a target format, and a destination if saving. */
+  readonly canConvert = computed(() => {
+    if (!this.outputFormat()) return false;
+    if (this.saveToBucket() && !this.saveBucket()) return false;
+    return this.mode() === 'upload' ? !!this.file() : !!this.selectedKey();
+  });
+
+  /**
+   * Chooses the source document in the console's one ObjectPicker, offering only the formats
+   * the converter reads. It reopens in the folder of the last pick; dismissing it keeps that pick.
+   */
+  chooseFile(): void {
+    const key = this.selectedKey();
+    this.dialog.open<PickedObject | undefined>(ObjectPicker, objectPickerConfig({
+      heading: 'Pick a document to convert',
+      bucket: this.bucket() || undefined,
+      selectedKey: key || undefined,
+      extensions: this.families().flatMap(f => f.inputFormats),
+    })).closed.subscribe(picked => {
+      if (!picked) return;
+      this.bucket.set(picked.bucket);
+      this.selectedKey.set(picked.key);
+      this.picked.set(picked);
     });
   }
 
-  ngOnInit(): void {
-    // A PDF from a dataset or a run is Reports › From pipelines' now; links that asked for it here land there.
-    const mode = this.route?.snapshot?.queryParamMap?.get('mode');
-    if ((mode === 'dataset' || mode === 'execution') && this.router) {
-      void this.router.navigate(['/reports/from-pipelines'], { queryParams: { make: mode }, replaceUrl: true });
-      return;
-    }
-    this.loadFormats();
-    this.loadLimits();
-    this.loadHistory();
+  /** "77.0 KB · modified 19 Oct 2026, 18:07" for the picked file's card; empty when the picker said neither. */
+  readonly pickedMeta = computed(() => {
+    const picked = this.picked();
+    if (!picked) return '';
+    const parts: string[] = [];
+    if (picked.size != null) parts.push(formatSize(picked.size));
+    const at = picked.lastModified ? this.when.transform(picked.lastModified, 'dateTime') : null;
+    if (at) parts.push(`modified ${at}`);
+    return parts.join(' · ');
+  });
+  private readonly when = new ServerTimePipe(inject(LOCALE_ID));
+
+  /** The folder a picked key sits in, for the card. */
+  folderOf(key: string): string {
+    const cut = key.lastIndexOf('/');
+    return cut > 0 ? key.slice(0, cut + 1) : '/';
   }
 
-  loadFormats(): void {
-    this.formatsState.start();
-    this.api.formats().subscribe({
-      next: r => {
-        if (r.status !== API_SUCCESS) { this.formatsState.fail(r, 'The supported formats could not be read.'); return; }
-        this.families.set(r.data ?? []);
-        this.formatsState.done();
-        // Files dropped before the formats arrived get their family and target now.
-        this.queue.update(list => list.map(i => i.state === 'waiting' && !i.problem ? this.withTarget(i) : i));
-      },
-      error: err => this.formatsState.fail(err, 'The supported formats could not be read.'),
-    });
+  applyRange(range: DateRange): void {
+    this.range.set(range);
+    saveRange(this.rangeStore, range);
+    this.taskPager.reset();
   }
 
+  setTaskQuery(value: string): void {
+    this.taskQuery.set(value);
+    this.taskPager.reset();
+  }
+
+  /** Reads the limits again: the queue's "now" numbers change while the page is open. */
   loadLimits(): void {
     this.limitsState.start();
-    this.api.limits().subscribe({
+    this.http.get<ApiResponse<ConverterLimits>>(`${API_BASE}/documentConverter.json/limits`).subscribe({
       next: r => {
-        if (r.status === API_SUCCESS && typeof r.data?.maxFileSizeMb === 'number') { this.limits.set(r.data); this.limitsState.done(); }
+        if (r?.status === API_SUCCESS && typeof r.data?.maxFileSizeMb === 'number') { this.limits.set(r.data); this.limitsState.done(); }
         else this.limitsState.fail(r, 'The limits could not be read.');
       },
+      // The limits are a hint; the server still checks every file. The strip says they are missing.
       error: err => this.limitsState.fail(err, 'The limits could not be read.'),
     });
   }
 
-  openFormats(): void {
-    this.dialog.open(FormatsSheet, sidePanelConfig({ families: this.families() }, 'narrow', 'right'));
+  /** A conversion's details, sliding over the right; its actions are done here. */
+  openTask(task: ConverterTask): void {
+    const data: ConversionPanelData = { task, folder: this.outputFolderOf(task) };
+    this.dialog.open<ConversionAction | undefined>(ConversionPanel, sidePanelConfig(data, 'narrow', 'right'))
+      .closed.subscribe(action => {
+        if (action === 'input' || action === 'output') this.view(task, action);
+        else if (action === 'delete') this.removeTask(task);
+      });
   }
 
-  // ------------------------------------------------------------------------------------------------- adding to queue
-
-  onDrop(event: DragEvent): void {
-    event.preventDefault();
-    this.dragging.set(false);
-    this.add([...(event.dataTransfer?.files ?? [])]);
-  }
-
-  onPick(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    this.add([...(input.files ?? [])]);
-    input.value = '';
-  }
-
-  /** Files join the queue (at most QUEUE_MAX in it); a type the converter does not read is said at once. */
-  add(files: File[]): void {
-    const room = QUEUE_MAX - this.queue().length;
-    if (files.length > room) this.toast.warn(`The queue holds ${QUEUE_MAX} files; ${files.length - Math.max(0, room)} were left out. Clear finished ones and add them again.`);
-    const added = files.slice(0, Math.max(0, room)).map(file => this.item(file.name, file.size, file, null));
-    this.queue.update(list => [...list, ...added]);
-  }
-
-  fromBucket(): void {
-    this.dialog.open<PickedObject | undefined>(ObjectPicker, objectPickerConfig({
-      heading: 'Pick a document to convert',
-      extensions: this.families().flatMap(f => f.inputFormats),
-    })).closed.subscribe(picked => {
-      if (!picked) return;
-      if (this.queue().length >= QUEUE_MAX) { this.toast.warn(`The queue holds ${QUEUE_MAX} files. Clear finished ones first.`); return; }
-      this.queue.update(list => [...list, this.item(picked.name, picked.size ?? null, null, { bucket: picked.bucket, key: picked.key })]);
-    });
-  }
-
-  private item(name: string, size: number | null, file: File | null, source: { bucket: string; key: string } | null): QueueItem {
-    const base: QueueItem = { id: this.nextId++, name, size, extension: extensionOf(name), file, source, target: '', state: 'waiting',
-      progress: null, asked: false, busy: false, problem: null, row: null };
-    return this.withTarget(base);
-  }
-
-  private withTarget(i: QueueItem): QueueItem {
-    if (!this.families().length) return i;
-    const problem = queueProblem(this.families(), i.name);
-    if (problem) return { ...i, state: 'failed', problem };
-    return { ...i, target: i.target || defaultTarget(familyOf(this.families(), i.extension), i.extension, this.convertAllTo()) };
-  }
-
-  targetsOf(i: QueueItem): string[] {
-    return familyOf(this.families(), i.extension)?.outputFormats ?? [];
-  }
-
-  setTarget(id: number, target: string): void {
-    this.queue.update(list => list.map(i => i.id === id ? { ...i, target } : i));
-  }
-
-  /** "Convert all to": every waiting file whose family has it takes it. */
-  setConvertAllTo(target: string): void {
-    this.convertAllTo.set(target);
-    this.queue.update(list => list.map(i => i.state === 'waiting' && !i.asked && this.targetsOf(i).includes(target) ? { ...i, target } : i));
-  }
-
-  remove(id: number): void {
-    this.sending.get(id)?.unsubscribe();
-    this.sending.delete(id);
-    this.queue.update(list => list.filter(i => i.id !== id));
-  }
-
-  clearFinished(): void {
-    this.queue.update(list => list.filter(i => i.state !== 'done' && i.state !== 'failed'));
-  }
-
-  chooseKeep(): void {
-    const current = this.keep();
-    this.dialog.open<KeepChoice | undefined>(KeepDialog, { data: {
-      heading: 'Keep results in a bucket', subtitle: 'Each result is saved to this folder and listed with a link to it.',
-      confirmLabel: 'Keep them here', folder: current?.folder ?? monthFolder('converted'), bucket: current?.bucket,
-    } satisfies KeepDialogData }).closed.subscribe(choice => { if (choice) this.keep.set(choice); });
-  }
-
-  // ------------------------------------------------------------------------------------------------------- converting
-
-  convertWaiting(): void {
-    this.queue.update(list => list.map(i => i.state === 'waiting' && !i.problem ? { ...i, asked: true } : i));
-    this.pump();
-  }
-
-  /** Starts asked files while fewer than QUEUE_PARALLEL are on their way. */
-  private pump(): void {
-    const active = this.queue().filter(i => i.state === 'uploading' || i.state === 'converting').length;
-    const next = this.queue().filter(i => i.state === 'waiting' && i.asked && !i.busy).slice(0, Math.max(0, QUEUE_PARALLEL - active));
-    next.forEach(i => void this.send(i));
-  }
-
-  private patch(id: number, change: Partial<QueueItem>): void {
-    this.queue.update(list => list.map(i => i.id === id ? { ...i, ...change } : i));
-  }
-
-  private async send(item: QueueItem): Promise<void> {
-    // A conversion that answered at once may already have started this one (pump runs again when one ends).
-    const now = this.queue().find(i => i.id === item.id);
-    if (!now || now.state !== 'waiting' || now.busy || !now.asked) return;
-    this.patch(item.id, { state: 'uploading', progress: 0 });
-    let file = item.file;
-    if (!file && item.source) {
-      file = await new Promise<File | null>(resolve => this.storage.previewBlob(item.source!.bucket, item.source!.key).subscribe({
-        next: blob => resolve(new File([blob], item.name)),
-        error: () => resolve(null),
-      }));
-      if (!file) {
-        this.patch(item.id, { state: 'failed', problem: { title: 'The file could not be read from the bucket.', icon: 'alert',
-          text: 'Check that it is still there, then add it again.' } });
-        this.pump();
-        return;
-      }
-    }
-    if (!this.queue().some(i => i.id === item.id)) return;
-    const keep = this.keep();
-    const sub = this.api.convert(file!, now.target, keep ? { bucketName: keep.bucket, targetFolder: keep.folder } : null).subscribe({
-      next: event => {
-        if (event.type === HttpEventType.UploadProgress) {
-          const done = event.total ? Math.round((event.loaded / event.total) * 100) : 0;
-          this.patch(item.id, done >= 100 ? { state: 'converting', progress: null } : { progress: done });
-          return;
-        }
-        if (event.type !== HttpEventType.Response) return;
-        this.sending.delete(item.id);
-        const r = event.body;
-        if (r?.status === API_SUCCESS && r.data) {
-          const row = r.data;
-          this.patch(item.id, { state: row.outcome === 'FAILED' ? 'failed' : 'done', row, progress: null,
-            problem: problemOf(row, this.limits()) });
-          if (!this.selected() && row.outcome !== 'FAILED') this.selected.set(row);
-        } else {
-          this.patch(item.id, { state: 'failed', progress: null, problem: { title: 'The conversion failed.', icon: 'alert',
-            text: r?.message || 'Try again; if it keeps failing, ask your administrator.' } });
-        }
-        this.afterOne();
-      },
-      error: err => {
-        this.sending.delete(item.id);
-        if (err?.status === 429) {
-          // Busy: nothing is wrong with the file. It waits and is asked again by itself.
-          this.patch(item.id, { state: 'waiting', busy: true, progress: null });
-          setTimeout(() => { this.patch(item.id, { busy: false }); this.pump(); }, BUSY_RETRY_MS);
-          this.loadLimits();
-          return;
-        }
-        this.patch(item.id, { state: 'failed', progress: null, problem: { title: 'The conversion failed.', icon: 'alert',
-          text: err?.error?.message || (err?.status === 413 ? 'The file is too big for the converter.' : 'Try again; if it keeps failing, ask your administrator.') } });
-        this.afterOne();
-      },
-    });
-    this.sending.set(item.id, sub);
-  }
-
-  private afterOne(): void {
-    this.pump();
-    this.loadHistory();
-    this.loadLimits();
-  }
-
-  /** Waiting · next in line / Waiting · 2nd in line / Waiting for Convert. */
-  waitingText(i: QueueItem): string {
-    if (i.busy) return 'The converter is busy · trying again by itself';
-    if (!i.asked) return 'Waiting · press Convert';
-    const ahead = this.queue().filter(q => q.state === 'waiting' && q.asked && q.id < i.id).length;
-    return ahead === 0 ? 'Waiting · next in line' : `Waiting · ${ahead} ahead`;
-  }
-
-  select(row: ConversionRow | null): void {
-    this.selected.set(row);
-  }
-
-  // ------------------------------------------------------------------------------------------------------------ result
-
-  onPreview(action: PreviewAction): void {
-    const row = this.selected();
-    if (!row) return;
-    if (action === 'download') this.download(row);
-    else if (action === 'documents') void this.sendToDocuments(row);
-    else if (action === 'pipeline') this.startPipeline(row);
-    else this.keepRow(row);
-  }
-
-  download(row: ConversionRow): void {
-    this.api.file(row.conversionId, 'output').subscribe({
-      next: blob => saveBlob(blob, row.outputFileName || `${row.name}.${row.outputFormat}`),
-      error: () => this.toast.error('The converted file could not be downloaded. It may have been removed after 30 days.'),
-    });
-  }
-
-  async sendToDocuments(row: ConversionRow): Promise<void> {
-    const ok = await confirmWith(this.dialog, {
-      title: 'Send to Documents',
-      body: `${row.outputFileName || row.name} goes to Documents as an upload: it is read, given a document type and put in the review queue.`,
-      confirmLabel: 'Send',
-    });
-    if (!ok) return;
-    this.api.sendToDocuments(row.conversionId).subscribe({
-      next: r => {
-        if (r.status !== API_SUCCESS || !r.data) { this.toast.error(r.message || 'It could not be sent to Documents.'); return; }
-        const { intake, conversion } = r.data;
-        this.replaceRow(conversion);
-        if (intake.outcome === 'Refused') this.toast.error(intake.reason || 'Documents refused the file.');
-        else this.toast.success(intake.outcome === 'Duplicate'
-          ? `Documents already has this file (document ${intake.ocrDocumentId}).`
-          : `Sent to Documents as document ${intake.ocrDocumentId}; it appears under Documents in once it is read.`);
-      },
-      error: err => this.toast.error(err?.error?.message || 'It could not be sent to Documents.'),
-    });
-  }
-
-  keepRow(row: ConversionRow, then?: (kept: ConversionRow) => void, words?: Partial<KeepDialogData>): void {
-    this.dialog.open<KeepChoice | undefined>(KeepDialog, { data: {
-      heading: 'Keep in a bucket', subtitle: 'The result is saved to this folder and kept until you remove it there.',
-      confirmLabel: 'Keep it', folder: this.keep()?.folder ?? monthFolder('converted'), bucket: this.keep()?.bucket, ...words,
-    } satisfies KeepDialogData }).closed.subscribe(choice => {
-      if (!choice) return;
-      this.api.keep(row.conversionId, choice.bucket, choice.folder).subscribe({
-        next: r => {
-          if (r.status !== API_SUCCESS || !r.data) { this.toast.error(r.message || 'It could not be kept.'); return; }
-          this.replaceRow(r.data);
-          this.toast.success(`Kept in ${choice.bucket}/${folderOf(r.data)}`);
-          then?.(r.data);
+  /** Pulls the chosen object down so it can be posted as the multipart file. */
+  private fetchSource(): Promise<File | null> {
+    const bucket = this.bucket(), key = this.selectedKey();
+    if (!bucket || !key) return Promise.resolve(null);
+    this.fetchingSource.set(true);
+    return new Promise(resolve => {
+      this.storage.previewBlob(bucket, key).subscribe({
+        next: blob => {
+          this.fetchingSource.set(false);
+          resolve(new File([blob], this.sourceName()));
         },
-        error: err => this.toast.error(err?.error?.message || 'It could not be kept.'),
+        error: () => {
+          this.fetchingSource.set(false);
+          this.toast.error('Could not read that file from the bucket.');
+          resolve(null);
+        },
       });
     });
   }
 
-  /** A pipeline reads files from a bucket: keep the result first if it is not, then describe it to the AI Assistant. */
-  startPipeline(row: ConversionRow): void {
-    const go = (kept: ConversionRow) => {
-      if (!kept.bucketName || !kept.outputStorageKey) return;
-      void this.router?.navigate(['/ai/assistant'], { queryParams: { prompt: assistantPrompt(kept.bucketName, kept.outputStorageKey) } });
-    };
-    if (row.keptIn === 'bucket') { go(row); return; }
-    this.keepRow(row, go, { heading: 'Keep it in a bucket first', confirmLabel: 'Keep and continue',
-      subtitle: 'A pipeline reads its files from a bucket. Keep the result there, then describe the pipeline to the AI Assistant.' });
+  /** Optional: the converter is also built directly in a spec, outside any route. */
+  private readonly route = inject(ActivatedRoute, { optional: true });
+
+  ngOnInit(): void {
+    // ?mode=dataset opens straight on that source: Generated reports' "PDF from a dataset" links here (UX final CV1).
+    const asked = this.route?.snapshot?.queryParamMap?.get('mode');
+    if (asked && this.modeOptions.some(o => o.id === asked)) this.mode.set(asked as ConverterMode);
+    this.loadTasks();
+    this.loadBuckets();
+    this.loadFormats();
+    this.loadLimits();
   }
 
-  private replaceRow(row: ConversionRow): void {
-    if (this.selected()?.conversionId === row.conversionId) this.selected.set(row);
-    this.rows.update(list => list.map(r => r.conversionId === row.conversionId ? row : r));
-    this.queue.update(list => list.map(i => i.row?.conversionId === row.conversionId ? { ...i, row } : i));
-  }
-
-  // ----------------------------------------------------------------------------------------------------------- history
-
-  loadHistory(): void {
-    this.historyLoad?.unsubscribe();
-    this.historyState.start();
-    this.historyLoad = this.api.list(this.view(), Number(this.days()) as HistoryDays, this.query(), this.page(), this.pageSize()).subscribe({
+  /** The buckets a result can be saved to (upload mode works without them; the Save to bucket box says why it is empty). */
+  loadBuckets(): void {
+    this.bucketsState.start();
+    this.storage.buckets().subscribe({
       next: r => {
-        if (r.status !== API_SUCCESS || !r.data) { this.historyState.fail(r, 'Recent conversions could not be read.'); return; }
-        this.rows.set(r.data.rows ?? []);
-        this.total.set(r.data.total ?? 0);
-        this.failedCount.set(r.data.failedCount ?? 0);
-        const ids = new Set(this.rows().map(x => x.conversionId));
-        this.picked.update(set => new Set([...set].filter(id => ids.has(id))));
-        this.historyState.done();
+        if (r.status !== API_SUCCESS) { this.bucketsState.fail(r, 'The buckets could not be read.'); return; }
+        this.buckets.set(r.data ?? []);
+        this.bucketsState.done();
       },
-      error: err => this.historyState.fail(err, 'Recent conversions could not be read.'),
+      error: err => this.bucketsState.fail(err, 'The buckets could not be read.'),
     });
   }
 
-  setView(view: HistoryView): void { this.view.set(view); this.page.set(1); this.loadHistory(); }
-  setDays(days: '7' | '30' | '90'): void { this.days.set(days); this.page.set(1); this.loadHistory(); }
-  goTo(page: number): void { this.page.set(page); this.loadHistory(); }
-  setPageSize(size: number): void { this.pageSize.set(size); this.page.set(1); this.loadHistory(); }
-
-  setQuery(value: string): void {
-    this.query.set(value);
-    if (this.searchTimer) clearTimeout(this.searchTimer);
-    this.searchTimer = setTimeout(() => { this.page.set(1); this.loadHistory(); }, 300);
+  loadFormats(): void {
+    this.formatsError.set('');
+    this.formatsState.start();
+    this.http.get<ApiResponse<FormatFamily[]>>(`${API_BASE}/documentConverter.json/supportedFormats`)
+      .subscribe({
+        next: response => {
+          if (response.status === API_SUCCESS) { this.families.set(response.data ?? []); this.formatsState.done(); }
+          else { this.formatsError.set('Could not load the supported formats.'); this.formatsState.fail(response, 'Could not load the supported formats.'); }
+        },
+        error: err => { this.formatsError.set('Could not load the supported formats.'); this.formatsState.fail(err, 'Could not load the supported formats.'); },
+      });
   }
 
-  togglePick(id: number): void {
-    this.picked.update(set => { const next = new Set(set); if (next.has(id)) next.delete(id); else next.add(id); return next; });
-  }
-
-  togglePickAll(): void {
-    this.picked.set(this.allPicked() ? new Set() : new Set(this.rows().filter(r => r.outcome !== 'FAILED').map(r => r.conversionId)));
-  }
-
-  downloadPicked(): void {
-    const ids = [...this.picked()];
-    if (!ids.length) return;
-    this.api.download(ids).subscribe({
-      next: blob => saveBlob(blob, `conversions-${ids.length}.zip`),
-      error: () => this.toast.error('The selected files could not be downloaded.'),
+  constructor() {
+    // A result belongs to the source and target that produced it. Picking another bucket file,
+    // another target or the other mode left the old "Ready to download" card offering the old
+    // output under the new selection.
+    effect(() => {
+      this.sourceName(); this.outputFormat(); this.mode();
+      untracked(() => { this.result.set(null); this.convertError.set(''); this.busy.set(false); });
+    });
+    // Picks a target format whenever the source changes, in either mode. Only the upload
+    // handler used to do this, so choosing a file from a bucket left the format empty while
+    // the select appeared to show one -- Convert stayed disabled with nothing explaining why.
+    effect(() => {
+      const family = this.family();
+      const current = untracked(() => this.outputFormat());
+      if (!family) {
+        if (current) this.outputFormat.set('');
+        return;
+      }
+      if (current && family.outputFormats.includes(current)) return;
+      const own = untracked(() => this.extension());
+      this.outputFormat.set(
+        family.outputFormats.find(f => f !== own) ?? family.outputFormats[0] ?? '');
     });
   }
 
-  async removeRow(row: ConversionRow): Promise<void> {
+  onFile(file: File | null): void {
+    this.file.set(file);
+    this.result.set(null);
+  }
+
+  async convert(): Promise<void> {
+    if (!this.outputFormat()) return;
+    // A bucket source has to be pulled down first; an upload is already in hand.
+    const file = this.mode() === 'upload' ? this.file() : await this.fetchSource();
+    if (!file) return;
+
+    const form = new FormData();
+    form.append('file', file, file.name);
+    form.append('outputFormat', this.outputFormat());
+    // Saving writes the result into a bucket so it outlives this tab; otherwise the file
+    // only exists as the base64 payload in the response.
+    form.append('save', String(this.saveToBucket()));
+    if (this.saveToBucket()) {
+      form.append('bucketName', this.saveBucket());
+      if (this.saveFolder().trim()) form.append('targetFolder', this.saveFolder().trim());
+      const name = this.taskName().trim() || file.name.replace(/\.[^.]+$/, '');
+      form.append('taskName', name);
+    }
+
+    this.converting.set(true);
+    this.convertError.set('');
+    this.busy.set(false);
+    this.progress.set(0);
+    this.http.post<ApiResponse<ConvertResult>>(`${API_BASE}/documentConverter.json/convert`, form,
+      { reportProgress: true, observe: 'events' })
+      .subscribe({
+        next: event => {
+          if (event.type === HttpEventType.UploadProgress) {
+            // Uploaded: the rest is the server converting, shown as such (no percentage to give).
+            const done = event.total ? Math.round((event.loaded / event.total) * 100) : 0;
+            this.progress.set(done >= 100 ? null : done);
+            return;
+          }
+          if (event.type !== HttpEventType.Response) return;
+          this.converting.set(false);
+          this.progress.set(null);
+          const response = event.body;
+          if (response?.status === API_SUCCESS && response.data) {
+            this.result.set(response.data);
+            this.toast.success(this.saveToBucket()
+              ? `Converted and saved to ${this.saveBucket()}.`
+              : `Converted to ${this.outputFormat().toUpperCase()}.`);
+            if (this.saveToBucket()) this.loadTasks();
+            this.loadLimits();
+          } else {
+            this.convertError.set(response?.message || 'The conversion failed.');
+          }
+        },
+        error: err => {
+          this.converting.set(false);
+          this.progress.set(null);
+          // 429: every office process is busy and the queue is full -- nothing went wrong with the file.
+          this.busy.set(err?.status === 429);
+          if (err?.status === 429) this.loadLimits();
+          this.convertError.set(err?.error?.message
+            || (err?.status === 429 ? 'The converter is busy. Try again in a minute.'
+              : err?.status === 413 ? 'The file is too big for the converter.' : 'The conversion failed.'));
+        },
+      });
+  }
+
+  /** "Showing 5,000 of 1,000,000 rows" for a table converted to PDF; nothing for any other file. */
+  rowsNote(done: ConvertResult): string {
+    if (done.rowCount == null) return '';
+    const total = done.rowCount.toLocaleString('en-US');
+    return done.truncated
+      ? `First ${(done.rowsShown ?? 0).toLocaleString('en-US')} of ${total} rows printed; the full data is the file you converted.`
+      : `${total} rows`;
+  }
+
+  download(): void {
+    const result = this.result();
+    if (!result) return;
+    // The API returns the file inline as base64; turn it back into bytes to save it.
+    const bytes = Uint8Array.from(atob(result.outputBase64), c => c.charCodeAt(0));
+    const url = URL.createObjectURL(new Blob([bytes], { type: result.outputContentType }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = result.outputFileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  reset(): void {
+    this.file.set(null);
+    this.result.set(null);
+    this.outputFormat.set('');
+    this.selectedKey.set('');
+    this.picked.set(null);
+    this.taskName.set('');
+  }
+
+  /**
+   * Every conversion is already recorded server-side with the bucket and key it wrote to.
+   * The screen never read that back, so a finished conversion was only retrievable from the
+   * one browser tab that produced it -- close the tab and the output was effectively lost.
+   */
+  loadTasks(): void {
+    this.tasksLoading.set(true);
+    this.tasksError.set('');
+    this.http.get<ApiResponse<ConverterTask[]>>(`${API_BASE}/documentConverter.json/fetchAllTasks`)
+      .subscribe({
+        next: response => {
+          this.tasksLoading.set(false);
+          if (response.status !== API_SUCCESS) { this.tasksError.set(response.message || 'Could not read the recent conversions.'); return; }
+          this.tasks.set(response.data ?? []);
+        },
+        error: err => {
+          this.tasksLoading.set(false);
+          this.tasksError.set(err?.error?.message || 'Could not read the recent conversions.');
+        },
+      });
+  }
+
+  async removeTask(task: ConverterTask): Promise<void> {
     const ok = await confirmWith(this.dialog, {
       title: 'Delete conversion',
-      body: row.keptIn === 'bucket'
-        ? `"${row.name}" leaves the list. The converted file stays in the bucket.`
-        : `"${row.name}" and its converted file are removed now, rather than after 30 days.`,
-      confirmLabel: 'Delete', danger: true,
+      body: `"${task.taskName}" leaves the list. The converted file stays in the bucket.`,
+      confirmLabel: 'Delete',
+      danger: true,
     });
     if (!ok) return;
-    this.api.remove(row.conversionId).subscribe({
-      next: r => {
-        if (r.status !== API_SUCCESS) { this.toast.error(r.message || 'It could not be deleted.'); return; }
-        if (this.selected()?.conversionId === row.conversionId) this.selected.set(null);
-        this.toast.success(`${row.name} deleted.`);
-        this.loadHistory();
+    this.http.delete<ApiResponse>(`${API_BASE}/documentConverter.json/deleteTask`,
+      { params: { documentConverterTaskId: String(task.documentConverterTaskId) } }).subscribe({
+      next: response => {
+        if (response.status === API_SUCCESS) {
+          this.toast.success(`${task.taskName} deleted.`);
+          this.loadTasks();
+        } else { this.toast.error(response.message); }
       },
-      error: err => this.toast.error(err?.error?.message || 'It could not be deleted.'),
+      error: err => this.toast.error(err?.error?.message || 'Delete failed.'),
     });
   }
 
-  view_(row: ConversionRow): void {
-    this.selected.set(row);
-    if (typeof document !== 'undefined') document.querySelector('[data-test=conversion-preview]')?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+  /**
+   * Opens either side of a past conversion in the same viewer the object browser uses, so a
+   * result can be checked without downloading it or hunting for it in a bucket.
+   */
+  view(task: ConverterTask, side: 'input' | 'output'): void {
+    const key = side === 'input' ? task.inputStorageKey : task.outputStorageKey;
+    if (!task.bucketName || !key) {
+      this.toast.info(`This conversion did not keep its ${side} file.`);
+      return;
+    }
+    this.dialog.open(PreviewDialog, {
+      data: {
+        bucket: task.bucketName, key,
+        name: side === 'input' ? task.inputFileName : task.outputFileName,
+        size: side === 'input' ? task.inputFileSize : task.outputFileSize,
+      },
+      hasBackdrop: true,
+    });
   }
 
-  byText(row: ConversionRow): string {
-    if (row.createdBy != null && row.createdBy === this.me()) return 'You';
-    return row.createdByName || '—';
+  /** Folder holding the output, so the row can open the object browser at it. */
+  outputFolderOf(task: ConverterTask): string {
+    const key = task.outputStorageKey ?? '';
+    const cut = key.lastIndexOf('/');
+    return cut > 0 ? key.slice(0, cut + 1) : (task.targetFolder ?? '');
   }
 
-  keptText(row: ConversionRow): string {
-    const at = instantOf(row.expiresAt ?? '');
-    return notKeptText(row, at ? this.when.transform(at, 'day') : null);
-  }
-
-  note(row: ConversionRow): string {
-    return statusNote(row, this.limits());
-  }
+  size = formatSize;
 }

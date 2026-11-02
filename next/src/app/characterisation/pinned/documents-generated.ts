@@ -1,85 +1,5 @@
 // Recorded by scripts/characterisation/record.mjs -- see ../harness.ts. Review the diff: it is the baseline.
 export const PINNED: Record<string, unknown> = {
-  "Reports from pipelines, a PDF from a dataset": {
-    "requests": [
-      "GET /storage.json/buckets",
-      "GET /documentConverter.json/renderFormats",
-      "GET /documentConverter.json/fetchAllTemplates"
-    ],
-    "headings": [
-      "Make a PDF"
-    ],
-    "buttons": [
-      "A table in a bucket",
-      "Close",
-      "From a dataset",
-      "From a run",
-      "Make PDF",
-      "Paste rows",
-      "Preview"
-    ],
-    "columns": [],
-    "fields": [
-      "Default layout",
-      "File name",
-      "Make",
-      "None",
-      "Orientation",
-      "Page",
-      "Page size",
-      "Rows (JSON)",
-      "Save the file to a bucket",
-      "Template",
-      "The dataset's own title",
-      "The title, or report",
-      "Title",
-      "Watermark",
-      "[{\"region\": \"North\", \"revenue\": 1234.50}, {\"region\": \"South\", \"revenue\": 980}]"
-    ],
-    "links": [],
-    "items": []
-  },
-  "Reports from pipelines, a PDF from a run": {
-    "requests": [
-      "GET /documentConverter.json/renderFormats",
-      "GET /documentConverter.json/fetchAllTemplates",
-      "GET /sourceJob.json/listSourceJob"
-    ],
-    "headings": [
-      "Make a PDF"
-    ],
-    "buttons": [
-      "Choose a dataset",
-      "Choose a schedule first",
-      "Close",
-      "From a dataset",
-      "From a run",
-      "Make PDF",
-      "Preview"
-    ],
-    "columns": [],
-    "fields": [
-      "Choose a schedule",
-      "Dataset",
-      "Default layout",
-      "File name",
-      "Make",
-      "None",
-      "Orientation",
-      "Page",
-      "Page size",
-      "Run",
-      "Save the file to a bucket",
-      "Schedule",
-      "Template",
-      "The dataset's own title",
-      "The title, or report",
-      "Title",
-      "Watermark"
-    ],
-    "links": [],
-    "items": []
-  },
   "Reports, as a tenant user without the page": {
     "url": "/unauthorized?page=tools-converter&title=Reports%20from%20pipelines",
     "requests": [
@@ -122,7 +42,6 @@ export const PINNED: Record<string, unknown> = {
       "Created",
       "Name",
       "Owner",
-      "PDF from a dataset or a run",
       "Pipeline",
       "Refresh",
       "Size",
@@ -151,7 +70,8 @@ export const PINNED: Record<string, unknown> = {
     ],
     "links": [
       "/pipelines/schedules/2849/runs/7405",
-      "/reports"
+      "/reports",
+      "/tools/converter?mode=dataset"
     ]
   },
   "a file's details, written by a recent run": {
@@ -174,5 +94,156 @@ export const PINNED: Record<string, unknown> = {
       "/pipelines/schedules/2849/runs/7405"
     ],
     "items": []
+  },
+  "the converter, Dataset → PDF": {
+    "requests": [
+      "GET /documentConverter.json/renderFormats",
+      "GET /documentConverter.json/fetchAllTemplates"
+    ],
+    "headings": [
+      "Document Converter",
+      "Convert",
+      "Recent conversions (1 of 1)"
+    ],
+    "buttons": [
+      "30 days",
+      "7 days",
+      "90 days",
+      "A table in a bucket",
+      "All time",
+      "Columns",
+      "Conversion",
+      "Created",
+      "Custom",
+      "Delete this conversion",
+      "From a bucket",
+      "Location",
+      "Make PDF",
+      "Name",
+      "PDF from a dataset",
+      "PDF from a run",
+      "Paste rows",
+      "Preview",
+      "Read the limits and queue again",
+      "Refresh",
+      "Size",
+      "Supported formats 2",
+      "Upload a file",
+      "View the converted file",
+      "View the original file"
+    ],
+    "columns": [
+      [
+        "Name",
+        "Conversion",
+        "Size",
+        "Location",
+        "Created",
+        "Actions"
+      ]
+    ],
+    "fields": [
+      "Default layout",
+      "File name",
+      "Make",
+      "None",
+      "Orientation",
+      "Page",
+      "Page size",
+      "Rows (JSON)",
+      "Save the file to a bucket",
+      "Search name, file or format",
+      "Search recent conversions",
+      "Template",
+      "The dataset's own title",
+      "The title, or report",
+      "Title",
+      "Watermark",
+      "[{\"region\": \"North\", \"revenue\": 1234.50}, {\"region\": \"South\", \"revenue\": 980}]"
+    ],
+    "links": [
+      "/data/files?bucket=ui-review-s3&prefix=UI-REVIEW%20converted%2F1034%2Foutput%2F",
+      "/data/reports",
+      "/tools",
+      "/tools/converter",
+      "/tools/transcript"
+    ]
+  },
+  "the converter, From an execution": {
+    "requests": [
+      "GET /documentConverter.json/renderFormats",
+      "GET /documentConverter.json/fetchAllTemplates",
+      "GET /sourceJob.json/listSourceJob"
+    ],
+    "headings": [
+      "Document Converter",
+      "Convert",
+      "Recent conversions (1 of 1)"
+    ],
+    "buttons": [
+      "30 days",
+      "7 days",
+      "90 days",
+      "All time",
+      "Choose a dataset",
+      "Choose a schedule first",
+      "Columns",
+      "Conversion",
+      "Created",
+      "Custom",
+      "Delete this conversion",
+      "From a bucket",
+      "Location",
+      "Make PDF",
+      "Name",
+      "PDF from a dataset",
+      "PDF from a run",
+      "Preview",
+      "Read the limits and queue again",
+      "Refresh",
+      "Size",
+      "Supported formats 2",
+      "Upload a file",
+      "View the converted file",
+      "View the original file"
+    ],
+    "columns": [
+      [
+        "Name",
+        "Conversion",
+        "Size",
+        "Location",
+        "Created",
+        "Actions"
+      ]
+    ],
+    "fields": [
+      "Choose a schedule",
+      "Dataset",
+      "Default layout",
+      "File name",
+      "Make",
+      "None",
+      "Orientation",
+      "Page",
+      "Page size",
+      "Run",
+      "Save the file to a bucket",
+      "Schedule",
+      "Search name, file or format",
+      "Search recent conversions",
+      "Template",
+      "The dataset's own title",
+      "The title, or report",
+      "Title",
+      "Watermark"
+    ],
+    "links": [
+      "/data/files?bucket=ui-review-s3&prefix=UI-REVIEW%20converted%2F1034%2Foutput%2F",
+      "/data/reports",
+      "/tools",
+      "/tools/converter",
+      "/tools/transcript"
+    ]
   }
 };
