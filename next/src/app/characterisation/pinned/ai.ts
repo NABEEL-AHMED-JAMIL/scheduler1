@@ -6,7 +6,8 @@ export const PINNED: Record<string, unknown> = {
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
-      "GET /aiConnection.json/list"
+      "GET /aiConnection.json/list",
+      "GET /aiPrompt.json/modelCatalog"
     ],
     "headings": [
       "New prompt",
@@ -18,6 +19,7 @@ export const PINNED: Record<string, unknown> = {
     ],
     "buttons": [
       "Add variable",
+      "Connection default (gemma3:1b)",
       "Run",
       "Save & activate",
       "Save draft"
@@ -42,7 +44,6 @@ export const PINNED: Record<string, unknown> = {
       "What this prompt is for",
       "Workspace default",
       "You are an analyst. Be terse. Never invent a value the document does not hold.",
-      "gemma3:1b",
       "pdf, docx"
     ],
     "links": [
@@ -75,6 +76,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /aiConnection.json/list",
+      "GET /aiPrompt.json/modelCatalog",
       "GET /aiPrompt.json/get?promptId=1049",
       "GET /aiPrompt.json/runs?limit=10&promptId=1049"
     ],
@@ -95,6 +97,7 @@ export const PINNED: Record<string, unknown> = {
       "Run",
       "Save & activate",
       "Save as v2",
+      "llama3.2:1bNot on the platform's list: runs on it are refused",
       "{{city}}",
       "{{rows}}",
       "{{url}}"
@@ -139,7 +142,6 @@ export const PINNED: Record<string, unknown> = {
       "What this prompt is for",
       "Workspace default",
       "You are an analyst. Be terse. Never invent a value the document does not hold.",
-      "gemma3:1b",
       "pdf, docx",
       "record_id",
       "what Try it uses"

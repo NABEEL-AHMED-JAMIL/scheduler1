@@ -25,6 +25,8 @@ import { isOwnPlatformSignIn } from '../../../core/auth/workspace-data';
 import { NeedsWorkspace } from '../../../shared/ui/needs-workspace';
 import { sidePanelConfig } from '../../../shared/ui/side-panel';
 import { RetentionPlatformPanel } from './retention-platform-panel';
+import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
+import { CatalogModel, ModelCatalogApi } from '../../ai/model-catalog/model-catalog';
 
 type Switch = 'aiWriteTools' | 'minFieldsWarning';
 
@@ -39,7 +41,8 @@ const readable = (text: string | null | undefined) => (text ?? '').replace(/\s--
  */
 @Component({
   selector: 'app-data-policies',
-  imports: [WorkspaceSelect, RefreshButton, PageHeader, Icon, LoadError, BlurLoader, RouterLink, ReviewPolicyCard, RetentionCard, NeedsWorkspace, InlineStatus],
+  imports: [WorkspaceSelect, RefreshButton, PageHeader, Icon, LoadError, BlurLoader, RouterLink, ReviewPolicyCard, RetentionCard, NeedsWorkspace, InlineStatus,
+    AdvancedSelect],
   templateUrl: './data-policies.html',
   styles: `
     .policy-table { table-layout: fixed; min-width: 56rem; }
@@ -51,6 +54,7 @@ const readable = (text: string | null | undefined) => (text ?? '').replace(/\s--
 })
 export class DataPolicies implements OnInit {
   private readonly api = inject(DataPolicyApi);
+  private readonly catalogApi = inject(ModelCatalogApi);
   private readonly auth = inject(AuthService);
   private readonly toast = inject(ToastService);
 
@@ -88,8 +92,12 @@ export class DataPolicies implements OnInit {
   readonly connectionsLoading = signal(false);
   readonly connectionsLoaded = signal(false);
 
+  /** Owner 2026-11-02: the platform's list of models (the ones switched on), which every allowed model is chosen from. */
+  readonly catalog = signal<CatalogModel[]>([]);
+  readonly catalogError = signal('');
+
   readonly state = computed(() => policyState(this.levels()));
-  readonly choices = computed(() => modelChoices(this.connections(), this.tenantId()));
+  readonly choices = computed(() => modelChoices(this.connections(), this.tenantId(), this.catalog()));
   readonly problems = computed(() => this.drafts().map(d => draftProblem(d)));
   readonly changed = computed(() => this.drafts().map((d, i) => !!this.levels()[i] && isChanged(d, this.levels()[i])));
   readonly changedCount = computed(() => this.changed().filter(Boolean).length);
@@ -129,11 +137,25 @@ export class DataPolicies implements OnInit {
       error: err => { this.loading.set(false); this.error.set(err?.error?.message || 'The data policy could not be read.'); },
     });
     if (this.canEdit() && !this.connections().length) this.loadConnections();
+    else if (!this.catalog().length) this.loadCatalog();
+  }
+
+  /** The platform's list of models (the ones switched on): every member reads it, so a chosen model reads by its name. */
+  loadCatalog(): void {
+    this.catalogError.set('');
+    this.catalogApi.list().subscribe({
+      next: r => {
+        if (r.status === API_SUCCESS) this.catalog.set(Array.isArray(r.data) ? r.data : []);
+        else this.catalogError.set(loadErrorText(r, 'The platform\'s list of models could not be read.'));
+      },
+      error: err => this.catalogError.set(loadErrorText(err, 'The platform\'s list of models could not be read.')),
+    });
   }
 
   loadConnections(): void {
     this.connectionsLoading.set(true);
     this.connectionsError.set('');
+    this.loadCatalog();
     this.api.connections().subscribe({
       next: r => {
         this.connectionsLoading.set(false);
@@ -206,7 +228,36 @@ export class DataPolicies implements OnInit {
     const offered = new Set(this.choices().map(c => c.value));
     return (this.drafts()[i]?.allowedModels ?? []).filter(v => !offered.has(v));
   }
-  allowedName(entry: string): string { return allowedText(entry, this.connections()); }
+  allowedName(entry: string): string { return allowedText(entry, this.connections(), this.catalog()); }
+
+  /**
+   * Owner 2026-11-02: what a level's "Add a model" offers -- each connection whole, then each listed model it runs, grouped
+   * by connection; one the level's rule would never allow is shown greyed with why; one already chosen is left out.
+   */
+  optionsFor(i: number): AdvancedOption[] {
+    const d = this.drafts()[i];
+    if (!d) return [];
+    return this.choices().filter(c => !d.allowedModels.includes(c.value)).map(c => {
+      const why = ruleBlocks(d.modelRule, c);
+      return {
+        value: c.value, label: c.label, group: c.connectionName, sample: c.model ?? undefined, mono: false,
+        description: c.model ? (c.local ? 'Local' : c.baa ? 'Hosted, BAA-marked connection' : 'Hosted') : 'Every model on the list this connection runs',
+        badge: why ?? (c.local ? 'Local' : c.baa ? 'BAA' : 'Hosted'), badgeTone: why ? 'warn' : c.local ? 'ok' : 'info',
+        keywords: `${c.connectionName} ${c.model ?? ''}`, disabled: !!why,
+      } as AdvancedOption;
+    });
+  }
+
+  /** Why a chosen entry can never be used under the level's rule (it stays chosen until removed), or null. */
+  chosenBlocked(i: number, entry: string): string | null {
+    const d = this.drafts()[i];
+    const choice = this.choices().find(c => c.value === entry);
+    return d && choice ? ruleBlocks(d.modelRule, choice) : null;
+  }
+
+  addModel(i: number, picked: AdvancedOption | null): void {
+    if (picked && !picked.disabled) this.toggleModel(i, picked.value, true);
+  }
   retentionText(d: LevelDraft): string {
     const days = d.retention.trim();
     return days ? `${days} day${days === '1' ? '' : 's'}` : 'The pipeline\'s own';

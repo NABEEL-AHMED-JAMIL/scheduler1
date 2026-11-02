@@ -17,6 +17,7 @@ import { API_SUCCESS } from '../../../core/api/api.config';
 function editor() {
   const get = vi.fn((url: string, options?: { params?: Record<string, string> }) => {
     if (url.endsWith('/aiConnection.json/list')) return of({ status: API_SUCCESS, data: [{ connectionId: 7, name: 'Ollama', provider: 'Ollama', defaultModel: 'gemma3:1b', isDefault: true }] });
+    if (url.endsWith('/aiPrompt.json/modelCatalog')) return of({ status: API_SUCCESS, data: [] });
     if (url.endsWith('/aiPrompt.json/objectText')) return of({ status: API_SUCCESS, message: 'Read discharge.pdf: 420 characters.', data: {
       bucket: options?.params?.['bucket'], key: options?.params?.['key'], name: 'discharge.pdf', kind: 'text',
       text: 'Discharge summary for M. Okafor. Total billed $188.50.', chars: 54, totalChars: 54, truncated: false,

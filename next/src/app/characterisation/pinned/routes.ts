@@ -1304,6 +1304,15 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
+      "path": "/platform/models",
+      "title": "Models",
+      "minRole": "PLATFORM_ADMIN",
+      "guards": [
+        "roleGuard"
+      ],
+      "lazy": true
+    },
+    {
       "path": "/settings/home-pages",
       "title": "Home pages",
       "minRole": "TENANT_ADMIN",

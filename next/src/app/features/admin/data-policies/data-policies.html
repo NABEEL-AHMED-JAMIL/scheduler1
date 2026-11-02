@@ -99,42 +99,40 @@
                 }
               </tr>
               <tr>
-                <th scope="row"><span class="block text-sm font-medium">Allowed models</span><span class="block text-xs font-normal text-[color:var(--text-muted)]">None ticked: any model the rule allows. A ticked connection allows each of its models.</span></th>
+                <th scope="row"><span class="block text-sm font-medium">Allowed models</span><span class="block text-xs font-normal text-[color:var(--text-muted)]">Chosen from the platform's list of models. None chosen: any listed model the rule allows. A connection chosen whole allows each listed model it runs. Checked on every call.</span></th>
                 @for (c of columns(); track c.d.sensitivity) {
                   <td [attr.data-level]="c.d.sensitivity" data-row="models">
                     @if (canEdit()) {
-                      <fieldset class="min-w-0">
-                        <legend class="sr-only">Allowed models for {{ text[c.d.sensitivity].label }}</legend>
-                        <div class="max-h-44 overflow-y-auto rounded-md border border-[color:var(--border-subtle)] px-3 py-2 flex flex-col gap-1.5">
-                          @for (m of choices(); track m.value) {
-                            <label class="flex items-start gap-2 text-sm min-w-0" [class.pl-5]="m.model">
-                              <input type="checkbox" class="checkbox mt-0.5 shrink-0" name="allowedModel" [value]="m.value"
-                                     [checked]="c.d.allowedModels.includes(m.value)" [disabled]="!!blocked(c.d.modelRule, m) && !c.d.allowedModels.includes(m.value)"
-                                     (change)="toggleModel(c.i, m.value, $any($event.target).checked)" />
-                              <span class="min-w-0 break-words" [class.mono]="m.model" [class.text-xs]="m.model">{{ m.model ?? m.label }}</span>
-                              @if (blocked(c.d.modelRule, m); as why) { <span class="ml-auto shrink-0 text-xs text-[color:var(--text-muted)]">{{ why }}</span> }
-                            </label>
+                      <div class="flex flex-col gap-2 min-w-0">
+                        <ul class="flex flex-wrap gap-1.5" [attr.aria-label]="'Allowed models for ' + text[c.d.sensitivity].label" data-allowed>
+                          @for (entry of c.d.allowedModels; track entry) {
+                            <li class="pill pill-neutral max-w-full gap-1" [class.pill-warn]="!!chosenBlocked(c.i, entry)" [attr.data-entry]="entry"
+                                [title]="chosenBlocked(c.i, entry) ? 'The rule above never allows it (' + chosenBlocked(c.i, entry) + ')' : ''">
+                              <span class="truncate">{{ allowedName(entry) }}</span>
+                              @if (chosenBlocked(c.i, entry); as why) { <span class="text-[11px]">· {{ why }}</span> }
+                              <button type="button" class="btn btn-ghost btn-icon btn-xs" (click)="toggleModel(c.i, entry, false)" [attr.aria-label]="'Remove ' + allowedName(entry)"><app-icon name="close" /></button>
+                            </li>
+                          } @empty {
+                            <li class="text-sm text-[color:var(--text-secondary)]" data-allowed-none>Any listed model the rule allows</li>
                           }
-                          @for (entry of unknownAllowed(c.i); track entry) {
-                            <label class="flex items-start gap-2 text-sm min-w-0">
-                              <input type="checkbox" class="checkbox mt-0.5 shrink-0" name="allowedModel" [value]="entry" checked
-                                     (change)="toggleModel(c.i, entry, $any($event.target).checked)" />
-                              <span class="min-w-0 break-words">{{ allowedName(entry) }}</span>
-                            </label>
-                          }
-                          @if (connectionsLoading() || connectionsError() || (!choices().length && !unknownAllowed(c.i).length)) {
-                            <app-inline-status [loading]="connectionsLoading()" [error]="connectionsError()"
-                                               [empty]="connectionsLoaded() && !choices().length" label="Loading model connections…"
-                                               emptyText="No model connections in this workspace yet." (retry)="loadConnections()">
-                              <a class="link-inline" routerLink="/settings/model-connections">Add one</a>
-                            </app-inline-status>
-                          }
-                        </div>
-                      </fieldset>
+                        </ul>
+                        <app-advanced-select [id]="'models-' + c.d.sensitivity" [ariaLabel]="'Add an allowed model for ' + text[c.d.sensitivity].label"
+                                             placeholder="Add a model…" searchPlaceholder="Search connections and models" [resetOnPick]="true" [compact]="true"
+                                             [options]="optionsFor(c.i)" [loading]="connectionsLoading()" loadingText="Loading the models…"
+                                             emptyText="Every listed model is chosen, or no model connection or listed model yet." panelWidth="24rem"
+                                             (picked)="addModel(c.i, $event)" />
+                        @if (connectionsLoading() || connectionsError() || catalogError() || (connectionsLoaded() && !choices().length)) {
+                          <app-inline-status [loading]="connectionsLoading()" [error]="connectionsError() || catalogError()"
+                                             [empty]="connectionsLoaded() && !choices().length" label="Loading model connections…"
+                                             emptyText="No model connection in this workspace yet." (retry)="loadConnections()">
+                            <a class="link-inline" routerLink="/settings/model-connections">Add one</a>
+                          </app-inline-status>
+                        }
+                      </div>
                     } @else {
                       <div class="flex flex-wrap gap-1">
-                        @for (entry of c.d.allowedModels; track entry) { <span class="pill pill-neutral mono">{{ allowedName(entry) }}</span> }
-                        @empty { <span>Any the rule allows</span> }
+                        @for (entry of c.d.allowedModels; track entry) { <span class="pill pill-neutral">{{ allowedName(entry) }}</span> }
+                        @empty { <span>Any listed model the rule allows</span> }
                       </div>
                     }
                   </td>

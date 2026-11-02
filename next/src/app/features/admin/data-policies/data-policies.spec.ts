@@ -11,12 +11,19 @@ import { DataPolicy, PolicyLevel, defaultLevel } from './data-policy.model';
 import { DataPolicies } from './data-policies';
 import { RetentionApi } from './retention.api';
 import { RETENTION_VIEW } from './retention.fixtures';
+import { ModelCatalogApi } from '../../ai/model-catalog/model-catalog';
 
 const RULE = 'A call\'s data is the highest level known of it.';
 const DEFAULTS: DataPolicy = { tenantId: 2924, levels: (['public', 'internal', 'sensitive'] as const).map(defaultLevel), rule: RULE };
 const CONNECTIONS = [
   { connectionId: 1049, name: 'Local box', provider: 'Ollama', defaultModel: 'qwen3:8b', tenantId: 2924 },
   { connectionId: 1050, name: 'Claude', provider: 'Anthropic', defaultModel: 'claude-sonnet-5', tenantId: 2924 },
+];
+
+/** Owner 2026-11-02: the platform's list of models -- what the allowed models are chosen from. */
+const CATALOG = [
+  { catalogId: 1, modelName: 'qwen3:8b', displayName: 'Qwen3 8B', provider: 'Ollama', local: true, note: null, active: true },
+  { catalogId: 2, modelName: 'claude-sonnet-5', displayName: 'Claude Sonnet 5', provider: 'Anthropic', local: false, note: null, active: true },
 ];
 
 type Role = 'TENANT_USER' | 'TENANT_ADMIN' | 'PLATFORM_ADMIN';
@@ -32,6 +39,7 @@ function render(role: Role, policy: DataPolicy | { error: string } = DEFAULTS) {
     tenants: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [{ tenantId: 2924, tenantName: 'Claude Demo' }] })),
   };
   const toast = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
+  const catalog = { list: vi.fn(() => of({ status: 'SUCCESS', message: '2 model(s).', data: CATALOG })) };
   // MIG-354: Core's retention section, read for the workspace a platform administrator picks (a workspace administrator's own
   // needs the session's workspace, which this screen test has not).
   const retention = { view: vi.fn(() => of({ status: 'SUCCESS', message: 'Retention policy.', data: RETENTION_VIEW })) };
@@ -44,6 +52,7 @@ function render(role: Role, policy: DataPolicy | { error: string } = DEFAULTS) {
       provideRouter([]),
       { provide: DataPolicyApi, useValue: api },
       { provide: RetentionApi, useValue: retention },
+      { provide: ModelCatalogApi, useValue: catalog },
       { provide: ToastService, useValue: toast },
       { provide: AuthService, useValue: { isTenantAdmin: () => admin, isPlatformAdmin: () => role === 'PLATFORM_ADMIN', role: () => role } },
     ],
@@ -127,14 +136,25 @@ describe('Administration › Data policies -- as a workspace administrator', () 
     expect(el.querySelectorAll('section[data-level]').length).toBe(0);
   });
 
-  it('offers the workspace\'s models, and rules out the ones the level\'s rule would never use', () => {
-    const { card, refresh, page } = render('TENANT_ADMIN');
-    const boxes = () => Array.from(card('sensitive').querySelectorAll<HTMLInputElement>('input[name="allowedModel"]'));
-    expect(boxes().map(b => b.value)).toEqual(['1049', '1049|qwen3:8b', '1050', '1050|claude-sonnet-5']);
-    expect(boxes().map(b => b.disabled)).toEqual([false, false, true, true]);
-    boxes()[1].click();
+  it('offers each connection and the listed models it runs, rules out the ones the level\'s rule would never use, and adds a pick', () => {
+    const { card, refresh, page, text } = render('TENANT_ADMIN');
+    const sensitive = page.drafts().findIndex(d => d.sensitivity === 'sensitive');
+    const options = page.optionsFor(sensitive);
+    expect(options.map(o => o.value)).toEqual(['1049', '1049|qwen3:8b', '1050', '1050|claude-sonnet-5']);
+    expect(options.map(o => !!o.disabled)).toEqual([false, false, true, true]);
+    expect(options.map(o => o.group)).toEqual(['Local box', 'Local box', 'Claude', 'Claude']);
+    expect(options[3].badge).toBe('Not local');
+    expect(card('sensitive').querySelector('app-advanced-select')).not.toBeNull();
+    page.addModel(sensitive, options[3]);
+    expect(page.drafts()[sensitive].allowedModels).toEqual([]);
+    page.addModel(sensitive, options[1]);
     refresh();
-    expect(page.drafts()[2].allowedModels).toEqual(['1049|qwen3:8b']);
+    expect(page.drafts()[sensitive].allowedModels).toEqual(['1049|qwen3:8b']);
+    expect(text(card('sensitive').querySelector('[data-allowed]'))).toContain('Local box · Qwen3 8B (qwen3:8b)');
+    expect(page.optionsFor(sensitive).map(o => o.value)).not.toContain('1049|qwen3:8b');
+    (card('sensitive').querySelector('[data-entry="1049|qwen3:8b"] button') as HTMLButtonElement).click();
+    refresh();
+    expect(page.drafts()[sensitive].allowedModels).toEqual([]);
   });
 
   it('puts a changed level back to its defaults, and discards every change', () => {
@@ -168,7 +188,7 @@ describe('Administration › Data policies -- as a member', () => {
     expect(text(el.querySelector('[data-read-only]'))).toContain('Only a workspace administrator can change');
     expect(text(card('sensitive'))).toContain('Local only');
     expect(text(card('sensitive'))).toContain('Off');
-    expect(text(card('public'))).toContain('Any the rule allows');
+    expect(text(card('public'))).toContain('Any listed model the rule allows');
   });
 });
 
@@ -201,7 +221,7 @@ describe('Administration › Data policies -- the model list loading, empty, err
     page.loadConnections();
     refresh();
     expect(page.connectionsLoading()).toBe(true);
-    expect(el.textContent).not.toContain('No model connections in this workspace yet.');
+    expect(el.textContent).not.toContain('No model connection in this workspace yet.');
   });
 
   it('says there are none once an empty list answers', () => {
@@ -211,7 +231,7 @@ describe('Administration › Data policies -- the model list loading, empty, err
     page.loadConnections();
     refresh();
     expect(page.connectionsLoading()).toBe(false);
-    expect(el.textContent).toContain('No model connections in this workspace yet.');
+    expect(el.textContent).toContain('No model connection in this workspace yet.');
   });
 
   it('says the list could not be read, in plain words, with Try again', () => {

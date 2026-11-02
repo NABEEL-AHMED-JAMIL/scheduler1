@@ -74,8 +74,12 @@
               </app-inline-status>
             </app-field>
             <app-field class="fr-6" label="Model" for="pModel" [control]="form.get('model')" [submitted]="submitted()" [hint]="modelHint()">
-              <input id="pModel" class="input mono" formControlName="model" [placeholder]="connection()?.defaultModel || 'connection default'" list="pModels" />
-              <datalist id="pModels">@for (m of connection()?.models ?? []; track m) { <option [value]="m"></option> }</datalist>
+              <app-advanced-select id="pModel" formControlName="model" [options]="modelOptions()" [allowClear]="true" [nullable]="true"
+                                   [clearLabel]="'Connection default' + (connection()?.defaultModel ? ' (' + connection()!.defaultModel + ')' : '')"
+                                   [placeholder]="'Connection default' + (connection()?.defaultModel ? ' (' + connection()!.defaultModel + ')' : '')"
+                                   [loading]="catalogLoading()" loadingText="Loading the list of models…" searchPlaceholder="Search the models"
+                                   emptyText="No model on the platform's list for this connection's provider yet."
+                                   unknownText="Not on the platform's list: runs on it are refused" />
             </app-field>
             <app-field class="fr-3" label="Temperature" for="pTemp" [control]="form.get('temperature')" [submitted]="submitted()" hint="0 is deterministic; blank is the provider's default.">
               <input id="pTemp" type="number" min="0" max="2" step="0.1" class="input" formControlName="temperature" placeholder="0.2" />

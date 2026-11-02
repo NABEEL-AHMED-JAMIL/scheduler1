@@ -93,8 +93,9 @@ describe('tab hubs: the strip lists the tabs the reader may open', () => {
   });
 
   it('many, filtered by role: Platform\'s tabs are a platform administrator\'s', () => {
-    // Owner #20-#23 (2026-10-19): Workspaces, Requests, Managed service, Staff activity, Service health, Engine settings.
-    expect(strip('/platform/workspaces', 'PLATFORM_ADMIN')).toHaveLength(6);
+    // Owner #20-#23 (2026-10-19): Workspaces, Requests, Managed service, Staff activity, Service health, Engine settings; and
+    // (owner 2026-11-02) Models, the platform's list of models.
+    expect(strip('/platform/workspaces', 'PLATFORM_ADMIN')).toHaveLength(7);
     expect(strip('/platform/workspaces', 'TENANT_ADMIN')).toEqual([]);
   });
 

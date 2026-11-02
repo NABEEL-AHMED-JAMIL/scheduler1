@@ -15,8 +15,9 @@ const REFUSED: RegExp[] = [
   /^\/documentConverter\.json\/(render\b|fetchAllTemplates|fetchTemplateById|saveTemplate|deleteTemplate)/,
   /^\/report(Template|Library|Asset|Data|Preview|Approve|Publish|Generate)\.json\//,
   /^\/reportStudio\.json\/(?!schema|components|pageLimit|ceiling)/,
-  // ai-service (the Tool Registry's tools/list|history|platformState and aiConnection.json/list stay).
-  /^\/aiPrompt\.json\/(?!tools\/(list|history|platformState)\b)/, /^\/askData\.json\//, /^\/reportDesigner\.json\//,
+  // ai-service (the Tool Registry's tools/list|history|platformState, the platform's list of models -- owner 2026-11-02 -- and
+  // aiConnection.json/list stay).
+  /^\/aiPrompt\.json\/(?!tools\/(list|history|platformState)\b|modelCatalog\b)/, /^\/askData\.json\//, /^\/reportDesigner\.json\//,
   /^\/aiAgent\.json\/(?!processAdHoc)/, /^\/aiConnection\.json\/(?!list\b)/,
   // Core (the names list, the counts and the task registry's own lines stay).
   /^\/sourceJob\.json\//, /^\/sourceTask\.json\/(?!names\b)/,

@@ -9,6 +9,8 @@ import { Field } from '../../../shared/ui/field';
 import { FormDialog } from '../../../shared/ui/form-dialog';
 import { Combobox } from '../../../shared/ui/combobox';
 import { AI_PROVIDERS, ModelConnection, providerOf } from '../ai-providers';
+import { AdvancedSelect } from '../../../shared/ui/advanced-select';
+import { CatalogModel, ModelCatalogApi, catalogOption, modelsFor } from '../model-catalog/model-catalog';
 
 /**
  * Add or edit a model connection: where prompts run. The key travels in once and never
@@ -17,7 +19,7 @@ import { AI_PROVIDERS, ModelConnection, providerOf } from '../ai-providers';
  */
 @Component({
   selector: 'app-connection-dialog',
-  imports: [ReactiveFormsModule, Field, FormDialog, Combobox],
+  imports: [ReactiveFormsModule, Field, FormDialog, Combobox, AdvancedSelect],
   template: `
     <app-form-dialog [heading]="isEdit() ? 'Edit connection' : 'New model connection'"
                      [subtitle]="isEdit() ? data.connection!.name : 'A provider, a key and a default model. Prompts pick a connection or take the workspace default.'"
@@ -55,9 +57,11 @@ import { AI_PROVIDERS, ModelConnection, providerOf } from '../ai-providers';
         }
         <div class="form-grid">
           <app-field label="Default model" for="cxModel" [required]="true" [control]="form.get('defaultModel')" [submitted]="submitted()"
-                     [hint]="'What a prompt runs on unless it names a model — e.g. ' + provider().modelHint + '. Test connection lists what the provider has.'">
-            <input id="cxModel" class="input mono" formControlName="defaultModel" [placeholder]="provider().modelHint" list="cxModels" />
-            <datalist id="cxModels">@for (m of data.connection?.models ?? []; track m) { <option [value]="m"></option> }</datalist>
+                     hint="What a prompt runs on unless it names a model. Chosen from the platform's list of models for this provider; the platform administrator adds models to it.">
+            <app-advanced-select id="cxModel" formControlName="defaultModel" [options]="modelOptions()" [loading]="catalogLoading()"
+                                 loadingText="Loading the list of models…" placeholder="Choose a model" searchPlaceholder="Search the models"
+                                 [emptyText]="modelsEmpty()"
+                                 unknownText="Not on the platform's list: calls on it are refused" />
           </app-field>
           <app-field label="State" for="cxStatus" [control]="form.get('status')" [submitted]="submitted()">
             <select id="cxStatus" class="input" formControlName="status">
@@ -98,6 +102,11 @@ export class ConnectionDialog {
   private readonly fb = inject(FormBuilder);
   private readonly http = inject(HttpClient);
   private readonly toast = inject(ToastService);
+  private readonly catalogApi = inject(ModelCatalogApi);
+  /** Owner 2026-11-02: the platform's list of models (the ones switched on); a default model is chosen from it. */
+  readonly catalog = signal<CatalogModel[]>([]);
+  readonly catalogLoading = signal(true);
+  readonly catalogError = signal('');
 
   readonly providers = AI_PROVIDERS;
   readonly saving = signal(false);
@@ -120,6 +129,9 @@ export class ConnectionDialog {
 
   private readonly providerKey = toSignal(this.form.get('provider')!.valueChanges, { initialValue: this.form.get('provider')!.value });
   readonly provider = computed(() => providerOf(this.providerKey()));
+  readonly modelOptions = computed(() => modelsFor(this.catalog(), this.providerKey()).map(catalogOption));
+  readonly modelsEmpty = computed(() => this.catalogError()
+    || `No model on the platform's list for ${this.provider().label} yet. Ask the platform administrator to add one.`);
   /** A BAA covers a hosted provider; a local (Ollama) model is already allowed by every data policy rule but "any". */
   readonly showBaa = computed(() => this.provider().key !== 'Ollama');
 
@@ -132,6 +144,10 @@ export class ConnectionDialog {
   private readonly workspaceRequired = !!this.data.tenants?.length && !this.isEdit();
 
   constructor() {
+    this.catalogApi.list().subscribe({
+      next: r => { this.catalogLoading.set(false); if (r.status === API_SUCCESS) this.catalog.set(Array.isArray(r.data) ? r.data : []); else this.catalogError.set(r.message); },
+      error: () => { this.catalogLoading.set(false); this.catalogError.set('The platform\'s list of models could not be read.'); },
+    });
     // app-field's [required] only draws the star. The endpoint, key and workspace were checked by
     // a toast each after the form had already passed as valid, with no field marked; the stars
     // and the validators now read the same signals, as the Kafka dialog does.

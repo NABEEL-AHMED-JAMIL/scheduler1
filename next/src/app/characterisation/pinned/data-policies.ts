@@ -54,6 +54,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /aiPrompt.json/dataPolicy",
+      "GET /aiPrompt.json/modelCatalog",
       "GET /sourceJob.json/review/policy",
       "GET /documentReview.json/policy",
       "GET /pageAccess.json/delegates/mine"
@@ -239,6 +240,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /aiPrompt.json/dataPolicy",
+      "GET /aiPrompt.json/modelCatalog",
       "GET /aiConnection.json/list",
       "GET /sourceJob.json/review/policy",
       "GET /documentReview.json/policy",
@@ -256,6 +258,9 @@ export const PINNED: Record<string, unknown> = {
       "Legal holds"
     ],
     "buttons": [
+      "Add an allowed model for Internal",
+      "Add an allowed model for Public",
+      "Add an allowed model for Sensitive",
       "Discard",
       "Discard changes",
       "Edit retention",
@@ -288,17 +293,12 @@ export const PINNED: Record<string, unknown> = {
       "Keep Internal run files (days)",
       "Keep Public run files (days)",
       "Keep Sensitive run files (days)",
-      "Local Ollama — any model",
       "Model rule for Internal",
       "Model rule for Public",
       "Model rule for Sensitive",
       "Off",
       "On",
-      "The pipeline's own",
-      "UI-CHECK Ollama qwen3 (tool loop) — any model",
-      "gemma3:1b",
-      "gemma3:4b",
-      "qwen3:8b"
+      "The pipeline's own"
     ],
     "links": [
       "/administration",
@@ -365,14 +365,7 @@ export const PINNED: Record<string, unknown> = {
           "level": "sensitive",
           "state": "",
           "rule": null,
-          "models": [
-            "1049",
-            "1049|qwen3:8b",
-            "1047",
-            "1047|gemma3:1b",
-            "1047|gemma3:4b",
-            "1047|qwen3:8b"
-          ],
+          "models": [],
           "switches": [],
           "terms": []
         },
@@ -380,14 +373,7 @@ export const PINNED: Record<string, unknown> = {
           "level": "internal",
           "state": "",
           "rule": null,
-          "models": [
-            "1049",
-            "1049|qwen3:8b",
-            "1047",
-            "1047|gemma3:1b",
-            "1047|gemma3:4b",
-            "1047|qwen3:8b"
-          ],
+          "models": [],
           "switches": [],
           "terms": []
         },
@@ -395,14 +381,7 @@ export const PINNED: Record<string, unknown> = {
           "level": "public",
           "state": "",
           "rule": null,
-          "models": [
-            "1049",
-            "1049|qwen3:8b",
-            "1047",
-            "1047|gemma3:1b",
-            "1047|gemma3:4b",
-            "1047|qwen3:8b"
-          ],
+          "models": [],
           "switches": [],
           "terms": []
         },

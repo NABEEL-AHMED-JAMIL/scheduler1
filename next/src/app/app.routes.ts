@@ -821,6 +821,16 @@ export const routes: Routes = [
         canActivate: [roleGuard],
       },
       {
+        // Owner 2026-11-02: the platform's list of models -- which may be used at all. Workspaces choose from it; every call
+        // is checked against it. Saving, switching and the history are PLATFORM_ADMIN on the server.
+        path: 'platform/models',
+        title: 'Models',
+        loadComponent: () =>
+          import('./features/ai/model-catalog/models-page').then(m => m.ModelsPage),
+        data: { minRole: 'PLATFORM_ADMIN' },
+        canActivate: [roleGuard],
+      },
+      {
         path: 'settings/home-pages',
         title: 'Home pages',
         loadComponent: () =>

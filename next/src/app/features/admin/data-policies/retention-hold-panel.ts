@@ -31,13 +31,13 @@ type Scope = 'WORKSPACE' | 'PIPELINE' | 'RUN';
           <p id="hold-scope-label" class="label m-0">Hold</p>
           <label class="flex items-start gap-2 text-sm"><input type="radio" name="hold-scope" class="mt-0.5" [checked]="scope() === 'WORKSPACE'"
                  (change)="scope.set('WORKSPACE')" data-test="hold-workspace" />
-            <span>The whole workspace<span class="block field-note text-[color:var(--text-muted)]">Every kind of data; no pass removes anything.</span></span></label>
+            <span>The whole workspace<span class="block field-note text-[color:var(--text-muted)]">Every kind of data, documents, AI conversations and notifications included; no pass removes anything, and expired run files are kept.</span></span></label>
           <label class="flex items-start gap-2 text-sm"><input type="radio" name="hold-scope" class="mt-0.5" [checked]="scope() === 'PIPELINE'"
                  (change)="scope.set('PIPELINE')" data-test="hold-pipeline" />
-            <span>One pipeline<span class="block field-note text-[color:var(--text-muted)]">Its runs' outputs and logs, its forms' submissions and the files its runs took.</span></span></label>
+            <span>One pipeline<span class="block field-note text-[color:var(--text-muted)]">Its runs' outputs, run files and logs, its forms' submissions, the files its runs took and the reports they made.</span></span></label>
           <label class="flex items-start gap-2 text-sm"><input type="radio" name="hold-scope" class="mt-0.5" [checked]="scope() === 'RUN'"
                  (change)="scope.set('RUN')" data-test="hold-run" />
-            <span>One run<span class="block field-note text-[color:var(--text-muted)]">Its outputs, datasets and logs.</span></span></label>
+            <span>One run<span class="block field-note text-[color:var(--text-muted)]">Its outputs, run files, datasets, logs and reports.</span></span></label>
         </div>
         @if (scope() === 'PIPELINE') {
           <div>

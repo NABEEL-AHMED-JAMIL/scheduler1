@@ -238,6 +238,7 @@ export const PINNED: Record<string, unknown> = {
       "/platform",
       "/platform/engine",
       "/platform/managed-service",
+      "/platform/models",
       "/platform/requests",
       "/platform/service-health",
       "/platform/staff-activity",

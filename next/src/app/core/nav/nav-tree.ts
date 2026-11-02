@@ -325,6 +325,8 @@ export const NAV: NavItem[] = [
       // Owner #21: Reliability slimmed into Service health. #22 and #23: Billing analytics and Rate cards moved into Billing.
       { label: 'Service health', path: '/platform/service-health', icon: 'activity', platformOnly: true },
       { label: 'Engine settings', path: '/platform/engine', icon: 'settings', platformOnly: true },
+      // Owner 2026-11-02: the list of models workspaces may choose from (aiPrompt.json/modelCatalog writes are PLATFORM_ADMIN).
+      { label: 'Models', path: '/platform/models', icon: 'sparkle', platformOnly: true },
     ],
   },
 ];

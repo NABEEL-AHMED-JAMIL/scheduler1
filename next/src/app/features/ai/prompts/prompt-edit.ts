@@ -29,9 +29,12 @@ import { InlineStatus, createLoadState } from '../../../shared/ui/loading';
  * rendered input and the model's answer on the right, so a change is run before it is
  * saved. Every save is a version; "Save & activate" is what a pipeline step may then run.
  */
+import { AdvancedSelect } from '../../../shared/ui/advanced-select';
+import { CatalogModel, ModelCatalogApi, catalogOption, modelsFor } from '../model-catalog/model-catalog';
 @Component({
   selector: 'app-prompt-edit',
-  imports: [ActionsBar, Section, FormRow, PageHeader, ReactiveFormsModule, RouterLink, Field, Icon, Combobox, ServerTimePipe, DecimalPipe, ManagedBanner, InlineStatus],
+  imports: [ActionsBar, Section, FormRow, PageHeader, ReactiveFormsModule, RouterLink, Field, Icon, Combobox, ServerTimePipe, DecimalPipe, ManagedBanner, InlineStatus,
+    AdvancedSelect],
   templateUrl: './prompt-edit.html',
 })
 export class PromptEdit implements OnInit {
@@ -41,6 +44,10 @@ export class PromptEdit implements OnInit {
   readonly promptId = input<string>();
   private readonly fb = inject(FormBuilder);
   private readonly http = inject(HttpClient);
+  private readonly catalogApi = inject(ModelCatalogApi);
+  /** Owner 2026-11-02: the platform's list of models (the ones switched on); a prompt's model is chosen from it. */
+  readonly catalog = signal<CatalogModel[]>([]);
+  readonly catalogLoading = signal(true);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
   private readonly auth = inject(AuthService);
@@ -137,8 +144,10 @@ export class PromptEdit implements OnInit {
   readonly modelHint = computed(() => {
     if (this.needsWorkspace()) return 'Pick a workspace first; its connections and models are offered here.';
     const c = this.connection();
-    return c ? `Blank runs on the connection's default, ${c.defaultModel}.${c.models?.length ? ' Listed: ' + c.models.slice(0, 6).join(', ') + (c.models.length > 6 ? '…' : '') : ''}` : 'Pick a connection, or set a workspace default, so there is somewhere to run.';
+    return c ? `Chosen from the platform's list of models for ${c.provider}. None: the connection's default, ${c.defaultModel}.` : 'Pick a connection, or set a workspace default, so there is somewhere to run.';
   });
+  /** The listed models the connection's provider runs. */
+  readonly modelOptions = computed(() => modelsFor(this.catalog(), this.connection()?.provider).map(catalogOption));
   /** Placeholders the template names that no variable declares -- shown, and refused at save. */
   readonly undeclared = computed(() => {
     const declared = new Set(this.declaredNames());
@@ -214,6 +223,10 @@ export class PromptEdit implements OnInit {
 
   ngOnInit(): void {
     this.loadConnections();
+    this.catalogApi.list().subscribe({
+      next: r => { this.catalogLoading.set(false); if (r.status === API_SUCCESS) this.catalog.set(Array.isArray(r.data) ? r.data : []); },
+      error: () => this.catalogLoading.set(false),
+    });
     if (this.isPlatformAdmin()) this.loadTenants();
     if (this.isEdit()) this.load();
   }

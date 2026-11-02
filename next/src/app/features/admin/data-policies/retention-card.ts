@@ -167,6 +167,20 @@ import { RetentionPlatformPanel } from './retention-platform-panel';
               <div class="min-w-0 flex-1">
                 <h3 class="font-semibold text-sm m-0">Legal holds</h3>
                 <p class="text-xs text-[color:var(--text-muted)] m-0 mt-0.5">While a hold is on, nothing in its scope is removed. Placing and releasing one is recorded.</p>
+                <details class="text-xs text-[color:var(--text-secondary)] mt-1" data-hold-help>
+                  <summary class="cursor-pointer text-[color:var(--text-link,inherit)]">What is a legal hold, and how does it work with retention?</summary>
+                  <div class="flex flex-col gap-1 mt-1 max-w-[72ch]">
+                    <p class="m-0">A legal hold is a "do not delete" order. Place one when data may be needed for a lawsuit, an audit, an
+                      investigation or a patient's request: it stops automatic deletion until the matter is over, whatever the retention days say.</p>
+                    <p class="m-0"><b>The whole workspace</b> stops every retention pass from removing anything. <b>One pipeline</b> or <b>one
+                      run</b> keeps that pipeline's or run's outputs, datasets, logs, files, form submissions and reports; documents, AI
+                      conversations and notifications are kept only by a workspace hold. The run files a run keeps for its steps and downloads
+                      (Keep run files, above) are kept too, even after they expire.</p>
+                    <p class="m-0">Releasing a hold needs a reason. Retention then carries on: the next pass removes what is older than its days.
+                      Who placed or released a hold, when and why is under History, above. A hold stops automatic deletion only; it does not
+                      change who can see the data.</p>
+                  </div>
+                </details>
               </div>
               <button type="button" class="btn btn-default btn-sm" (click)="openHold()" data-retention-place-hold><app-icon name="lock" />Place a hold</button>
             </div>

@@ -19,7 +19,7 @@ function dialogWith(data: any) {
     providers: [
       { provide: DIALOG_DATA, useValue: data },
       { provide: DialogRef, useValue: { close: vi.fn() } },
-      { provide: HttpClient, useValue: { post } },
+      { provide: HttpClient, useValue: { post, get: vi.fn(() => of({ status: 'SUCCESS', data: [] })) } },
       { provide: ToastService, useValue: toast },
     ],
   });

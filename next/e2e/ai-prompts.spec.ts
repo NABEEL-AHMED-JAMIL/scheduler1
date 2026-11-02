@@ -70,7 +70,8 @@ test.describe('AI prompts in pipelines', () => {
     await page.getByRole('heading', { name: 'New model connection' }).waitFor();
     await page.locator('#cxName').fill(CONNECTION);
     await page.locator('#cxProvider').selectOption('Ollama');
-    await page.locator('#cxModel').fill(MODEL);
+    // Owner 2026-11-02: the default model is chosen from the platform's list of models (by its name as the provider names it).
+    await pickOption(page.locator('#cxModel'), MODEL);
     await page.getByRole('button', { name: 'Create' }).click();
     await expect(page.getByText(`"${CONNECTION}" saved.`)).toBeVisible();
     const connections = await (await request.get(`${api}/aiConnection.json/list`, { headers })).json();

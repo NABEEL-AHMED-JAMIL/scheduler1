@@ -24,7 +24,8 @@ review where the pipeline asks for a review, and never treats it as a decision. 
    LM Studio and others).
 4. Fill **API endpoint** only where the provider needs one (Azure OpenAI and OpenAI-compatible servers); the others have it
    built in. Paste the **API key** for a hosted provider. A local Ollama connection needs no key.
-5. Type the **Default model**: what a prompt runs on unless it names another model.
+5. Choose the **Default model** from the platform's list of models for that provider: what a prompt runs on unless it
+   names another model. The list is kept by the platform's administrator (see *The platform's list of models* below).
 6. Set the two caps (see below) and save.
 7. Choose **Test connection**. A passing test lists the models the provider offers and confirms the key; the result shows
    under **Last test**.
@@ -49,9 +50,19 @@ review where the pipeline asks for a review, and never treats it as a decision. 
 - Which models may see a given kind of data is the workspace's data policy:
   see [Which models may see which data](#ai-data-levels).
 
+## The platform's list of models
+Only the models on the platform's list may be used. The platform's administrator keeps it on **Platform › Models**: each
+model's name as its provider knows it (such as `qwen3:8b`), a display name, the provider that runs it, whether it is local
+or hosted, a note, and whether it is switched on. Every model you pick — a connection's default model, a prompt's model,
+a data policy's allowed models — comes from it, and every model call is checked against it when it runs: a model that is
+not on the list, or is switched off, is refused with a sentence that says so, and nothing is sent. Adding a model to the
+list does not install it; the backend team installs models on the platform's machines. Every change to the list is
+recorded under **Changes** on that page.
+
 ## Local models
-An **Ollama (local)** connection runs models on machines your organisation runs itself, so the data never goes to a hosted
-provider. The **Sensitive** data level starts as *Local only*: until an administrator changes it, only local connections
+An **Ollama (local)** connection at your own network's address runs models on machines your organisation runs itself, so
+the data never goes to a hosted provider. An Ollama *cloud* model (its name ends in `-cloud`) and an Ollama connection at an
+internet address are hosted. The **Sensitive** data level starts as *Local only*: until an administrator changes it, only local connections
 may see sensitive data.
 
 ## Make a connection inactive, or the default

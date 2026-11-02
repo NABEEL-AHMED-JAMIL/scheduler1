@@ -1,4 +1,5 @@
 import { ModelConnection } from '../../ai/ai-providers';
+import { CatalogModel, catalogEntry, isCloudName, modelsFor } from '../../ai/model-catalog/model-catalog';
 import { SENSITIVITY_LEVELS, SensitivityLevel } from '../../../shared/ui/sensitivity';
 
 /**
@@ -38,9 +39,9 @@ export const MODEL_RULES: { value: ModelRule; label: string; short: string; expl
   { value: 'any', label: 'Any model', short: 'Any model',
     explain: 'Any of the workspace\'s model connections may see this data, hosted or local.' },
   { value: 'baa', label: 'BAA-signed hosted, or local', short: 'BAA-signed or local',
-    explain: 'Local models, and hosted models only on a connection marked as covered by a signed Business Associate Agreement (BAA).' },
+    explain: 'Local models, and hosted models only on a connection a workspace administrator has marked as covered by a signed Business Associate Agreement (BAA). A hosted connection without the mark is refused.' },
   { value: 'local', label: 'Local only', short: 'Local only',
-    explain: 'Only models running on your own machines (Ollama connections). The data never goes to a hosted provider.' },
+    explain: 'Only models that run on your own machines: an Ollama connection at your own network\'s address, with a model the platform\'s list calls local. Never a hosted provider, and never an Ollama cloud model.' },
 ];
 
 export function ruleOf(rule: string | null | undefined) {
@@ -131,25 +132,51 @@ export function saveBody(drafts: LevelDraft[], originals: PolicyLevel[], tenantI
 export interface ModelChoice {
   value: string;
   connectionId: number;
+  connectionName: string;
   model: string | null;
+  /** The model's name on the platform's list (its display name); the connection's for "any listed model". */
   label: string;
   local: boolean;
   baa: boolean;
 }
 
-/** A connection is local when its provider is Ollama -- ai-service's own test. */
-export const isLocalConnection = (c: Pick<ModelConnection, 'provider'>) => c.provider === 'Ollama';
+/**
+ * A connection runs on your own machines when it is Ollama at this network's address (none, a name without dots, a
+ * local name or a private IP) -- ai-service's own test (TenantDataPolicy.isLocal). Any other is hosted.
+ */
+export function isLocalConnection(c: Pick<ModelConnection, 'provider'> & { apiEndpoint?: string | null }): boolean {
+  if (c.provider !== 'Ollama') return false;
+  const endpoint = (c.apiEndpoint ?? '').trim();
+  if (!endpoint) return true;
+  let host: string;
+  try { host = new URL(endpoint).hostname.toLowerCase().replace(/^\[|\]$/g, ''); } catch { return false; }
+  if (!host) return false;
+  if (host === 'localhost' || host === 'host.docker.internal' || /\.(internal|local|localhost)$/.test(host)) return true;
+  const v4 = host.match(/^(\d{1,3})\.(\d{1,3})\.\d{1,3}\.\d{1,3}$/);
+  if (v4) {
+    const [a, b] = [Number(v4[1]), Number(v4[2])];
+    return a === 10 || a === 127 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 169 && b === 254);
+  }
+  if (host.includes(':')) return host === '::1' || /^f[cd]/.test(host) || host.startsWith('fe80');
+  return !host.includes('.');
+}
 
-/** Each connection of the workspace whole ("any of its models"), then each model it names. */
-export function modelChoices(connections: ModelConnection[], tenantId: number | null): ModelChoice[] {
+/**
+ * Owner 2026-11-02: each connection of the workspace whole ("any listed model"), then each model on the platform's list
+ * that its provider runs and that is switched on. Choosing is not installing: the list is the platform administrator's,
+ * and the backend team installs a model. A model the list calls hosted, or an Ollama cloud model, is hosted.
+ */
+export function modelChoices(connections: ModelConnection[], tenantId: number | null, catalog: CatalogModel[] = []): ModelChoice[] {
   const mine = connections.filter(c => tenantId == null || c.tenantId == null || c.tenantId === tenantId);
   return mine.flatMap(c => {
     const local = isLocalConnection(c);
     const baa = !!c.baaSigned;
-    const models = [...new Set([c.defaultModel, ...(c.models ?? [])].filter((m): m is string => !!m && !!m.trim()))];
     return [
-      { value: String(c.connectionId), connectionId: c.connectionId, model: null, label: `${c.name} — any model`, local, baa },
-      ...models.map(m => ({ value: `${c.connectionId}|${m}`, connectionId: c.connectionId, model: m, label: `${c.name} · ${m}`, local, baa })),
+      { value: String(c.connectionId), connectionId: c.connectionId, connectionName: c.name, model: null, label: 'Any listed model', local, baa },
+      ...modelsFor(catalog, c.provider).map(m => ({
+        value: `${c.connectionId}|${m.modelName}`, connectionId: c.connectionId, connectionName: c.name, model: m.modelName,
+        label: m.displayName, local: local && m.local && !isCloudName(m.modelName), baa,
+      })),
     ];
   });
 }
@@ -161,12 +188,15 @@ export function ruleBlocks(rule: ModelRule, choice: ModelChoice): string | null 
   return null;
 }
 
-/** A saved entry as a person reads it: by its connection's name when the connections could be read. */
-export function allowedText(entry: string, connections: ModelConnection[]): string {
+/** A saved entry as a person reads it: by its connection's name and the model's name on the list, when they could be read. */
+export function allowedText(entry: string, connections: ModelConnection[], catalog: CatalogModel[] = []): string {
   const [id, ...rest] = entry.split('|');
   const model = rest.length ? rest.join('|') : null;
-  const name = connections.find(c => String(c.connectionId) === id.trim())?.name ?? `Connection ${id.trim()}`;
-  return model ? `${name} · ${model}` : `${name} — any model`;
+  const connection = connections.find(c => String(c.connectionId) === id.trim());
+  const name = connection?.name ?? `Connection ${id.trim()}`;
+  if (!model) return `${name} — any listed model`;
+  const listed = connection ? catalogEntry(catalog, connection.provider, model) : null;
+  return `${name} · ${listed && listed.displayName !== model ? `${listed.displayName} (${model})` : model}`;
 }
 
 /** One line for a level: its rule, its write tools, its retention. */
