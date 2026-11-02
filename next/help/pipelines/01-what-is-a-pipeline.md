@@ -26,6 +26,11 @@ rows and passes rows on:
 3. Output steps (**Save File**, **Upload to bucket**, **Generate report**, **Send webhook** and the others) pass the rows
    on unchanged, so a pipeline can write in several places.
 
+**Empty values in a condition.** A **Filter** condition (and a **Compute** formula, or a **Call API** check) never counts
+an empty value as less or more than anything: "hba1c **lt** 8" (less than) keeps only the rows that have an HbA1c below
+8, and a row with no HbA1c is left out; **lte**, **gt** and **gte** work the same way. To pick the empty ones, use
+**is_empty**; to require a value, add **not_empty**. **ne** (is not) keeps an empty value: an empty HbA1c is not 7.2.
+
 The builder groups the steps into stages so a long pipeline stays readable: **Read** (where the rows come from),
 **Check**, **Transform**, **AI**, **Review** (the run waits for a person) and **Write** (where the results go).
 
