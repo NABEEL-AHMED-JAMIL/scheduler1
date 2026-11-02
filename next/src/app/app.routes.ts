@@ -71,6 +71,14 @@ export const routes: Routes = [
     loadComponent: () => import('./features/docs/docs').then(m => m.Docs),
   },
   {
+    // Reports redesign (feature 1): the public verify page a report's QR code opens. Public on purpose, like a shared form:
+    // the version's random code is the only key, media answers only whether that copy is genuine, current, replaced or
+    // void and who issued it -- never its contents; no shell, no sign-in.
+    path: 'r/:code',
+    title: 'Verify a report',
+    loadComponent: () => import('./features/report-studio/verify/public-verify').then(m => m.PublicVerify),
+  },
+  {
     // MIG-278: a form shared by link. Public on purpose -- the link's token is the only key, and Core decides what it
     // opens; the page shows the form and nothing of the workspace or the console behind it.
     path: 'f/:token',

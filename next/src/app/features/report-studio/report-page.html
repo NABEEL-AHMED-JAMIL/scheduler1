@@ -301,7 +301,9 @@
                 <div class="rsp-qr"><span class="rsp-qr-tile" aria-hidden="true"><app-icon name="qr" size="2.5rem" /></span>
                   <div class="min-w-0">
                     @switch (q.content) {
-                      @case ('verifyLink') { <b>Scan to verify</b><div class="text-xs text-[color:var(--text-muted)] mt-1">Opens <span class="mono break-all">{{ verifyLink(v) }}</span>. Only people signed in to {{ workspace() || 'this workspace' }} can follow it.</div> }
+                      @case ('verifyLink') { <b>Scan to verify</b><div class="text-xs text-[color:var(--text-muted)] mt-1">Opens <span class="mono break-all">{{ verifyLink(v) }}</span>.
+                        @if (v.verifyCode) { Anyone can see whether this copy is genuine and current; the report's contents stay behind sign-in. }
+                        @else { This version was made before public codes: only people signed in to {{ workspace() || 'this workspace' }} can follow it. }</div> }
                       @case ('reportId') { <b>The report's number</b><div class="text-xs text-[color:var(--text-muted)] mt-1">Encodes <span class="mono">{{ r.label }}</span> and its version as text.</div> }
                       @case ('binding') { <b>A value from the data</b><div class="text-xs text-[color:var(--text-muted)] mt-1">Each report encodes its own value, such as a visit reference.</div> }
                       @default { <b>Fixed text</b><div class="text-xs text-[color:var(--text-muted)] mt-1">The template's own words, the same on every report.</div> }
@@ -310,6 +312,7 @@
                   </div></div>
                 @if (q.content === 'verifyLink') {
                   <div class="flex flex-wrap gap-2">
+                    @if (v.verifyCode) { <a class="btn btn-default btn-sm" [href]="'/r/' + v.verifyCode" target="_blank" rel="noopener" data-test="see-scan"><app-icon name="eye" />See what a scan shows</a> }
                     <button type="button" class="btn btn-default btn-sm" (click)="copyVerify(v)"><app-icon name="copy" />Copy link</button>
                     @if (v.approval?.signed) { <button type="button" class="btn btn-default btn-sm" (click)="verifyVersion(v)"><app-icon name="shield" />Verify signature</button> }
                   </div>

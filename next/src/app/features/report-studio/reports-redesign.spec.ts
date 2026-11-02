@@ -159,3 +159,20 @@ describe('the overview -- figures', () => {
     expect(trendWords(103, 87)).toBe('+18% on the 30 days before');
   });
 });
+
+describe('the public verify page (feature 1)', () => {
+  it('says each state in words, never the report\'s contents', async () => {
+    const { verdict, codeOf, shortPrint, sha256Hex } = await import('./verify/public-verify');
+    expect(verdict({ state: 'GENUINE', issuer: 'Riverside Health', signed: true }).title).toBe('This report is genuine and current');
+    expect(verdict({ state: 'REPLACED', newer: { version: 3, issuedAt: '26 Oct 2026, 10:00' } }).text).toContain('version 3 (26 Oct 2026, 10:00) replaces it');
+    expect(verdict({ state: 'VOID', issuer: 'Riverside Health', voidedAt: '22 Oct 2026, 09:00' }).tone).toBe('crit');
+    expect(verdict({ state: 'NOT_APPROVED' }).tone).toBe('warn');
+    expect(verdict({ state: 'NOT_FOUND' }).title).toBe('Not found');
+    expect(codeOf(' 7kq2m 9xd4p ')).toBe('7KQ2M-9XD4P');
+    expect(codeOf('OIL00-00000')).toBe('01100-00000');
+    expect(codeOf('UUUUU-UUUUU')).toBeNull();
+    expect(shortPrint('7c419e0a52d3aaaa' + '0'.repeat(40) + '0b6fe1a2')).toBe('SHA-256 7c41 9e0a 52d3 aaaa … 0b6f e1a2');
+    expect(await sha256Hex(new TextEncoder().encode('abc').buffer as ArrayBuffer))
+      .toBe('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
+  });
+});

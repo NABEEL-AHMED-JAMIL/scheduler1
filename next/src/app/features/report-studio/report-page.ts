@@ -366,9 +366,13 @@ export class ReportPage implements OnInit {
   /** May this person void a version (the people who generate reports). */
   readonly canVoid = computed(() => this.canGenerate());
 
-  /** The verify link a scan opens today (signed in only): the console's report page for that version. */
+  /**
+   * The link a scan opens: the public verify page by the version's random code (feature 1); a version made before codes
+   * kept the signed-in link it printed.
+   */
   verifyLink(v: ReportVersionRow): string {
-    return `${window.location.origin}/reports/library/${v.reportId}?version=${v.version}&verify=1`;
+    return v.verifyCode ? `${window.location.origin}/r/${v.verifyCode}`
+      : `${window.location.origin}/reports/library/${v.reportId}?version=${v.version}&verify=1`;
   }
 
   copyVerify(v: ReportVersionRow): void {

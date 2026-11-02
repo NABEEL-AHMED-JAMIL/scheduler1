@@ -41,6 +41,12 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
+      "path": "/r/:code",
+      "title": "Verify a report",
+      "guards": [],
+      "lazy": true
+    },
+    {
       "path": "/f/:token",
       "title": "Form",
       "guards": [],

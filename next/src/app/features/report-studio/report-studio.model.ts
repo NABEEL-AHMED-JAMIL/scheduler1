@@ -283,6 +283,8 @@ export interface ReportVersionRow {
   downloadable?: boolean;
   refusal?: string;
   expiredAt?: string | null;
+  /** Reports redesign (feature 1): the version's public verify code (its QR code opens /r/<code>); none before codes. */
+  verifyCode?: string | null;
 }
 
 /**
