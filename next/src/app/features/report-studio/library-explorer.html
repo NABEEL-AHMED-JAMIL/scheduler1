@@ -94,11 +94,11 @@
             <th class="w-8"><input type="checkbox" class="checkbox" [checked]="allPicked()" [disabled]="!rows().length" (change)="togglePage($any($event.target).checked)" aria-label="Select this page" data-pick-page /></th>
             <th class="w-8"><span class="sr-only">Page</span></th>
             <th [attr.aria-sort]="sortMark('name')"><button type="button" class="lx-sort" (click)="sortBy('name')">Report</button></th>
-            <th class="lx-c-template" [attr.aria-sort]="sortMark('template')"><button type="button" class="lx-sort" (click)="sortBy('template')">Template</button></th>
-            <th [attr.aria-sort]="sortMark('version')"><button type="button" class="lx-sort" (click)="sortBy('version')">Version</button></th>
-            <th [attr.aria-sort]="sortMark('state')"><button type="button" class="lx-sort" (click)="sortBy('state')">Status</button></th>
+            @if (!oneTemplate()) { <th class="lx-c-template" [attr.aria-sort]="sortMark('template')"><button type="button" class="lx-sort" (click)="sortBy('template')">Template</button></th> }
+            <th class="lx-c-ver" [attr.aria-sort]="sortMark('version')"><button type="button" class="lx-sort" (click)="sortBy('version')">Version</button></th>
+            <th class="lx-c-state" [attr.aria-sort]="sortMark('state')"><button type="button" class="lx-sort" (click)="sortBy('state')">Status</button></th>
             <th class="lx-c-by">Made by</th>
-            <th [attr.aria-sort]="sortMark('madeAt')"><button type="button" class="lx-sort" (click)="sortBy('madeAt')">Made</button></th>
+            <th class="lx-c-made" [attr.aria-sort]="sortMark('madeAt')"><button type="button" class="lx-sort" (click)="sortBy('madeAt')">Made</button></th>
           </tr></thead>
           <tbody>
             @for (r of rows(); track r.reportId) {
@@ -106,8 +106,8 @@
                   (click)="open(r, panelTab())" (keydown)="key($event, r)" [attr.aria-selected]="selected()?.reportId === r.reportId">
                 <td (click)="$event.stopPropagation()"><input type="checkbox" class="checkbox" [checked]="isPicked(r)" (change)="togglePick(r)" [attr.aria-label]="'Select ' + r.name" data-pick-report /></td>
                 <td><span class="lx-doc" aria-hidden="true"><i></i><i></i><i></i><i></i></span></td>
-                <td class="lx-name"><span class="truncate block font-medium" [title]="r.name">{{ r.name }}</span><span class="mono text-xs text-[color:var(--text-muted)]">{{ r.label }}@if (r.test) { · test }</span></td>
-                <td class="lx-c-template"><span class="truncate block" [title]="r.templateName">{{ r.templateName }}</span></td>
+                <td class="lx-name"><span class="lx-nm" [title]="r.name">{{ r.name }}</span><span class="mono text-xs text-[color:var(--text-muted)]">{{ r.label }}@if (r.test) { · test }</span></td>
+                @if (!oneTemplate()) { <td class="lx-c-template"><span class="truncate block" [title]="r.templateName">{{ r.templateName }}</span></td> }
                 <td class="tabular">@if (r.currentVersion) { v{{ r.currentVersion }} } @else { — }</td>
                 <td><span class="pill" [class]="'pill-' + stateTone(r.state)">@if (r.state === 'WAITING') { <app-icon name="clock" /> }@if (r.state === 'APPROVED' && r.signed) { <app-icon name="check" /> }{{ stateChip(r) }}</span></td>
                 <td class="lx-c-by text-sm"><app-icon [name]="r.madeBy === 'PIPELINE' ? 'zap' : r.madeBy === 'SCHEDULE' ? 'calendar' : 'user'" size="0.85em" /> {{ madeByWords[r.madeBy] }}</td>

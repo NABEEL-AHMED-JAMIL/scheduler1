@@ -116,6 +116,8 @@ describe('the library -- ZIP, bars and chips', () => {
     expect(stateChip({ state: 'WAITING', signed: false, needsSecond: true, firstApprovedBy: 7 })).toBe('2nd approval');
     expect(stateChip({ state: 'APPROVED', signed: true, needsSecond: false, firstApprovedBy: null })).toBe('Signed');
     expect(stateTone('FAILED')).toBe('crit');
+    // A report with no version is never Ready: still being made, or its generation failed.
+    expect(stateChip({ state: 'PENDING', signed: false, needsSecond: false, firstApprovedBy: null })).toBe('Generating');
   });
 
   it('browse sends each filter as a comma list, tests and the range only when set', () => {

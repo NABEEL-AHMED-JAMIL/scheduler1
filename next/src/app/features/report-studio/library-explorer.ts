@@ -18,6 +18,7 @@ import {
 } from './report-library.api';
 import { saveBlob } from './report-files';
 import { zipStore } from './zip-store';
+import { plainHint } from '../../shared/ui/plain-words';
 
 type Facet = 'state' | 'templateId' | 'category' | 'madeBy' | 'approver';
 type PanelTab = 'preview' | 'approval' | 'versions' | 'activity';
@@ -32,7 +33,7 @@ export function bars(days: HistogramDay[], from: string | null, to: string | nul
   const first = from ?? days[0]?.day;
   const last = to ?? days[days.length - 1]?.day;
   if (!first || !last) return out;
-  const states: ReportState[] = ['APPROVED', 'WAITING', 'READY', 'FAILED', 'VOID'];
+  const states: ReportState[] = ['APPROVED', 'WAITING', 'READY', 'PENDING', 'FAILED', 'VOID'];
   for (let d = new Date(first + 'T12:00:00'); d <= new Date(last + 'T12:00:00') && out.length < 400; d.setDate(d.getDate() + 1)) {
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     const h = byDay.get(key);
@@ -116,11 +117,15 @@ export class LibraryExplorer implements OnInit {
   readonly approvable = computed(() => this.pickedRows().filter(r => this.mayApprove(r)));
   readonly deletable = computed(() => this.pickedRows().filter(r => r.state !== 'APPROVED'));
   readonly allPicked = computed(() => this.rows().length > 0 && this.rows().every(r => this.picked().has(r.reportId)));
-  readonly stateFacets = computed(() => this.order(this.facets()?.state ?? [], ['READY', 'WAITING', 'APPROVED', 'FAILED', 'VOID']));
+  readonly stateFacets = computed(() => this.order(this.facets()?.state ?? [], ['READY', 'WAITING', 'APPROVED', 'FAILED', 'VOID', 'PENDING'])
+    .filter(f => f.value !== 'PENDING' || f.count > 0));
   readonly templateFacets = computed(() => {
     const all = this.facets()?.template ?? [];
     return this.templatesAll() ? all : all.slice(0, 5);
   });
+  /** One template picked: its column only repeats it, so it gives the report's name the room. */
+  readonly oneTemplate = computed(() => this.filters().templateId.length === 1);
+
   readonly current = computed(() => {
     const d = this.detail();
     return d?.versions.find(v => v.version === d.currentVersion) ?? null;
@@ -430,7 +435,8 @@ export class LibraryExplorer implements OnInit {
 
   /** What to do next with the open report, in a sentence. */
   nextSteps(r: LibraryRow): string {
-    if (r.state === 'FAILED') return 'Its last generation failed; open the report to see why and generate it again.';
+    if (r.state === 'FAILED') return r.failReason ? `Generation failed: ${plainHint(r.failReason)}` : 'Its last generation failed; open the report to see why and generate it again.';
+    if (r.state === 'PENDING') return 'Its first version is being made.';
     if (r.state === 'VOID') return 'Its current version is VOID. Generate it again to make a correct version.';
     if (r.state === 'APPROVED') return r.signed ? `Approved and signed by ${r.approverName}.` : `Approved by ${r.approverName}.`;
     if (r.state === 'WAITING') {

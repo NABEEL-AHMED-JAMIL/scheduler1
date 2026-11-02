@@ -10,11 +10,12 @@ import { API_BASE, ApiResponse } from '../../core/api/api.config';
  */
 
 /** A report's state, as the library's facets and pills say it. */
-export type ReportState = 'READY' | 'WAITING' | 'APPROVED' | 'FAILED' | 'VOID';
+export type ReportState = 'READY' | 'WAITING' | 'APPROVED' | 'FAILED' | 'VOID' | 'PENDING';
 export type MadeBy = 'PIPELINE' | 'SCHEDULE' | 'CONSOLE';
 
 export const STATE_WORDS: Record<ReportState, string> = {
   READY: 'Ready', WAITING: 'Waiting for approval', APPROVED: 'Approved and signed', FAILED: 'Generation failed', VOID: 'Void',
+  PENDING: 'No version yet',
 };
 export const MADE_BY_WORDS: Record<MadeBy, string> = { PIPELINE: 'A pipeline', SCHEDULE: 'A schedule', CONSOLE: 'A person' };
 
@@ -30,6 +31,7 @@ export function stateChip(r: Pick<LibraryRow, 'state' | 'signed' | 'needsSecond'
     case 'WAITING': return r.needsSecond && r.firstApprovedBy ? '2nd approval' : 'Waiting';
     case 'FAILED': return 'Failed';
     case 'VOID': return 'Void';
+    case 'PENDING': return 'Generating';
     default: return 'Ready';
   }
 }
@@ -39,6 +41,8 @@ export interface LibraryRow {
   category?: string | null; test: boolean; status: string; state: ReportState; currentVersion?: number | null; pages?: number | null;
   madeAt?: string | null; updatedAt?: string | null; madeBy: MadeBy; createdBy?: number | null; signed: boolean;
   approvedBy?: number | null; approverName?: string | null; needsSecond: boolean; firstApprovedBy?: number | null;
+  /** A failed report's newest job's message. */
+  failReason?: string | null;
   firstApproverName?: string | null; askedAt?: string | null; waitingForMe: boolean;
 }
 
@@ -48,7 +52,7 @@ export interface LibraryFacets {
   state: FacetValue[]; template: FacetValue[]; category: FacetValue[]; madeBy: FacetValue[]; approver: FacetValue[]; tests: number;
 }
 
-export interface HistogramDay { day: string; READY?: number; WAITING?: number; APPROVED?: number; FAILED?: number; VOID?: number; }
+export interface HistogramDay { day: string; READY?: number; WAITING?: number; APPROVED?: number; FAILED?: number; VOID?: number; PENDING?: number; }
 
 export interface LibraryBrowse {
   reports: LibraryRow[]; total: number; offset: number; limit: number; facets: LibraryFacets;
