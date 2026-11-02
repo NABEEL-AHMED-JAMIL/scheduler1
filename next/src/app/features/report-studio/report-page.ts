@@ -35,8 +35,8 @@ import { idOf, idValue } from '../../shared/ui/advanced-options';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { askReason } from '../../shared/ui/reason';
 import { ReportViewer } from './report-viewer';
-import { Meaning, ReportLibraryApi } from './report-library.api';
-import { Stage, findQr, reportStages } from './report-stages';
+import { Meaning, ReportLibraryApi, TemplateFeatures } from './report-library.api';
+import { Stage, reportStages } from './report-stages';
 
 type Tab = 'approval' | 'details' | 'activity' | 'access' | 'again';
 
@@ -85,8 +85,11 @@ export class ReportPage implements OnInit {
   readonly meanings = signal<Meaning[]>([]);
   readonly meaningDefaults = signal<{ first: string; final: string }>({ first: 'REVIEWED', final: 'RELEASE' });
   readonly meaning = signal<string | null>(null);
-  /** The QR code the version's template prints, when it has one (its content mode). */
-  readonly qr = signal<{ content: string; sizeMm?: number } | null>(null);
+  /** The QR code the current version's template prints, when it has one (what it encodes), from the report itself. */
+  readonly qr = computed<{ content: string; sizeMm?: number } | null>(() => {
+    const f = (this.r() as (ReportDetail & { templateFeatures?: TemplateFeatures }) | null)?.templateFeatures;
+    return f?.qr ? { content: f.qrContent ?? 'text' } : null;
+  });
   /** The template's versions a report can be made from (published, and the ones superseded since). */
   readonly templateVersions = signal<VersionRow[]>([]);
   /** The Template version choices' read: loading, none, or why it failed (owner 2026-10-27). */
@@ -195,7 +198,6 @@ export class ReportPage implements OnInit {
         this.loading.set(false);
         if (this.shown() != null && !r.versions.some(v => v.version === this.shown())) this.shown.set(null);
         if (this.canGenerate()) this.loadVersions(r.templateId);
-        this.loadQr(r);
         const asked = Number(this.version());
         const v = this.verify() === '1' && !this.verifyOpened ? r.versions.find(x => x.version === asked) : undefined;
         if (v) {
@@ -361,18 +363,6 @@ export class ReportPage implements OnInit {
 
   /** May this person void a version (the people who generate reports). */
   readonly canVoid = computed(() => this.canGenerate());
-
-  /** The version's QR code, read from its template version (once per report). */
-  private loadQr(r: ReportDetail): void {
-    const v = r.versions.find(x => x.version === r.currentVersion);
-    if (!v || this.qrFor === r.templateId + ':' + v.templateVersion || typeof this.api.version !== 'function') return;
-    this.qrFor = r.templateId + ':' + v.templateVersion;
-    this.api.version(r.templateId, String(v.templateVersion)).subscribe({
-      next: tv => this.qr.set(findQr(tv.definition)),
-      error: () => this.qr.set(null),
-    });
-  }
-  private qrFor = '';
 
   /** The verify link a scan opens today (signed in only): the console's report page for that version. */
   verifyLink(v: ReportVersionRow): string {

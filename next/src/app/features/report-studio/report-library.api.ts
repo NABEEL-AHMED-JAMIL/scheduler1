@@ -68,6 +68,12 @@ export interface LibrarySummary {
   recent: LibraryRow[]; mostUsed: { templateId: string; name: string; reports: number }[]; testTemplates: number;
 }
 
+/** What a template has (media's TemplateFeatures): the gallery's chips, a template's "At a glance", a report's QR card. */
+export interface TemplateFeatures {
+  approvals: number; qr: boolean; qrContent?: string | null; charts: number; images: number; conditional: boolean; repeat: boolean;
+  signature: boolean; stamp: boolean; confidentiality: boolean; components: number; pageSize?: string | null; orientation?: string | null;
+}
+
 export interface Meaning { code: string; words: string; }
 export interface Meanings { meanings: Meaning[]; firstDefault: string; finalDefault: string; }
 
