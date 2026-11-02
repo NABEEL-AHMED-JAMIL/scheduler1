@@ -48,6 +48,8 @@ export class PromptEdit implements OnInit {
   /** Owner 2026-11-02: the platform's list of models (the ones switched on); a prompt's model is chosen from it. */
   readonly catalog = signal<CatalogModel[]>([]);
   readonly catalogLoading = signal(true);
+  /** Owner 2026-11-02: the data policy's Minimum-fields warning per level (unread: the defaults, on everywhere). */
+  readonly minFieldsByLevel = signal<Record<string, boolean>>({});
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
   private readonly auth = inject(AuthService);
@@ -146,6 +148,12 @@ export class PromptEdit implements OnInit {
     const c = this.connection();
     return c ? `Chosen from the platform's list of models for ${c.provider}. None: the connection's default, ${c.defaultModel}.` : 'Pick a connection, or set a workspace default, so there is somewhere to run.';
   });
+  private readonly sensitivityValue = toSignal(this.form.get('dataSensitivity')!.valueChanges, { initialValue: '' as string | null });
+  /** The prompt's level when its data policy's Minimum-fields warning is on, else null. */
+  readonly minFieldsLevel = computed(() => {
+    const level = this.sensitivityValue() || 'internal';
+    return this.minFieldsByLevel()[level] === false ? null : level;
+  });
   /** The listed models the connection's provider runs. */
   readonly modelOptions = computed(() => modelsFor(this.catalog(), this.connection()?.provider).map(catalogOption));
   /** Placeholders the template names that no variable declares -- shown, and refused at save. */
@@ -226,6 +234,11 @@ export class PromptEdit implements OnInit {
     this.catalogApi.list().subscribe({
       next: r => { this.catalogLoading.set(false); if (r.status === API_SUCCESS) this.catalog.set(Array.isArray(r.data) ? r.data : []); },
       error: () => this.catalogLoading.set(false),
+    });
+    this.http.get<ApiResponse<{ levels?: { sensitivity: string; minFieldsWarning?: boolean }[] }>>(`${API_BASE}/aiPrompt.json/dataPolicy`).subscribe({
+      next: r => this.minFieldsByLevel.set(Object.fromEntries((Array.isArray(r?.data?.levels) ? r.data!.levels! : [])
+        .map(l => [l.sensitivity, l.minFieldsWarning !== false]))),
+      error: () => { /* unread: the defaults, the warning on at every level */ },
     });
     if (this.isPlatformAdmin()) this.loadTenants();
     if (this.isEdit()) this.load();

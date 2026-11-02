@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, forkJoin, map, of, switchMap } from 'rxjs';
+import { Observable, catchError, forkJoin, map, of, switchMap } from 'rxjs';
 import { API_BASE, ApiResponse } from '../../../core/api/api.config';
 import { LIST_LIMIT } from '../../../core/api/list-limit';
 import { jobActionRequest } from '../../jobs/job-actions';
@@ -174,8 +174,17 @@ export class StepsApi {
       }))));
   }
 
+  /**
+   * The active prompts, each with whether its data level's Minimum-fields warning is on (owner 2026-11-02: the data policy's
+   * switch). A policy that cannot be read counts as the defaults, where the warning is on at every level.
+   */
   prompts(): Observable<PromptChoice[]> {
-    return this.http.get<ApiResponse<{ promptId?: number; name: string; status?: string }[]>>(`${API_BASE}/aiPrompt.json/list`).pipe(
-      map(r => (r.data ?? []).filter(p => p.promptId != null && p.status === 'Active').map(p => ({ id: p.promptId!, label: p.name }))));
+    const policy = this.http.get<ApiResponse<{ levels?: { sensitivity: string; minFieldsWarning?: boolean }[] }>>(`${API_BASE}/aiPrompt.json/dataPolicy`).pipe(
+      map(r => r.data?.levels ?? []), catchError(() => of([] as { sensitivity: string; minFieldsWarning?: boolean }[])));
+    const list = this.http.get<ApiResponse<{ promptId?: number; name: string; status?: string; dataSensitivity?: string | null }[]>>(`${API_BASE}/aiPrompt.json/list`);
+    return forkJoin([list, policy]).pipe(map(([r, levels]) => (r.data ?? []).filter(p => p.promptId != null && p.status === 'Active').map(p => {
+      const level = p.dataSensitivity || 'internal';
+      return { id: p.promptId!, label: p.name, level, minFields: levels.find(l => l.sensitivity === level)?.minFieldsWarning !== false };
+    })));
   }
 }

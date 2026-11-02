@@ -772,7 +772,17 @@ export type FieldKind = 'text' | 'textarea' | 'number' | 'integer' | 'boolean' |
 export interface ScheduleChoice { id: number; label: string; }
 
 /** MIG-245: a saved AI prompt a step may name: its id, and its name as the choice shows it. */
-export interface PromptChoice { id: number; label: string; }
+export interface PromptChoice {
+  id: number;
+  label: string;
+  /**
+   * Owner 2026-11-02 (Data policies' Minimum-fields warning): the prompt's data level (internal when it declares none) has the
+   * warning on, so whoever builds the step is reminded to send the model only the fields it needs.
+   */
+  minFields?: boolean;
+  /** The prompt's declared level, as the warning names it. */
+  level?: string;
+}
 
 /**
  * MIG-346: a workspace webhook a Send webhook step may name: its id, its address as the choice shows it, and whether it can

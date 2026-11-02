@@ -244,7 +244,7 @@ describe('SchemaForm -- a prompt setting', () => {
   const PROMPT_SCHEMA: JsonSchema = { type: 'object', required: ['promptId'],
     properties: { promptId: { type: 'integer', format: 'prompt', title: 'Prompt' } } };
 
-  function promptForm(prompts: { id: number; label: string }[], value: Record<string, unknown> | null) {
+  function promptForm(prompts: { id: number; label: string; minFields?: boolean; level?: string }[], value: Record<string, unknown> | null) {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({ imports: [SchemaForm], providers: [provideZonelessChangeDetection()] });
     const fixture = TestBed.createComponent(SchemaForm);
@@ -286,6 +286,14 @@ describe('SchemaForm -- a prompt setting', () => {
     select.choose('41');
     fixture.detectChanges();
     expect(changes[changes.length - 1]).toEqual({ promptId: 41 });
+  });
+
+  it('reminds to send only the fields the step needs when the chosen prompt\'s data level has the minimum-fields warning on', () => {
+    const prompts = [{ id: 41, label: 'Wound assessment', minFields: true, level: 'sensitive' }, { id: 42, label: 'Summary', minFields: false, level: 'public' }];
+    const on = promptForm(prompts, { promptId: 41 });
+    expect(on.el.querySelector('[data-min-fields]')?.textContent).toContain('the minimum-fields warning is on for sensitive data');
+    const off = promptForm(prompts, { promptId: 42 });
+    expect(off.el.querySelector('[data-min-fields]')).toBeNull();
   });
 
   it('keeps a prompt that is no longer listed, by its id', () => {

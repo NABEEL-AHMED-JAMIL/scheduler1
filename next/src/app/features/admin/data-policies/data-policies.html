@@ -168,7 +168,7 @@
                 }
               </tr>
               <tr>
-                <th scope="row"><span class="block text-sm font-medium">Minimum-fields warning</span><span class="block text-xs font-normal text-[color:var(--text-muted)]">Remind whoever builds a step to send a model only the fields it needs.</span></th>
+                <th scope="row"><span class="block text-sm font-medium">Minimum-fields warning</span><span class="block text-xs font-normal text-[color:var(--text-muted)]">Remind whoever builds a step to send a model only the fields it needs: shown on a prompt's editor and on a pipeline's AI step for a prompt of this level.</span></th>
                 @for (c of columns(); track c.d.sensitivity) {
                   <td [attr.data-level]="c.d.sensitivity" data-row="minfields">
                     @if (canEdit()) {

@@ -7,7 +7,8 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /aiConnection.json/list",
-      "GET /aiPrompt.json/modelCatalog"
+      "GET /aiPrompt.json/modelCatalog",
+      "GET /aiPrompt.json/dataPolicy"
     ],
     "headings": [
       "New prompt",
@@ -77,6 +78,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/list?limit=20&page=1",
       "GET /aiConnection.json/list",
       "GET /aiPrompt.json/modelCatalog",
+      "GET /aiPrompt.json/dataPolicy",
       "GET /aiPrompt.json/get?promptId=1049",
       "GET /aiPrompt.json/runs?limit=10&promptId=1049"
     ],

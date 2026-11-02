@@ -116,6 +116,13 @@ interface MapRow { key: string; value: unknown; }
                                    [placeholder]="f.required ? 'Choose a prompt…' : 'None'" [ariaLabel]="f.label" searchLabel="Search the prompts"
                                    emptyText="No active prompt in this workspace yet (AI › Prompts)." />
             </app-field>
+            @if (minFieldsFor(f); as level) {
+              <p class="field-note text-warn-500 flex items-start gap-1.5 -mt-2" data-min-fields>
+                <app-icon name="shield" size="0.9em" class="mt-0.5 shrink-0" />
+                <span>Send the model only the fields it needs: give each of the prompt's variables the one column it uses, never the
+                  whole row. (Data policies: the minimum-fields warning is on for {{ level }} data.)</span>
+              </p>
+            }
           }
           @case ('webhook') {
             <app-field [label]="f.label" [for]="idOf(f)" [required]="f.required" [error]="errorOf(f)"
@@ -498,6 +505,12 @@ export class SchemaForm {
 
   documentTypeListed(f: FieldSpec): boolean {
     return this.documentTypes().some(t => '' + t.id === this.textOf(f));
+  }
+
+  /** The chosen prompt's data level when its Minimum-fields warning is on (the data policy's switch), else null. */
+  minFieldsFor(f: FieldSpec): string | null {
+    const chosen = this.prompts().find(p => '' + p.id === this.textOf(f));
+    return chosen?.minFields ? chosen.level ?? 'internal' : null;
   }
 
   promptListed(f: FieldSpec): boolean {
