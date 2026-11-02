@@ -17,7 +17,7 @@ can check later who approved it and that it has not changed since.
 
 In the menu it is **See results › Reports**.
 
-![The Reports overview](rs-overview "Reports › Overview: this month's versions, templates waiting to be published, recent reports and generation jobs")
+![The Reports overview](rs-overview "Reports › Overview: 30-day figures, Needs you, reports made by category, recent reports and the most used templates")
 
 ## The workflow
 1. **Brand it once.** Upload your logo, letterhead, signatures and stamps in **Assets & branding**, and make a brand
@@ -36,7 +36,7 @@ In the menu it is **See results › Reports**.
 
 | Tab | What it is for |
 |---|---|
-| **Overview** | Versions made this month, published templates, how many generated without a problem, what needs attention; recent reports, generation jobs, connected pipelines and template activity |
+| **Overview** | Reports made in 30 days against the 30 before, waiting for approval, approved and signed, failed in 7 days; **Needs you** (your approvals, failed generations with what to do, templates to publish); reports made a day by category; recent reports as pages; the most used templates. Test templates and reports are left out |
 | **Templates** | Every template of the workspace and the starters: make, copy, import, publish, archive |
 | **Library** | Every report and its versions, and the generation jobs; **From pipelines** lists the files pipelines made |
 | **Data** | Browse what a report can read: pipeline outputs, storage buckets, uploads; see a schema and the first rows |

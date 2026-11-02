@@ -69,7 +69,8 @@ The job shows its progress. When it finishes, **Open the report**: version N is 
 If it fails, no version is made and the message says why; **Back to mapping** to fix it.
 
 ## Generate again
-On a report's page, **Generate again** makes the next version: pick the **Template version** and the **Data** (the
+On a report's page, open the **⋮** menu and choose **Generate again…** (it opens beside the report). It makes the next
+version: pick the **Template version** and the **Data** (the
 frozen data of the current version, or **Other data: a newer run, a file, pasted JSON**), tick **Mark this version as
 COPY** or **Ask for approval when it is ready**, and choose **Check and generate vN**. An approved version stays; the
 new one needs its own approval.

@@ -115,7 +115,10 @@
   "as": "summit.admin",
   "steps": [
    {
-    "click": "button:has-text('Verify signature')"
+    "click": "[data-test=report-more]"
+   },
+   {
+    "click": "[role=menuitem]:has-text('Verify signature')"
    },
    {
     "waitFor": "app-side-panel"
@@ -137,7 +140,18 @@
  {
   "name": "rs-library",
   "route": "/reports/library",
-  "as": "summit.admin"
+  "as": "summit.admin",
+  "steps": [
+   {
+    "wait": 2500
+   },
+   {
+    "click": "tr[data-row]"
+   },
+   {
+    "wait": 3500
+   }
+  ]
  },
  {
   "name": "rs-settings",

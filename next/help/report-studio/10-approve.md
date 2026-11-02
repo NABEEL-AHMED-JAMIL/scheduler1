@@ -21,8 +21,19 @@ The version then waits in the approvers' **Review › Approvals**. A newer versi
 
 ## Approve and sign
 1. Open **Review › Approvals** (or the report's page). The task shows the first page and the next ones.
-2. Read it. Choose **Approve and sign**, or **Reject**, which needs a reason the person who asked reads.
-3. The version now reads **Signed**, with your name and time under **Approved and signed**.
+2. Read it. Pick what your approval **means** -- **Reviewed for clinical accuracy**, **Approved for release**,
+   **Reviewed and agree with the content**, **Responsible for this report** or **Author of this report** (the first of
+   two approvals is *Reviewed for clinical accuracy* unless you choose otherwise, the approval that signs is *Approved
+   for release*).
+3. Choose **Approve and sign**, or **Send back…** (**Reject** in Review), which needs a reason the person who asked reads.
+4. The version now reads **Signed**. Its life-cycle strip says who approved and when, the **Approval** card shows each
+   approver with the meaning they chose, the signature box on the PDF prints the meaning beside the time, and the PDF's
+   digital signature names it in its reason.
+
+## Approve several at once
+In **Reports › Library**, tick the reports (up to 50), pick the **Meaning**, and choose **Approve and sign N**. Each one is
+approved exactly as on its own page -- never one you generated or asked for, only its current version, a second person
+where the workspace asks for two -- and each says on its own how it went; a refused one leaves the others approved.
 
 ![A signed report](rs-report-page "A report's page: the current version, approved and signed, its PDF and HTML, and where it came from")
 
