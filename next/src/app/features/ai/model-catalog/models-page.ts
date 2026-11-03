@@ -22,9 +22,36 @@ interface Draft {
   local: boolean;
   note: string;
   active: boolean;
+  /** The limits, as typed ('' = the platform's default). */
+  callTimeoutSeconds: string;
+  answerTokens: string;
+  maxParallel: string;
 }
 
-const BLANK: Draft = { catalogId: null, modelName: '', displayName: '', provider: 'Ollama', local: true, note: '', active: true };
+const BLANK: Draft = { catalogId: null, modelName: '', displayName: '', provider: 'Ollama', local: true, note: '', active: true,
+  callTimeoutSeconds: '', answerTokens: '', maxParallel: '' };
+
+/** The limits' bounds (the service checks the same): seconds a call may take, tokens an answer may use, calls at once. */
+export const LIMITS = {
+  callTimeoutSeconds: { min: 5, max: 900, label: 'Call timeout (seconds)', note: 'How long one call may take before it is stopped.' },
+  answerTokens: { min: 16, max: 65536, label: 'Answer tokens', note: 'The most an answer may be.' },
+  maxParallel: { min: 1, max: 64, label: 'Max parallel', note: 'Calls to this model at once, across the platform.' },
+} as const;
+export type LimitKey = keyof typeof LIMITS;
+
+/** A limit as typed: a whole number in bounds, '' for the default, or why not. */
+export function limitProblem(key: LimitKey, raw: string): string {
+  const v = raw.trim();
+  if (!v) return '';
+  const n = Number(v);
+  const { min, max } = LIMITS[key];
+  return Number.isInteger(n) && n >= min && n <= max ? '' : `A whole number from ${min} to ${max}, or empty for the default.`;
+}
+
+/** A detected capability: Yes, No, or not detected yet. */
+export function capText(v: boolean | null | undefined): string {
+  return v == null ? 'Not detected' : v ? 'Yes' : 'No';
+}
 
 /** A model's name as a provider writes it: letters, digits and . _ : / - @ +, no spaces (the service checks the same). */
 const MODEL_NAME = /^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,254}$/;
@@ -34,7 +61,9 @@ const MODEL_NAME = /^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,254}$/;
  * A workspace administrator picks from it -- a data policy's allowed models, a connection's default model, a prompt's
  * model -- and a model call whose model is not on it, or is switched off here, is refused. Adding a model here does not
  * install it: the backend team installs a model on the machines (or the provider offers it); this list says which may be
- * used. Every change is recorded (who, when, from what to what) and shown under Changes.
+ * used. Every change is recorded (who, when, from what to what) and shown under Changes. What a model can do -- read photos,
+ * think, call tools -- is detected from the provider (Ollama) and shown read-only; its limits (call timeout, answer tokens,
+ * calls at once) are set here, so a bigger model is a change of settings, never of code.
  */
 @Component({
   selector: 'app-models-page',
@@ -95,6 +124,15 @@ const MODEL_NAME = /^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,254}$/;
           <input id="mNote" class="input" name="note" [value]="d.note" (input)="patch({ note: $any($event.target).value })" maxlength="500"
                  placeholder="What it is good for, or who asked for it" />
         </div>
+        @for (k of limitKeys; track k) {
+          <div>
+            <label class="label" [for]="'mLimit-' + k">{{ limits[k].label }} <span class="text-[color:var(--text-muted)] font-normal">(optional)</span></label>
+            <input class="input" type="number" [id]="'mLimit-' + k" [name]="k" [min]="limits[k].min" [max]="limits[k].max" [value]="d[k]"
+                   (input)="setLimit(k, $any($event.target).value)" [class.input-invalid]="!!limitError(k)" placeholder="Platform default" [attr.data-limit]="k" />
+            @if (limitError(k)) { <p class="field-note text-crit-500">{{ limitError(k) }}</p> }
+            @else { <p class="field-note text-[color:var(--text-muted)]">{{ limits[k].note }}</p> }
+          </div>
+        }
         <div>
           <span class="label">Status</span>
           <label class="inline-flex items-center gap-2 text-sm"><input type="checkbox" class="checkbox" role="switch" name="active" [checked]="d.active"
@@ -104,7 +142,7 @@ const MODEL_NAME = /^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,254}$/;
       @if (saveError()) { <p class="text-sm text-crit-500 flex items-start gap-1.5" role="alert" data-save-error><app-icon name="alert" size="0.9em" class="mt-0.5" />{{ saveError() }}</p> }
       <div class="flex flex-wrap justify-end gap-2">
         <button type="button" class="btn btn-default btn-sm" (click)="cancel()" [disabled]="saving()">Cancel</button>
-        <button type="button" class="btn btn-primary btn-sm" data-save (click)="save()" [disabled]="saving() || !!nameProblem() || !d.modelName.trim() || !d.displayName.trim()">
+        <button type="button" class="btn btn-primary btn-sm" data-save (click)="save()" [disabled]="saving() || !!nameProblem() || anyLimitError() || !d.modelName.trim() || !d.displayName.trim()">
           <app-icon name="save" />{{ saving() ? 'Saving…' : d.catalogId ? 'Save changes' : 'Add to the list' }}</button>
       </div>
     </section>
@@ -120,12 +158,14 @@ const MODEL_NAME = /^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,254}$/;
       </div>
       <div class="overflow-x-auto mt-3">
         <table class="table-modern">
-          <thead><tr><th>Model</th><th>Model name</th><th>Runs on</th><th>Where</th><th>Note</th><th>Status</th><th>Last changed</th><th class="th-actions">Actions</th></tr></thead>
+          <thead><tr><th>Model</th><th>Model name</th><th>Runs on</th><th>Where</th>
+            <th title="Detected from the provider; read-only">Reads photos</th><th title="Detected from the provider; read-only">Thinks</th><th title="Detected from the provider; read-only">Uses tools</th>
+            <th>Limits</th><th>Note</th><th>Status</th><th>Last changed</th><th class="th-actions">Actions</th></tr></thead>
           <tbody>
             @if (state.pending()) {
-              <tr><td colspan="8" class="p-0"><app-loading shape="rows" label="Loading the list of models…" [count]="3" /></td></tr>
+              <tr><td colspan="12" class="p-0"><app-loading shape="rows" label="Loading the list of models…" [count]="3" /></td></tr>
             } @else if (!models().length) {
-              <tr><td colspan="8" class="text-center text-[color:var(--text-muted)] py-6">No model is on the list yet, so every model call is refused. Add the models the backend team has installed.</td></tr>
+              <tr><td colspan="12" class="text-center text-[color:var(--text-muted)] py-6">No model is on the list yet, so every model call is refused. Add the models the backend team has installed.</td></tr>
             }
             @for (m of models(); track m.catalogId) {
               <tr [attr.data-model]="m.modelName" [class.opacity-70]="!m.active">
@@ -133,6 +173,10 @@ const MODEL_NAME = /^[A-Za-z0-9][A-Za-z0-9._:/@+-]{0,254}$/;
                 <td class="mono text-xs whitespace-nowrap">{{ m.modelName }}</td>
                 <td class="whitespace-nowrap"><span [class]="pill(m.provider)">{{ providerLabel(m.provider) }}</span></td>
                 <td><span class="pill" [class.pill-ok]="m.local" [class.pill-info]="!m.local">{{ where(m) }}</span></td>
+                <td class="text-xs whitespace-nowrap" data-cap="readsPhotos" [class.opacity-70]="m.readsPhotos == null">{{ cap(m.readsPhotos) }}</td>
+                <td class="text-xs whitespace-nowrap" data-cap="thinks" [class.opacity-70]="m.thinks == null">{{ cap(m.thinks) }}</td>
+                <td class="text-xs whitespace-nowrap" data-cap="usesTools" [class.opacity-70]="m.usesTools == null">{{ cap(m.usesTools) }}</td>
+                <td class="text-xs whitespace-nowrap text-[color:var(--text-secondary)]" data-limits>{{ limitsText(m) }}</td>
                 <td class="text-xs text-[color:var(--text-secondary)] max-w-72">{{ m.note || '—' }}</td>
                 <td>@if (m.active) { <span class="pill pill-ok"><app-icon name="check" size="0.9em" />On</span> } @else { <span class="pill pill-warn"><app-icon name="pause" size="0.9em" />Off</span> }</td>
                 <td class="text-xs text-[color:var(--text-secondary)] whitespace-nowrap">{{ m.dateUpdated | serverTime:'recent' }}</td>
@@ -195,6 +239,9 @@ export class ModelsPage implements OnInit {
   readonly saving = signal(false);
   readonly saveError = signal('');
   readonly busy = signal<number | null>(null);
+  readonly limits = LIMITS;
+  readonly limitKeys = Object.keys(LIMITS) as LimitKey[];
+  readonly cap = capText;
 
   readonly onCount = computed(() => this.models().filter(m => m.active).length);
   readonly providerOptions: AdvancedOption[] = AI_PROVIDERS.map(p => ({ value: p.key, label: p.label, description: p.key === 'Ollama' ? 'Local' : 'Hosted' }));
@@ -209,6 +256,18 @@ export class ModelsPage implements OnInit {
     const same = this.models().find(m => m.catalogId !== d.catalogId && m.provider === d.provider && sameModel(m.modelName, name));
     return same ? `On the list already, as "${same.displayName}".` : '';
   });
+
+  setLimit(k: LimitKey, value: string): void { this.patch({ [k]: value } as Partial<Draft>); }
+
+  limitError(k: LimitKey): string { const d = this.draft(); return d ? limitProblem(k, d[k]) : ''; }
+  anyLimitError(): boolean { return this.limitKeys.some(k => !!this.limitError(k)); }
+
+  /** "90 s · 800 tokens · 2 at once", or "Defaults". */
+  limitsText(m: CatalogModel): string {
+    const parts = [m.callTimeoutSeconds != null ? `${m.callTimeoutSeconds} s` : '', m.answerTokens != null ? `${m.answerTokens} tokens` : '',
+      m.maxParallel != null ? `${m.maxParallel} at once` : ''].filter(Boolean);
+    return parts.length ? parts.join(' · ') : 'Defaults';
+  }
 
   ngOnInit(): void { this.load(); }
 
@@ -241,7 +300,9 @@ export class ModelsPage implements OnInit {
 
   startEdit(m: CatalogModel): void {
     this.saveError.set('');
-    this.draft.set({ catalogId: m.catalogId, modelName: m.modelName, displayName: m.displayName, provider: m.provider, local: m.local, note: m.note ?? '', active: m.active });
+    const str = (v: number | null | undefined) => (v == null ? '' : String(v));
+    this.draft.set({ catalogId: m.catalogId, modelName: m.modelName, displayName: m.displayName, provider: m.provider, local: m.local, note: m.note ?? '', active: m.active,
+      callTimeoutSeconds: str(m.callTimeoutSeconds), answerTokens: str(m.answerTokens), maxParallel: str(m.maxParallel) });
   }
 
   cancel(): void { this.draft.set(null); this.saveError.set(''); }
@@ -262,10 +323,12 @@ export class ModelsPage implements OnInit {
 
   save(): void {
     const d = this.draft();
-    if (!d || this.saving() || this.nameProblem()) return;
+    if (!d || this.saving() || this.nameProblem() || this.anyLimitError()) return;
     this.saving.set(true);
+    const n = (v: string) => (v.trim() ? Number(v.trim()) : null);
     this.api.save({ catalogId: d.catalogId, modelName: d.modelName.trim(), displayName: d.displayName.trim(), provider: d.provider,
-      local: this.canBeLocal() && d.local, note: d.note.trim() || null, active: d.active }).subscribe({
+      local: this.canBeLocal() && d.local, note: d.note.trim() || null, active: d.active,
+      callTimeoutSeconds: n(d.callTimeoutSeconds), answerTokens: n(d.answerTokens), maxParallel: n(d.maxParallel) }).subscribe({
       next: r => {
         this.saving.set(false);
         if (r.status !== API_SUCCESS) { this.saveError.set(r.message); return; }

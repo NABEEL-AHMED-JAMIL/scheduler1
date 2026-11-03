@@ -21,6 +21,14 @@ export interface CatalogModel {
   local: boolean;
   note: string | null;
   active: boolean;
+  /** Detected from the provider (Ollama /api/show), read-only: it reads photos, it thinks, it calls tools. */
+  readsPhotos?: boolean | null;
+  thinks?: boolean | null;
+  usesTools?: boolean | null;
+  /** Limits the platform administrator sets; null: the platform's defaults. */
+  callTimeoutSeconds?: number | null;
+  answerTokens?: number | null;
+  maxParallel?: number | null;
   createdBy?: number | null;
   updatedBy?: number | null;
   dateCreated?: string | null;
@@ -47,6 +55,9 @@ export interface CatalogSave {
   local: boolean;
   note: string | null;
   active: boolean;
+  callTimeoutSeconds?: number | null;
+  answerTokens?: number | null;
+  maxParallel?: number | null;
 }
 
 @Injectable({ providedIn: 'root' })
