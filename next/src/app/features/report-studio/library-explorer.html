@@ -150,16 +150,20 @@
           @case ('preview') {
             <div class="lx-paper">
               @if (pageImage(); as src) { <img [src]="src" [alt]="'Page ' + panelPage() + ' of ' + r.name" /> }
-              @else if (r.state === 'FAILED' || !r.currentVersion) { <p class="text-sm text-[color:var(--text-muted)] p-6">No pages: the report has no version yet.</p> }
+              @else if (r.state === 'FAILED' || !r.currentVersion) { <p class="lx-nopages">No pages: the report has no version yet.</p> }
               @else if (pageError()) { <p class="text-sm text-[color:var(--text-muted)] p-6">{{ pageError() }}</p> }
               @else { <div class="spinner mx-auto my-24" role="status" aria-label="Drawing the page"></div> }
             </div>
+            @if (r.currentVersion && r.state !== 'FAILED') {
             <div class="flex items-center gap-2 mt-2 text-sm">
               <button type="button" class="btn btn-default btn-icon btn-sm" [disabled]="panelPage() <= 1" (click)="turn(-1)" aria-label="Previous page"><app-icon name="chevronLeft" /></button>
               <span class="tabular">Page {{ panelPage() }} of {{ r.pages ?? 1 }}</span>
               <button type="button" class="btn btn-default btn-icon btn-sm" [disabled]="panelPage() >= (r.pages ?? 1)" (click)="turn(1)" aria-label="Next page"><app-icon name="chevronRight" /></button>
               <a class="link-inline ml-auto" [routerLink]="['/reports/library', r.reportId]">Open the report <app-icon name="arrowRight" size="0.9em" /></a>
             </div>
+            } @else {
+              <a class="link-inline text-sm mt-2 inline-block" [routerLink]="['/reports/library', r.reportId]">Open the report <app-icon name="arrowRight" size="0.9em" /></a>
+            }
           }
           @case ('approval') {
             @if (current(); as v) {
