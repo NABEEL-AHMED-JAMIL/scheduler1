@@ -26,6 +26,7 @@ The version then waits in the approvers' **Review › Approvals**. A newer versi
    two approvals is *Reviewed for clinical accuracy* unless you choose otherwise, the approval that signs is *Approved
    for release*).
 3. Choose **Approve and sign**, or **Send back…** (**Reject** in Review), which needs a reason the person who asked reads.
+   The version's open [review comments](#rs-review-comments) go back with it, and the person who asked is told how many.
 4. The version now reads **Signed**. Its life-cycle strip says who approved and when, the **Approval** card shows each
    approver with the meaning they chose, the signature box on the PDF prints the meaning beside the time, and the PDF's
    digital signature names it in its reason.

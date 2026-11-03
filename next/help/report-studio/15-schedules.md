@@ -50,6 +50,10 @@ reports had problems, whether the bucket folder is writable (**Check the folder 
 named `.etl-console-write-check` there), and how many people can approve. **Save and turn on** saves the schedule
 only when no check fails.
 
+The checks also include the **fax check** of the first report: what a black-and-white fax would lose (text under 8 pt,
+colour-only meaning, light text and rules, pictures that print dark), each with its block. It is advice and never stops
+a save. See [Show as Fax and the fax check](#rs-designer--show-as-fax-and-the-fax-check).
+
 ## What a run does
 1. At its time it reads the data — for a pipeline, its newest successful run — keeps the rows of the window, and makes
    one report per value (at most 1,000 a run). Each report's data is frozen when the run starts.

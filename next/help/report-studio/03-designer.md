@@ -43,6 +43,28 @@ grid** for a list).
 > **Tip:** Add test data first ([Data and test samples](#rs-data)). The page then fills with real-looking values and the
 > checks tell you about a binding that reads nothing.
 
+## Show only when: the rule builder
+A **Show only when** block shows what is inside it only for data that meets its rules. Select it and set **Show when** in
+its settings, one rule a row:
+
+1. Pick the **field** from the test data (for example `primary.wound.stage`; inside **Repeat for each**, the item's
+   fields too, such as `visit.area`).
+2. Pick the **test**: **is**, **is not**, **is one of**, **is none of**, **is above**, **is at least**, **is below**,
+   **is at most**, **is between**, **is empty**, **is not empty**, **contains**, **starts with**, **ends with** (only the
+   tests that suit the field's kind are offered).
+3. Give the **value** (the test data's values are suggested). For **is one of**, one value a line.
+4. Add more rules with **+ Rule**, and choose **All of these hold** or **Any of these holds**.
+
+Under the rules the designer says how many of your test records the block **shows for** ("Shows for 4 of 14 test
+records"; inside a repeat, how many of the first record's items). The report itself is decided when it is made, from its
+own data.
+
+The rules are kept as a short formula (for example `primary.hba1c > 8 and contains(primary.wound.site, 'heel')`).
+**Edit as text** shows and edits it; **Use the builder** goes back when the formula is made of rules. A formula the
+builder cannot show (arithmetic, *not*, a mix of *and* and *or* without brackets) stays as text and is never rewritten.
+
+![The rule builder](rs-rule-builder "Show when: two rules joined by any, and the test records the block shows for")
+
 ## Page settings
 Click **Page settings** in the toolbar (or click outside every block) to set the whole report:
 
@@ -58,6 +80,9 @@ Click **Page settings** in the toolbar (or click outside every block) to set the
   mark, and the fingerprints the public verify page lists are those of the files as issued (a DRAFT copy matches none of
   them, which is the truth: it is not the issued report).
 - **Bookmarks in the PDF from the headings** (on by default): the reader's side panel lists the report's headings.
+- **Fax-safe** (under **Type and colour**): the report prints for a black-and-white fax -- every word and rule in black,
+  fills behind text white, and each series of a chart told apart by a pattern (solid, hatched, crossed, dotted) instead
+  of a colour. See [Show as Fax and the fax check](#rs-designer--show-as-fax-and-the-fax-check).
 - **Brand** (in the toolbar): the workspace default, a brand profile, or **No branding**.
 
 > **Note:** Previews always say DRAFT across the page, so a preview is never mistaken for the real report.
@@ -69,6 +94,30 @@ Also in the page settings:
   **tagged PDF** for screen readers. See [PDF/A and tagged PDF](#rs-pdf-archive).
 - **Personal data**: tick the fields that identify a person, and choose what a copy without names prints instead; the
   other dates' rule and whether notes are searched for names. See [A copy without names](#rs-copy-without-names).
+
+## Show as Fax and the fax check
+**Show as** in the toolbar draws the page as it is edited (**Screen**), as it prints (**Print**) or as a black-and-white
+fax receives it (**Fax**). Shown as a fax, the designer also lays the report out as the PDF and lists what a fax would
+lose, block by block, over the page:
+
+- **Text too small for a fax**: text under 8 pt.
+- **Light text a fax prints white**, and **Light lines a fax loses** (a light grey on white).
+- **Meaning carried by colour alone**: values set apart only by a colour (a pale red fill on high results) that a fax
+  prints like the rest. Add a word or a mark, or use a rule's bold **Text** style.
+- **Lines too thin for a fax**: under 0.5 pt.
+- **A picture a fax prints dark**: a picture mostly darker than mid grey.
+- **Chart series told apart by colour**.
+
+Click a row to select its block. The fax check is advice: nothing stops a report for it. **Fax-safe** in the page
+settings answers most of it at once. A [report schedule](#rs-schedules--test-it-first) runs the same check on its first
+report.
+
+![The fax check](rs-fax-check "Shown as a fax: what a black-and-white fax would lose, block by block")
+
+## Review comments about the template
+When reviewers comment on a block of a report and tick **About the template** ([Comments while
+reviewing](#rs-review-comments)), the designer lists those comments over the page: the block, the report and who wrote
+it. Click one to select its block, or **Open the comment** to read it on the report.
 
 ## Checks and publishing
 The bar at the bottom reads **Template structure valid** (or **Template has errors**), how many problems the bindings
