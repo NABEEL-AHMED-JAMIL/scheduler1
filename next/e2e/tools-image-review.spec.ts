@@ -66,7 +66,7 @@ function hasMetadata(jpeg: Buffer): boolean {
 async function upload(request: APIRequestContext, file: string, buffer: Buffer, taken: string, extra: Record<string, string> = {}) {
   const r = await request.post(`${api}/imageReview.json/photos`, { headers: authOf(admin), timeout: 120_000, multipart: {
     file: { name: file, mimeType: 'image/jpeg', buffer }, patientRef: PATIENT, woundLabel: 'W1', bodyPart: 'foot', siteDetail: 'left foot, plantar',
-    takenAt: taken, ...extra } });
+    takenAt: taken, imageType: 'wound', ...extra } });
   const body = await r.json();
   expect(body.status, body.message).toBe('SUCCESS');
   return body.data.photos[0];
@@ -236,10 +236,31 @@ test.describe('Image review (live)', () => {
     await page.getByTestId('upload-patient').fill(PATIENT);
     await page.getByTestId('upload-wound').fill('L2');
     await page.getByTestId('upload-send').click();
-    await expect.poll(async () => (await ownPhotos(request)).length, { timeout: 120_000 }).toBeGreaterThan(0);
-    const mine = await (await request.get(`${api}/imageReview.json/photos`, { headers: authOf(admin), params: { days: '0', q: PATIENT, size: '50', page: '1' } })).json();
-    const made = (mine.data.rows as { woundLabel?: string; imageType?: string }[]).find(r => r.woundLabel === 'L2');
-    expect(made?.imageType, 'the Type chosen in the strip').toBe('lesion');
+    // The earlier cases' photos are this patient's too: wait for this one (L2) itself.
+    const l2 = async () => {
+      const mine = await (await request.get(`${api}/imageReview.json/photos`, { headers: authOf(admin), params: { days: '0', q: PATIENT, size: '50', page: '1' } })).json();
+      return (mine.data.rows as { woundLabel?: string; imageType?: string }[]).find(r => r.woundLabel === 'L2');
+    };
+    await expect.poll(async () => (await l2()) !== undefined, { timeout: 120_000 }).toBe(true);
+    expect((await l2())?.imageType, 'the Type chosen in the strip').toBe('lesion');
+  });
+
+  test('an image uploaded with no type gets one suggestion, a draft, from the offered types', async ({ request }) => {
+    const p = await upload(request, 'xray-XR42.jpg', readFileSync(join(FIX, 'xray-XR42.jpg')), '2026-10-29T15:50', { woundLabel: 'XR2', imageType: '' });
+    expect(p.status).toBe('NEEDS_TYPE');
+    let photo: { typeSuggestStatus?: string; typeSuggested?: boolean; typeSuggestion?: string | null; imageType?: string | null } = {};
+    for (let i = 0; i < 60; i++) {
+      const r = await request.get(`${api}/imageReview.json/photos/${p.photoId}`, { headers: authOf(admin) });
+      const d = (await r.json()).data;
+      photo = d.photo ?? d;
+      if (photo.typeSuggestStatus && !['PENDING', 'NONE'].includes(photo.typeSuggestStatus)) break;
+      await new Promise(res => setTimeout(res, 3000));
+    }
+    expect(['DONE', 'FAILED', 'OFF']).toContain(photo.typeSuggestStatus);
+    if (photo.typeSuggested) {
+      expect(['wound', 'lesion', 'burn', 'xray', 'slide', 'other']).toContain(photo.typeSuggestion);
+      expect(photo.imageType).toBe(photo.typeSuggestion);
+    }
   });
 
   test('a refused Ask ("Is there a fracture?") shows the fixed reply, and no model is asked', async ({ request, browser }) => {
