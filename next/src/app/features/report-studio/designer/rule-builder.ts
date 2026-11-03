@@ -269,6 +269,10 @@ export class RuleBuilder {
     if (seen.length && seen.every(v => typeof v === 'number')) return 'number';
     if (seen.length && seen.every(v => typeof v === 'boolean')) return 'boolean';
     if (seen.length && seen.every(v => typeof v === 'string' && ISO_DATE.test(v))) return 'date';
+    // No test data: what the rules already compare the field with (a number written as a number).
+    const written = this.rows().filter(r => r.field === field).flatMap(r => r.values);
+    if (written.length && written.every(v => typeof v === 'number')) return 'number';
+    if (written.length && written.every(v => typeof v === 'boolean')) return 'boolean';
     return 'text';
   }
 

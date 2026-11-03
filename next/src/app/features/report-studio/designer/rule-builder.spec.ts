@@ -142,4 +142,17 @@ describe('the rule builder of "Show only when"', () => {
     expect((p.el.querySelector('[aria-label="Rule 1 value"]') as HTMLInputElement).disabled).toBe(true);
     expect([...p.el.querySelectorAll('button')].some(b => b.textContent!.includes('Rule') && !b.disabled)).toBe(false);
   });
+
+  it('without test data, reads a field compared with a number as a number (its tests and its values)', () => {
+    const p = panel({ id: 'c1', type: 'conditional', condition: { left: 'primary.summary.worsening', operator: 'gt', right: 0 }, children: [] });
+    p.fixture.componentRef.setInput('fields', []);
+    p.fixture.componentRef.setInput('records', []);
+    p.fixture.detectChanges();
+    const tests = [...(p.el.querySelector('[aria-label="Rule 1 test"]') as HTMLSelectElement).options].map(o => o.value);
+    expect(tests).toContain('gte');
+    p.write('Rule 1 test', 'gte');
+    p.write('Rule 1 value', '2');
+    expect(p.last()).toEqual({ key: 'when', value: 'primary.summary.worsening >= 2', unset: ['condition'] });
+    expect(p.status()).toBe('Pick test data to see which records it shows for.');
+  });
 });
