@@ -684,8 +684,7 @@
   "theme": "light",
   "scale": 2,
   "topic": "dashboards",
-  "taken": "2026-11-02",
-  "retake": "Riverside: a few conversions in Recent conversions (the e2e tools-converter-transcript spec makes some)"
+  "taken": "2026-11-03"
  },
  "dash-files": {
   "width": 3840,
@@ -757,8 +756,7 @@
   "theme": "light",
   "scale": 2,
   "topic": "dashboards",
-  "taken": "2026-11-02",
-  "retake": "Riverside: a finished recording in Recordings (the e2e tools-converter-transcript spec makes one)"
+  "taken": "2026-11-03"
  },
  "dash-transcript-new": {
   "width": 3840,
@@ -768,7 +766,17 @@
   "theme": "light",
   "scale": 2,
   "topic": "dashboards",
-  "taken": "2026-11-02"
+  "taken": "2026-11-03"
+ },
+ "dash-transcript-page": {
+  "width": 3840,
+  "height": 2160,
+  "route": "/tools/transcript",
+  "as": "riverside.admin",
+  "theme": "light",
+  "scale": 2,
+  "topic": "dashboards",
+  "taken": "2026-11-03"
  },
  "dev-client-change": {
   "width": 1856,

@@ -233,10 +233,10 @@
   "as": "riverside.admin",
   "steps": [
    {
-    "waitFor": "[data-test=recent-conversions] tbody tr"
+    "waitFor": "tr[data-conversion]"
    },
    {
-    "click": "[data-test=recent-conversions] tbody tr button[title='See it'] >> nth=0"
+    "click": "tr[data-conversion]:has-text('Done') >> nth=0"
    },
    {
     "waitFor": "[data-test=preview-result] img"
@@ -244,8 +244,7 @@
    {
     "wait": 1000
    }
-  ],
-  "retake": "Riverside: a few conversions in Recent conversions (the e2e tools-converter-transcript spec makes some)"
+  ]
  },
  {
   "name": "dash-transcript",
@@ -253,19 +252,18 @@
   "as": "riverside.admin",
   "steps": [
    {
-    "waitFor": "[data-test=recordings-rail] [data-recording]"
+    "waitFor": "tr[data-recording]"
    },
    {
-    "click": "[data-test=recordings-rail] [data-recording]:has-text('Done') >> nth=0"
+    "click": "tr[data-recording]:has-text('two-voices-visit') >> nth=0"
    },
    {
-    "waitFor": "[data-test=player]"
+    "waitFor": "[data-test=panel-transcript]"
    },
    {
     "wait": 1500
    }
-  ],
-  "retake": "Riverside: a finished recording in Recordings (the e2e tools-converter-transcript spec makes one)"
+  ]
  },
  {
   "name": "dash-transcript-new",
@@ -277,6 +275,49 @@
    },
    {
     "wait": 800
+   }
+  ]
+ },
+ {
+  "name": "dash-transcript-page",
+  "route": "/tools/transcript",
+  "as": "riverside.admin",
+  "steps": [
+   {
+    "waitFor": "tr[data-recording]"
+   },
+   {
+    "click": "tr[data-recording]:has-text('two-voices-visit') >> nth=0"
+   },
+   {
+    "click": "[data-test=open-transcript]"
+   },
+   {
+    "waitFor": "[data-test=player]"
+   },
+   {
+    "wait": 1500
+   },
+   {
+    "click": "tr[data-seg] .tlink >> nth=5"
+   },
+   {
+    "wait": 1200
+   },
+   {
+    "click": "[data-test=play]"
+   },
+   {
+    "fill": [
+     "[data-test=transcript-search]",
+     "dressing"
+    ]
+   },
+   {
+    "wait": 800
+   },
+   {
+    "scrollTop": true
    }
   ]
  }

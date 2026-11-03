@@ -47,7 +47,21 @@
   "name": "ai-transcript",
   "route": "/tools/transcript",
   "as": "summit.admin",
-  "retake": "Summit Valley: a care-call recording transcribed (jobs 209, 210)"
+  "retake": "Summit Valley: a care-call recording transcribed (jobs 209, 210)",
+  "steps": [
+   {
+    "waitFor": "tr[data-recording]"
+   },
+   {
+    "click": "tr[data-recording]:has-text('Done') >> nth=0"
+   },
+   {
+    "waitFor": "[data-test=panel-transcript]"
+   },
+   {
+    "wait": 1500
+   }
+  ]
  },
  {
   "name": "ai-assistant",

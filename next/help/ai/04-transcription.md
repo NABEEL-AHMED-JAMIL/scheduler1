@@ -12,20 +12,24 @@ in a pipeline and on the tool page. A pipeline can then summarise the text with 
 report for each call, or search it in Ask your data.
 
 ## Transcribe recordings by hand
-1. Open **See results › Tools › Audio Transcript** and choose **New transcript**.
-2. Drop one or more recordings (.mp3, .m4a, .wav or .ogg), or pick one **From a bucket…**. Each recording's length is read
-   before it is uploaded, and the page says about how long it takes and how many audio minutes are billed.
-3. Choose **Transcribe**. It runs on the server: the card shows how much has been heard and the time left, and you can
-   leave the page.
-4. When it is ready, play it back with the transcript beside it: each part has its time, search marks every match on
-   the waveform, and **Use this transcript** downloads it (text, subtitles, JSON or PDF), sends it to Documents as a visit
-   note, or starts a pipeline with it.
+1. Open **See results › Tools › Audio Transcript** and choose **Transcribe recordings** (or drop recordings anywhere on
+   the page).
+2. Add one or more recordings (.mp3, .m4a, .wav or .ogg), or pick one **From a bucket…**. Each recording's length is read
+   before it is uploaded, and the panel says about how long it takes and how many audio minutes are billed. **Speakers**
+   finds 2 to 6 by itself, or takes **One speaker** or **Exactly 2** to **6**.
+3. Choose **Transcribe**. It runs on the server: the recording shows its progress in the list, and you can leave the
+   page.
+4. When it is ready, choose it in the list for a side panel with a compact player and the first lines, or **Open
+   transcript** for its own page: one player row, the transcript as a table (choose a time to play from there), search
+   with every match marked on the track, one **All speakers** filter, and **Download** (text, subtitles, JSON or PDF),
+   **Send to Documents** as a visit note, or **Start a pipeline** with it.
 
-Every recording of the last 30 days is listed under **Recordings**; the transcripts stay until you delete them (or your
-workspace's retention removes them), and the recording itself is kept 30 days for playback if you chose to keep it. See
-[Tools: Document Converter and Audio Transcript](#dash-tools) for the player, speakers and masking.
+The list shows the recordings of the last 7, 30 or 90 days, or all of them, with facets for status, who made them,
+speakers and language; the transcripts stay until you delete them (or your workspace's retention removes them), and the
+recording itself is kept 30 days for playback if you chose to keep it. See
+[Tools: Document Converter and Audio Transcript](#dash-tools) for the page, speakers and masking.
 
-![The Audio Transcript tool](ai-transcript "See results › Tools › Audio Transcript: a finished recording with the player, the transcript and how to use it")
+![The Audio Transcript tool](ai-transcript "See results › Tools › Audio Transcript: the recordings, with a finished one open in the side panel")
 
 ## Transcribe in a pipeline
 1. In the pipeline's **Steps**, add **Transcribe audio** from **Add step from the Task Registry…**.

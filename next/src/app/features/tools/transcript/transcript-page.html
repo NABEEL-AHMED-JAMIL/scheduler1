@@ -235,7 +235,7 @@
                         <td class="tp-c-time"><button type="button" class="tlink" [class.tlink-now]="now" (click)="playFrom(s)" [attr.aria-label]="'Play from ' + clock(s.startMs / 1000)">
                           <app-icon [name]="now && playback.playing() ? 'pause' : 'play'" size="0.8em" />{{ clock(s.startMs / 1000) }}</button></td>
                         @if (speakers().length) {
-                          <td class="tp-c-spk">@if (s.speaker != null) { <span class="spk"><span [class]="'dot ' + tone(s.speaker)"></span><span class="truncate">{{ speakerName(s.speaker) }}</span></span> }</td>
+                          <td class="tp-c-spk">@if (s.speaker != null) { <span class="spk"><span [class]="'dot ' + tone(s.speaker)"></span><span class="truncate" [title]="speakerName(s.speaker)">{{ speakerName(s.speaker) }}</span></span> }</td>
                         }
                         <td class="tp-txt">
                           @if (editing()) {

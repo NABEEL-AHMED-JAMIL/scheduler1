@@ -28,6 +28,8 @@
   border-top: 1px solid var(--border-subtle); font-size: 0.75rem; color: var(--text-muted); }
 .tx-pager { display: inline-flex; align-items: center; gap: 0.375rem; margin-left: auto; color: var(--text-secondary); }
 
+/* A very wide screen gives the panel's page more room. */
+@media (min-width: 2200px) { .tx.tx-panel-on { grid-template-columns: 15rem minmax(0, 1fr) 36rem; } }
 @media (max-width: 1499px) {
   .tx { grid-template-columns: 12.5rem minmax(0, 1fr); }
   .tx.tx-panel-on { grid-template-columns: 12.5rem minmax(0, 1fr) 25rem; }
