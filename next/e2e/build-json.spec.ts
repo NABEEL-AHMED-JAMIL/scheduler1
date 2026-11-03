@@ -84,6 +84,6 @@ test.describe('Build JSON step (MIG-451)', () => {
     expect(run.jobStatus).toBe('Completed');
     const page = await pageAs(browser, s);
     await page.goto(`/pipelines/schedules/${job}/runs/${run.jobQueueId}`);
-    await expect(page.locator('[data-step="shape"]')).toContainText('2 documents');
+    await expect(page.locator('[data-step="shape"] [data-test="step-documents"]')).toContainText('2 documents');
   });
 });
