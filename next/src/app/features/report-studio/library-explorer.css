@@ -7,8 +7,11 @@
 .lx-fh { display: flex; align-items: center; gap: 0.375rem; margin: 1.125rem 0 0.375rem; }
 .lx-fh:first-child { margin-top: 0; }
 .lx-fh h2 { font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); margin: 0; }
-.lx-f { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 0.5rem; padding: 0.1875rem 0; cursor: pointer; }
-.lx-f span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lx-f { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: 0.5rem; padding: 0.1875rem 0; cursor: pointer;
+  line-height: 1.3; }
+.lx-f > input { margin-top: 0.125rem; }
+/* Owner review 2026-11-03: a long label wraps to two lines (its full text on hover), the count stays aligned right. */
+.lx-f span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
 .lx-f b { font-weight: 400; color: var(--text-muted); font-size: 0.8125rem; font-variant-numeric: tabular-nums; }
 .lx-none { font-size: 0.8125rem; color: var(--text-muted); margin: 0; }
 .lx-badge { display: inline-grid; place-items: center; min-width: 1.125rem; height: 1.125rem; padding: 0 0.25rem; border-radius: var(--radius-full); font-size: 0.6875rem;
@@ -22,15 +25,7 @@
   border-radius: var(--radius-md); background: var(--surface-inset); font-size: 0.8125rem; }
 .lx-hist { padding: 0 0.875rem 0.75rem; }
 .lx-hist-head { display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.375rem; }
-.lx-bars { display: flex; align-items: flex-end; gap: 2px; height: 3.25rem; }
-.lx-col { flex: 1 1 0; min-width: 2px; height: 100%; display: flex; flex-direction: column-reverse; }
-.lx-col i { display: block; width: 100%; }
-.lx-col i:last-child { border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
-.s-APPROVED { background: var(--ok-text); }
-.s-WAITING { background: var(--warn-text); }
-.s-READY { background: color-mix(in oklab, var(--text-muted) 55%, transparent); }
-.s-FAILED { background: var(--crit-text); }
-.s-VOID { background: var(--text-primary); }
+.lx-sub { display: block; font-size: 0.75rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lx-bulk { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; padding: 0.5rem 0.875rem; background: var(--surface-inverse);
   color: var(--text-inverse); font-size: 0.875rem; position: sticky; top: 3.5rem; z-index: 3; }
 .lx-on-dark { background: transparent; color: inherit; border: 1px solid color-mix(in oklab, currentColor 35%, transparent); }
@@ -47,8 +42,6 @@
 .lx-c-ver { width: 4.5rem; }
 .lx-c-state { width: 8.5rem; }
 .lx-c-made { width: 7.5rem; }
-.lx-c-template { width: 16%; }
-.has-panel .lx-c-template { width: 13%; }
 .has-panel .lx-c-by { display: none; }
 .lx-c-by { width: 9.5rem; }
 .lx-sort { font: inherit; letter-spacing: inherit; text-transform: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
@@ -66,15 +59,20 @@
 .lx-doc i { height: 2px; background: color-mix(in oklab, var(--text-muted) 40%, var(--paper)); }
 .lx-doc i:first-child { background: var(--chart-1); }
 .lx-foot { display: flex; justify-content: space-between; gap: 1rem; padding: 0.625rem 0.875rem; font-size: 0.75rem; color: var(--text-muted); }
-.lx-panel { border-left: 1px solid var(--border-subtle); min-width: 0; background: var(--surface-raised); border-radius: 0 var(--radius-card) var(--radius-card) 0; }
+/* Owner review 2026-11-03: the open report stays in view beside a long list (sticky, the viewport's height, scrolling on its
+   own) and ends with its content beside a short one: never a tall empty column. */
+.lx-panel { border-left: 1px solid var(--border-subtle); min-width: 0; background: var(--surface-raised); border-radius: 0 var(--radius-card) var(--radius-card) 0;
+  position: sticky; top: 4rem; align-self: start; max-height: calc(100vh - 5rem); overflow: auto; }
 .lx-ph { padding: 0.875rem 1rem 0.5rem; }
 .lx-title { font-size: 1.125rem; font-weight: 600; margin: 0.5rem 0; line-height: 1.3; }
 .lx-tags { display: flex; flex-wrap: wrap; gap: 0.375rem; }
 .lx-tag { font-size: 0.75rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 0.125rem 0.375rem; color: var(--text-muted); }
 .lx-tag b { color: var(--text-primary); font-weight: 500; }
-.lx-pb { padding: 0.875rem 1rem 1rem; background: var(--surface-sunken); min-height: 20rem; }
-.lx-paper { background: var(--paper); box-shadow: 0 1px 4px color-mix(in oklab, var(--text-primary) 16%, transparent); min-height: 12rem; }
-.lx-paper img { width: 100%; display: block; }
+.lx-pb { padding: 0.875rem 1rem 1rem; background: var(--surface-sunken); }
+.lx-paper { display: flex; justify-content: center; min-height: 12rem; }
+/* The page fits the height the panel has, so the whole page shows without scrolling the panel. */
+.lx-paper img { display: block; max-width: 100%; max-height: calc(100vh - 21rem); width: auto; height: auto; background: var(--paper);
+  box-shadow: 0 1px 4px color-mix(in oklab, var(--text-primary) 16%, transparent); }
 .lx-next { margin-top: 1rem; padding: 0.75rem 0.875rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); background: var(--surface-raised); }
 .lx-next h3 { font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); margin: 0 0 0.25rem; }
 .lx-next p { font-size: 0.875rem; margin: 0; }
@@ -89,7 +87,8 @@
 /* Under 1500 px the panel lies over the list; under 1280 px the facets go behind "Filters". */
 @media (max-width: 1499px) {
   .lx.has-panel { grid-template-columns: 14.5rem minmax(0, 1fr); }
-  .lx-panel { position: absolute; top: 0; right: 0; bottom: 0; width: min(29rem, 100%); z-index: 6; overflow: auto;
+  .lx-panel { position: fixed; top: 4rem; right: 1rem; bottom: 1rem; max-height: none; width: min(29rem, calc(100vw - 2rem)); z-index: 6; overflow: auto;
+    border: 1px solid var(--border-subtle); border-radius: var(--radius-card);
     box-shadow: -12px 0 32px -16px var(--shadow-color); }
 }
 @media (max-width: 1279px) {
@@ -101,4 +100,6 @@
   .lx-c-by { display: none; }
   .lx-keys { display: none; }
 }
-.s-PENDING { background: color-mix(in oklab, var(--info-text) 45%, transparent); }
+
+/* Owner review 2026-11-03: the facets take more room on a wide screen, so their labels rarely wrap. */
+@media (min-width: 1700px) { .lx { grid-template-columns: 17.5rem minmax(0, 1fr); } .lx.has-panel { grid-template-columns: 17.5rem minmax(0, 1fr) 31rem; } }

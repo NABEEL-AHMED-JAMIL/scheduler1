@@ -188,3 +188,49 @@ describe('the report viewer\'s note (owner review 2026-11-03)', () => {
     expect(note({ void: { reason: 'x' } })).toBe('VOID copy');
   });
 });
+
+describe('the library after the owner\'s review (2026-11-03)', () => {
+  it('does not repeat the template when the report\'s name already says it', async () => {
+    const { namesTemplate } = await import('./library-explorer');
+    expect(namesTemplate('Patient intake · S-1151', 'Patient intake summary')).toBe(true);
+    expect(namesTemplate('MIG-326 load report 0412', 'MIG-326 load report')).toBe(true);
+    expect(namesTemplate('Wound review · October 2026', 'Wound assessment report')).toBe(false);
+    expect(namesTemplate('Pre-bill claims review · batch 7', 'Pre-bill claims review')).toBe(true);
+  });
+
+  it('dates the axis at about five evenly spaced days, first and last always', async () => {
+    const { axisDays, dayWords } = await import('./library-histogram');
+    const days = Array.from({ length: 30 }, (_, i) => `2026-10-${String(i + 1).padStart(2, '0')}`);
+    const ticks = axisDays(days);
+    expect(ticks[0].day).toBe('2026-10-01');
+    expect(ticks[ticks.length - 1].day).toBe('2026-10-30');
+    expect(ticks.length).toBeGreaterThanOrEqual(4);
+    expect(ticks.length).toBeLessThanOrEqual(6);
+    expect(dayWords('2026-10-21')).toBe('21 Oct');
+  });
+
+  it('says "All N on <day>" when every report falls on one day', async () => {
+    const { LibraryHistogram } = await import('./library-histogram');
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [provideZonelessChangeDetection()] });
+    const f = TestBed.createComponent(LibraryHistogram);
+    f.componentRef.setInput('bars', [
+      { day: '2026-10-20', parts: [], total: 0 },
+      { day: '2026-10-21', parts: [{ state: 'READY', n: 430 }, { state: 'FAILED', n: 3 }], total: 433 },
+      { day: '2026-10-22', parts: [], total: 0 },
+    ]);
+    f.detectChanges();
+    const el = f.nativeElement as HTMLElement;
+    expect(el.querySelector('[data-test=hist-one-day]')!.textContent!.replace(/\s+/g, ' ')).toContain('All 433 on 21 Oct');
+    expect(el.querySelector('.lx-bars')).toBeNull();
+    f.componentRef.setInput('bars', [
+      { day: '2026-10-20', parts: [{ state: 'APPROVED', n: 2 }], total: 2 },
+      { day: '2026-10-21', parts: [], total: 0 },
+      { day: '2026-10-22', parts: [{ state: 'READY', n: 5 }], total: 5 },
+    ]);
+    f.detectChanges();
+    expect(el.querySelector('.lx-top')!.textContent).toBe('5');
+    expect(el.querySelectorAll('.lx-col.is-empty').length).toBe(1);
+    expect([...el.querySelectorAll('.lx-legend .lx-leg')].map(x => x.textContent!.trim())).toEqual(['Approved and signed', 'Ready']);
+  });
+});

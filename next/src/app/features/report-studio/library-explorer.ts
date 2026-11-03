@@ -18,6 +18,7 @@ import {
 } from './report-library.api';
 import { saveBlob } from './report-files';
 import { zipStore } from './zip-store';
+import { LibraryHistogram } from './library-histogram';
 import { plainHint } from '../../shared/ui/plain-words';
 
 type Facet = 'state' | 'templateId' | 'category' | 'madeBy' | 'approver';
@@ -43,6 +44,17 @@ export function bars(days: HistogramDay[], from: string | null, to: string | nul
   return out;
 }
 
+/** A report's name already says its template ("Patient intake · S-1151" from "Patient intake"): don't repeat it. */
+export function namesTemplate(name: string, template: string): boolean {
+  const a = name.trim().toLowerCase();
+  const b = template.trim().toLowerCase();
+  if (!b) return true;
+  if (a.startsWith(b)) return true;
+  // "Patient intake · S-1151" from "Patient intake summary": the name's lead before its first separator starts the template.
+  const lead = a.split(/\s+[·\-–—|:]\s+/)[0];
+  return lead.length >= 4 && b.startsWith(lead);
+}
+
 /**
  * The report library as an explorer (reports redesign, owner 2026-11-02; design library.html, the owner's Datadog-style
  * references): facets with counts on the left (state, template, category, who made it, approver, the hidden test reports),
@@ -52,7 +64,7 @@ export function bars(days: HistogramDay[], from: string | null, to: string | nul
  */
 @Component({
   selector: 'app-library-explorer',
-  imports: [Icon, RsTimePipe, RouterLink, DateRangePicker, Pagination],
+  imports: [Icon, RsTimePipe, RouterLink, DateRangePicker, Pagination, LibraryHistogram],
   templateUrl: './library-explorer.html',
   styleUrl: './library-explorer.css',
 })
@@ -111,7 +123,6 @@ export class LibraryExplorer implements OnInit {
   readonly anyFilter = computed(() => !!this.q().trim() || Object.values(this.filters()).some(v => v.length) || this.tests());
   readonly bars = computed(() => bars(this.data()?.histogram.days ?? [], this.range().preset === 'all' ? null : this.range().from,
     this.range().preset === 'all' ? null : this.range().to));
-  readonly barMax = computed(() => Math.max(1, ...this.bars().map(b => b.total)));
   readonly pickedRows = computed(() => this.rows().filter(r => this.picked().has(r.reportId)));
   /** Of the picked, those this person may approve now: waiting or ready, not theirs, not asked by them. */
   readonly approvable = computed(() => this.pickedRows().filter(r => this.mayApprove(r)));
@@ -476,7 +487,8 @@ export class LibraryExplorer implements OnInit {
     return days <= 0 ? 'today' : days === 1 ? '1 day ago' : `${days} days ago`;
   }
 
-  barTitle(b: { day: string; parts: { state: ReportState; n: number }[]; total: number }): string {
-    return `${b.day}: ${b.total} report${b.total === 1 ? '' : 's'}` + (b.parts.length ? ' (' + b.parts.map(p => `${p.n} ${STATE_WORDS[p.state].toLowerCase()}`).join(', ') + ')' : '');
+  namesTemplate(r: LibraryRow): boolean {
+    return namesTemplate(r.name, r.templateName);
   }
+
 }
