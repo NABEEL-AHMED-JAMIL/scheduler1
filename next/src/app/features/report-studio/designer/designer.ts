@@ -251,6 +251,11 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
   readonly draftVersion = computed(() => this.t()?.draft?.version ?? 0);
   readonly draftRevision = signal(0);
   readonly sample = computed(() => firstRecord(this.inspect()));
+  /** Feature 14: every record of the test sample, for the rule builder's "shows for N of M test records". */
+  readonly sampleRecords = computed<unknown[]>(() => {
+    const s = this.inspect()?.sample;
+    return Array.isArray(s) ? s : s === undefined || s === null ? [] : [s];
+  });
   readonly dropTargets = computed(() => [...this.pages().map(p => `rsd-page-${p.index}`), 'rsd-layers']);
   readonly paletteGroups = computed(() => groupPalette(this.palette(), this.search()));
   /** Reports redesign: the page shown as on screen, as printed, or as a black-and-white fax. */
@@ -540,6 +545,7 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
       if (!at) return false;
       if (change.value === undefined) delete at.block[change.key];
       else at.block[change.key] = change.value;
+      for (const k of change.unset ?? []) delete at.block[k];
       return true;
     }, `${id}:${change.key}`);
   }

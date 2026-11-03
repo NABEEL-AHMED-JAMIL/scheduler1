@@ -5,12 +5,14 @@ import { SchemaField, TreeNode } from '../report-studio.model';
 import { AssetCard } from '../assets.model';
 import { RsPickSearch } from '../pick-search';
 import {
-  Block, collections, innerPath, itemFields, lengthAt, sampleText, scalars, typeIcon, typeWord, valueAt,
+  Block, collections, find, innerPath, itemFields, lengthAt, sampleText, scalars, typeIcon, typeWord, valueAt,
 } from './designer-model';
 import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
 import { QrInspector } from './qr-inspector';
 import { BarcodeInspector } from './barcode-inspector';
 import { BarcodeMeasure } from '../report-studio.model';
+import { RuleBuilder, RuleContext, RuleField } from './rule-builder';
+import { parseExpression, readerFor } from './rule-expr';
 
 /** One setting of a component, as the form draws it. */
 export interface PropField {
@@ -18,7 +20,7 @@ export interface PropField {
   label: string;
   kind: 'text' | 'textarea' | 'number' | 'boolean' | 'enum' | 'binding' | 'listBinding' | 'collection' | 'columns' | 'items'
     | 'format' | 'style' | 'size' | 'itemField' | 'json' | 'asset' | 'imageSource' | 'filter' | 'rowField' | 'series' | 'object' | 'bands'
-    | 'path';
+    | 'path' | 'rule';
   group: 'content' | 'data' | 'format' | 'style' | 'layout';
   options?: string[];
   /** The words for an enum's options, where its own values are not words (QA 2026-10-20: emphasis). */
@@ -35,8 +37,8 @@ export interface PropField {
 /** A table column's conditional style (phase 4): compare with a value or another field, or an expression; a theme tone. */
 export interface ColumnRule { operator?: string; value?: string | number | boolean; field?: string; when?: string; tone?: string; style?: string; }
 
-/** A change to one setting: the new value, or undefined to remove it. */
-export interface PropChange { key: string; value: unknown; }
+/** A change to one setting: the new value, or undefined to remove it; `unset` names settings removed with it in the same step. */
+export interface PropChange { key: string; value: unknown; unset?: string[]; }
 
 type JsonSchema = { type?: string | string[]; enum?: unknown[]; $ref?: string; maxLength?: number; minimum?: number; maximum?: number;
   properties?: Record<string, JsonSchema>; items?: JsonSchema };
@@ -151,6 +153,8 @@ export function fieldsFor(type: string, definitions: Record<string, JsonSchema>)
   const out: PropField[] = [];
   for (const [key, s] of Object.entries(props)) {
     if (key === 'id' || key === 'type' || key === 'children') continue;
+    // Feature 14: a conditional's structured condition and its expression are one setting, the rule builder's.
+    if (type === 'conditional' && key === 'condition') continue;
     const group = GROUPS[key] ?? 'content';
     const label = (type === 'spacer' && key === 'size' ? LABELS['size_spacer'] : LABELS[key]) ?? key;
     let field: PropField;
@@ -176,6 +180,7 @@ export function fieldsFor(type: string, definitions: Record<string, JsonSchema>)
     else if (key === 'categoryField' || key === 'seriesField') field = { key, label, kind: 'itemField', group: 'data' };
     else if (key === 'series') field = { key, label, kind: 'series', group: 'data' };
     else if (key === 'text' && type === 'qrCode') field = { key, label: LABELS['text_qr'], kind: 'text', group: 'content' };
+    else if (key === 'when' && type === 'conditional') field = { key, label: 'Show when', kind: 'rule', group: 'data' };
     else if (key === 'when') field = { key, label, kind: 'textarea', group: 'data',
       hint: "e.g. primary.summary.rate > 12 and primary.site = 'North'. Paths, numbers, 'words', and, or, not, is null." };
     else if (s.type === 'object' && s.properties && Object.values(s.properties).every(p => p.type !== 'array' && p.type !== 'object'))
@@ -274,7 +279,7 @@ export function filterRows(rows: unknown[], f: RowFilter | null): unknown[] {
  */
 @Component({
   selector: 'app-rs-properties',
-  imports: [Icon, NgTemplateOutlet, RsPickSearch, AdvancedSelect, QrInspector, BarcodeInspector],
+  imports: [Icon, NgTemplateOutlet, RsPickSearch, AdvancedSelect, QrInspector, BarcodeInspector, RuleBuilder],
   template: `
     @if (block(); as b) {
       <div class="rsd-props-head">
@@ -396,6 +401,11 @@ export function filterRows(rows: unknown[], f: RowFilter | null): unknown[] {
                                          emptyText="The list's items have no fields in the test data." />
                   </label>
                 }
+              }
+              @case ('rule') {
+                <app-rs-rule-builder [when]="ruleWhen()" [condition]="ruleCondition()" [readonly]="readonly()" [fields]="ruleScope().fields"
+                                     [names]="names()" [contexts]="ruleScope().contexts" [noun]="ruleScope().noun" [note]="ruleScope().note ?? ''" [total]="ruleScope().total"
+                                     (changed)="changed.emit({ key: 'when', value: $event, unset: ['condition'] })" />
               }
               @case ('filter') {
                 @if (b.type !== 'labelValue' || rowsShown()) {
@@ -777,6 +787,9 @@ export class PropertiesPanel {
   readonly names = input<string[]>(['primary']);
   /** The template's blocks (the QR inspector reads a repeated item's value from them). */
   readonly blocks = input<Block[]>([]);
+  /** Feature 14: the test data's records (the inspect's sample) and how many the data has, for "shows for N of M". */
+  readonly records = input<unknown[]>([]);
+  readonly recordTotal = input<number | null>(null);
   /** Feature 5: each barcode as the canvas drew it, by component id (its inspector's scan check). */
   readonly measures = input<Record<string, BarcodeMeasure>>({});
   /** MIG-406: what this person may place (approved assets, their own or granted), and the template's asset entries. */
@@ -1090,6 +1103,64 @@ export class PropertiesPanel {
   });
 
   /** How many sample rows the filter keeps. */
+  // ---------------------------------------------------------------- feature 14: the rule builder of "Show only when"
+
+  readonly ruleWhen = computed(() => (typeof this.block()?.['when'] === 'string' ? (this.block()!['when'] as string) : undefined));
+  readonly ruleCondition = computed(() => {
+    const c = this.block()?.['condition'];
+    return c && typeof c === 'object' && !Array.isArray(c) ? (c as { left?: string; operator?: string; right?: unknown }) : undefined;
+  });
+
+  /**
+   * What the rules are written over and counted on. At the top of the page: the primary record's fields, each test record
+   * read as the report's data. Inside "Repeat for each": also the item's fields (item.stage), counted over the items of the
+   * first test record's list -- the server shows the block once for each item that holds.
+   */
+  readonly ruleScope = computed<{ fields: RuleField[]; contexts: RuleContext[]; noun: string; note?: string; total: number | null }>(() => {
+    const b = this.block();
+    const records = this.records();
+    const primaryFields: RuleField[] = scalars(this.fields()).map(f => ({ path: `${this.primary()}.${f.path}`, type: f.type }));
+    const repeats: Block[] = [];
+    let at = b ? find(this.blocks(), b.id) : null;
+    for (let guard = 0; at?.parent && guard < 50; guard++) {
+      if (at.parent.type === 'repeat') repeats.push(at.parent);
+      at = find(this.blocks(), at.parent.id);
+    }
+    if (!repeats.length) {
+      return { fields: primaryFields, contexts: records.map(record => ({ record, scopes: {} })), noun: 'test record', total: this.recordTotal() };
+    }
+    // The innermost repeat's items; outer repeats read their first item, as the canvas draws them.
+    const record = records[0];
+    const scopes: Record<string, unknown> = {};
+    const itemFieldList: RuleField[] = [];
+    let items: unknown[] = [];
+    for (const r of [...repeats].reverse()) {
+      const alias = typeof r['as'] === 'string' && r['as'] ? (r['as'] as string) : 'item';
+      const dataset = typeof r['dataset'] === 'string' ? (r['dataset'] as string) : '';
+      let list: unknown;
+      try {
+        const ast = parseExpression(dataset);
+        list = ast.k === 'path' ? readerFor(record, this.names(), scopes)(ast.steps) : undefined;
+      } catch {
+        list = undefined;
+      }
+      items = Array.isArray(list) ? list : [];
+      scopes[alias] = items[0];
+      const inner = innerPath(dataset, this.names());
+      if (inner !== null && inner) {
+        for (const f of itemFields(this.fields(), inner)) {
+          if (!/object|list|array/i.test(f.type) && !f.path.includes('[]')) itemFieldList.push({ path: `${alias}.${f.path}`, type: f.type });
+        }
+      }
+    }
+    const innermost = repeats[0];
+    const alias = typeof innermost['as'] === 'string' && innermost['as'] ? (innermost['as'] as string) : 'item';
+    const contexts = record === undefined ? [] : items.map(item => ({ record, scopes: { ...scopes, [alias]: item } }));
+    const seen = new Set<string>();
+    const fields = [...itemFieldList, ...primaryFields].filter(f => !seen.has(f.path) && seen.add(f.path));
+    return { fields, contexts, noun: 'item', note: ` of ${innermost['dataset'] ?? 'the list'} in the first test record`, total: null };
+  });
+
   readonly filterMatch = computed(() => {
     const f = this.filter();
     if (!f) return null;

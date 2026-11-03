@@ -294,7 +294,7 @@
       <aside class="rsd-right" aria-label="Properties">
         @if (selectedBlock()) {
           <app-rs-properties [block]="selectedBlock()" [label]="selectedLabel()" [definitions]="definitions()" [readonly]="!editable()"
-                             [fields]="dataFields()" [sample]="sample()" [tree]="inspect()?.tree" [names]="names()" [blocks]="blocks()" [measures]="measures()"
+                             [fields]="dataFields()" [sample]="sample()" [records]="sampleRecords()" [recordTotal]="inspect()?.records ?? null" [tree]="inspect()?.tree" [names]="names()" [blocks]="blocks()" [measures]="measures()"
                              [assets]="usableAssets()" [assetsTotal]="usableTotal()" [assetTotals]="usableTotals()" (findAssets)="findAssets($event)"
                              [templateAssets]="templateAssets()" (assetPicked)="pickAsset($event)"
                              (changed)="setProperty($event)" (duplicate)="duplicateSelected()" (remove)="removeSelected()" />

@@ -264,8 +264,11 @@ describe('phase 4 settings', () => {
     const c = panel({ id: 'k1', type: 'conditional', condition: { left: 'primary.period', operator: 'in' }, children: [] });
     c.fixture.componentRef.setInput('definitions', phase4);
     c.fixture.detectChanges();
-    c.write('Show when Value', 'Sep, Oct');
-    expect(c.last()).toEqual({ key: 'condition', value: { left: 'primary.period', operator: 'in', right: ['Sep', 'Oct'] } });
+    // Feature 14: the condition is the rule builder's; a finished row writes the expression in its place.
+    const values = c.el.querySelector('[aria-label="Rule 1 values"]') as HTMLTextAreaElement;
+    values.value = 'Sep\nOct';
+    values.dispatchEvent(new Event('change'));
+    expect(c.last()).toEqual({ key: 'when', value: "primary.period in ('Sep', 'Oct')", unset: ['condition'] });
   });
 
   it('gives a table column a total and style rules, a value or another field', () => {
