@@ -180,5 +180,17 @@
   "name": "rs-settings",
   "route": "/reports/settings",
   "as": "summit.admin"
+ },
+ {
+  "name": "rs-schedule",
+  "route": "/reports/schedules/01M6FVRDZKSYJ9D5KJB28N54Z5",
+  "as": "riverside.admin",
+  "settle": 4000
+ },
+ {
+  "name": "rs-schedules",
+  "route": "/reports/schedules",
+  "as": "riverside.admin",
+  "settle": 2000
  }
 ]

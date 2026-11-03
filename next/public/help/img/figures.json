@@ -2123,6 +2123,16 @@
   "topic": "report-studio",
   "taken": "2026-10-27"
  },
+ "rs-barcode": {
+  "width": 3840,
+  "height": 2160,
+  "route": "/reports/templates/01M6FV21D6MKFM8JDZ4PGY94BF/design",
+  "as": "riverside.admin",
+  "theme": "light",
+  "scale": 2,
+  "topic": "report-studio",
+  "taken": "2026-11-03"
+ },
  "rs-chart": {
   "width": 3840,
   "height": 2160,
@@ -2192,6 +2202,26 @@
   "scale": 2,
   "topic": "report-studio",
   "taken": "2026-11-02"
+ },
+ "rs-schedule": {
+  "width": 3840,
+  "height": 2160,
+  "route": "/reports/schedules/01M6FVRDZKSYJ9D5KJB28N54Z5",
+  "as": "riverside.admin",
+  "theme": "light",
+  "scale": 2,
+  "topic": "report-studio",
+  "taken": "2026-11-03"
+ },
+ "rs-schedules": {
+  "width": 3840,
+  "height": 2160,
+  "route": "/reports/schedules",
+  "as": "riverside.admin",
+  "theme": "light",
+  "scale": 2,
+  "topic": "report-studio",
+  "taken": "2026-11-03"
  },
  "rs-settings": {
   "width": 3840,

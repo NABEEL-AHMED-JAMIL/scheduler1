@@ -90,6 +90,8 @@ no pages, so it is not affected.
 The barcode's inspector shows its **Scan check** from what was drawn: the modules across, the printed size, and whether
 it reads printed and faxed. A barcode wider than its column is narrowed to fit, and the check says so.
 
+![A barcode's inspector](rs-barcode "A Barcode selected: Code 128 of the specimen's accession number, its module and the scan check")
+
 ## Limits
 | What | Limit |
 |---|---|

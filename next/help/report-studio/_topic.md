@@ -4,7 +4,7 @@ chapter: 13
 part: Part VI · See results
 icon: template
 blurb: Design report templates once, fill them from your data, approve and sign every version.
-paths: /reports/overview, /reports/templates, /reports/library
+paths: /reports/overview, /reports/templates, /reports/library, /reports/schedules
 sections: Get started | Design | Data | Generate | Approve and sign | Manage | Help
 ---
 Report Studio turns your data into finished, branded PDF and HTML reports: a discharge summary, a monthly safety report,
@@ -30,7 +30,8 @@ from vN**, change the draft and publish it as the next version. See [Templates a
 
 ### How do I make one report for each row, such as a statement per guarantor?
 In the pipeline's **Generate report** step, turn on **One report per row** and name each report from the row's columns.
-See [Reports from a pipeline](#rs-pipeline).
+See [Reports from a pipeline](#rs-pipeline). To make them on a schedule — one per patient every Monday, approved and then
+emailed or saved in a bucket — use **Reports › Schedules**: see [Generate many reports on a schedule](#rs-schedules).
 
 ### My report failed: "is not in this data". What now?
 The template reads a field the data does not have. Choose **Fix field mapping** and match it, or add the field to the
