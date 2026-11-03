@@ -49,6 +49,12 @@ describe('A Route\'s branches', () => {
     expect(stepSummary(steps[1])).toEqual([{ label: 'Branches', value: 'urgent · routine' }]);
   });
 
+  it('counts a list of settings with the right plural', () => {
+    expect(stepSummary(steps[2])).toEqual([{ label: 'formulas', value: '1 item' }]);
+    expect(stepSummary(steps[0])).toEqual([{ label: 'rows', value: '1 item' }]);
+    expect(stepSummary({ key: 'r', task: 'sample', config: { rows: [{ a: 1 }, { a: 2 }] } })).toEqual([{ label: 'rows', value: '2 items' }]);
+  });
+
   it('draws a run\'s branch from its Route with the branch\'s own rows', () => {
     const run = [
       { key: 'triage', task: 'route', status: 'Completed', recordsOut: 5, reads: [],

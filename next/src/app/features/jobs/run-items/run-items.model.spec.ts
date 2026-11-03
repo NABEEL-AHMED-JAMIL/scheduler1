@@ -21,6 +21,7 @@ describe('Run items: the readings', () => {
   it('offers View for a step with data, the files for one that made many, and a dash where it did not run', () => {
     expect(cellLook({ status: 'done', hasData: true, files: 0 }).kind).toBe('view');
     expect(cellLook({ status: 'done', hasData: true, files: 40 })).toMatchObject({ kind: 'files', text: '40 files' });
+    expect(cellLook({ status: 'done', hasData: true, branch: 'urgent' })).toMatchObject({ kind: 'view', text: 'urgent' });
     expect(cellLook({ status: 'done', files: 1 })).toMatchObject({ kind: 'files', text: '1 file' });
     expect(cellLook({ status: 'not_run' }).text).toBe('—');
     expect(cellLook(undefined).text).toBe('—');

@@ -425,6 +425,7 @@ export class RunItemPanel implements OnInit {
     const parts: string[] = [];
     if (s.rows !== null && s.rows !== undefined) parts.push(`${s.rows.toLocaleString('en-GB')} ${s.rows === 1 ? 'row' : 'rows'}`);
     if (s.files) parts.push(`${s.files} ${s.files === 1 ? 'file' : 'files'}`);
+    if (s.branch) parts.push(`routed to ${s.branch}`);
     if (s.reusedFromAttempt) parts.push(`reused from attempt ${s.reusedFromAttempt}`);
     return parts.join(' · ');
   }

@@ -234,7 +234,7 @@ function short(value: unknown): string | null {
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value);
   if (Array.isArray(value)) {
     const scalars = value.filter(v => ['string', 'number', 'boolean'].includes(typeof v));
-    return scalars.length === value.length ? scalars.join(', ') : `${value.length} items`;
+    return scalars.length === value.length ? scalars.join(', ') : `${value.length} ${value.length === 1 ? 'item' : 'items'}`;
   }
   return null;
 }

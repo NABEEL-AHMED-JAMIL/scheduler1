@@ -23,6 +23,8 @@ export interface ItemCell {
   sharedBy?: number | null;
   reused?: boolean | null;
   hasData?: boolean | null;
+  /** MIG-450: a Route step's branch for the item ("urgent"). */
+  branch?: string | null;
   /** ZT-I35: the step's one file for the item (files is 1), for its chip in the table. */
   file?: { fileRef?: number | string | null; name: string; format?: string | null } | null;
 }
@@ -109,6 +111,8 @@ export interface ItemDetailStep {
   index: number; key: string; name: string; task?: string | null; status: CellStatus | 'running';
   note?: string | null; durationMs?: number | null; rows?: number | null; files?: number | null; sharedBy?: number | null;
   hasData?: boolean | null; reusedFromAttempt?: number | null;
+  /** MIG-450: a Route step's branch for the item. */
+  branch?: string | null;
 }
 
 export interface ItemFile {
@@ -200,6 +204,9 @@ export function cellLook(cell: ItemCell | null | undefined): CellLook {
   if (cell.status === 'shared') {
     const n = cell.sharedBy ?? 0;
     return { kind: 'shared', text: n ? `Shared by ${n.toLocaleString('en-GB')}` : 'Shared', title: 'Made once for the run and used by these items' };
+  }
+  if (cell.hasData && cell.branch && cell.status !== 'failed') {
+    return { kind: 'view', text: cell.branch, title: `Routed to ${cell.branch}: see what this step had for the item` };
   }
   if (cell.hasData) {
     return { kind: 'view', text: 'View', title: cell.status === 'failed' ? 'This step failed: see why and what it had' : 'See what this step had for the item' };
