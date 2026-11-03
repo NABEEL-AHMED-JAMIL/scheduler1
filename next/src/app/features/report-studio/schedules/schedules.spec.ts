@@ -8,7 +8,7 @@ import { API_BASE } from '../../../core/api/api.config';
 import { ReportVersionRow } from '../report-studio.model';
 import { delivered, reportStages } from '../report-stages';
 import { ReportDeliveries, SchedulesApi, blankSchedule, placeholders, runTone, scheduleTone } from './schedules.api';
-import { missing, plannable } from './schedule-page';
+import { forPlan, missing, plannable, splitReady } from './schedule-page';
 import { ReportSchedules } from './schedule-list';
 
 /**
@@ -21,17 +21,27 @@ const version = (over: Partial<ReportVersionRow> = {}): ReportVersionRow => ({
 } as ReportVersionRow);
 
 describe('a schedule body', () => {
-  it('is planned once it has a template, data, a group field and a name pattern', () => {
+  it('is planned once it has a template and data, the other steps stood in for until they are chosen', () => {
     const b = blankSchedule();
     expect(plannable(b)).toBe(false);
     b.template.templateId = 'T1';
     b.data.pipelineId = 1084;
+    expect(plannable(b)).toBe(true);
+    expect(splitReady(b)).toBe(false);
+    b.delivery.email = { userIds: [] };
+    b.delivery.bucket = { connection: '', path: '' };
+    b.timing.days = [];
+    b.split.name = 'Visit · {patient_id}';
+    const p = forPlan(b);
+    expect(p.split).toEqual({ mode: 'ALL', name: 'Report' });
+    expect(p.delivery.email).toBeNull();
+    expect(p.delivery.bucket).toBeNull();
+    expect(p.timing.days).toEqual(['MON']);
+    expect(p.name).toBe('New schedule');
     b.split.groupBy = 'patient_id';
-    b.split.name = 'Wound summary · {patient_id} · week {week}';
-    expect(plannable(b)).toBe(true);
-    b.split.mode = 'ALL';
-    b.split.groupBy = '';
-    expect(plannable(b)).toBe(true);
+    expect(splitReady(b)).toBe(true);
+    expect(forPlan(b).split).toEqual({ mode: 'PER_GROUP', groupBy: 'patient_id', name: 'Visit · {patient_id}' });
+    expect(b.delivery.email).toEqual({ userIds: [] });
   });
 
   it('says what is missing, in the order of the steps', () => {

@@ -28,11 +28,32 @@ import { SchedTestThumb } from './test-thumb';
 /** A test report of "Make the first 3 now (test)": its PDF (an object URL), or why it could not be made. */
 interface TestReport { position: number; name: string; url?: string; pages?: number; errors?: number; warnings?: number; error?: string; }
 
-/** Everything a schedule body must say before it can be planned: a template and where the data comes from. */
+/** What a schedule body must say before it can be planned: a template and where the data comes from (the rest can follow). */
 export function plannable(b: ScheduleBody): boolean {
   const d = b.data;
-  return !!b.template.templateId && (d.kind === 'SOURCE' ? !!d.sourceId : !!d.pipelineId)
-    && (b.split.mode === 'ALL' || !!b.split.groupBy) && !!b.split.name.trim();
+  return !!b.template.templateId && (d.kind === 'SOURCE' ? !!d.sourceId : !!d.pipelineId);
+}
+
+/** Whether the "How many reports" step is complete (else the plan reads the data with a stand-in one report of all rows). */
+export function splitReady(b: ScheduleBody): boolean {
+  return (b.split.mode === 'ALL' || !!b.split.groupBy) && !!b.split.name.trim();
+}
+
+/**
+ * The body as the plan reads it while the person is still filling it in: a step not finished yet (the field to group by,
+ * the name, the email's people, the bucket, the days) is stood in for, so the data is read -- and its fields offered --
+ * before everything is chosen. Saving sends the body itself, and is refused while a step is missing.
+ */
+export function forPlan(b: ScheduleBody): ScheduleBody {
+  const out = structuredClone(b);
+  if (!splitReady(out)) out.split = { mode: 'ALL', name: out.split.name.trim() || 'Report' };
+  if (out.split.mode === 'ALL' && /\{(?!(year|month|week|date|n|count|schedule)\})[^{}]+\}/.test(out.split.name)) out.split.name = 'Report';
+  if (out.delivery.email && !out.delivery.email.userIds.length) out.delivery.email = null;
+  if (out.delivery.bucket && (!out.delivery.bucket.connection || !out.delivery.bucket.path.trim())) out.delivery.bucket = null;
+  if (out.timing.repeat === 'WEEKLY' && !(out.timing.days ?? []).length) out.timing.days = ['MON'];
+  if (out.timing.repeat === 'ONCE' && !out.timing.date) out.timing.repeat = 'DAILY';
+  if (!out.name.trim()) out.name = 'New schedule';
+  return out;
 }
 
 /** What the page says is still missing before it can be saved, in the steps' order; empty when nothing is. */
@@ -187,8 +208,10 @@ export class ReportSchedulePage implements OnInit {
     const asked = ++this.planAsked;
     this.planning.set(true);
     this.planError.set('');
-    this.api.plan(this.body(), checkFolder).subscribe({
-      next: p => { if (asked === this.planAsked) { this.plan.set(p); this.planning.set(false); } },
+    const provisional = !splitReady(this.body());
+    this.api.plan(forPlan(this.body()), checkFolder).subscribe({
+      next: p => { if (asked === this.planAsked) { this.plan.set(provisional ? { ...p, reportsPlanned: undefined, firstReports: [], exampleName: undefined } : p);
+        this.planning.set(false); } },
       error: e => { if (asked === this.planAsked) { this.planError.set(studioError(e, 'The plan could not be made.').message); this.planning.set(false); } },
     });
   }
@@ -433,8 +456,11 @@ export class ReportSchedulePage implements OnInit {
           next: d => {
             this.saving.set(false);
             this.toast.success(this.isNew() ? `“${d.name}” is on; it runs next ${rsTime(d.nextRunAt, 'recent', d.zone) ?? ''}.` : 'Schedule saved.');
-            if (this.isNew()) void this.router.navigate(['/reports/schedules', d.scheduleId]);
-            else { this.detail.set(d); this.body.set({ ...structuredClone(d.spec), name: d.name, scheduleId: d.scheduleId, rowVersion: d.rowVersion }); }
+            // The same page goes on showing it (the route's component is kept when only its id changes).
+            const wasNew = this.isNew();
+            this.detail.set(d);
+            this.body.set({ ...structuredClone(d.spec), name: d.name, scheduleId: d.scheduleId, rowVersion: d.rowVersion });
+            if (wasNew) void this.router.navigate(['/reports/schedules', d.scheduleId], { replaceUrl: true });
           },
           error: e => { this.saveError.set(studioError(e, 'The schedule could not be saved.').message); this.saving.set(false); },
         });

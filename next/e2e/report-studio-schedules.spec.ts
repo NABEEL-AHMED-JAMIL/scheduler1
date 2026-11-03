@@ -73,38 +73,42 @@ test.describe('Report schedules: make, test, run, approve and deliver (live)', (
     const page = await pageAs(browser, admin, { viewport: { width: 1920, height: 1200 } });
     await page.goto('/reports/schedules/new');
     await expect(page.getByRole('heading', { level: 1, name: /New schedule/ })).toBeVisible();
-    await page.getByTestId('sched-name').fill(NAME);
+    await page.locator('[data-test="sched-name"]').fill(NAME);
+    // The lists are long (and drawn as they scroll): each is searched first.
     await page.locator('#sp-template').click();
+    await page.getByPlaceholder('Search templates').fill(TEMPLATE);
     await page.getByRole('option', { name: new RegExp(TEMPLATE) }).click();
     await page.locator('#sp-source').click();
+    await page.getByPlaceholder('Search pipelines and sources').fill(`E2E wound visits ${STAMP}`);
     await page.getByRole('option', { name: new RegExp(`E2E wound visits ${STAMP}`) }).click();
-    await expect(page.getByTestId('sched-data-note')).toContainText('4 rows read');
+    await expect(page.locator('[data-test="sched-data-note"]')).toContainText('4 rows read');
     await page.locator('#sp-group').click();
     await page.getByRole('option', { name: 'patient_id', exact: true }).click();
-    await page.getByTestId('sched-pattern').fill('Visit summary · {patient_id} · {date}');
-    await expect(page.getByTestId('sched-example')).toContainText('Visit summary · P-9101 ·');
-    await page.getByTestId('sched-email').check();
+    await page.locator('[data-test="sched-pattern"]').fill('Visit summary · {patient_id} · {date}');
+    await expect(page.locator('[data-test="sched-example"]')).toContainText('Visit summary · P-9101 ·');
+    await page.locator('[data-test="sched-email"]').check();
     await page.getByRole('button', { name: /Add a person/ }).click();
+    await page.getByPlaceholder('Search people').fill((reviewer.fullName ?? 'Alex Morgan').split(',')[0]);
     await page.getByRole('option', { name: new RegExp((reviewer.fullName ?? 'Alex Morgan').split(',')[0], 'i') }).first().click();
-    await page.getByTestId('sched-bucket').check();
-    await page.getByTestId('sched-path').fill(`e2e/schedules/${STAMP}/{date}/`);
-    await page.getByTestId('sched-webhook').check();
+    await page.locator('[data-test="sched-bucket"]').check();
+    await page.locator('[data-test="sched-path"]').fill(`e2e/schedules/${STAMP}/{date}/`);
+    await page.locator('[data-test="sched-webhook"]').check();
 
     const before = await data('reports before', await request.get(`${api}/reportLibrary.json/reports?q=${encodeURIComponent('Visit summary · P-91')}`,
       { headers: authOf(admin) }));
-    await page.getByTestId('sched-test').click();
-    await expect(page.getByTestId('sched-tests').locator('figure')).toHaveCount(3, { timeout: 60_000 });
-    await expect(page.getByTestId('sched-checks')).toContainText('3 test reports made without problems');
+    await page.locator('[data-test="sched-test"]').click();
+    await expect(page.locator('[data-test="sched-tests"]').locator('figure')).toHaveCount(3, { timeout: 60_000 });
+    await expect(page.locator('[data-test="sched-checks"]')).toContainText('3 test reports made without problems');
     const after = await data('reports after', await request.get(`${api}/reportLibrary.json/reports?q=${encodeURIComponent('Visit summary · P-91')}`,
       { headers: authOf(admin) }));
     expect(after.total, 'a test keeps nothing').toBe(before.total);
 
-    await page.getByTestId('sched-check-folder').click();
-    await expect(page.getByTestId('sched-checks')).toContainText('The bucket folder is writable.', { timeout: 30_000 });
-    await page.getByTestId('sched-save').click();
+    await page.locator('[data-test="sched-check-folder"]').click();
+    await expect(page.locator('[data-test="sched-checks"]')).toContainText('The bucket folder is writable.', { timeout: 30_000 });
+    await page.locator('[data-test="sched-save"]').click();
     await page.waitForURL(/\/reports\/schedules\/[0-9A-Z]{26}$/);
     scheduleId = page.url().split('/').pop()!;
-    await expect(page.getByTestId('sched-state')).toHaveText('On');
+    await expect(page.locator('[data-test="sched-state"]')).toHaveText('On');
   });
 
   test('Run now makes one report per patient, DRAFT and waiting for approval', async ({ request }) => {
@@ -134,9 +138,12 @@ test.describe('Report schedules: make, test, run, approve and deliver (live)', (
       return d.deliveries.map((x: any) => `${x.channel}:${x.status}`).sort().join(' ');
     }, { timeout: 90_000, intervals: [3_000] }).toBe('BUCKET:SENT EMAIL:SENT LIBRARY:SENT WEBHOOK:SENT');
 
-    const listed = await data('bucket', await request.get(`${api}/storage.json/listObjects?bucket=${BUCKET}&prefix=${encodeURIComponent(`e2e/schedules/${STAMP}/`)}`
-      + '&maxKeys=50', { headers: authOf(admin) }));
-    expect(JSON.stringify(listed)).toMatch(/RPT-\d{4}-v1\.pdf/);
+    // The folder is the run's date; in it, the approved PDF named by its number.
+    const list = async (prefix: string) => data<any>('bucket', await request.get(`${api}/storage.json/listObjects?bucket=${BUCKET}`
+      + `&prefix=${encodeURIComponent(prefix)}&maxKeys=50`, { headers: authOf(admin) }));
+    const day = (await list(`e2e/schedules/${STAMP}/`)).objects.find((o: any) => o.folder);
+    expect(day?.key).toMatch(new RegExp(`^e2e/schedules/${STAMP}/\\d{4}-\\d{2}-\\d{2}/$`));
+    expect(JSON.stringify(await list(day.key))).toMatch(/RPT-\d{4}-v1\.pdf/);
 
     // The mail, when the local mail catcher answers: the link, the number, no patient and not the report's name.
     const caught = await request.get('http://127.0.0.1:4566/_aws/ses').catch(() => null);
@@ -151,8 +158,8 @@ test.describe('Report schedules: make, test, run, approve and deliver (live)', (
 
     const page = await pageAs(browser, admin, { viewport: { width: 1920, height: 1200 } });
     await page.goto(`/reports/schedules/${scheduleId}`);
-    await expect(page.getByTestId('sched-deliveries')).toContainText('Bucket folder');
-    await page.getByTestId('sched-pause').click();
-    await expect(page.getByTestId('sched-state')).toHaveText('Paused');
+    await expect(page.locator('[data-test="sched-deliveries"]')).toContainText('Bucket folder');
+    await page.locator('[data-test="sched-pause"]').click();
+    await expect(page.locator('[data-test="sched-state"]')).toHaveText('Paused');
   });
 });

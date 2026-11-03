@@ -187,7 +187,14 @@ export class ReportOverview implements OnInit {
     const u = this.upcoming();
     const n = u?.upcoming.find(x => x.at);
     if (!u || !n) return null;
-    return { when: `${rsTime(n.at, 'day', u.zone)}, ${rsTime(n.at, 'time', u.zone)}`, what: `${n.name} · ${n.then}`, scheduleId: n.scheduleId };
+    return { when: `${this.dayOf(n.at, u.zone).day} ${rsTime(n.at, 'day', u.zone)}, ${rsTime(n.at, 'time', u.zone)}`, what: `${n.name} · ${n.then}`,
+      scheduleId: n.scheduleId };
+  });
+
+  /** The card's rows: each schedule once, at its next run (a paused or failing one without a time last), at most six. */
+  readonly scheduled = computed(() => {
+    const seen = new Set<string>();
+    return (this.upcoming()?.upcoming ?? []).filter(s => !seen.has(s.scheduleId) && !!seen.add(s.scheduleId)).slice(0, 6);
   });
 
   /** The card's rows: a day's short name and date, then the schedule. */

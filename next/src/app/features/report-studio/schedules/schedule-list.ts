@@ -46,8 +46,8 @@ import { RUN_WORDS, STATE_WORDS, ScheduleSummary, SchedulesApi, runTone, schedul
       } @else {
         <section class="card" aria-label="Schedules">
           <div class="overflow-x-auto">
-            <table class="table sch-table" aria-label="Report schedules">
-              <thead><tr><th>Schedule</th><th>State</th><th>When</th><th>Next run</th><th>Last run</th><th>Then</th></tr></thead>
+            <table class="table-modern sch-table" aria-label="Report schedules">
+              <thead><tr><th>Schedule</th><th>State</th><th>Next run</th><th>Last run</th><th>Then</th></tr></thead>
               <tbody>
                 @for (s of rows(); track s.scheduleId) {
                   <tr class="sch-row" (click)="open(s)" [attr.data-schedule]="s.scheduleId">
@@ -55,8 +55,8 @@ import { RUN_WORDS, STATE_WORDS, ScheduleSummary, SchedulesApi, runTone, schedul
                       <div class="text-xs text-[color:var(--text-muted)] truncate">{{ s.templateName }} · {{ s.makes }}</div></td>
                     <td><span class="pill" [class]="'pill pill-' + tone(s.state)">{{ words[s.state] }}</span>
                       @if (s.problem) { <div class="sch-problem" [title]="s.problem">{{ s.problem }}</div> }</td>
-                    <td class="whitespace-nowrap">{{ s.when }}</td>
-                    <td class="whitespace-nowrap">{{ s.nextRunAt ? (s.nextRunAt | rsTime: 'recent': zone()) : '—' }}</td>
+                    <td><span class="whitespace-nowrap">{{ s.nextRunAt ? (s.nextRunAt | rsTime: 'recent': zone()) : '—' }}</span>
+                      <div class="text-xs text-[color:var(--text-muted)]">{{ s.when }}</div></td>
                     <td class="whitespace-nowrap">@if (s.lastRun; as r) {
                       <span class="pill" [class]="'pill pill-' + runTone(r.status)">{{ runWords[r.status] }}</span>
                       <span class="text-xs text-[color:var(--text-muted)]"> {{ r.dueAt | rsTime: 'recent': zone() }}@if (r.reportsMade) { · {{ r.reportsMade }} made }</span>
@@ -74,6 +74,8 @@ import { RUN_WORDS, STATE_WORDS, ScheduleSummary, SchedulesApi, runTone, schedul
   `,
   styles: `
     .sch-table td { vertical-align: top; }
+    .sch-table td:first-child { min-width: 14rem; }
+    .sch-table td:last-child { min-width: 13rem; }
     .sch-row { cursor: pointer; }
     .sch-row:hover td { background: var(--surface-sunken); }
     .sch-problem { font-size: 0.75rem; color: var(--crit-text); max-width: 18rem; margin-top: 0.25rem; }

@@ -170,7 +170,7 @@
                     <span class="sp-chips">@for (p of chosenPeople(); track p.userId) {
                       <span class="sp-chip">{{ p.name }}@if (p.email) { · {{ p.email }} }
                         <button type="button" class="sp-x" (click)="removePerson(p.userId)" [attr.aria-label]="'Remove ' + p.name"><app-icon name="close" /></button></span> }</span>
-                    <app-advanced-select [options]="peopleOptions()" value="" [resetOnPick]="true" (valueChange)="addPerson($event)" ariaLabel="Add a person"
+                    <app-advanced-select [options]="peopleOptions()" value="" [resetOnPick]="true" (picked)="addPerson($event?.value ?? '')" ariaLabel="Add a person"
                                          placeholder="Add a person of this workspace" searchPlaceholder="Search people" [compact]="true"
                                          emptyText="Everyone who can be emailed is on the list." />
                   }
@@ -180,13 +180,12 @@
                 <input type="checkbox" class="checkbox" id="sp-bucket" [checked]="!!body().delivery.bucket" (change)="toggleBucket($any($event.target).checked)" data-test="sched-bucket" />
                 <span class="min-w-0 flex-1"><label for="sp-bucket"><b>Put the PDF in a bucket folder</b></label>
                   @if (body().delivery.bucket; as bk) {
-                    <span class="sp-row2 mt-1">
-                      <app-advanced-select [options]="bucketOptions()" [value]="bk.connection" (valueChange)="set('bucketConnection', $event)" ariaLabel="Bucket"
-                                           [compact]="true" emptyText="No bucket connection you can reach." />
-                      <input class="input input-sm font-mono" [ngModel]="bk.path" (ngModelChange)="set('bucketPath', $event)" aria-label="Folder"
-                             placeholder="reports/{year}/{week}/" data-test="sched-path" /></span>
+                    <app-advanced-select [options]="bucketOptions()" [value]="bk.connection" (valueChange)="set('bucketConnection', $event)" ariaLabel="Bucket"
+                                         [compact]="true" emptyText="No bucket connection you can reach." />
+                    <input class="input input-sm font-mono" [ngModel]="bk.path" (ngModelChange)="set('bucketPath', $event)" aria-label="Folder"
+                           placeholder="reports/{year}/{week}/" data-test="sched-path" />
                     @if (plan()?.bucketExample; as ex) { <small class="font-mono">→ {{ ex }}</small> }
-                    <button type="button" class="btn btn-default btn-sm mt-1" (click)="runPlan(true)" data-test="sched-check-folder"><app-icon name="check" />Check the folder is writable</button>
+                    <button type="button" class="btn btn-default btn-sm self-start" (click)="runPlan(true)" data-test="sched-check-folder"><app-icon name="check" />Check the folder is writable</button>
                   }
                   <small>The approved, signed PDF, named by its number. A folder is named by the date only, never by a value of the data.</small></span>
               </div>
@@ -195,7 +194,7 @@
                 <span><b>Call a webhook</b><small>event <code>report.approved</code> with the report's number and a sign-in link, to the workspace's webhooks (Developers › Webhooks)</small></span></label>
               <div class="sp-choice is-off" aria-disabled="true">
                 <input type="checkbox" class="checkbox" disabled aria-label="Send to the EHR (later)" />
-                <span><b>Send to the EHR</b> <span class="pill pill-neutral">Later</span><small>as a FHIR DocumentReference through a connection</small></span>
+                <span><span class="flex items-center gap-2"><b>Send to the EHR</b><span class="pill pill-neutral">Later</span></span><small>as a FHIR DocumentReference through a connection</small></span>
               </div>
             </div>
           </div>
@@ -274,7 +273,7 @@
         <div class="rs-head"><h2 class="section-title" id="sp-runs">Runs <span class="rs-count">{{ d.runsTotal }}</span></h2>
           <span class="text-xs text-[color:var(--text-muted)]">times in {{ city() }}</span></div>
         @if (d.runs.length) {
-          <div class="overflow-x-auto"><table class="table" aria-label="Runs of this schedule">
+          <div class="overflow-x-auto"><table class="table-modern" aria-label="Runs of this schedule">
             <thead><tr><th>Due</th><th>Run</th><th>State</th><th class="text-right">Reports</th><th>What happened</th></tr></thead>
             <tbody>
               @for (r of d.runs; track r.runId) {
@@ -308,7 +307,7 @@
         <div class="rs-head"><h2 class="section-title" id="sp-deliveries">Deliveries</h2>
           <span class="text-xs text-[color:var(--text-muted)]">where approved reports went</span></div>
         @if (d.deliveries.length) {
-          <div class="overflow-x-auto"><table class="table" aria-label="Deliveries of this schedule's reports">
+          <div class="overflow-x-auto"><table class="table-modern" aria-label="Deliveries of this schedule's reports">
             <thead><tr><th>Report</th><th>To</th><th>State</th><th>When</th></tr></thead>
             <tbody>@for (x of d.deliveries; track x.deliveryId) {
               <tr><td class="whitespace-nowrap"><a class="link-inline" [routerLink]="['/reports/library', x.reportId]">{{ x.reportLabel }}</a> v{{ x.version }}</td>

@@ -111,11 +111,11 @@
         </section>
 
         <section class="card" aria-labelledby="ov-sched" data-test="ov-scheduled">
-          <div class="rs-head"><h2 class="section-title" id="ov-sched">Scheduled deliveries @if (upcoming()?.upcoming?.length) { <span class="rs-count">{{ upcoming()!.upcoming.length }}</span> }</h2>
+          <div class="rs-head"><h2 class="section-title" id="ov-sched">Scheduled deliveries @if (scheduled().length) { <span class="rs-count">{{ scheduled().length }}</span> }</h2>
             @if (canGenerate()) { <a class="btn btn-default btn-sm" routerLink="/reports/schedules">All schedules <app-icon name="arrowRight" /></a> }</div>
           @if (upcoming(); as u) {
             <ul class="ov-sched">
-              @for (s of u.upcoming; track s.scheduleId + (s.at ?? '')) {
+              @for (s of scheduled(); track s.scheduleId) {
                 <li>
                   <span class="ov-day"><b>{{ dayOf(s.at, u.zone).day }}</b><span>{{ dayOf(s.at, u.zone).date }}</span></span>
                   <div class="min-w-0"><a class="link-inline font-medium truncate block" [routerLink]="['/reports/schedules', s.scheduleId]">{{ s.name }}</a>
