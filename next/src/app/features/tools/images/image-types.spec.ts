@@ -406,7 +406,7 @@ describe('Upload with a type', () => {
     expect(api.upload).toHaveBeenCalledWith(expect.any(File), expect.objectContaining({ imageType: undefined }));
     const [first, second] = [...el.querySelectorAll('[data-upload-item]')];
     expect(first.querySelector('[data-test="upload-suggested"]')!.textContent).toContain('Looks like an X-ray');
-    expect(first.querySelector('[data-test="upload-suggested"] .pill')!.textContent).toContain('suggested');
+    expect(first.querySelector('[data-test="upload-suggested"] .pill')!.textContent).toContain('Suggested');
     expect((first.querySelector('[data-test="upload-type"]') as HTMLSelectElement).value).toBe('xray');
     expect(second.querySelector('[data-test="upload-no-suggestion"]')!.textContent).toContain('No suggestion: please choose');
     expect(second.querySelector('[data-test="upload-type"]')!.classList).toContain('us-need');

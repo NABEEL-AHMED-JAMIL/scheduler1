@@ -58,7 +58,7 @@ const DAY_OPTIONS: { id: ImageDays; label: string }[] = [{ id: '7', label: '7 da
     .il-strip-acts { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-left: auto; }
     .il-thumb { width: 3.5rem; }
     .il-t th, .il-t td { padding-left: 0.625rem; padding-right: 0.625rem; }
-    .il-thumb-none { width: 3.5rem; height: 2.625rem; border-radius: 0.3125rem; background: var(--surface-sunken); display: grid; place-items: center;
+    .il-thumb-none { width: 3.5rem; height: 2.625rem; border-radius: var(--radius-sm); background: var(--surface-sunken); display: grid; place-items: center;
       color: var(--text-muted); }
     .il-c-th { width: 4.75rem; }
     .il-c-size { width: 10.875rem; white-space: nowrap; }

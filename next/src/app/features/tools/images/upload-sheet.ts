@@ -118,7 +118,7 @@ export function localNow(now = new Date()): string {
               }
               @if (i.suggestion === 'suggested' && i.photo) {
                 <div class="us-sub" data-test="upload-suggested"><app-icon name="sparkle" size="0.9em" />{{ looksLike(typeName(i.photo)) }}
-                  <span class="pill pill-warn">suggested</span><span class="text-[color:var(--text-muted)]">a draft; your choice wins</span></div>
+                  <span class="pill pill-warn">Suggested</span><span class="text-[color:var(--text-muted)]">a draft; your choice wins</span></div>
               } @else if (i.suggestion === 'none') {
                 <div class="us-sub text-[color:var(--text-muted)]" data-test="upload-no-suggestion">No suggestion: please choose</div>
               }

@@ -32,7 +32,8 @@ export const IMAGE_REVIEW_TAG = 'Image review';
     .tc-lock app-icon { flex: none; margin-top: 0.125rem; color: var(--text-muted); }
     .tc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(21rem, 1fr)); gap: 1rem; margin-top: 1.25rem; }
     .tc { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
-    .tc-photo { aspect-ratio: 16 / 9; background: var(--surface-sunken) center / cover no-repeat; border-bottom: 1px solid var(--border-subtle); }
+    .tc-photo { aspect-ratio: 16 / 9; background: var(--surface-sunken); border-bottom: 1px solid var(--border-subtle); overflow: hidden; }
+    .tc-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
     .tc-b { display: flex; flex-direction: column; gap: 0.75rem; padding: 1rem; flex: 1 1 auto; }
     .tc-h { display: flex; flex-wrap: wrap; align-items: center; gap: 0.375rem; }
     .tc-h h3 { margin: 0; font-size: 0.9375rem; font-weight: 600; }
@@ -69,7 +70,7 @@ export const IMAGE_REVIEW_TAG = 'Image review';
         <div class="tc-grid" data-test="types-grid">
           @for (t of types(); track t.key) {
             <section class="card tc" [attr.data-type]="t.key">
-              <div class="tc-photo" [style.background-image]="thumb(t)" role="img" [attr.aria-label]="'Synthetic test image · ' + t.name"></div>
+              <div class="tc-photo">@if (thumb(t); as src) { <img [src]="src" [alt]="'Synthetic test image · ' + t.name" /> }</div>
               <div class="tc-b">
                 <div class="tc-h"><h3>{{ t.name }}</h3>
                   <span class="pill" [class.pill-neutral]="t.builtIn" [class.pill-info]="!t.builtIn">{{ t.builtIn ? 'Built in' : 'Ours' }}</span>
@@ -112,7 +113,7 @@ export class ImageTypesPage implements OnInit {
   readonly types = computed(() => this.store.types());
 
   constructor() {
-    inject(DestroyRef).onDestroy(() => Object.values(this.thumbs()).forEach(u => URL.revokeObjectURL(u.slice(5, -2))));
+    inject(DestroyRef).onDestroy(() => Object.values(this.thumbs()).forEach(u => URL.revokeObjectURL(u)));
   }
 
   ngOnInit(): void { this.load(); }
@@ -136,12 +137,12 @@ export class ImageTypesPage implements OnInit {
     const names = new Set(this.types().map(t => TRY_PHOTOS[t.baseKey ?? t.key]).filter(Boolean));
     for (const name of names) {
       if (this.thumbs()[name]) continue;
-      this.api.tryPhoto(name).subscribe({ next: blob => this.thumbs.update(m => ({ ...m, [name]: `url("${URL.createObjectURL(blob)}")` })), error: () => undefined });
+      this.api.tryPhoto(name).subscribe({ next: blob => this.thumbs.update(m => ({ ...m, [name]: URL.createObjectURL(blob) })), error: () => undefined });
     }
   }
 
   thumb(t: ImageType): string {
-    return this.thumbs()[TRY_PHOTOS[t.baseKey ?? t.key] ?? ''] ?? 'none';
+    return this.thumbs()[TRY_PHOTOS[t.baseKey ?? t.key] ?? ''] ?? '';
   }
 
   never(t: ImageType): string { return neverText(t.never); }

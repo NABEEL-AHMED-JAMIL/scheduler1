@@ -59,12 +59,12 @@ import {
         @case ('FAILED') {
           <p class="text-sm m-0">The description could not be drafted{{ d.descriptionMessage ? ': ' + d.descriptionMessage : '.' }}</p>
           <div class="dc-acts"><button type="button" class="btn btn-default btn-sm" (click)="again()" data-test="describe-again"><app-icon name="refresh" />Describe again</button>
-            <button type="button" class="btn btn-ghost btn-sm" (click)="edit()">Write one</button></div>
+            <button type="button" class="btn btn-default btn-sm" (click)="edit()">Write one</button></div>
         }
         @case ('DISCARDED') {
           <p class="text-sm m-0 text-[color:var(--text-secondary)]">The draft was discarded. The size stays.</p>
           <div class="dc-acts"><button type="button" class="btn btn-default btn-sm" (click)="again()"><app-icon name="refresh" />Describe again</button>
-            <button type="button" class="btn btn-ghost btn-sm" (click)="edit()">Write one</button></div>
+            <button type="button" class="btn btn-default btn-sm" (click)="edit()">Write one</button></div>
         }
         @case ('NONE') {
           @if (!editing()) { <p class="text-sm m-0 text-[color:var(--text-secondary)]">No description for this photo.</p> }
@@ -100,11 +100,11 @@ import {
           } @else if (d.descriptionStatus === 'DRAFT') {
             @if (unsure().length) {
               <button type="button" class="btn btn-primary btn-sm" (click)="edit()" data-test="description-fill"><app-icon name="edit" />Fill in and confirm</button>
-              <button type="button" class="btn btn-ghost btn-sm" (click)="discard()" data-test="description-discard">Discard draft</button>
+              <button type="button" class="btn btn-default btn-intent-crit btn-sm" (click)="discard()" data-test="description-discard">Discard draft</button>
             } @else {
               <button type="button" class="btn btn-primary btn-sm" (click)="confirm()" [disabled]="busy()" data-test="description-confirm"><app-icon name="check" />Confirm</button>
               <button type="button" class="btn btn-default btn-sm" (click)="edit()" data-test="description-edit"><app-icon name="edit" />Edit</button>
-              <button type="button" class="btn btn-ghost btn-sm" (click)="discard()" data-test="description-discard">Discard</button>
+              <button type="button" class="btn btn-default btn-intent-crit btn-sm" (click)="discard()" data-test="description-discard">Discard</button>
             }
           } @else if (d.descriptionStatus === 'CONFIRMED') {
             <button type="button" class="btn btn-default btn-sm" (click)="edit()" data-test="description-edit"><app-icon name="edit" />Edit</button>
@@ -209,19 +209,19 @@ export class DescriptionCard {
           }
           @case ('too-dark') {
             <button type="button" class="btn btn-primary btn-sm" (click)="upload.emit()" data-test="state-upload"><app-icon name="upload" />Upload another photo</button>
-            <button type="button" class="btn btn-ghost btn-sm" (click)="remove.emit()" data-test="state-remove">Remove</button>
+            <button type="button" class="btn btn-default btn-intent-crit btn-sm" (click)="remove.emit()" data-test="state-remove">Remove</button>
           }
           @case ('too-large') {
             <button type="button" class="btn btn-default btn-sm" (click)="bucket.emit()" data-test="state-bucket"><app-icon name="folder" />Pick from a bucket</button>
-            <button type="button" class="btn btn-ghost btn-sm" (click)="remove.emit()" data-test="state-remove">Remove</button>
+            <button type="button" class="btn btn-default btn-intent-crit btn-sm" (click)="remove.emit()" data-test="state-remove">Remove</button>
           }
           @case ('upload-failed') {
             <button type="button" class="btn btn-default btn-sm" (click)="converter()" data-test="state-converter"><app-icon name="file" />Open Document Converter</button>
-            <button type="button" class="btn btn-ghost btn-sm" (click)="remove.emit()" data-test="state-remove">Remove</button>
+            <button type="button" class="btn btn-default btn-intent-crit btn-sm" (click)="remove.emit()" data-test="state-remove">Remove</button>
           }
           @default {
             <button type="button" class="btn btn-primary btn-sm" (click)="upload.emit()"><app-icon name="upload" />Upload another photo</button>
-            <button type="button" class="btn btn-ghost btn-sm" (click)="remove.emit()">Remove</button>
+            <button type="button" class="btn btn-default btn-intent-crit btn-sm" (click)="remove.emit()">Remove</button>
           }
         }
       </div>
@@ -249,21 +249,21 @@ export class PhotoState {
 @Component({
   selector: 'app-area-chart',
   imports: [ServerTimePipe],
-  styles: `:host { display: block; } svg { width: 100%; display: block; overflow: visible; }`,
+  styles: `:host { display: block; } svg { width: 100%; display: block; overflow: visible; } .ac-spark { height: 60px; } .ac-full { height: 170px; }`,
   template: `
     @if (points().length) {
       @if (kind() === 'spark') {
-        <svg viewBox="0 0 300 60" [style.height.px]="60" role="img" [attr.aria-label]="label()">
+        <svg class="ac-spark" viewBox="0 0 300 60" role="img" [attr.aria-label]="label()">
           <polyline [attr.points]="line()" fill="none" stroke="var(--ok-text)" stroke-width="2.5" />
           @for (p of points(); track p.id) {
             <circle [attr.cx]="p.x" [attr.cy]="p.y" r="4" fill="var(--ok-text)" />
-            <text [attr.x]="p.tx" y="58" font-size="9" fill="var(--text-muted)" [attr.text-anchor]="p.anchor">{{ p.at | serverTime: 'day' }} · {{ p.area.toFixed(1) }}</text>
+            <text [attr.x]="p.tx" y="58" font-size="11" fill="var(--text-muted)" [attr.text-anchor]="p.anchor">{{ p.at | serverTime: 'day' }} · {{ p.area.toFixed(1) }}</text>
           }
         </svg>
       } @else {
-        <svg viewBox="0 0 360 150" [style.height.px]="170" role="img" [attr.aria-label]="label()">
+        <svg class="ac-full" viewBox="0 0 360 150" role="img" [attr.aria-label]="label()">
           <g stroke="var(--border-subtle)">@for (g of grid(); track g.v) { <line x1="30" x2="350" [attr.y1]="g.y" [attr.y2]="g.y" /> }</g>
-          <g font-size="10" fill="var(--text-muted)">
+          <g font-size="11" fill="var(--text-muted)">
             @for (g of grid(); track g.v) { <text [attr.x]="g.v >= 10 ? 4 : 8" [attr.y]="g.y + 4">{{ g.v }}</text> }
             @for (p of points(); track p.id) { <text [attr.x]="p.x" y="134" text-anchor="middle">{{ p.at | serverTime: 'day' }}</text> }
           </g>

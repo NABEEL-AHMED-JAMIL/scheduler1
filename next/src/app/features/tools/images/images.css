@@ -28,3 +28,5 @@
   border: 1px solid color-mix(in oklab, var(--warn-text) 30%, transparent); background: var(--pill-warn-bg); color: var(--text-primary); }
 .ir-only app-icon { flex: none; margin-top: 0.125rem; color: var(--warn-text); }
 .ir-type { display: inline-flex; align-items: center; gap: 0.3125rem; font-size: 0.8125rem; white-space: nowrap; }
+.ir-pill-sm { height: 1.125rem; }
+.ir-top { border-top: 1px solid var(--border-subtle); }

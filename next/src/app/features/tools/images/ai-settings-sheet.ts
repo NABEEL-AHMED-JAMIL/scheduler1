@@ -96,7 +96,7 @@ export function modelLine(m: AiModelOption | null | undefined): string {
     .as-rule { display: flex; gap: 0.5rem; align-items: flex-start; padding: 0.25rem 0; font-size: 0.8125rem; }
     .as-rule app-icon { flex: none; margin-top: 0.125rem; color: var(--text-muted); }
     .as-try { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
-    .as-thumb { width: 5.75rem; height: 4.25rem; border-radius: var(--radius-md); border: 2px solid transparent; background: var(--surface-sunken) center / cover no-repeat;
+    .as-thumb { width: 5.75rem; height: 4.25rem; border-radius: var(--radius-md); border: 2px solid transparent; background: var(--surface-sunken);
       cursor: pointer; padding: 0; }
     .as-thumb.on { border-color: var(--text-primary); }
     .as-cmp { display: grid; grid-template-columns: 7rem minmax(0, 1fr) minmax(0, 1fr); margin-top: 0.75rem; border: 1px solid var(--border-subtle);
@@ -110,6 +110,10 @@ export function modelLine(m: AiModelOption | null | undefined): string {
     .as-side { display: grid; grid-template-columns: 8rem minmax(0, 1fr) minmax(0, 1fr) auto; gap: 0.5rem 0.75rem; align-items: center; font-size: 0.8125rem; }
     .as-lim { display: grid; grid-template-columns: repeat(2, minmax(0, 12rem)); gap: 0.5rem 1rem; }
     .as-muted { color: var(--text-muted); }
+    .as-row > span.as-name { color: var(--text-primary); }
+    .as-sec h3 .as-quiet { font-weight: 400; color: var(--text-muted); }
+    .as-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: var(--radius-sm); }
+    .as-thumb { overflow: hidden; }
     .as-audit { font-size: 0.75rem; color: var(--text-muted); margin: 0.75rem 0 0; }
     @media (max-width: 760px) { .as-row, .as-side, .as-add { grid-template-columns: minmax(0, 1fr); } }
   `,
@@ -169,7 +173,7 @@ export function modelLine(m: AiModelOption | null | undefined): string {
           @if (current(); as t) {
             @let d = draftOf(t.key);
             <div class="as-edit" data-test="as-editor" [attr.data-editing]="t.key">
-              <div class="as-row as-head"><span class="font-semibold" style="color:var(--text-primary)">{{ t.name }}</span>
+              <div class="as-row as-head"><span class="font-semibold as-name">{{ t.name }}</span>
                 <span class="text-xs text-[color:var(--text-muted)] self-center">{{ t.builtIn ? 'Built in' : 'Ours, copied from ' + baseName(t) }} · fields come from the chosen prompt's output schema</span></div>
               <div class="as-row"><span>Prompt</span>
                 <div>
@@ -266,7 +270,7 @@ export function modelLine(m: AiModelOption | null | undefined): string {
         </section>
 
         <section class="as-sec" data-test="as-rules">
-          <h3><app-icon name="lock" size="0.95em" />Always applied, every type <span class="as-end text-[color:var(--text-muted)]" style="font-weight:400">added by the platform in code; not editable</span></h3>
+          <h3><app-icon name="lock" size="0.95em" />Always applied, every type <span class="as-end as-quiet">added by the platform in code; not editable</span></h3>
           @for (r of rules(); track r) { <div class="as-rule"><app-icon name="lock" size="0.9em" /><span>{{ r }}</span></div> }
         </section>
 
@@ -275,8 +279,9 @@ export function modelLine(m: AiModelOption | null | undefined): string {
             <h3>Try it on a photo</h3>
             <div class="as-try">
               @for (ph of tryPhotos(); track ph.name) {
-                <button type="button" class="as-thumb" [class.on]="tryPick() === ph.name" [style.background-image]="thumb(ph.name)" (click)="tryPick.set(ph.name)"
-                        [attr.aria-label]="'Synthetic test image · ' + (ph.label || ph.name)" [attr.aria-pressed]="tryPick() === ph.name"></button>
+                <button type="button" class="as-thumb" [class.on]="tryPick() === ph.name" (click)="tryPick.set(ph.name)"
+                        [attr.aria-label]="'Synthetic test image · ' + (ph.label || ph.name)" [attr.aria-pressed]="tryPick() === ph.name">
+                  @if (thumb(ph.name); as src) { <img [src]="src" alt="" /> }</button>
               }
               <span class="text-xs text-[color:var(--text-muted)]">Synthetic test image · {{ t.name }}</span>
               <button type="button" class="btn btn-default btn-sm ml-auto" (click)="tryIt()" [disabled]="trying() || !tryPick()" data-test="as-try-run">
@@ -370,7 +375,7 @@ export class AiSettingsSheet implements OnInit {
   });
 
   constructor() {
-    inject(DestroyRef).onDestroy(() => Object.values(this.thumbs()).forEach(u => URL.revokeObjectURL(u.slice(5, -2))));
+    inject(DestroyRef).onDestroy(() => Object.values(this.thumbs()).forEach(u => URL.revokeObjectURL(u)));
   }
 
   ngOnInit(): void { this.load(); }
@@ -402,13 +407,13 @@ export class AiSettingsSheet implements OnInit {
     for (const p of this.tryPhotos()) {
       if (this.thumbs()[p.name]) continue;
       this.api.tryPhoto(p.name).subscribe({
-        next: blob => this.thumbs.update(t => ({ ...t, [p.name]: `url("${URL.createObjectURL(blob)}")` })),
+        next: blob => this.thumbs.update(t => ({ ...t, [p.name]: URL.createObjectURL(blob) })),
         error: () => undefined,
       });
     }
   }
 
-  thumb(name: string): string { return this.thumbs()[name] ?? 'none'; }
+  thumb(name: string): string { return this.thumbs()[name] ?? ''; }
 
   select(key: string): void {
     this.selected.set(key);

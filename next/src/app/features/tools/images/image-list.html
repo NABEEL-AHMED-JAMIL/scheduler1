@@ -37,10 +37,10 @@
           <label class="btn btn-default btn-sm cursor-pointer">Choose images…
             <input type="file" class="sr-only" multiple accept=".jpg,.jpeg,.png,.heic,.heif,image/jpeg,image/png,image/heic" (change)="onPick($event)" data-test="photos-files" /></label>
           @if (!ownSignIn) {
-            <button type="button" class="btn btn-ghost btn-sm" (click)="fromBucket()" data-test="photos-bucket"><app-icon name="folder" />From a bucket</button>
+            <button type="button" class="btn btn-default btn-sm" (click)="fromBucket()" data-test="photos-bucket"><app-icon name="folder" />From a bucket</button>
           }
           @if (canDocuments()) {
-            <button type="button" class="btn btn-ghost btn-sm" (click)="fromDocuments()" data-test="photos-documents"><app-icon name="inbox" />From Documents</button>
+            <button type="button" class="btn btn-default btn-sm" (click)="fromDocuments()" data-test="photos-documents"><app-icon name="inbox" />From Documents</button>
           }
         </span>
       </div>
@@ -71,7 +71,7 @@
                   <td class="il-c-type" data-test="row-type">
                     @if (typeName(r); as tn) {
                       <span class="il-type"><app-icon [name]="typeIcon(r.imageType)" size="0.9em" />{{ tn }}</span>
-                      @if (r.typeSuggested) { <span class="pill pill-warn ml-1" style="height:1.125rem" title="Suggested by AI at upload: a draft until someone chooses">suggested</span> }
+                      @if (r.typeSuggested) { <span class="pill pill-warn ml-1 ir-pill-sm" title="Suggested by AI at upload: a draft until someone chooses">Suggested</span> }
                     } @else { <span class="text-[color:var(--text-muted)]">—</span> }
                   </td>
                   <td class="tabular il-c-size">

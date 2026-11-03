@@ -50,50 +50,60 @@ export type DrawMode = 'view' | 'outline' | 'blur';
   selector: 'app-photo-view',
   host: { class: 'pv', '[class.pv-sm]': 'small()', '[class.pv-drawing]': "mode() !== 'view'", '[attr.data-photo]': 'photoId()' },
   styles: `
-    :host { position: relative; display: block; border-radius: var(--radius-lg); overflow: hidden; background: #111; line-height: 0; }
-    :host(.pv-sm) { border-radius: 0.3125rem; }
+    :host { position: relative; display: block; border-radius: var(--radius-lg); overflow: hidden; background: var(--color-ink-950); line-height: 0; }
+    :host(.pv-sm) { border-radius: var(--radius-sm); }
     img { width: 100%; display: block; }
-    .pv-ph { aspect-ratio: var(--pv-ratio, 1000 / 760); display: grid; place-items: center; color: #9ca3af; font-size: 0.75rem; line-height: 1.2; }
+    .pv-ph { position: relative; display: grid; place-items: center; color: var(--color-ink-400); font-size: 0.75rem; line-height: 1.2; }
+    .pv-ph svg { position: static; display: block; width: 100%; height: auto; }
+    .pv-ph span { position: absolute; inset: 0; display: grid; place-items: center; }
     svg { position: absolute; inset: 0; width: 100%; height: 100%; }
     :host(.pv-drawing) svg { cursor: crosshair; }
-    .pv-tag { position: absolute; line-height: 1.2; font: 600 0.6875rem var(--font-sans); padding: 0.1875rem 0.4375rem; border-radius: 0.3125rem;
-      background: rgb(17 24 39 / 0.82); color: #fff; white-space: nowrap; pointer-events: none; }
-    .pv-tag.pv-ok { background: #15803d; }
-    .pv-tag.pv-warn { background: #b45309; }
+    .pv-tag { position: absolute; line-height: 1.2; font: 600 0.6875rem var(--font-sans); padding: 0.1875rem 0.4375rem; border-radius: var(--radius-sm);
+      background: color-mix(in oklab, var(--color-ink-900) 82%, transparent); color: var(--on-solid); white-space: nowrap; pointer-events: none; }
+    .pv-tag.pv-ok { background: var(--color-ok-500); }
+    .pv-tag.pv-warn { background: var(--color-warn-600); }
+    .pv-corner { left: 3%; bottom: 4%; }
+    .pv-outline { fill: color-mix(in oklab, var(--color-info-500) 10%, transparent); stroke: var(--color-info-500); }
+    .pv-lw { stroke: var(--on-solid); }
+    .pv-ruler { fill: none; stroke: var(--color-ok-400); }
+    .pv-blur { fill: none; stroke: var(--color-warn-400); }
+    .pv-draw { fill: color-mix(in oklab, var(--color-warn-400) 12%, transparent); stroke: var(--color-warn-400); }
+    .pv-dot { fill: var(--color-warn-400); }
+    .pv-box { fill: color-mix(in oklab, var(--color-warn-400) 20%, transparent); stroke: var(--color-warn-400); }
     :host(.pv-sm) .pv-tag { display: none; }
   `,
   template: `
     @if (src(); as s) {
       <img [src]="s" [alt]="alt()" (load)="loaded.set(true)" />
     } @else {
-      <div class="pv-ph" [style.--pv-ratio]="ratio()">{{ failed() ? 'The photo could not be shown.' : '' }}</div>
+      <div class="pv-ph"><svg [attr.viewBox]="'0 0 ' + w() + ' ' + h()" aria-hidden="true"></svg><span>{{ failed() ? 'The photo could not be shown.' : '' }}</span></div>
     }
     @if (src()) {
       <svg #svg [attr.viewBox]="'0 0 ' + w() + ' ' + h()" preserveAspectRatio="none" (click)="onClick($event)" (dblclick)="finish()"
            (pointerdown)="onDown($event)" (pointermove)="onMove($event)" (pointerup)="onUp($event)" aria-hidden="true">
         @if (show('outline') && outlinePath(); as d) {
-          <path [attr.d]="d" fill="rgb(59 130 246 / 0.10)" stroke="#3b82f6" [attr.stroke-width]="stroke()" stroke-linejoin="round" />
+          <path class="pv-outline" [attr.d]="d" [attr.stroke-width]="stroke()" stroke-linejoin="round" />
         }
         @if (show('lw') && sized()) {
           @for (l of lines(); track $index) {
-            <line [attr.x1]="l[0]" [attr.y1]="l[1]" [attr.x2]="l[2]" [attr.y2]="l[3]" stroke="#fff" [attr.stroke-width]="stroke() * 0.75"
+            <line [attr.x1]="l[0]" [attr.y1]="l[1]" [attr.x2]="l[2]" [attr.y2]="l[3]" class="pv-lw" [attr.stroke-width]="stroke() * 0.75"
                   [attr.stroke-dasharray]="stroke() * 2.5 + ' ' + stroke() * 1.5" />
           }
         }
         @if (show('ruler') && rulerBox(); as r) {
-          <rect [attr.x]="r[0]" [attr.y]="r[1]" [attr.width]="r[2] - r[0]" [attr.height]="r[3] - r[1]" rx="6" fill="none" stroke="#22c55e"
+          <rect [attr.x]="r[0]" [attr.y]="r[1]" [attr.width]="r[2] - r[0]" [attr.height]="r[3] - r[1]" rx="6" class="pv-ruler"
                 [attr.stroke-width]="stroke() * 1.25" />
         }
         @for (b of blurBoxes(); track $index) {
-          <rect [attr.x]="b.x" [attr.y]="b.y" [attr.width]="b.width" [attr.height]="b.height" rx="10" fill="none" stroke="#f59e0b"
+          <rect [attr.x]="b.x" [attr.y]="b.y" [attr.width]="b.width" [attr.height]="b.height" rx="10" class="pv-blur"
                 [attr.stroke-width]="stroke()" [attr.stroke-dasharray]="stroke() * 3 + ' ' + stroke() * 2" />
         }
         @if (drawing().length) {
-          <polyline [attr.points]="drawingPoints()" fill="rgb(245 158 11 / 0.12)" stroke="#f59e0b" [attr.stroke-width]="stroke()" />
-          @for (p of drawingDots(); track $index) { <circle [attr.cx]="p[0]" [attr.cy]="p[1]" [attr.r]="stroke() * 1.4" fill="#f59e0b" /> }
+          <polyline class="pv-draw" [attr.points]="drawingPoints()" [attr.stroke-width]="stroke()" />
+          @for (p of drawingDots(); track $index) { <circle [attr.cx]="p[0]" [attr.cy]="p[1]" [attr.r]="stroke() * 1.4" class="pv-dot" /> }
         }
         @if (box(); as b) {
-          <rect [attr.x]="b.x" [attr.y]="b.y" [attr.width]="b.width" [attr.height]="b.height" fill="rgb(245 158 11 / 0.2)" stroke="#f59e0b"
+          <rect [attr.x]="b.x" [attr.y]="b.y" [attr.width]="b.width" [attr.height]="b.height" class="pv-box"
                 [attr.stroke-width]="stroke()" />
         }
       </svg>
@@ -105,7 +115,7 @@ export type DrawMode = 'view' | 'outline' | 'blur';
         @if (show('ruler') && rulerTag(); as t) {
           <span class="pv-tag pv-ok" [style.left.%]="t.x" [style.top.%]="t.y" data-test="tag-ruler">Ruler found · {{ t.cm }} cm · {{ pxPerCm()!.toFixed(1) }} px/cm</span>
         }
-        @if (noRuler() && !hideNoRuler()) { <span class="pv-tag pv-warn" style="left:3%;bottom:4%" data-test="tag-no-ruler">No ruler found: no size</span> }
+        @if (noRuler() && !hideNoRuler()) { <span class="pv-tag pv-warn pv-corner" data-test="tag-no-ruler">No ruler found: no size</span> }
       }
     }
   `,

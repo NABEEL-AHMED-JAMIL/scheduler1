@@ -95,7 +95,7 @@ describe('Image review list', () => {
     expect(el.querySelector('[data-facet="type"]')!.textContent).toContain('X-ray');
     const xray = el.querySelector('[data-photo-row="1004"]')!;
     expect(xray.querySelector('[data-test="row-type"]')!.textContent).toContain('X-ray');
-    expect(xray.querySelector('[data-test="row-type"]')!.textContent).toContain('suggested');
+    expect(xray.querySelector('[data-test="row-type"]')!.textContent).toContain('Suggested');
     expect(xray.textContent).toContain('Description only');
     expect(el.querySelector('[data-facet="status"]')!.textContent).toContain('Description only');
     expect([...el.querySelectorAll('[data-test="strip-type"] option')].map(o => o.textContent!.trim())).toEqual(['Choose, or let AI suggest', 'Wound', 'X-ray']);

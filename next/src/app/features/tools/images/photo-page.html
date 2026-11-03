@@ -59,7 +59,7 @@
           <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'measurement'" [attr.aria-selected]="tab() === 'measurement'" (click)="open('measurement')" data-tab="measurement">Measurement</button>
         }
         <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'description'" [attr.aria-selected]="tab() === 'description'" (click)="open('description')" data-tab="description">
-          Description @if (d.descriptionStatus === 'DRAFT') { <span class="pill pill-warn ml-1" style="height:1.125rem">draft</span> }</button>
+          Description @if (d.descriptionStatus === 'DRAFT') { <span class="pill pill-warn ml-1 ir-pill-sm">Draft</span> }</button>
         <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'ask'" [attr.aria-selected]="tab() === 'ask'" (click)="open('ask')" data-tab="ask">
           Ask @if (asks()?.length) { <span class="pg-count">{{ asks()!.length }}</span> }</button>
         <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'compare'" [attr.aria-selected]="tab() === 'compare'" (click)="open('compare')" data-tab="compare">
@@ -84,7 +84,7 @@
                       }
                       <div class="cap"><b>{{ day(r.takenAt) }}</b>
                         <span class="text-[color:var(--text-secondary)] tabular">{{ r.sized ? r.lengthCm!.toFixed(1) + ' × ' + r.widthCm!.toFixed(1) + ' cm · ' + r.areaCm2!.toFixed(1) + ' cm²' : 'no ruler: no size' }}</span>
-                        @if (r.current) { <span class="pill pill-info">this photo</span> }</div>
+                        @if (r.current) { <span class="pill pill-info">This photo</span> }</div>
                     </div>
                   }
                 </div>
@@ -289,7 +289,7 @@
                     <div><b>{{ d.widthCm!.toFixed(1) }} cm</b><span>Width</span></div>
                     <div><b>{{ s.area }}</b><span>Area ({{ d.outlineSource === 'drawn' ? 'drawn outline' : 'outline' }})</span></div>
                   </div>
-                  <div class="ir-card-b" style="border-top:1px solid var(--border-subtle)">
+                  <div class="ir-card-b ir-top">
                     @if (d.sinceFirstPct != null) {
                       <div class="flex text-sm"><span class="text-[color:var(--text-secondary)]">Since {{ day(d.firstAt) }}</span>
                         <span class="ml-auto font-medium" [class.ir-down]="d.sinceFirstPct < 0" [class.ir-up]="d.sinceFirstPct > 0" data-test="size-trend">{{ trendWords(d.sinceFirstPct) }}</span></div>
