@@ -164,6 +164,11 @@ import { BlurLoader } from '../../../shared/ui/blur-loader';
                       <div class="rs-problem flex items-center gap-1 text-[color:var(--text-secondary)]" data-test="step-branches">
                         <app-icon name="branch" size="0.9em" class="shrink-0" />{{ split }}</div>
                     }
+                    <!-- MIG-451: a Build JSON step's documents -- how many it made. -->
+                    @if (jsonDocuments(r.step); as docs) {
+                      <div class="rs-problem flex items-center gap-1 text-[color:var(--text-secondary)]" data-test="step-documents">
+                        <app-icon name="braces" size="0.9em" class="shrink-0" />{{ docs }}</div>
+                    }
                     @if (r.step.approval; as a) {
                       <div class="rs-problem flex items-center gap-1.5 text-[color:var(--text-secondary)]" data-test="step-approval">
                         @if (!a.waiting && a.decidedByUserId) { <app-avatar [appUserId]="a.decidedByUserId" [name]="a.decidedBy" [size]="1.1" [decorative]="true" /> }
@@ -311,6 +316,7 @@ export class RunStepsTable {
   outcome(approval: StepApproval): string { return approvalOutcome(approval, this.approvals?.teamNames()); }
 
   readonly branchSplit = branchSplit;
+  readonly jsonDocuments = jsonDocuments;
 
   chooseAttempt(value: string): void {
     const attempt = Number(value);
@@ -339,6 +345,13 @@ export class RunStepsTable {
   }
 
   chipTitle(o: OutputChip): string { return o.detail ? `${o.name} · ${o.detail}` : o.name; }
+}
+
+/** MIG-451: "2 documents" for a Build JSON step, as Core's note says it; null for any other step, or before it is done. */
+export function jsonDocuments(step: StepExecution): string | null {
+  if (step.task !== 'build_json') return null;
+  const said = /(?:^|\W)((?:\d[\d,]*) documents?)\s*$/.exec(step.statusMessage ?? '');
+  return said ? said[1] : null;
 }
 
 /** MIG-450: "urgent 12 · routine 88" for a Route, from the branch datasets Core kept on it; null for any other step. */

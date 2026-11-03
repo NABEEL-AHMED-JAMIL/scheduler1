@@ -4,7 +4,7 @@ import { provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { API_SUCCESS } from '../../../core/api/api.config';
-import { RunStepsTable, branchSplit } from './run-steps-table';
+import { RunStepsTable, branchSplit, jsonDocuments } from './run-steps-table';
 import { RunTimelineStore } from './run-timeline.store';
 import { RunAiTrace } from './run-ai-trace';
 import { engineTimeline, errorText, focusStep, recordsLabel } from './run-steps.model';
@@ -289,5 +289,14 @@ describe('A Route on the run page (MIG-450)', () => {
       { runDatasetId: 3, name: 'branch routine', rowCount: 88 }, { runDatasetId: 2, name: 'branch urgent', rowCount: 12 }] });
     expect(branchSplit(route as never)).toBe('urgent 12 · routine 88');
     expect(branchSplit(step(2, 'shape', 'transform') as never)).toBeNull();
+  });
+});
+
+describe('A Build JSON step on the run page (MIG-451)', () => {
+  it('says how many documents it made, from Core\'s note', () => {
+    expect(jsonDocuments(step(2, 'shape', 'build_json', { statusMessage: 'Completed in 0.1 s: 3 in, 2 out. 2 documents' }) as never)).toBe('2 documents');
+    expect(jsonDocuments(step(2, 'shape', 'build_json', { statusMessage: 'Completed in 0.1 s: 1 in, 1 out. 1 document' }) as never)).toBe('1 document');
+    expect(jsonDocuments(step(2, 'shape', 'build_json', { statusMessage: 'Running' }) as never)).toBeNull();
+    expect(jsonDocuments(step(2, 'shape', 'transform', { statusMessage: 'Completed: 2 documents' }) as never)).toBeNull();
   });
 });
