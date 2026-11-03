@@ -196,7 +196,7 @@ export class ImageList implements OnInit {
         const fresh = open ? this.rows().find(x => x.photoId === open.photoId) : null;
         if (fresh) this.selected.set(fresh);
         this.listState.done();
-        if (this.rows().some(x => x.status === 'MEASURING' || x.descriptionStatus === 'PENDING')) this.timer = setTimeout(() => this.load(), POLL_MS);
+        if (this.rows().some(x => x.status === 'MEASURING' || x.descriptionStatus === 'PENDING' || x.typeSuggestStatus === 'PENDING')) this.timer = setTimeout(() => this.load(), POLL_MS);
       },
       error: err => this.listState.fail(err, 'The photos could not be read.'),
     });

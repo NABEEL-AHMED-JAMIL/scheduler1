@@ -37,8 +37,12 @@ interface Item {
   type: string;
   /** The image as taken, once uploaded. */
   photo?: PhotoDetail | null;
-  /** After upload: the AI suggested the type (a draft), or had no suggestion, so the person chooses. */
-  suggestion?: 'suggested' | 'none' | null;
+  /** After upload: the AI suggested the type (a draft), had no suggestion (the person chooses), or is still suggesting. */
+  suggestion?: 'suggested' | 'none' | 'pending' | null;
+  /** Before upload (POST /photos/suggest): asking, a type suggested, none, or skipped (HEIC: suggested after the upload). */
+  pre?: 'pending' | 'suggested' | 'none' | 'skipped' | null;
+  preType?: string | null;
+  preName?: string | null;
   /** The note is a refusal or a state that needs doing (too dark): said in red. */
   crit?: boolean;
 }
@@ -49,6 +53,7 @@ export function takenNote(one: PhotoDetail | undefined): { note: string; crit: b
   if (one.status === 'REFUSED') return { note: one.refusalMessage || stateAdvice(one)?.lead || 'Not uploaded', crit: true };
   if (one.status === 'TOO_DARK') return { note: 'Too dark to read: retake it with the room light on or the flash', crit: true };
   if (one.status === 'NOT_READ') return { note: one.refusalMessage || 'Could not be read', crit: true };
+  if (one.status === 'NEEDS_TYPE') return { note: one.typeSuggestStatus === 'PENDING' ? 'Taken; a type is being suggested' : 'Taken; choose its type', crit: false };
   if (one.status === 'NO_RULER') return { note: 'No ruler: no size', crit: false };
   if (one.status === 'UNMEASURED' || one.measuredType === false) return { note: 'Description only', crit: false };
   if (one.areaCm2 != null) return { note: `${one.areaCm2.toFixed(1)} cm²`, crit: false };
@@ -116,7 +121,16 @@ export function localNow(now = new Date()): string {
               } @else if (i.note) {
                 <div class="us-sub" [class.us-crit]="i.crit || i.state === 'failed'" [attr.role]="i.crit || i.state === 'failed' ? 'alert' : null" data-test="upload-note">{{ i.note }}</div>
               }
-              @if (i.suggestion === 'suggested' && i.photo) {
+              @if (i.state === 'waiting' && i.pre === 'pending') {
+                <div class="us-sub text-[color:var(--text-muted)]" data-test="upload-suggesting"><app-icon name="sparkle" size="0.9em" />Suggesting…</div>
+              } @else if (i.state === 'waiting' && i.pre === 'suggested' && i.type === i.preType) {
+                <div class="us-sub" data-test="upload-suggested"><app-icon name="sparkle" size="0.9em" />{{ looksLike(i.preName || i.preType || '') }}
+                  <span class="pill pill-warn">Suggested</span><span class="text-[color:var(--text-muted)]">a draft; your choice wins</span></div>
+              } @else if (i.state === 'waiting' && i.pre === 'none' && !i.type) {
+                <div class="us-sub text-[color:var(--text-muted)]" data-test="upload-no-suggestion">No suggestion: please choose</div>
+              } @else if (i.suggestion === 'pending') {
+                <div class="us-sub text-[color:var(--text-muted)]" data-test="upload-suggesting"><app-icon name="sparkle" size="0.9em" />Suggesting a type… the list shows it when it is ready</div>
+              } @else if (i.suggestion === 'suggested' && i.photo) {
                 <div class="us-sub" data-test="upload-suggested"><app-icon name="sparkle" size="0.9em" />{{ looksLike(typeName(i.photo)) }}
                   <span class="pill pill-warn">Suggested</span><span class="text-[color:var(--text-muted)]">a draft; your choice wins</span></div>
               } @else if (i.suggestion === 'none') {
@@ -126,7 +140,7 @@ export function localNow(now = new Date()): string {
             @if (i.state !== 'failed' && !(i.state === 'waiting' && i.problem)) {
               <select class="input input-sm us-type" [class.us-need]="needsType(i)" [attr.aria-label]="'Image type of ' + i.name"
                       [disabled]="i.state === 'sending' || sending()" (change)="choose(k, $any($event.target).value)" data-test="upload-type">
-                @if (i.state === 'waiting') { <option value="" [selected]="!i.type">{{ suggestOn() ? 'Let AI suggest' : 'Choose a type' }}</option> }
+                @if (i.state === 'waiting') { <option value="" [selected]="!i.type">{{ suggestOn() && i.pre !== 'none' ? 'Let AI suggest' : 'Choose a type' }}</option> }
                 @else if (!i.type) { <option value="" selected>Choose a type</option> }
                 @for (t of types(); track t.key) { <option [value]="t.key" [selected]="i.type === t.key">{{ t.name }}</option> }
                 @for (n of notOffered(); track n) { <option disabled>{{ n }} · not offered in this workspace</option> }
@@ -175,7 +189,7 @@ export function localNow(now = new Date()): string {
         @if (finished() && !sendable().length) {
           <button type="button" class="btn btn-primary btn-sm" (click)="close()" [disabled]="busyType()" data-test="upload-done"><app-icon name="check" />Done</button>
         } @else {
-          <button type="button" class="btn btn-primary btn-sm" (click)="send()" [disabled]="sending() || !sendable().length || mustChoose() > 0" data-test="upload-send">
+          <button type="button" class="btn btn-primary btn-sm" (click)="send()" [disabled]="sending() || !sendable().length || mustChoose() > 0 || suggesting()" data-test="upload-send">
             <app-icon name="upload" />{{ sendLabel() }}</button>
         }
       </ng-container>
@@ -206,10 +220,14 @@ export class UploadSheet {
   readonly finished = signal(false);
   readonly made = signal<PhotoDetail[]>([]);
   readonly items = signal<Item[]>(this.initial());
+
   readonly tooMany = computed(() => (this.data.files?.length ?? 0) > this.data.limits.maxAtOnce);
   readonly sendable = computed(() => this.items().filter(i => i.state === 'waiting'));
   /** Images still waiting with no type, when the AI does not suggest one. */
-  readonly mustChoose = computed(() => this.suggestOn() ? 0 : this.sendable().filter(i => !i.type).length);
+  readonly mustChoose = computed(() => this.sendable().filter(i => this.needsType(i)).length);
+  readonly suggesting = computed(() => this.sendable().some(i => i.pre === 'pending'));
+  /** False once POST /photos/suggest is missing (404): the suggestion then happens after the upload, as before. */
+  private preSuggest = true;
   readonly sendLabel = computed(() => {
     const n = this.sendable().length;
     const base = n <= 1 ? 'Upload image' : `Upload ${n}`;
@@ -223,6 +241,10 @@ export class UploadSheet {
     }
     return 'A description is drafted for a clinician to confirm. It never diagnoses.';
   });
+
+  constructor() {
+    queueMicrotask(() => void this.suggestAll());
+  }
 
   size(n: number): string {
     return formatSize(n);
@@ -245,6 +267,7 @@ export class UploadSheet {
     const more = files.slice(0, Math.max(0, room)).map(file => this.fileItem(file));
     this.finished.set(false);
     this.items.update(list => [...list, ...more]);
+    void this.suggestAll();
   }
 
   private initial(): Item[] {
@@ -273,7 +296,35 @@ export class UploadSheet {
   }
 
   needsType(i: Item): boolean {
-    return (i.state === 'waiting' && !this.suggestOn() && !i.type) || (i.state === 'done' && i.suggestion === 'none' && !i.type);
+    if (i.state === 'waiting') return !i.type && !i.problem && (!this.suggestOn() || i.pre === 'none');
+    return i.state === 'done' && i.suggestion === 'none' && !i.type;
+  }
+
+  /**
+   * The AI's suggestion before the upload (design types-states, 1), once per file left to "Let AI suggest": the select is set to
+   * the type it suggests (a draft; the person's choice wins), or the line asks for a choice. HEIC is skipped (suggested after
+   * the upload); with no such endpoint (404) every file is suggested after the upload, as before.
+   */
+  async suggestAll(): Promise<void> {
+    if (!this.suggestOn()) return;
+    for (let k = 0; k < this.items().length; k++) {
+      const i = this.items()[k];
+      if (!this.preSuggest || !i || i.state !== 'waiting' || !i.file || i.problem || i.type || i.pre) continue;
+      this.patch(k, { pre: 'pending' });
+      try {
+        const r = await firstValueFrom(this.api.suggest(i.file));
+        const s = r.status === API_SUCCESS ? r.data : null;
+        if (!s || s.status === 'skipped') { this.patch(k, { pre: 'skipped' }); continue; }
+        const key = s.status === 'ok' && s.typeKey && this.types().some(t => t.key === s.typeKey) ? s.typeKey : null;
+        // The person may have chosen while it was asked: their choice wins.
+        const chosen = this.items()[k]?.type ?? '';
+        if (key) this.patch(k, { pre: 'suggested', preType: key, preName: s.typeName ?? this.types().find(t => t.key === key)?.name ?? key, type: chosen || key });
+        else this.patch(k, { pre: 'none', preType: null });
+      } catch (err) {
+        if ((err as { status?: number })?.status === 404) this.preSuggest = false;
+        this.patch(k, { pre: 'skipped' });
+      }
+    }
   }
 
   /** A type chosen: before upload it goes with the image; after, it is saved at once and replaces the suggestion. */
@@ -296,10 +347,10 @@ export class UploadSheet {
     }
   }
 
-  private details(type: string): PhotoDetails {
+  private details(type: string, suggested?: string | null): PhotoDetails {
     const taken = this.taken().trim();
     return { patientRef: this.patient().trim(), woundLabel: this.wound().trim(), bodyPart: this.site(), siteDetail: this.where().trim(),
-      takenAt: taken || undefined, imageType: type || undefined };
+      takenAt: taken || undefined, imageType: type || undefined, suggestedType: suggested || undefined };
   }
 
   async send(): Promise<void> {
@@ -307,7 +358,7 @@ export class UploadSheet {
     const list = this.items();
     for (let k = 0; k < list.length; k++) {
       if (list[k].state !== 'waiting') continue;
-      const details = this.details(list[k].type);
+      const details = this.details(list[k].type, list[k].pre === 'suggested' ? list[k].preType : null);
       this.patch(k, { state: 'sending' });
       try {
         let photos: PhotoDetail[] = [];
@@ -328,7 +379,8 @@ export class UploadSheet {
         this.made.update(m => [...m, ...photos]);
         const refused = !!one && one.status === 'REFUSED';
         // No type chosen: the AI's suggestion (a draft) or none, said on the line, with the type to choose.
-        const suggestion = !one || refused || list[k].type ? null : one.typeSuggested && one.imageType ? 'suggested' as const : !one.imageType ? 'none' as const : null;
+        const suggestion = !one || refused || list[k].type ? null : one.typeSuggested && one.imageType ? 'suggested' as const
+          : one.status === 'NEEDS_TYPE' && one.typeSuggestStatus === 'PENDING' ? 'pending' as const : !one.imageType ? 'none' as const : null;
         this.patch(k, { state: refused ? 'failed' : 'done', photo: one ?? null, problem: null, suggestion,
           type: list[k].type || (one?.imageType ?? ''), ...takenNote(one) });
       } catch (err) {

@@ -2,7 +2,7 @@
 import { formatSize } from '../../../shared/ui/format-size';
 
 /** UNMEASURED: a type that is never measured (X-ray, slide, other): "Description only". */
-export type PhotoStatus = 'MEASURING' | 'MEASURED' | 'NO_RULER' | 'NO_REGION' | 'TOO_DARK' | 'NOT_READ' | 'REFUSED' | 'UNMEASURED';
+export type PhotoStatus = 'MEASURING' | 'MEASURED' | 'NO_RULER' | 'NO_REGION' | 'TOO_DARK' | 'NOT_READ' | 'REFUSED' | 'UNMEASURED' | 'NEEDS_TYPE';
 export type DescriptionStatus = 'NONE' | 'PENDING' | 'DRAFT' | 'CONFIRMED' | 'DISCARDED' | 'FAILED' | 'OFF';
 export type BodyPart = 'foot' | 'heel' | 'leg' | 'sacrum' | 'hip' | 'hand' | 'arm' | 'other';
 /** A description's field: a key of the type's prompt's output schema (wound: woundBed, moisture, edges, around). */
@@ -71,6 +71,8 @@ export interface PhotoSummary {
   typeSuggested?: boolean;
   /** The key the AI suggested (kept as a draft), or null: no suggestion. */
   typeSuggestion?: string | null;
+  /** The suggestion at upload for an image with no type (status NEEDS_TYPE until it is done): PENDING, DONE, FAILED, OFF. */
+  typeSuggestStatus?: string | null;
   /** Whether the photo's type is measured; false: "Description only", never a size. */
   measuredType?: boolean | null;
 }
@@ -143,7 +145,8 @@ export interface ImageLimits {
 }
 
 /** A type the upload offers (limits.types). */
-export interface OfferedType { key: string; name: string; measured: boolean; targetLabel?: string | null; }
+export interface OfferedType { key: string; name: string; measured: boolean; targetLabel?: string | null; measureNote?: string | null;
+  bannerText?: string | null; note?: string | null; noteWarning?: boolean | null; }
 
 export const DEFAULT_IMAGE_LIMITS: ImageLimits = {
   formats: ['jpg', 'png', 'heic'], heic: true, maxMb: 25, maxAtOnce: 20, keepDays: 30, describe: true,
@@ -184,6 +187,8 @@ export interface PhotoDetails {
   takenAt?: string;
   /** The image type's key; without one, media asks the AI for a suggestion (a draft). */
   imageType?: string;
+  /** What the AI suggested before the upload (the sheet's draft), sent with the type chosen. */
+  suggestedType?: string;
 }
 
 export interface ImageDocument { ocrDocumentId: number; name: string; contentType: string; size?: number | null; status?: string | null; createdAt?: string | null; }
@@ -213,6 +218,7 @@ export interface Pill { tone: 'ok' | 'warn' | 'crit' | 'info' | 'neutral'; label
 /** The list's status pill: what needs doing first. */
 export function listPill(p: PhotoSummary): Pill {
   if (p.status === 'REFUSED') return { tone: 'crit', icon: 'alert', label: p.refusalCode === 'TOO_LARGE' ? 'Too large' : 'Upload failed' };
+  if (p.status === 'NEEDS_TYPE') return p.typeSuggestStatus === 'PENDING' ? { tone: 'info', label: 'Suggesting a type…' } : { tone: 'warn', icon: 'alert', label: 'Choose a type' };
   if (p.status === 'TOO_DARK') return { tone: 'crit', icon: 'alert', label: 'Too dark' };
   if (p.status === 'NOT_READ') return { tone: 'crit', icon: 'alert', label: 'Could not read' };
   if (p.status === 'MEASURING') return { tone: 'info', label: 'Measuring…' };
@@ -235,6 +241,7 @@ export function measurePill(p: PhotoSummary): Pill {
     case 'MEASURING': return { tone: 'info', label: 'Measuring…' };
     case 'REFUSED': return { tone: 'crit', label: 'Not uploaded' };
     case 'UNMEASURED': return { tone: 'neutral', label: 'Description only' };
+    case 'NEEDS_TYPE': return { tone: 'warn', label: 'Choose a type' };
     default: return { tone: 'crit', label: 'Not measured' };
   }
 }
@@ -369,6 +376,9 @@ export function typeIcon(key: string | null | undefined, baseKey?: string | null
   return TYPE_ICONS[k] ?? 'image';
 }
 const TYPE_ICONS: Record<string, string> = { wound: 'image', lesion: 'eye', burn: 'alert', xray: 'layers', slide: 'table', other: 'file' };
+
+/** POST /photos/suggest: the AI's type for a file before upload. */
+export interface TypeSuggestion { status: 'ok' | 'off' | 'failed' | 'skipped'; typeKey?: string | null; typeName?: string | null; message?: string | null; }
 
 /** A question asked about a photo, and its answer (GET /photos/{id}/asks). */
 export interface AskRow {

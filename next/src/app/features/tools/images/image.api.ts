@@ -3,7 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { API_BASE, ApiResponse } from '../../../core/api/api.config';
 import { IntakeAnswer } from '../../documents/documents.model';
-import { AskRow, BlurRegion, Comparison, Description, ImageDocument, ImageLimits, PhotoDetail, PhotoDetails, PhotoList, PhotoQuery } from './image.model';
+import { AskRow, TypeSuggestion, BlurRegion, Comparison, Description, ImageDocument, ImageLimits, PhotoDetail, PhotoDetails, PhotoList, PhotoQuery } from './image.model';
 
 const BASE = `${API_BASE}/imageReview.json`;
 
@@ -28,6 +28,13 @@ export class ImageApi {
     form.append('file', file, file.name);
     for (const [k, v] of Object.entries(details)) if (v != null && String(v).trim()) form.append(k, String(v).trim());
     return this.http.post<ApiResponse<{ photos: PhotoDetail[] }>>(`${BASE}/photos`, form);
+  }
+
+  /** The AI's type suggestion for a file before it is uploaded (a draft): ok with a type or none, off, failed, or skipped (HEIC). */
+  suggest(file: File): Observable<ApiResponse<TypeSuggestion>> {
+    const form = new FormData();
+    form.append('file', file, file.name);
+    return this.http.post<ApiResponse<TypeSuggestion>>(`${BASE}/photos/suggest`, form);
   }
 
   fromBucket(bucket: string, key: string, details: PhotoDetails): Observable<ApiResponse<PhotoDetail>> {
