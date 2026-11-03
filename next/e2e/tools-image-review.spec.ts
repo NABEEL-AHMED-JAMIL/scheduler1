@@ -18,7 +18,7 @@ import { LOCAL_BUILD_USE, useLocalBuild } from './support/local-build';
  *   fracture?") is answered by the fixed reply, and no model is asked.
  *
  * Everything is synthetic: the photos under e2e/fixtures/tools/images/ are the platform's demo images and the design's drawn
- * ones (lesion-L1, xray-XR42, other-O1), each stamped "SYNTHETIC TEST IMAGE - not a patient". It removes its own photos at the
+ * ones (lesion-L1, xray-XR42), each stamped "SYNTHETIC TEST IMAGE - not a patient". It removes its own photos at the
  * end (afterAll: every photo of the patient E2E-IR-<time> it made, through the app's delete); each draft description, type
  * suggestion and answered question bills one ai.vision.images to Riverside (a refused question bills nothing).
  */

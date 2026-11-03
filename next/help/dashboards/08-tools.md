@@ -1,14 +1,14 @@
 ---
 id: dash-tools
 title: Tools: Document Converter, Audio Transcript and Image review
-summary: Convert several documents at once and check each result beside its original, turn recordings into timed text you can play back, search and use, and measure wound photos against the ruler in them.
+summary: Convert several documents at once and check each result beside its original, turn recordings into timed text you can play back, search and use, and describe, measure, sort and route clinical images (wounds, skin lesions, burns, X-rays, tissue slides) without ever diagnosing.
 section: Files and tools
 who: Anyone whose page access includes Document Converter, Audio Transcript or Image review
 where: See results › Tools › Document Converter (/tools/converter); See results › Tools › Audio Transcript (/tools/transcript); See results › Tools › Image review (/tools/images)
 related: dash-files, bill-usage
 ---
 The tools do by hand what a pipeline's steps do for many files: the **Document Converter** converts documents,
-**Audio Transcript** turns recordings into text, and **Image review** measures wound photos, the same way a scheduled run
+**Audio Transcript** turns recordings into text, and **Image review** describes and measures clinical images, the same way a scheduled run
 does it. Each keeps what it made, so nothing is lost when you leave the page, and each is billed like the steps it stands
 in for.
 
@@ -116,17 +116,24 @@ transcribed one by one), **no speech heard** (**Choose another**), **the transcr
 by itself), and **not a recording** (a Word file goes to the Document Converter).
 
 ## Measure a wound photo
-**Image review** is for wound photos and other clinical photos. It measures the wound against the paper ruler in the photo,
-in code, and drafts a description for a nurse to confirm. It does not diagnose.
+**Image review** describes, measures, sorts and routes clinical images: wound photos, skin lesions, burns, X-rays, tissue
+slides and other photos. A measured type is measured against the paper ruler in the photo, in code; every image gets a
+draft description for a clinician to confirm. It never diagnoses.
 
-1. Open **See results › Tools › Image review**. Drop photos anywhere on the page (JPG, PNG or HEIC, up to 20 at once, 25 MB
-   each), or use **Upload photos**, **Choose photos…**, **From a bucket** or **From Documents**.
-2. Say what they show: the **Patient**, the **Wound** (W1), the **Body site** and where exactly, and when it was **Taken**.
+1. Open **See results › Tools › Image review**. Drop images anywhere on the page (JPG, PNG or HEIC, up to 20 at once, 25 MB
+   each), or use **Upload images**, **Choose images…**, **From a bucket** or **From Documents**.
+2. Choose the **Type** of the images (Wound, Skin lesion, Burn, X-ray, Tissue slide, Other photo, or your workspace's own),
+   in the strip or for each image, or leave **Choose, or let AI suggest**: a local model then suggests one at upload. A
+   suggestion is a draft ("Looks like an X-ray", marked **suggested**) and your choice always wins: change it on the line,
+   or later in the image's **Details**. With no suggestion the line says **No suggestion: please choose**.
+3. Say what they show: the **Patient**, the **Wound** (W1), the **Body site** and where exactly, and when it was **Taken**.
    The camera's own date-time is removed on upload, so the time is yours to give. Photos of the same patient and wound are
    compared over time.
-3. Each photo is measured at once. The list shows its **size in code** (length × width · area), its **change** in area since
-   the wound's first photo with a size, its status, who uploaded it and when it was taken. Narrow it with **Status**
-   (Measured, No ruler: no size, Description to confirm, Could not read), **Body site**, **Patient** and **Made by**.
+4. Each image is measured at once when its type is measured. The list shows its **Type**, its **size in code** (length ×
+   width · area, or **Description only** for a type that is never measured), its **change** in area since the wound's first
+   photo with a size, its status, who uploaded it and when it was taken. Narrow it with **Image type**, **Status**
+   (Measured, Description only, No ruler: no size, Description to confirm, Could not read), **Body site**, **Patient** and
+   **Made by**.
 
 ![Image review](dash-images "Image review: facets, the drop strip and the photos, with one open in the side panel")
 
@@ -137,9 +144,11 @@ Choose a photo to see it in the side panel with its **outline** (blue), the **ru
 - **The size comes only from the ruler in the photo.** A photo without a ruler says **No ruler found: no size**: its outline
   is kept, but a size is never estimated. **Adjust outline** lets you draw the outline yourself (click round the wound, then
   **Done**): it is measured in cm against the photo's ruler, or in pixels only when there is none.
-- **The description is a draft and not a diagnosis.** A local vision model writes the wound bed, moisture, edges and the
-  skin around it from the photo alone. A field it is unsure of reads **Not sure: please fill in**. **Confirm**, **Edit** or
-  **Discard** it; only a confirmed description goes into a visit note or a report.
+- **The description is a draft and not a diagnosis.** A local vision model fills the fields of the image's type from the
+  image alone (a wound: wound bed, moisture, edges and the skin around it). A field it is unsure of reads **Not sure: please
+  fill in**. **Confirm**, **Edit** or **Discard** it; only a confirmed description goes into a visit note or a report. The
+  line under it says which type, prompt version and model wrote it ("Skin lesion · Skin lesion description (built in) v1
+  on qwen3.5:9b").
 - **Compare** shows the same wound's photos side by side, the area over time and "area down 56% since 19 Oct". Only
   photos with a ruler are on the chart; each uses its own ruler, so photos taken from different distances still compare.
 ![Compare](dash-images-compare "A photo's Compare tab: the same wound over time, the area chart and its table")
@@ -153,14 +162,87 @@ Choose a photo to see it in the side panel with its **outline** (blue), the **ru
 image in Report Studio's Assets & branding) and **Start a pipeline** (the photo is kept in a bucket, then you describe the
 pipeline to the AI Assistant).
 
+## Image types
+Each type has its own description prompt, the fields it fills, whether it is measured and against what, and what it never
+says. **Image types** (the link in the page's header line) shows them all, one card each, with **Duplicate to edit** for
+administrators.
+
+| Type | Measured | Fields | Never says |
+|---|---|---|---|
+| Wound | Paper ruler · red region | wound bed, moisture, edges, around it | a diagnosis, stage, cause or treatment |
+| Skin lesion | Paper ruler · dark region | colour, border, shape, surface | a diagnosis, "benign" or "suspicious", a risk |
+| Burn | Paper ruler · red region (area only) | colours seen, blisters, surface | a depth or degree, % of body surface, a treatment |
+| X-ray | Never | body part, view, image quality, markers | fractures, findings, "normal" or "abnormal" |
+| Tissue slide | Never | stain seen, magnification (only if printed), image quality | findings, "abnormal", counts, a grade |
+| Other photo | Never | a short summary | a diagnosis or advice |
+
+- **A type that is never measured** (X-ray, Tissue slide, Other photo) has no **Measurement** tab. Its page reads
+  **Description only · no size · not a diagnosis**: an X-ray's scale is in its DICOM file, which is not read, and a
+  microscope's scale is not a paper ruler. A copy of one of these types is never measured either.
+- **A skin lesion** is measured against the ruler like a wound; its **Measurement** tab says the target, **dark region** on
+  skin.
+- **X-rays:** local vision models are weak on X-rays, and the page says so. Check every field against the image. A pipeline
+  routes on confirmed fields only, never on a draft.
+- **The fixed rules apply to every type**, added by the platform in code and shown locked: no diagnosis, ever; no size from
+  AI (sizes come only from a paper ruler, measured in code); a field the model is unsure of stays empty; always a draft until
+  a person confirms it; local models only.
+- A type an administrator switched off is listed at upload as **not offered in this workspace**. Earlier images keep their
+  type and description.
+
+## Ask about an image
+The **Ask** tab of an image's page (and of the side panel) answers questions about what is visible: "Is the border the same
+colour all the way round?", "Which view is this?", "Is the L marker visible?". Type the question and choose **Ask**.
+
+- An answer is a **draft, not a diagnosis**. It names the prompt, its version, the model and how long it took. **Copy** it,
+  or **Add to the visit note** (it is added to the image's note, marked as a draft answer).
+- A question that asks for a diagnosis, a fracture, a stage, a depth, a degree, findings or a treatment ("Is there a
+  fracture?", "Is this melanoma? Should we remove it?") is **Not answered**: a fixed reply says why and suggests the
+  clinician, and **no model is asked** (nothing is billed for it).
+- Every question and answer is kept with the image and listed in its **Details**.
+
+## AI settings (administrators)
+A workspace administrator sees **AI settings** in Image review's header. The sheet lists the image types with **Offered**,
+**Prompt · model** and **Measured**; choose a type to change it:
+
+- **Prompt**: the type's built-in prompt (marked **Platform**, read-only) or one of the workspace's prompts. Only prompts
+  that fit can be chosen (JSON output and a photo input); one that does not says why. **Duplicate to edit** copies a built-in
+  prompt into **Prompts**, where you change its wording; the fields come from the chosen prompt's output schema.
+- **Model**: the models on the platform's list that read photos. A model that cannot be used says why (for example "text
+  only: cannot read photos"). **Call timeout** and **Answer tokens** are optional.
+- **Measurement**: on or off, and the target (**Red region** or **Dark region**). Types without a paper ruler are never
+  measured.
+- **Offered**: whether people can choose the type when they upload.
+- **Add a type** makes your own, copied from a built-in one. The **type suggestion** and **Ask** have their own prompt, model
+  and switch.
+- **Try it** runs the saved choice and your change on a synthetic test image, side by side; a try is never saved to an image.
+- **Save** says what is unsaved first; the line under it says who changed the settings last. A save applies to new images;
+  earlier descriptions keep the prompt and model that wrote them.
+
+Built-in prompts also appear in **Build › Pipelines › Prompts** (tag **Image review**) with a **Platform** pill: they are
+read-only there too, with **Duplicate to edit**.
+
+## Switching to a bigger model
+Moving Image review to a bigger or better model is a change of settings only. Nothing is coded or deployed.
+
+1. The platform administrator adds the model in **Platform › Models** (**Add a model**, runs on Ollama, the model name as
+   `ollama list` shows it). Whether it **reads photos**, **thinks** and **uses tools** is detected from Ollama and shown in
+   the list; only a model that reads photos can describe images.
+2. Optionally, set its limits on the same page (**Change**): **Call timeout (seconds)**, **Answer tokens** and **Max
+   parallel**.
+3. A workspace administrator opens **Image review › AI settings** and picks the model for a type, for the type suggestion,
+   or for Ask.
+4. **Try it** on a synthetic test image to compare the saved choice with the new model.
+5. **Save**.
+
 ### When a photo cannot be measured
 Each state says why and what to do: **No ruler found** (upload a photo with the ruler flat beside the wound, or keep it
 without a size), **Too dark** (retake it with the room light or the flash), **Too large** (send it at a smaller size, or
 put it in a bucket and pick it from there) and **Upload failed** (not a photo: a scanned PDF goes to the Document
-Converter).
+Converter). A file too large or not a photo is said on its line in **Upload images** as soon as you add it, and the
+refusal's own message stays on the line after the upload.
 
 ## Limits
-The drop strips, **Transcribe recordings** and **Upload photos** say this platform's limits; when this was written they were:
+The drop strips, **Transcribe recordings** and **Upload images** say this platform's limits; when this was written they were:
 
 | What | Limit |
 |---|---|
@@ -179,7 +261,8 @@ The drop strips, **Transcribe recordings** and **Upload photos** say this platfo
 
 The results follow your workspace's **Data policies › Retention** (Transcripts, Audio recordings, Converted files, Image
 review photos), and a legal hold keeps them. A conversion kept in a bucket is billed per document, as before; a transcript
-by the minute of audio; a photo once for each draft description (Images described); measuring is free (see
+by the minute of audio; an image once for each draft description, each type suggestion and each answered question (Images
+described; a refused question is not billed); measuring is free (see
 [How usage is counted](#bill-usage)).
 
 ## Example
