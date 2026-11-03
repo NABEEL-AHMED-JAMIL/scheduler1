@@ -192,5 +192,20 @@
   "route": "/reports/schedules",
   "as": "riverside.admin",
   "settle": 2000
+ },
+ {
+  "name": "rs-compare",
+  "route": "/reports/library/01M6G141SX9JH4H43PW9DCH7AX/compare?a=1&b=2",
+  "as": "riverside.admin",
+  "settle": 6000,
+  "steps": [
+   {
+    "click": "[data-test=changes] li:nth-child(2) button"
+   },
+   {
+    "wait": 1500
+   }
+  ],
+  "retake": "new in reports phase 4: taken once the compare page is live"
  }
 ]
