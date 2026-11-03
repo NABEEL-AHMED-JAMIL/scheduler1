@@ -23,12 +23,22 @@ type Names = (id: number | null | undefined) => string;
 /** The events a person made: the rest (a task opening, a reminder, the end) are the workflow's, and carry no byline. */
 const BY_A_PERSON = new Set(['Started', 'Approved', 'Rejected', 'ChangesRequested', 'Done', 'Reassigned', 'Cancelled', 'PersonalDataShown']);
 
+/**
+ * Owner 2026-11-03: a decision our platform team made in a managed session is said as theirs -- they are not in the
+ * workspace's directory, so the reader saw "user 1000". The reader's own decision stays "Name (you)".
+ */
+function staffName(n: string): string {
+  if (n.endsWith('(you)') || n === 'you') return n;
+  return /^user #?\d+$/.test(n) ? 'Platform administrator (platform team)' : `${n} (platform team)`;
+}
+
 export function historyLines(events: HistoryEvent[], name: Names, stepName: (key: string | null | undefined) => string): HistoryLine[] {
   const lines: HistoryLine[] = [];
   for (const e of events) {
     const d = detailOf(e.detail);
     const step = stepName(e.stepKey);
-    const who = e.onBehalfOf ? `${name(e.actor)} (for ${name(e.onBehalfOf)})` : name(e.actor);
+    const actorName = d['managedService'] === true ? staffName(name(e.actor)) : name(e.actor);
+    const who = e.onBehalfOf ? `${actorName} (for ${name(e.onBehalfOf)})` : actorName;
     const line = (text: string, tone: HistoryLine['tone'] = 'plain', comment?: string) =>
       {
       const byPerson = e.actor != null && BY_A_PERSON.has(e.type);

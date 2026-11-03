@@ -19,4 +19,17 @@ describe('history byline', () => {
     expect(line.actor).toBeUndefined();
     expect(line.actorId).toBeUndefined();
   });
+
+  it('says a managed-session decision is the platform team\'s, never "user 1000" (owner 2026-11-03)', () => {
+    const managed = (actor: number): HistoryEvent =>
+      ({ id: 1, type: 'Approved', at: '2026-11-02T21:37:15Z', actor, stepKey: 's1', detail: '{"managedService":true}' } as unknown as HistoryEvent);
+    const [unknown] = historyLines([managed(1000)], names, () => 'Approve');
+    expect(unknown.text).toBe('Approve: approved by Platform administrator (platform team)');
+    expect(unknown.actor).toBe('Platform administrator (platform team)');
+    const [named] = historyLines([managed(7)], names, () => 'Approve');
+    expect(named.actor).toBe('Ada Admin (platform team)');
+    const [mine] = historyLines([managed(9)], id => (id === 9 ? 'Pat Ops (you)' : `user ${id}`), () => 'Approve');
+    expect(mine.actor).toBe('Pat Ops (you)');
+  });
 });
+
