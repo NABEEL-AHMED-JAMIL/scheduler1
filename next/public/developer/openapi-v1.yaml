@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: ETL Console customer API
-  version: 1.0.0-draft
+  version: 1.0.0
   summary: Start work, follow it, decide on it, and be told when something happens.
   description: |
     The public contract for an organisation's own portals and systems. Generic: any pipeline, any form,
@@ -20,6 +20,11 @@ info:
       endpoint and signed links are not. Webhook deliveries that arrive are billed as `webhook.deliveries`.
     - Embeddable run view: POST /v1/runs/{runId}/view-links answers a 15-minute link to a read-only page of the run that a
       portal may frame from the origins its API client allows.
+    - Sensitive files: a pipeline marked sensitive keeps its files from every client unless the workspace's own administrator
+      grants that client `files:sensitive`, with a reason; its links then last 60 seconds and every download is audited.
+    - Versioning: this is v1.0.0. Within /v1 every change is additive (new operations, fields, enum values, event types and
+      problem types; ignore what you do not know). A breaking change goes to /v2, and v1 then keeps running for at least 12
+      months, its answers carrying `Deprecation` and `Sunset` headers. Every change is in the changelog.
   contact:
     name: Platform team
   license:
@@ -453,7 +458,8 @@ paths:
         report RPT-0093 version 1") -- Markdown is never signed: the PDF is the record. A run that made several reports (one
         per row) names one with `report` (else 409 `several-reports`, listing them in `reports`). Without a report, html and
         md are the result rows above as a table (masked the same way), and pdf is a 404 (`no-report`). A pipeline marked
-        sensitive keeps its report from API clients in every format (403 `sensitive-files`), as its files; a report made
+        sensitive keeps its report from API clients in every format (403 `sensitive-files`), as its files, unless the client
+        holds `files:sensitive` (each such answer audited); a report made
         without the format's source (a PDF-only report has no HTML, so no Markdown) is a 404 (`format-not-kept`); one whose
         files the workspace's retention removed is a 410 (`report-expired`). A document's answer says what it is made from in
         X-Result-Source (report or rows) and, for a report, X-Report, X-Report-Version and X-Report-Signed; it is never
@@ -723,14 +729,17 @@ paths:
     get:
       tags: [files]
       operationId: downloadFile
-      summary: Redirects to a signed link valid 5 minutes.
+      summary: Redirects to a signed link valid 5 minutes (60 seconds for a sensitive file).
       description: >
         A file of the workspace's -- one it uploaded, or one a run made (the manifest's) -- answered with a 302 to its
         signed link on this API (/v1/files/{fileId}/content?token=...), valid 5 minutes. The link needs no token, so a
         portal may hand it to a browser; it opens that one file only, and never names a bucket or a storage key. The body
         says the same for a caller that does not follow redirects. A made file past its expiry is 410. A file a pipeline marked
-        sensitive made (a saved file, a report's PDF) is the pipeline's real output, never masked: an API client is refused it
-        with a 403 of type sensitive-files until a scope for it is offered -- its meta still describes it.
+        sensitive made (a saved file, a report's PDF) is the pipeline's real output, never masked: it needs the
+        `files:sensitive` scope beside `files:read`, which only the workspace's own administrator grants to a client, with a
+        reason. Without it the answer is a 403 of type sensitive-files (its meta still describes it). With it, the link is
+        valid 60 seconds, and every link made and every download is written to the workspace's audit log (the client, the
+        file, the run, the time).
       security: [{ clientCredentials: [files:read] }]
       parameters: [{ $ref: '#/components/parameters/FileId' }]
       responses:
@@ -753,9 +762,12 @@ paths:
       summary: The file's bytes, through the signed link GET /v1/files/{fileId} answered.
       x-signed-link: true
       description: >
-        No access token: the link's signature is the permission, for this file only, until it expires (5 minutes). A
-        link that has expired is 410 (ask GET /v1/files/{fileId} for a new one); a link that is not one this API made, or
-        names another file, is 404. A file a pipeline marked sensitive made is 403 (sensitive-files), as GET /v1/files/{fileId}.
+        No access token: the link's signature is the permission, for this file only, until it expires (5 minutes; 60 seconds
+        for a sensitive file). A link that has expired is 410 (ask GET /v1/files/{fileId} for a new one); a link that is not
+        one this API made, or names another file, is 404. A file a pipeline marked sensitive made opens only on a link
+        GET /v1/files/{fileId} made for it, and only while the client that asked for it still holds `files:sensitive`
+        (a revoke stops links already handed out): otherwise 403 (sensitive-files). A run view's download links never open
+        one. Every read of a sensitive file, served or refused, is in the workspace's audit log.
       security: []
       parameters:
         - $ref: '#/components/parameters/FileId'
@@ -795,6 +807,9 @@ paths:
       tags: [forms]
       operationId: listForms
       summary: The active forms this client may fill in.
+      description: >
+        The workspace's Active forms, by id (oldest first), with their fields -- what a portal needs to draw each. A Draft or
+        Archived form is never listed. Page with limit and cursor.
       security: [{ clientCredentials: [forms:read] }]
       parameters:
         - $ref: '#/components/parameters/Limit'
@@ -810,6 +825,7 @@ paths:
                 properties:
                   data: { type: array, items: { $ref: '#/components/schemas/Form' } }
                   nextCursor: { type: [string, 'null'] }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
@@ -818,6 +834,7 @@ paths:
       tags: [forms]
       operationId: getForm
       summary: One form and its fields.
+      description: An Active form of the workspace's; a Draft or Archived one, or another workspace's, is 404.
       security: [{ clientCredentials: [forms:read] }]
       parameters: [{ $ref: '#/components/parameters/FormId' }]
       responses:
@@ -826,6 +843,8 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Form' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
   /forms/{formId}/submissions:
@@ -833,6 +852,14 @@ paths:
       tags: [forms]
       operationId: submitForm
       summary: Submit answers (file fields name file ids); starts the form's pipeline or workflow when it has one.
+      description: >
+        answers is an object of the form's field keys, checked against the form exactly as the console checks a person's: a
+        required field, a choice's options, a checkboxes field's least and most, a number, a date, an e-mail address, a
+        table's columns. A file field names the ids of files uploaded with POST /v1/files (a list when it takes several), a
+        signature field one PNG's id; each is checked against the field's types and size and copied to the form. The answer
+        is 201 with the Submission and its Location; it starts the form's pipeline (runId) and its workflow when it has
+        them, and sends form.submission.received. A 422 names each answer to fix at `answers.<key>`; a form no longer
+        taking submissions (Archived) is 409 `form-closed`. Recorded as the API client's ("API client cl_...").
       security: [{ clientCredentials: [forms:write] }]
       parameters:
         - $ref: '#/components/parameters/FormId'
@@ -849,11 +876,17 @@ paths:
       responses:
         '201':
           description: Received.
+          headers:
+            Location: { schema: { type: string, format: uri-reference }, description: "/v1/forms/{formId}/submissions/{submissionId}" }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Submission' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/TooLarge' }
         '422': { $ref: '#/components/responses/Unprocessable' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
   /forms/{formId}/submissions/{submissionId}:
@@ -861,6 +894,9 @@ paths:
       tags: [forms]
       operationId: getSubmission
       summary: One submission and the run it started.
+      description: >
+        Any submission of the form in the workspace -- from the API, the console or a share link -- with the run it started;
+        never its answers. Another form's submission, or another workspace's, is 404.
       security: [{ clientCredentials: [forms:read] }]
       parameters:
         - $ref: '#/components/parameters/FormId'
@@ -871,6 +907,8 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Submission' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
 
@@ -1182,6 +1220,7 @@ components:
             forms:write: Submit forms.
             events:write: Send events.
             webhooks:manage: Manage webhook subscriptions and read the event catalogue.
+            files:sensitive: Download the files a pipeline marked sensitive made (with files:read). Granted on its own by a workspace administrator, with a reason; every download is audited.
   parameters:
     Limit: { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
     Cursor: { name: cursor, in: query, schema: { type: string } }
@@ -1279,6 +1318,7 @@ components:
     conflict: { status: 409, title: Conflict, description: "The resource's state refuses it, e.g. a redelivery while the webhook is paused or a workspace's 21st webhook." }
     idempotency-conflict: { status: 409, title: Conflict, description: "This Idempotency-Key was already used with a different request (within 24 hours). Use a new key for new work." }
     idempotency-in-progress: { status: 409, title: Conflict, description: "A request with this Idempotency-Key is still being handled. Try again in a moment with the same key." }
+    form-closed: { status: 409, title: Conflict, description: "The form no longer takes submissions (it is Archived).", operations: [submitForm] }
     run-in-flight: { status: 409, title: Conflict, description: "A run of this pipeline is still in flight; one runs at a time. Start (or retry) the next once it has finished.", operations: [startRun, retryRun] }
     pipeline-inactive: { status: 409, title: Conflict, description: "The pipeline is not active.", operations: [startRun, retryRun, startBackfill] }
     workspace-paused: { status: 409, title: Conflict, description: "The workspace is suspended or inactive, so its runs are paused.", operations: [startRun, retryRun] }
@@ -1289,7 +1329,7 @@ components:
     format-not-kept: { status: 404, title: Not Found, description: "The run's report was made without this format's source: a PDF-only report has no HTML, so no Markdown either. Ask for a format it has, or add the format to the Generate report step.", operations: [getRunResult, startRun] }
     several-reports: { status: 409, title: Conflict, description: "The run made several reports (one per row); name one with report=RPT-… (`reports` lists them), or read each item's files.", operations: [getRunResult, startRun] }
     report-expired: { status: 410, title: Gone, description: "The report's files were removed by the workspace's retention policy; its record stays. Run the pipeline again for a new report.", operations: [getRunResult, startRun] }
-    sensitive-files: { status: 403, title: Forbidden, description: "The pipeline is marked sensitive: its files, and its report in every format (pdf, html, md), are downloaded in the console, not through the API. json stays masked.", operations: [downloadFile, readFileContent, getRunResult, startRun] }
+    sensitive-files: { status: 403, title: Forbidden, description: "The pipeline is marked sensitive: its files, and its report in every format (pdf, html, md), need the files:sensitive scope, which only the workspace's own administrator grants to an API client, with a reason; or a link that is not a sensitive file's own, or whose client no longer holds the scope. json stays masked.", operations: [downloadFile, readFileContent, getRunResult, startRun] }
     run-not-failed: { status: 409, title: Conflict, description: "Only a failed run is retried; this one is queued, running, completed, skipped or interrupted.", operations: [retryRun] }
     pipeline-changed: { status: 409, title: Conflict, description: "The pipeline changed before the step that failed (its source, or a step's key, task, input or settings), so the kept outputs no longer match it. Retry with from start.", operations: [retryRun] }
     input-changed: { status: 409, title: Conflict, description: "A file a step before the failed one read has changed since (its sha256), or is gone; a resume would mix old and new data. Retry with from start.", operations: [retryRun] }
@@ -1617,10 +1657,10 @@ components:
         expiresAt: { type: [string, 'null'], format: date-time }
         sensitive:
           type: boolean
-          description: "Present (true) on a file a pipeline marked sensitive made: listed here, refused by GET /v1/files/{fileId} and its link (403 sensitive-files)."
+          description: "Present (true) on a file a pipeline marked sensitive made: listed here; GET /v1/files/{fileId} and its link need the files:sensitive scope (403 sensitive-files without it)."
         downloadable:
           type: boolean
-          description: "Present (false) beside sensitive: an API client cannot download it yet."
+          description: "Present beside sensitive: whether this client may download it -- true when its token carries files:sensitive, false otherwise."
     FileLink:
       type: object
       required: [url, expiresAt]

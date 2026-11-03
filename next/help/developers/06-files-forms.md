@@ -23,13 +23,18 @@ A file is an id; a form is an id and its fields.
    its own server.
 3. When a link has expired, it asks for a fresh one.
 
+A file of a pipeline marked **sensitive** needs the client to hold `files:sensitive`, which your administrator allows
+with a reason (see [API clients](#dev-clients)). Its link lasts 60 seconds, and every download is audited.
+
 > **Note:** A file a run made is kept for as long as the pipeline keeps its runs' files. After that it is still
 > listed, marked expired, and can no longer be downloaded: run the pipeline again for a new one.
 
 ## Submit a form
 1. The system lists the **active forms** it may fill in (scope `forms:read`), each with its fields.
 2. It submits the answers (scope `forms:write`). A file field names the id of a file it uploaded first.
-3. The submission starts the form's pipeline or workflow, if the form has one.
+3. The submission starts the form's pipeline or workflow, if the form has one. It is checked as a person's would be:
+   an answer to fix is named field by field, and a form that is archived takes no more submissions.
+4. The submission shows on the form's **Submissions** page as the API client's ("API client cl_...").
 
 A webhook subscribed to `form.submission.received` hears of every submission, from the console, a share link or the
 API.
@@ -38,7 +43,7 @@ API.
 | What | Limit |
 |---|---|
 | One upload | 100 MB |
-| A download link | 5 minutes |
+| A download link | 5 minutes (60 seconds for a sensitive file) |
 | A file made by a run | Kept as long as the pipeline keeps its runs' files |
 
 ## Example

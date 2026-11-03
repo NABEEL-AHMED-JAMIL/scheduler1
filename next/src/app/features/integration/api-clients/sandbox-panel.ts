@@ -10,6 +10,8 @@ import { confirmWith } from '../../../shared/ui/confirm';
 import { ApiClientRow, ApiClientWithSecret, ApiClientsApi, SandboxInfo, ScopeRow } from './api-clients.api';
 import { ClientDialog, ClientDialogData, ClientDialogResult } from './client-dialog';
 import { SecretDialog, SecretDialogData } from './secret-dialog';
+import { allowSensitive, canAllowSensitive, holdsSensitive, stopSensitive } from './sensitive-files';
+import { AuthService } from '../../../core/auth/auth.service';
 import { AppLoading, createLoadState } from '../../../shared/ui/loading';
 import { BlurLoader } from '../../../shared/ui/blur-loader';
 import { createTableSort } from '../../../shared/ui/sort';
@@ -78,7 +80,7 @@ import { SortHeader } from '../../../shared/ui/sort-header';
                       <td class="mono text-xs text-[color:var(--text-secondary)]">{{ c.clientId }}</td>
                       <td class="max-w-80">
                         <div class="flex flex-wrap gap-1">
-                          @for (sc of c.scopes; track sc) { <span class="pill pill-neutral mono">{{ sc }}</span> }
+                          @for (sc of c.scopes; track sc) { <span [class]="sc === 'files:sensitive' ? 'pill pill-warn mono' : 'pill pill-neutral mono'">{{ sc }}</span> }
                         </div>
                       </td>
                       <td class="whitespace-nowrap text-[color:var(--text-secondary)]">{{ c.lastUsedAt ? (c.lastUsedAt | serverTime: 'dateTime') : 'Never' }}</td>
@@ -92,6 +94,16 @@ import { SortHeader } from '../../../shared/ui/sort-header';
                           <ng-template #keyMenu>
                             <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
                               <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="rotate(c)"><app-icon name="refresh" />New secret</button>
+                              @if (canAllowSensitive(c)) {
+                                <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="allowSensitive(c)" data-allow-sensitive>
+                                  <app-icon name="lock" />Allow sensitive files…
+                                </button>
+                              }
+                              @if (holdsSensitive(c)) {
+                                <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="stopSensitive(c)" data-stop-sensitive>
+                                  <app-icon name="lock" class="icon-crit" />Stop sensitive files
+                                </button>
+                              }
                               <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="revoke(c)">
                                 <app-icon name="power" class="icon-crit" />Revoke
                               </button>
@@ -252,6 +264,32 @@ export class SandboxPanel implements OnInit, OnChanges {
       },
       error: err => { this.busy.set(null); this.toast.error(err?.error?.message || 'The secret could not be changed.'); },
     });
+  }
+
+  /** MIG-456: the same files:sensitive actions as the workspace's clients have, for a test key (sandbox). */
+  private readonly auth = inject(AuthService);
+  readonly mayGrantSensitive = computed(() => this.auth.role() === 'TENANT_ADMIN' && !this.auth.isManagedSession());
+
+  holdsSensitive(client: ApiClientRow): boolean {
+    return holdsSensitive(client);
+  }
+
+  canAllowSensitive(client: ApiClientRow): boolean {
+    return canAllowSensitive(client, this.mayGrantSensitive());
+  }
+
+  async allowSensitive(client: ApiClientRow): Promise<void> {
+    this.busy.set(client.clientId);
+    const done = await allowSensitive({ dialog: this.dialog, api: this.api, toast: this.toast }, client, true);
+    this.busy.set(null);
+    if (done) this.load();
+  }
+
+  async stopSensitive(client: ApiClientRow): Promise<void> {
+    this.busy.set(client.clientId);
+    const done = await stopSensitive({ dialog: this.dialog, api: this.api, toast: this.toast }, client, true, this.tenantId());
+    this.busy.set(null);
+    if (done) this.load();
   }
 
   async revoke(client: ApiClientRow): Promise<void> {

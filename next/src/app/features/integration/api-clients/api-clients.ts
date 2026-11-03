@@ -20,6 +20,7 @@ import { SecretDialog, SecretDialogData } from './secret-dialog';
 import { WebhookDialog, WebhookDialogData, WebhookDialogResult } from './webhook-dialog';
 import { WebhookSecretDialog, WebhookSecretDialogData } from './webhook-secret-dialog';
 import { SandboxPanel } from './sandbox-panel';
+import { allowSensitive, canAllowSensitive, holdsSensitive, stopSensitive } from './sensitive-files';
 import { ClientHistoryData, ClientHistoryPanel } from './client-history-panel';
 import { sidePanelConfig } from '../../../shared/ui/side-panel';
 import { PageHeader } from '../../../shared/ui/page-header';
@@ -42,6 +43,9 @@ import { InlineStatus, createLoadState } from '../../../shared/ui/loading';
  * MIG-337: each client's limit and calls this month, and the workspace's limits and monthly quota above the list; a client's
  * own limit is set in Change (our team's in a MANAGED workspace), the workspace's bounds in Administration › Tenants.
  * MIG-336: below the clients, the workspace's sandbox and its test keys (SandboxPanel).
+ * MIG-456: a client may download the files of pipelines marked sensitive only with files:sensitive, which the workspace's own
+ * administrator grants it here (Allow sensitive files, with a reason) and takes away (Stop sensitive files); its row shows
+ * who granted it, when and why, and its History lists every link and download (sensitiveAccess).
  *
  * A platform administrator has no workspace of his own: he picks one in the header (the shared workspace selector, opening
  * on the one picked last this session), and until he does the page asks for one instead of reading anything. Every read
@@ -262,6 +266,41 @@ export class ApiClients implements OnInit {
 
   statusPill(client: ApiClientRow): string {
     return client.status === 'Active' ? 'pill pill-ok' : client.status === 'Expired' ? 'pill pill-warn' : 'pill pill-neutral';
+  }
+
+  /**
+   * MIG-456: only the workspace's own administrator grants files:sensitive -- not a platform administrator, not our team in
+   * a managed session -- to an active client holding files:read.
+   */
+  readonly mayGrantSensitive = computed(() => this.auth.role() === 'TENANT_ADMIN' && !this.auth.isManagedSession());
+
+  holdsSensitive(client: ApiClientRow): boolean {
+    return holdsSensitive(client);
+  }
+
+  canAllowSensitive(client: ApiClientRow): boolean {
+    return canAllowSensitive(client, this.mayGrantSensitive());
+  }
+
+  /** The grant's line on the client's row: who allowed it ("you", or the person's number). */
+  grantedBy(client: ApiClientRow): string {
+    const by = client.sensitiveFiles?.grantedBy;
+    const me = this.auth.user()?.appUserId;
+    return by == null ? 'an administrator' : by === me ? 'you' : `person #${by}`;
+  }
+
+  async allowSensitive(client: ApiClientRow): Promise<void> {
+    this.busy.set(client.clientId);
+    const done = await allowSensitive({ dialog: this.dialog, api: this.api, toast: this.toast }, client, false);
+    this.busy.set(null);
+    if (done) this.load();
+  }
+
+  async stopSensitive(client: ApiClientRow): Promise<void> {
+    this.busy.set(client.clientId);
+    const done = await stopSensitive({ dialog: this.dialog, api: this.api, toast: this.toast }, client, false, this.tenantId());
+    this.busy.set(null);
+    if (done) this.load();
   }
 
   openNew(): void {

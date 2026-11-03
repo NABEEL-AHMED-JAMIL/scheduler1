@@ -16,7 +16,7 @@ describe('ClientHistoryPanel', () => {
     ] }));
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({ imports: [ClientHistoryPanel], providers: [
-      { provide: ApiClientsApi, useValue: { history } },
+      { provide: ApiClientsApi, useValue: { history, sensitiveAccess: vi.fn(() => of({ status: 'SUCCESS', data: [] })) } },
       { provide: DialogRef, useValue: { close: vi.fn() } },
       { provide: DIALOG_DATA, useValue: { client: { clientId: 'cl_x', name: 'Referral portal' }, sandbox: false, names: { 7: 'you' } } },
     ] });
@@ -37,7 +37,7 @@ describe('ClientHistoryPanel -- loading, empty, error (owner 2026-10-27)', () =>
   function panel(answer: () => Observable<unknown>) {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({ providers: [
-      { provide: ApiClientsApi, useValue: { history: vi.fn(answer) } },
+      { provide: ApiClientsApi, useValue: { history: vi.fn(answer), sensitiveAccess: vi.fn(() => of({ status: 'SUCCESS', data: [] })) } },
       { provide: DialogRef, useValue: { close: vi.fn() } },
       { provide: DIALOG_DATA, useValue: { client: { clientId: 'cl_x', name: 'Referral portal' }, sandbox: false, names: {} } },
     ] });
@@ -60,5 +60,47 @@ describe('ClientHistoryPanel -- loading, empty, error (owner 2026-10-27)', () =>
     const p = panel(() => throwError(() => new HttpErrorResponse({ status: 500 })));
     expect(p.loading()).toBe(false);
     expect(p.error()).toBe('The history could not be read.');
+  });
+});
+
+/** MIG-456: a grant and a revoke read as words with their reason, and the client's sensitive file downloads are listed. */
+describe('ClientHistoryPanel -- files:sensitive', () => {
+  function render(sandbox: boolean, tenantId?: number) {
+    const history = vi.fn(() => of({ status: 'SUCCESS', data: [
+      { id: 5, action: 'SENSITIVE_FILES_GRANTED', changes: { sensitiveFilesReason: { from: null, to: 'The portal shows signed reports' } },
+        changedBy: 7, changedAt: '2026-11-03T12:00:00' },
+    ] }));
+    const sensitiveAccess = vi.fn(() => of({ status: 'SUCCESS', data: [
+      { action: 'download', fileId: '01JMADE0000000000000000000', runId: 9100, fileName: 'signed.pdf', outcome: 'served', status: 200,
+        reason: 'files:sensitive', at: '2026-11-03T12:05:00' },
+      { action: 'download', fileId: '01JMADE0000000000000000000', runId: 9100, fileName: 'signed.pdf', outcome: 'refused', status: 403,
+        reason: 'files:sensitive not held', at: '2026-11-03T12:06:00' },
+    ] }));
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ imports: [ClientHistoryPanel], providers: [
+      { provide: ApiClientsApi, useValue: { history, sensitiveAccess } },
+      { provide: DialogRef, useValue: { close: vi.fn() } },
+      { provide: DIALOG_DATA, useValue: { client: { clientId: 'cl_x', name: 'Referral portal' }, sandbox, names: { 7: 'you' }, tenantId } },
+    ] });
+    const fixture = TestBed.createComponent(ClientHistoryPanel);
+    fixture.detectChanges();
+    return { text: (fixture.nativeElement as HTMLElement).textContent!.replace(/\s+/g, ' '), sensitiveAccess };
+  }
+
+  it('says who allowed sensitive files and why, and lists each download, served or refused', () => {
+    const { text, sensitiveAccess } = render(false);
+    expect(text).toContain('Sensitive files allowed');
+    expect(text.replace(/\s+/g, '')).toContain('Whysensitivefiles:none→Theportalshowssignedreports');
+    expect(sensitiveAccess).toHaveBeenCalledWith('cl_x');
+    expect(text).toContain('Sensitive file downloads');
+    const tight = text.replace(/\s+/g, '');
+    expect(tight).toContain('Downloadedsigned.pdf·run#9100');
+    expect(tight).toContain('Refusedsigned.pdf');
+    expect(text).toContain('the client did not hold files:sensitive');
+  });
+
+  it('reads no downloads for a sandbox test key or a platform administrator outside the workspace', () => {
+    expect(render(true).sensitiveAccess).not.toHaveBeenCalled();
+    expect(render(false, 1006).sensitiveAccess).not.toHaveBeenCalled();
   });
 });

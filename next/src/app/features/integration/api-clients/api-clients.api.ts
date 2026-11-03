@@ -26,6 +26,29 @@ export interface ApiClientRow {
   callsThisMonth?: number | null;
   /** MIG-335: the origins that may frame the client's run views (CSP frame-ancestors); empty: none. */
   frameAncestors?: string[];
+  /** MIG-336: a sandbox's test key (cl_test_). */
+  test?: boolean;
+  /** MIG-456: while the client holds files:sensitive -- who granted it, when (wall clock) and why; null otherwise. */
+  sensitiveFiles?: SensitiveFilesGrant | null;
+}
+
+/** MIG-456: a files:sensitive grant, as the client's row shows it. */
+export interface SensitiveFilesGrant { reason: string; grantedBy: number | null; grantedAt: string | null }
+
+/** MIG-456: the scope only a workspace's own administrator grants, one client at a time, with a reason. */
+export const FILES_SENSITIVE = 'files:sensitive';
+
+/** MIG-456: one link to, or download of, a sensitive file by an API client (Core's file_access_log). */
+export interface SensitiveAccessRow {
+  action: 'link' | 'download';
+  fileId: string | null;
+  runId: number | null;
+  fileName: string | null;
+  outcome: 'served' | 'refused';
+  status: number;
+  reason: string | null;
+  /** The platform's wall clock (America/Chicago). */
+  at: string | null;
 }
 
 /** MIG-337: a workspace's API bounds (the platform administrator's) and this month's calls against its quota. */
@@ -67,12 +90,13 @@ export interface ApiLimitsInput {
 /** A client as created or rotated: the secret, once. */
 export interface ApiClientWithSecret extends ApiClientRow { clientSecret: string }
 
-export interface ScopeRow { scope: string; description: string }
+/** grantedApart (MIG-456): never a checkbox -- granted to one client on its own, with a reason (files:sensitive). */
+export interface ScopeRow { scope: string; description: string; grantedApart?: boolean }
 
 /** Owner #25: one change to an API client (Identity's api_client_change): never a secret. */
 export interface ClientChangeRow {
   id: number;
-  action: 'CREATED' | 'UPDATED' | 'SECRET_ROTATED' | 'REVOKED';
+  action: 'CREATED' | 'UPDATED' | 'SECRET_ROTATED' | 'REVOKED' | 'SENSITIVE_FILES_GRANTED' | 'SENSITIVE_FILES_REVOKED';
   /** Field to {from, to}; empty for a rotation or a revoke. */
   changes: Record<string, { from: unknown; to: unknown }>;
   changedBy: number | null;
@@ -261,6 +285,25 @@ export class ApiClientsApi {
   revoke(clientId: string, sandbox = false, tenantId?: number | null): Observable<ApiResponse<ApiClientRow>> {
     return this.http.post<ApiResponse<ApiClientRow>>(`${this.clients}/revoke`,
       scopedBody(sandbox ? { clientId, sandbox } : { clientId }, tenantId));
+  }
+
+  /**
+   * MIG-456: the client may download sensitive files (files:sensitive). Only the workspace's own administrator, with a
+   * reason; its tokens end. `sandbox`: a test key of the workspace's sandbox.
+   */
+  grantSensitiveFiles(clientId: string, reason: string, sandbox = false): Observable<ApiResponse<ApiClientRow>> {
+    return this.http.post<ApiResponse<ApiClientRow>>(`${this.clients}/grantSensitiveFiles`, sandbox ? { clientId, reason, sandbox } : { clientId, reason });
+  }
+
+  /** MIG-456: files:sensitive taken away; its tokens end and its sensitive links stop. */
+  revokeSensitiveFiles(clientId: string, sandbox = false, tenantId?: number | null): Observable<ApiResponse<ApiClientRow>> {
+    return this.http.post<ApiResponse<ApiClientRow>>(`${this.clients}/revokeSensitiveFiles`,
+      scopedBody(sandbox ? { clientId, sandbox } : { clientId }, tenantId));
+  }
+
+  /** MIG-456: the client's links to and downloads of sensitive files, newest first (Core; the workspace's own administrator). */
+  sensitiveAccess(clientId: string, limit = 50): Observable<ApiResponse<SensitiveAccessRow[]>> {
+    return this.http.get<ApiResponse<SensitiveAccessRow[]>>(`${API_BASE}/apiFileAccess.json/sensitive`, { params: { clientId, limit: String(limit) } });
   }
 
   /** MIG-336: the workspace's sandbox, or null when our team has not made one. */

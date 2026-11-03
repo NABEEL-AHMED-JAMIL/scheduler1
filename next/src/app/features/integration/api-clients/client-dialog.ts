@@ -79,7 +79,8 @@ export function sameFrames(text: string, origins: string[] | null | undefined): 
       <fieldset class="form-lock mt-4 mb-4">
         <legend class="text-sm font-medium mb-2">Scopes</legend>
         <div class="flex flex-col gap-1.5" data-scopes>
-          @for (s of data.scopes; track s.scope) {
+          <!-- MIG-456: files:sensitive is never a checkbox (Allow sensitive files on the client's menu). -->
+          @for (s of choosable; track s.scope) {
             <label class="inline-flex items-start gap-2 text-sm">
               <input type="checkbox" class="checkbox mt-0.5" [checked]="chosen().includes(s.scope)" (change)="toggle(s.scope)"
                      [attr.data-scope]="s.scope" />
@@ -136,6 +137,8 @@ export class ClientDialog {
 
   readonly name = signal(this.data.client?.name ?? '');
   readonly chosen = signal<string[]>(this.data.client?.scopes ?? []);
+  /** The scopes chosen here: every one but those granted apart (files:sensitive), which a save keeps as they are. */
+  readonly choosable = this.data.scopes.filter(s => !s.grantedApart);
   readonly allowlist = signal((this.data.client?.ipAllowlist ?? []).join('\n'));
   readonly frames = signal(framesText(this.data.client?.frameAncestors));
   readonly expires = signal(dayOf(this.data.client?.expiresAt));

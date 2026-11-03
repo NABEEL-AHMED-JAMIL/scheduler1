@@ -104,8 +104,18 @@
               </td>
               <td class="max-w-80">
                 <div class="flex flex-wrap gap-1">
-                  @for (s of c.scopes; track s) { <span class="pill pill-neutral mono">{{ s }}</span> }
+                  @for (s of c.scopes; track s) {
+                    <span [class]="s === 'files:sensitive' ? 'pill pill-warn mono' : 'pill pill-neutral mono'"
+                          [attr.title]="s === 'files:sensitive' ? 'May download the files of pipelines marked sensitive; every download is audited' : null">{{ s }}</span>
+                  }
                 </div>
+                @if (c.sensitiveFiles; as g) {
+                  <!-- MIG-456: who granted files:sensitive, when and why. -->
+                  <div class="text-xs text-[color:var(--text-muted)] mt-1" data-sensitive-grant>
+                    Sensitive files allowed by {{ grantedBy(c) }}{{ g.grantedAt ? ' on ' + (g.grantedAt | serverTime: 'dateTime') : '' }}:
+                    <span class="text-[color:var(--text-secondary)]">{{ g.reason }}</span>
+                  </div>
+                }
               </td>
               <td class="text-[color:var(--text-secondary)]" data-client-allowed>
                 {{ c.ipAllowlist.length ? c.ipAllowlist.join(', ') : 'Any address' }}
@@ -135,6 +145,16 @@
                       <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="openClient(c)"><app-icon name="edit" />Change</button>
                       <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="rotate(c)"><app-icon name="refresh" />New secret</button>
                       <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="openHistory(c)"><app-icon name="history" />History</button>
+                      @if (canAllowSensitive(c)) {
+                        <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="allowSensitive(c)" data-allow-sensitive>
+                          <app-icon name="lock" />Allow sensitive files…
+                        </button>
+                      }
+                      @if (holdsSensitive(c)) {
+                        <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="stopSensitive(c)" data-stop-sensitive>
+                          <app-icon name="lock" class="icon-crit" />Stop sensitive files
+                        </button>
+                      }
                       <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="revoke(c)">
                         <app-icon name="power" class="icon-crit" />Revoke
                       </button>

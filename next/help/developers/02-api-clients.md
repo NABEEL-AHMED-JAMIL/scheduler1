@@ -40,6 +40,24 @@ where it may call from. Make one client for each system, so each can be limited,
 | `forms:write` | Submit forms |
 | `events:write` | Send events |
 | `webhooks:manage` | Manage webhook subscriptions and read the list of event types |
+| `files:sensitive` | Download the files of pipelines marked sensitive (with `files:read`). Never ticked here: see **Sensitive files** below |
+
+## Sensitive files
+A pipeline marked **sensitive** keeps its files -- often signed reports with personal health information -- from every
+API client until you allow one.
+
+1. Open the client's ⋯ menu and choose **Allow sensitive files…**. The client must already hold `files:read`.
+2. Write **why** this client needs them (at least 10 characters). The reason is kept with the grant and in the
+   client's **History**.
+3. The client's tokens end; its system asks for a new one, which may download sensitive files.
+
+Only your workspace's own administrator can allow it: not our team, not a platform administrator. The client's row
+then shows `files:sensitive` and who allowed it, when and why. **Stop sensitive files** on the same menu takes it away
+at once: its tokens end, and links to sensitive files it was already given stop working.
+
+> **Privacy:** Every link to and every download of a sensitive file, allowed or refused, is audited. The client's
+> **History** lists them under **Sensitive file downloads**: the file, the run and when. A link to a sensitive file
+> lasts 60 seconds, and a run view never offers one.
 
 ## The client list
 Each row shows the **Client** (its name and id), its **Scopes**, **Allowed from** (its allowlist, or **Any address**,
@@ -55,7 +73,8 @@ Open a client's ⋯ menu:
   tokens, so the system asks for a new one.
 - **New secret**: the current secret stops working at once, and so does every token the client holds. Your system
   needs the new secret before it can ask for another token. Plan it with the system's owner.
-- **History**: the changes made to the client, by whom and when.
+- **History**: the changes made to the client, by whom and when, and its sensitive file downloads.
+- **Allow sensitive files…** / **Stop sensitive files**: see **Sensitive files** above.
 - **Revoke**: the client and every token it holds stop working now, for good. To connect that system again, make a new
   client.
 

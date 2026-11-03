@@ -16,6 +16,7 @@ import { AuthService } from '../../../core/auth/auth.service';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { WorkspaceDirectory } from '../../../core/workspaces/workspace-directory';
 import { ApiLimitsDialog } from '../../admin/tenants/api-limits-dialog';
+import { ReasonDialog } from '../../../shared/ui/reason';
 
 const CLIENTS = [
   { clientId: 'cl_portal000000000000000000', name: 'Order portal', scopes: ['pipelines:read', 'runs:write'], ipAllowlist: ['203.0.113.0/24'],
@@ -59,7 +60,8 @@ function directoryOf(remembered: number | null) {
 }
 
 /** `platform`: as a platform administrator, with the workspace this session picked last (null: none yet). */
-function setup(options: { confirm?: boolean; locked?: boolean; platform?: { remembered: number | null } } = {}) {
+function setup(options: { confirm?: boolean; locked?: boolean; platform?: { remembered: number | null }; reason?: string | null;
+  role?: string } = {}) {
   const api = {
     list: vi.fn(() => of({ status: 'SUCCESS', message: '', data: CLIENTS })),
     limits: vi.fn(() => of({ status: 'SUCCESS', message: '', data: LIMITS })),
@@ -77,6 +79,9 @@ function setup(options: { confirm?: boolean; locked?: boolean; platform?: { reme
     // MIG-336: the sandbox panel below the clients; this workspace has none.
     sandbox: vi.fn(() => of({ status: 'SUCCESS', message: '', data: null })),
     sandboxList: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [] })),
+    // MIG-456: files:sensitive, granted with a reason and taken away.
+    grantSensitiveFiles: vi.fn(() => of({ status: 'SUCCESS', message: 'The client may now download sensitive files.' })),
+    revokeSensitiveFiles: vi.fn(() => of({ status: 'SUCCESS', message: 'The client may no longer download sensitive files.' })),
   };
   const opened: { component: unknown; data: any }[] = [];
   const toasts: string[] = [];
@@ -86,7 +91,8 @@ function setup(options: { confirm?: boolean; locked?: boolean; platform?: { reme
     provideRouter([]),
     { provide: ApiClientsApi, useValue: api },
     { provide: AuthService, useValue: { canBuild: signal(!options.locked), builderLocked: signal(!!options.locked),
-      isPlatformAdmin: () => !!options.platform, isManagedSession: () => false, user: () => ({ appUserId: 4639 }) } },
+      isPlatformAdmin: () => !!options.platform, isManagedSession: () => false, user: () => ({ appUserId: 4639 }),
+      role: () => options.role ?? (options.platform ? 'PLATFORM_ADMIN' : 'TENANT_ADMIN') } },
     ...(options.platform ? [{ provide: WorkspaceDirectory, useValue: directoryOf(options.platform.remembered) }] : []),
     { provide: Dialog, useValue: { open: (component: unknown, config: { data: any }) => {
       opened.push({ component, data: config.data });
@@ -94,6 +100,7 @@ function setup(options: { confirm?: boolean; locked?: boolean; platform?: { reme
       if (component === WebhookDialog) return { closed: of({ made: MADE_HOOK }) };
       if (component === SecretDialog || component === RouteDialog || component === WebhookSecretDialog) return { closed: of(undefined) };
       if (component === DeliveriesDialog) return { closed: of(false) };
+      if (component === ReasonDialog) return { closed: of(options.reason ?? null) };
       return { closed: of(options.confirm ?? true) };
     } } },
     { provide: ToastService, useValue: { success: (m: string) => toasts.push(m), error: (m: string) => toasts.push('!' + m) } },
@@ -655,5 +662,72 @@ describe('Developers › API Clients for a workspace administrator', () => {
     for (const read of ['list', 'limits', 'routesList', 'routeTargets', 'webhookList', 'sandbox'] as const) {
       expect(api[read]).toHaveBeenCalledWith(null);
     }
+  });
+});
+
+/** MIG-456: files:sensitive -- shown on the client's row with who allowed it and why; allowed with a reason, stopped. */
+describe('MIG-456: sensitive files on Developers › API Clients', () => {
+  const READER = { ...CLIENTS[0], clientId: 'cl_reader00000000000000000', name: 'Records portal', scopes: ['files:read'] };
+  const HOLDER = { ...CLIENTS[0], clientId: 'cl_holder00000000000000000', name: 'Referral portal', scopes: ['files:read', 'files:sensitive'],
+    sensitiveFiles: { reason: 'The portal shows signed discharge reports', grantedBy: 4639, grantedAt: '2026-11-03T12:00:00' } };
+
+  it('shows files:sensitive and who allowed it, when and why', () => {
+    const { fixture, page } = setup();
+    page.clients.set([HOLDER as any]);
+    fixture.detectChanges();
+    const text = (fixture.nativeElement as HTMLElement).textContent!.replace(/\s+/g, ' ');
+    expect(text).toContain('files:sensitive');
+    expect(text).toContain('Sensitive files allowed by you');
+    expect(text).toContain('The portal shows signed discharge reports');
+  });
+
+  it('only the workspace\'s own administrator may allow it, to an active client holding files:read', () => {
+    expect(setup().page.canAllowSensitive(READER as any)).toBe(true);
+    expect(setup().page.canAllowSensitive(HOLDER as any)).toBe(false);
+    expect(setup().page.canAllowSensitive(CLIENTS[0] as any)).toBe(false);
+    expect(setup().page.canAllowSensitive({ ...READER, status: 'Revoked' } as any)).toBe(false);
+    expect(setup({ platform: { remembered: 2960 } }).page.canAllowSensitive(READER as any)).toBe(false);
+    expect(setup({ role: 'TENANT_USER' }).page.canAllowSensitive(READER as any)).toBe(false);
+    expect(setup().page.holdsSensitive(HOLDER as any)).toBe(true);
+  });
+
+  it('asks why before it allows it, and allows nothing without a reason of 10 characters', async () => {
+    const declined = setup({ reason: null });
+    await declined.page.allowSensitive(READER as any);
+    expect(declined.api.grantSensitiveFiles).not.toHaveBeenCalled();
+    const short = setup({ reason: 'because' });
+    await short.page.allowSensitive(READER as any);
+    expect(short.api.grantSensitiveFiles).not.toHaveBeenCalled();
+    expect(short.toasts).toContain('!Say why in at least 10 characters.');
+    const { page, api, toasts } = setup({ reason: 'The portal shows signed reports' });
+    await page.allowSensitive(READER as any);
+    await settle();
+    expect(api.grantSensitiveFiles).toHaveBeenCalledWith(READER.clientId, 'The portal shows signed reports', false);
+    expect(toasts).toContain('The client may now download sensitive files.');
+  });
+
+  it('asks to confirm before it stops it, and stops nothing when declined', async () => {
+    const declined = setup({ confirm: false });
+    await declined.page.stopSensitive(HOLDER as any);
+    expect(declined.api.revokeSensitiveFiles).not.toHaveBeenCalled();
+    const { page, api } = setup();
+    await page.stopSensitive(HOLDER as any);
+    await settle();
+    expect(api.revokeSensitiveFiles).toHaveBeenCalledWith(HOLDER.clientId, false, null);
+  });
+});
+
+describe('MIG-456: the client dialog never offers files:sensitive as a checkbox', () => {
+  it('lists every scope but the ones granted apart', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [
+      { provide: ApiClientsApi, useValue: {} },
+      { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn() } },
+      { provide: DialogRef, useValue: { close: vi.fn() } },
+      { provide: DIALOG_DATA, useValue: { scopes: [...SCOPES, { scope: 'files:sensitive', description: 'Sensitive files.', grantedApart: true }],
+        client: null, bounds: null, canSetLimits: true } },
+    ] });
+    const dialog = TestBed.runInInjectionContext(() => new ClientDialog());
+    expect(dialog.choosable.map(s => s.scope)).toEqual(['pipelines:read', 'runs:write']);
   });
 });
