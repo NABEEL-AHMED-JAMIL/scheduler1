@@ -21,9 +21,11 @@ import { PhotoPanel } from './photo-panel';
 import { PhotoView } from './photo-view';
 import { UploadSheet, UploadSheetData } from './upload-sheet';
 import { DocumentsPicker } from './documents-picker';
+import { ImageTypesStore } from './image-ai';
+import { AiSettingsSheet } from './ai-settings-sheet';
 import {
-  BY_WORDS, DEFAULT_IMAGE_LIMITS, ImageDocument, ImageLimits, PhotoDetail, PhotoFacets, PhotoSummary, SITE_WORDS, STATUS_WORDS, listPill,
-  pctText, sizeParts, subLine,
+  BY_WORDS, DEFAULT_IMAGE_LIMITS, ImageDocument, ImageLimits, OfferedType, PhotoDetail, PhotoFacets, PhotoSummary, SITE_WORDS, STATUS_WORDS, TYPE_WORDS,
+  isMeasuredPhoto, listPill, pctText, sizeParts, subLine, typeIcon, typeName,
 } from './image.model';
 
 const POLL_MS = 5000;
@@ -37,7 +39,10 @@ const DAY_OPTIONS: { id: ImageDays; label: string }[] = [{ id: '7', label: '7 da
  * Image review's list (owner-approved design 2026-11-03, image-a.html), as the Report library: facets with counts (Status, Body
  * site, Patient, Made by), one search and a range; one slim drop strip (Choose photos, From a bucket, From Documents) that says
  * location and camera details are removed on upload; the table -- thumbnail, patient · site, size (in code), change, status, by,
- * taken -- and the selected photo in the side panel. Photos dropped anywhere on the page open the upload.
+ * taken -- and the selected photo in the side panel. Photos dropped anywhere on the page open the upload. With image types
+ * (design types-list): an Image type facet and column, a Type choice in the strip (or let the AI suggest one, a draft), the
+ * status Description only for a type never measured, and, for administrators, AI settings in the header; Image types (the
+ * catalog) is linked from the header's line.
  */
 @Component({
   selector: 'app-image-list',
@@ -61,6 +66,11 @@ const DAY_OPTIONS: { id: ImageDays; label: string }[] = [{ id: '7', label: '7 da
     .il-c-st { width: 9.875rem; }
     .il-c-by { width: 5.75rem; }
     .il-c-taken { width: 7rem; white-space: nowrap; }
+    .il-c-type { width: 9.5rem; }
+    .il-type { display: inline-flex; align-items: center; gap: 0.3125rem; white-space: nowrap; font-size: 0.8125rem; }
+    .il-strip-type { display: inline-flex; align-items: center; gap: 0.5rem; }
+    .il-strip-type select { width: 13rem; }
+    .il-by { display: flex; flex-wrap: wrap; align-items: center; gap: 0.375rem; margin-top: 0.375rem; font-size: 0.75rem; color: var(--text-secondary); }
     .il-sub { font-size: 0.75rem; color: var(--text-muted); }
     .il-down { color: var(--ok-text); }
     .il-up { color: var(--crit-text); }
@@ -77,6 +87,7 @@ export class ImageList implements OnInit {
   private readonly route = inject(ActivatedRoute, { optional: true });
   private readonly auth = inject(AuthService, { optional: true });
   private readonly tabCounts = inject(TabCounts, { optional: true });
+  readonly types = inject(ImageTypesStore);
 
   /** ?new=1: the upload is open over the list. */
   readonly openNew = input(false);
@@ -102,14 +113,27 @@ export class ImageList implements OnInit {
   readonly facetsOpen = signal(false);
   readonly dragging = signal(false);
   readonly selected = signal<PhotoSummary | null>(null);
+  /** The strip's Type: '' lets the AI suggest one at upload (a draft). */
+  readonly stripType = signal('');
   private listLoad: Subscription | null = null;
   private timer: ReturnType<typeof setTimeout> | null = null;
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
   private sheet: DialogRef<PhotoDetail[] | undefined, UploadSheet> | null = null;
 
+  /** The types the upload offers: limits.types, else the types read from ai-service that are offered. */
+  readonly offered = computed<OfferedType[]>(() => this.limits().types?.length ? this.limits().types!
+    : this.types.types().filter(t => t.offered).map(t => ({ key: t.key, name: t.name, measured: t.measured, targetLabel: t.targetLabel })));
+  /** Types this workspace has switched off: listed, not offered (design types-states, 2). */
+  readonly notOffered = computed(() => this.types.types().filter(t => !t.offered && !this.offered().some(o => o.key === t.key)));
+  readonly typeWords = computed(() => ({ ...TYPE_WORDS, ...Object.fromEntries(this.types.types().map(t => [t.key, t.name])),
+    ...Object.fromEntries(this.offered().map(t => [t.key, t.name])) }));
+  readonly typeCount = computed(() => this.types.types().length || this.offered().length);
+  readonly canChange = computed(() => this.types.canChange());
+
   readonly groups = computed<FacetGroup[]>(() => {
     const c = this.counts(), p = this.picks();
     return [
+      { key: 'type', title: 'Image type', options: facetOptions(c.type, this.typeWords(), p['type'] ?? []) },
       { key: 'status', title: 'Status', options: facetOptions(c.status, STATUS_WORDS, p['status'] ?? []) },
       { key: 'site', title: 'Body site', options: facetOptions(c.site, SITE_WORDS, p['site'] ?? []) },
       { key: 'patient', title: 'Patient', options: facetOptions(c.patient, {}, p['patient'] ?? [], [], v => v || 'Unknown') },
@@ -129,6 +153,9 @@ export class ImageList implements OnInit {
   readonly sizeParts = sizeParts;
   readonly pctText = pctText;
   readonly subLine = subLine;
+  readonly typeName = typeName;
+  readonly typeIcon = typeIcon;
+  readonly isMeasured = isMeasuredPhoto;
 
   constructor() {
     effect(() => {
@@ -143,6 +170,7 @@ export class ImageList implements OnInit {
   }
 
   ngOnInit(): void {
+    this.types.load();
     this.api.limits().subscribe({
       next: r => { if (r.status === API_SUCCESS && r.data && Array.isArray(r.data.formats)) this.limits.set({ ...DEFAULT_IMAGE_LIMITS, ...r.data }); },
       error: () => this.limits.set(DEFAULT_IMAGE_LIMITS),
@@ -156,7 +184,7 @@ export class ImageList implements OnInit {
     this.listState.start();
     const p = this.picks();
     this.listLoad = this.api.list({ days: Number(this.days()), q: this.query(), page: this.page(), size: this.pageSize(),
-      status: p['status'] ?? [], site: p['site'] ?? [], patient: p['patient'] ?? [], by: p['by'] ?? [] }).subscribe({
+      type: p['type'] ?? [], status: p['status'] ?? [], site: p['site'] ?? [], patient: p['patient'] ?? [], by: p['by'] ?? [] }).subscribe({
       next: r => {
         if (r.status !== API_SUCCESS || !r.data) { this.listState.fail(r, 'The photos could not be read.'); return; }
         this.rows.set(r.data.rows ?? []);
@@ -249,9 +277,23 @@ export class ImageList implements OnInit {
       .closed.subscribe(d => { if (d) this.openSheet({ document: { ocrDocumentId: d.ocrDocumentId, name: d.name, size: d.size } }); });
   }
 
-  openSheet(source: Omit<UploadSheetData, 'limits'>): void {
+  /** AI settings (administrators): the types' prompts, models and measurement, the suggestion and Ask. */
+  aiSettings(focus?: string): void {
+    this.dialog.open<boolean | undefined>(AiSettingsSheet, sidePanelConfig({ focus }, 'wide', 'right')).closed.subscribe(saved => {
+      if (!saved) return;
+      this.types.load(true);
+      this.api.limits().subscribe({ next: r => { if (r.status === API_SUCCESS && r.data && Array.isArray(r.data.formats)) this.limits.set({ ...DEFAULT_IMAGE_LIMITS, ...r.data }); } });
+    });
+  }
+
+  catalog(): void {
+    void this.router?.navigate([], { relativeTo: this.route ?? undefined, queryParams: { view: 'types' } });
+  }
+
+  openSheet(source: Omit<UploadSheetData, 'limits' | 'types' | 'notOffered'>): void {
     if (this.sheet) return;
-    const data: UploadSheetData = { limits: this.limits(), ...source };
+    const data: UploadSheetData = { limits: this.limits(), types: this.offered(), notOffered: this.notOffered().map(t => t.name),
+      imageType: this.stripType() || undefined, ...source };
     const ref = this.dialog.open<PhotoDetail[] | undefined, UploadSheetData, UploadSheet>(UploadSheet, sidePanelConfig(data, 'wide', 'right'));
     this.sheet = ref;
     ref.closed.subscribe(made => {
@@ -259,8 +301,8 @@ export class ImageList implements OnInit {
       if (this.openNew() && this.router) void this.router.navigate([], { relativeTo: this.route ?? undefined, queryParams: {}, replaceUrl: true });
       if (made?.length) {
         const taken = made.filter(p => p.status !== 'REFUSED');
-        if (taken.length) this.toast.success(taken.length === 1 ? 'The photo is measured; its description is being drafted.'
-          : `${taken.length} photos are measured; their descriptions are being drafted.`);
+        if (taken.length) this.toast.success(taken.length === 1 ? 'The image is taken; its description is being drafted.'
+          : `${taken.length} images are taken; their descriptions are being drafted.`);
         this.selected.set(made[0]);
         this.load();
       }

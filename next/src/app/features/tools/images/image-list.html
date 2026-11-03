@@ -1,6 +1,12 @@
 <div class="page-tool" (dragover)="onDragOver($event)" (dragleave)="dragging.set(false)" (drop)="onDrop($event)">
-  <app-page-header title="Image review" subtitle="Measure wounds against the ruler in the photo, with a draft description for the nurse to confirm. It does not diagnose.">
-    <button type="button" class="btn btn-primary btn-sm" (click)="askNew()" data-test="upload-photos"><app-icon name="upload" />Upload photos</button>
+  <app-page-header title="Image review" subtitle="Describe, measure, sort and route clinical images. Sizes come only from a paper ruler in the photo. It never diagnoses.">
+    <div subtitle class="il-by" data-test="types-byline"><app-icon name="sparkle" size="0.95em" />
+      @if (typeCount()) { {{ typeCount() }} image types · } descriptions are drafts by local models ·
+      <a class="link-inline" href="/tools/images?view=types" (click)="$event.preventDefault(); catalog()" data-test="open-types">Image types</a></div>
+    @if (canChange()) {
+      <button type="button" class="btn btn-default btn-sm" (click)="aiSettings()" data-test="ai-settings"><app-icon name="settings" />AI settings</button>
+    }
+    <button type="button" class="btn btn-primary btn-sm" (click)="askNew()" data-test="upload-photos"><app-icon name="upload" />Upload images</button>
   </app-page-header>
 
   <div class="tx" [class.tx-panel-on]="!!selected()" [class.tx-filters-open]="facetsOpen()" [class.il-drop]="dragging()" data-test="photos">
@@ -12,7 +18,7 @@
           <app-icon name="filter" />Filters</button>
         <div class="search-field tx-search">
           <app-icon name="search" size="0.95em" />
-          <input class="input" placeholder="Search patient, body site, file" [value]="query()" aria-label="Search photos"
+          <input class="input" placeholder="Search patient, body part, file" [value]="query()" aria-label="Search photos"
                  (input)="setQuery($any($event.target).value)" data-test="photos-search" />
         </div>
         <app-segmented class="tx-days" [value]="days()" (valueChange)="setDays($event)" [options]="dayOptions" ariaLabel="How far back" />
@@ -20,9 +26,15 @@
 
       <div class="il-strip" [class.il-strip-on]="dragging()" data-test="photos-drop">
         <app-icon name="upload" />
-        <span class="il-strip-text"><b>Drop photos</b><span class="text-[color:var(--text-muted)]"> · {{ hint() }}</span></span>
+        <span class="il-strip-text"><b>Drop images</b><span class="text-[color:var(--text-muted)]"> · {{ hint() }}</span></span>
         <span class="il-strip-acts">
-          <label class="btn btn-default btn-sm cursor-pointer">Choose photos…
+          <label class="il-strip-type text-xs text-[color:var(--text-secondary)]">Type
+            <select class="input input-sm" [value]="stripType()" (change)="stripType.set($any($event.target).value)" aria-label="Image type for the images dropped" data-test="strip-type">
+              <option value="">{{ limits().suggestOn === false ? 'Choose a type' : 'Choose, or let AI suggest' }}</option>
+              @for (t of offered(); track t.key) { <option [value]="t.key">{{ t.name }}</option> }
+              @for (t of notOffered(); track t.key) { <option [value]="t.key" disabled>{{ t.name }} · not offered in this workspace</option> }
+            </select></label>
+          <label class="btn btn-default btn-sm cursor-pointer">Choose images…
             <input type="file" class="sr-only" multiple accept=".jpg,.jpeg,.png,.heic,.heif,image/jpeg,image/png,image/heic" (change)="onPick($event)" data-test="photos-files" /></label>
           @if (!ownSignIn) {
             <button type="button" class="btn btn-ghost btn-sm" (click)="fromBucket()" data-test="photos-bucket"><app-icon name="folder" />From a bucket</button>
@@ -41,7 +53,7 @@
         <div class="tx-scroll">
           <table class="tx-t il-t" [class.tx-busy]="listState.pending()">
             <thead><tr>
-              <th class="il-c-th"><span class="sr-only">Photo</span></th><th>Patient · site</th><th class="il-c-size">Size (in code)</th>
+              <th class="il-c-th"><span class="sr-only">Photo</span></th><th>Patient · site</th><th class="il-c-type">Type</th><th class="il-c-size">Size (in code)</th>
               <th class="tx-num il-c-chg" title="The area's change since this wound's first photo with a size">Change</th><th class="il-c-st">Status</th><th class="il-c-by">By</th><th class="il-c-taken">Taken</th>
             </tr></thead>
             <tbody>
@@ -56,8 +68,15 @@
                   </td>
                   <td class="min-w-0"><div class="tx-name truncate" [title]="r.title">{{ r.title }}</div>
                     <div class="il-sub truncate">{{ subLine(r) }}</div></td>
+                  <td class="il-c-type" data-test="row-type">
+                    @if (typeName(r); as tn) {
+                      <span class="il-type"><app-icon [name]="typeIcon(r.imageType)" size="0.9em" />{{ tn }}</span>
+                      @if (r.typeSuggested) { <span class="pill pill-warn ml-1" style="height:1.125rem" title="Suggested by AI at upload: a draft until someone chooses">suggested</span> }
+                    } @else { <span class="text-[color:var(--text-muted)]">—</span> }
+                  </td>
                   <td class="tabular il-c-size">
                     @if (size) { {{ size.lw }} · <b>{{ size.area }}</b> }
+                    @else if (!isMeasured(r) && r.status !== 'REFUSED') { <span class="text-[color:var(--text-secondary)]">Description only</span> }
                     @else if (r.status === 'NO_RULER') { <span class="text-[color:var(--text-secondary)]">No ruler: no size</span> }
                     @else if (r.status === 'MEASURING') { <span class="text-[color:var(--text-muted)]">Measuring…</span> }
                     @else { <span class="text-[color:var(--text-secondary)]">—</span> }
@@ -72,8 +91,8 @@
                   <td class="whitespace-nowrap tabular text-[color:var(--text-secondary)]">{{ (r.takenAt || r.createdAt) ? ((r.takenAt || r.createdAt) | serverTime: 'recent') : '—' }}</td>
                 </tr>
               } @empty {
-                <tr><td colspan="7" class="tx-empty">
-                  {{ filtered() ? 'No photo matches the filters.' : 'No photos in this range. Drop wound photos anywhere on this page: each is measured against the ruler in it.' }}
+                <tr><td colspan="8" class="tx-empty">
+                  {{ filtered() ? 'No image matches the filters.' : 'No images in this range. Drop clinical images anywhere on this page: a measured type is measured against the ruler in it.' }}
                   @if (filtered()) { <button type="button" class="link-inline" (click)="clearFilters()">Clear filters</button> }
                 </td></tr>
               }
@@ -97,7 +116,7 @@
     </section>
 
     @if (selected(); as s) {
-      <app-photo-panel [summary]="s" [canSend]="canSend()" [canReport]="canReport()" (closed)="selected.set(null)" (changed)="load()"
+      <app-photo-panel [summary]="s" [canSend]="canSend()" [canReport]="canReport()" [askOn]="limits().askOn ?? true" (closed)="selected.set(null)" (changed)="load()"
                        (another)="askNew()" (bucket)="fromBucket()" data-test="photo-panel" />
     }
   </div>
