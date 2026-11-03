@@ -181,6 +181,7 @@ export const PINNED: Record<string, unknown> = {
     "links": [
       "/tools",
       "/tools/converter",
+      "/tools/images",
       "/tools/transcript"
     ]
   },

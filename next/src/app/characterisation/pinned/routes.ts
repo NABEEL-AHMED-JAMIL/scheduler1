@@ -1012,6 +1012,15 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
+      "path": "/tools/images",
+      "title": "Image review",
+      "pageKey": "tools-images",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
       "path": "/data/catalog",
       "title": "Data Catalog",
       "pageKey": "data-catalog",

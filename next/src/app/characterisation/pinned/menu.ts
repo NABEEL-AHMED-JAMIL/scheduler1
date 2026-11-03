@@ -14,7 +14,7 @@ export const PINNED: Record<string, unknown> = {
     "See results › Dashboards — Boards of tiles over your pipelines' results -> /data/analytics/dashboards",
     "See results › Analysis — Ask your data, explore it, and find what was made from it -> /data",
     "See results › Reports — Report templates, the reports made from them, and their data -> /reports",
-    "See results › Tools — Convert documents, and turn speech into text -> /tools",
+    "See results › Tools — Convert documents, turn speech into text, and describe and measure clinical images -> /tools",
     "Administration & billing › Administration — Users, teams, page access, sign-in security, data policies and appearance -> /administration",
     "Administration & billing › Billing — What the workspace used, what it costs, and its bills -> /billing",
     "Administration & billing › Settings — Models, tools, registry tasks, Kafka, the values a pipeline reads, and alerts -> /settings",
@@ -29,7 +29,7 @@ export const PINNED: Record<string, unknown> = {
     "Run & review › Runs — Recent runs, runs by date, how they measure up, and the ones that failed -> /runs",
     "See results › Dashboards — Boards of tiles over your pipelines' results -> /data/analytics/dashboards",
     "See results › Analysis — Ask your data, explore it, and find what was made from it -> /data",
-    "See results › Tools — Convert documents, and turn speech into text -> /tools",
+    "See results › Tools — Convert documents, turn speech into text, and describe and measure clinical images -> /tools",
     "Administration & billing › Settings — Models, tools, registry tasks, Kafka, the values a pipeline reads, and alerts -> /settings"
   ],
   "the menu for a tenant user with five pages (api-check TU)": [
@@ -55,7 +55,7 @@ export const PINNED: Record<string, unknown> = {
     "See results › Dashboards — Boards of tiles over your pipelines' results -> /data/analytics/dashboards",
     "See results › Analysis — Ask your data, explore it, and find what was made from it -> /data",
     "See results › Reports — Report templates, the reports made from them, and their data -> /reports",
-    "See results › Tools — Convert documents, and turn speech into text -> /tools",
+    "See results › Tools — Convert documents, turn speech into text, and describe and measure clinical images -> /tools",
     "Administration & billing › Administration — Users, teams, page access, sign-in security, data policies and appearance -> /administration",
     "Administration & billing › Billing — What the workspace used, what it costs, and its bills -> /billing",
     "Administration & billing › Settings — Models, tools, registry tasks, Kafka, the values a pipeline reads, and alerts -> /settings",

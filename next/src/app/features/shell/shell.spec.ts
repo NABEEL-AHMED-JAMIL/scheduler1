@@ -61,7 +61,7 @@ describe('shell navigation', () => {
       '/reports/templates', '/review/all', '/review/approvals', '/review/documents',
       '/review/requests', '/review/runs', '/runs/analytics', '/runs/backfills', '/runs/by-date', '/runs/failed',
       '/runs/latest',
-      '/settings/tools', '/tools/converter', '/tools/transcript', '/workflows/designer',
+      '/settings/tools', '/tools/converter', '/tools/images', '/tools/transcript', '/workflows/designer',
     ]);
     expect(HUBS.every(hub => !('pageKey' in hub && hub.pageKey) && !('pageKeys' in hub && hub.pageKeys))).toBe(true);
     expect(children().find(child => child.path === '/dashboard')?.pageKey).toBeUndefined();
