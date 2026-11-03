@@ -343,6 +343,7 @@ export class RunStepsTable {
 
 /** MIG-450: "urgent 12 · routine 88" for a Route, from the branch datasets Core kept on it; null for any other step. */
 export function branchSplit(step: StepExecution): string | null {
-  const branches = (step.datasets ?? []).filter(d => d.name.startsWith('branch '));
+  // In the route's order: Core keeps them branch by branch, so by id (a listing may sort them by name).
+  const branches = (step.datasets ?? []).filter(d => d.name.startsWith('branch ')).sort((a, b) => a.runDatasetId - b.runDatasetId);
   return branches.length ? branches.map(d => `${d.name.slice('branch '.length)} ${(d.rowCount ?? 0).toLocaleString('en-GB')}`).join(' · ') : null;
 }

@@ -286,7 +286,7 @@ describe('Run page: the Steps tab -- sorting and states (owner 2026-10-27)', () 
 describe('A Route on the run page (MIG-450)', () => {
   it('says how many rows went down each branch, from the branch datasets Core kept on it', () => {
     const route = step(1, 'triage', 'route', { datasets: [{ runDatasetId: 1, name: 'output', rowCount: 100 },
-      { runDatasetId: 2, name: 'branch urgent', rowCount: 12 }, { runDatasetId: 3, name: 'branch routine', rowCount: 88 }] });
+      { runDatasetId: 3, name: 'branch routine', rowCount: 88 }, { runDatasetId: 2, name: 'branch urgent', rowCount: 12 }] });
     expect(branchSplit(route as never)).toBe('urgent 12 · routine 88');
     expect(branchSplit(step(2, 'shape', 'transform') as never)).toBeNull();
   });
