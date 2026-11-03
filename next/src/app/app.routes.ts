@@ -513,6 +513,22 @@ export const routes: Routes = [
         canActivate: [pageGuard],
       },
       {
+        // Reports redesign (features 3 and 4): generate many reports on a schedule and deliver them once approved; the
+        // schedules are Generate's (report-generate), as making a report is.
+        path: 'reports/schedules',
+        title: 'Report schedules',
+        loadComponent: () => import('./features/report-studio/schedules/schedule-list').then(m => m.ReportSchedules),
+        data: { pageKey: 'report-generate', workspaceData: workspace('Report schedules are', 'make and send its reports on a schedule', 'clock') },
+        canActivate: [pageGuard],
+      },
+      {
+        path: 'reports/schedules/:scheduleId',
+        title: 'Report schedule',
+        loadComponent: () => import('./features/report-studio/schedules/schedule-page').then(m => m.ReportSchedulePage),
+        data: { pageKey: 'report-generate', workspaceData: workspace('A report schedule is', 'make and send its reports on a schedule', 'clock') },
+        canActivate: [pageGuard],
+      },
+      {
         // MIG-406 (approved screen 8): logos, images, signatures and stamps, and brand profiles; report-assets.
         path: 'reports/assets',
         title: 'Assets & branding',

@@ -47,8 +47,13 @@
       </div>
       <div class="ov-kpi">
         <span class="ov-k">Next delivery</span>
-        <b class="ov-v ov-v-sm">None scheduled</b>
-        <span class="ov-s">Reports reach people from the library today.</span>
+        @if (nextDelivery(); as n) {
+          <b class="ov-v ov-v-sm" data-test="ov-next-delivery">{{ n.when }}</b>
+          <a class="ov-s link-inline truncate" [routerLink]="['/reports/schedules', n.scheduleId]" [title]="n.what">{{ n.what }}</a>
+        } @else {
+          <b class="ov-v ov-v-sm">None scheduled</b>
+          <span class="ov-s">@if (canGenerate()) { <a class="link-inline" routerLink="/reports/schedules/new">Make a schedule</a> to send reports on a schedule. } @else { Reports reach people from the library. }</span>
+        }
       </div>
     </section>
     @if (summaryError()) { <p class="text-xs text-[color:var(--crit-text)] mt-2" role="alert">{{ summaryError() }} <button type="button" class="link-inline" (click)="load()">Try again</button></p> }
@@ -105,9 +110,23 @@
           <div class="ov-legend">@for (k of categories(); track k; let i = $index) { <span><i [class]="'c' + i"></i>{{ k }}</span> }</div>
         </section>
 
-        <section class="card" aria-labelledby="ov-sched">
-          <div class="rs-head"><h2 class="section-title" id="ov-sched">Scheduled deliveries</h2></div>
-          <p class="p-4 pt-0 text-sm text-[color:var(--text-muted)]">Nothing is scheduled to go out. Reports are opened and downloaded from the library.</p>
+        <section class="card" aria-labelledby="ov-sched" data-test="ov-scheduled">
+          <div class="rs-head"><h2 class="section-title" id="ov-sched">Scheduled deliveries @if (upcoming()?.upcoming?.length) { <span class="rs-count">{{ upcoming()!.upcoming.length }}</span> }</h2>
+            @if (canGenerate()) { <a class="btn btn-default btn-sm" routerLink="/reports/schedules">All schedules <app-icon name="arrowRight" /></a> }</div>
+          @if (upcoming(); as u) {
+            <ul class="ov-sched">
+              @for (s of u.upcoming; track s.scheduleId + (s.at ?? '')) {
+                <li>
+                  <span class="ov-day"><b>{{ dayOf(s.at, u.zone).day }}</b><span>{{ dayOf(s.at, u.zone).date }}</span></span>
+                  <div class="min-w-0"><a class="link-inline font-medium truncate block" [routerLink]="['/reports/schedules', s.scheduleId]">{{ s.name }}</a>
+                    <span class="text-xs text-[color:var(--text-muted)]">@if (s.at) { {{ s.at | rsTime: 'time': u.zone }} · }{{ s.makes }} · {{ s.then }}</span></div>
+                  <span class="pill" [class]="'pill pill-' + scheduleTone(s.state)">{{ scheduleWords[s.state] }}</span>
+                </li>
+              } @empty { <li class="text-sm text-[color:var(--text-muted)]">Nothing is scheduled to go out in the next two weeks.</li> }
+            </ul>
+          } @else {
+            <p class="p-4 pt-0 text-sm text-[color:var(--text-muted)]">Nothing is scheduled to go out. Reports are opened and downloaded from the library.</p>
+          }
         </section>
 
         @if (summary(); as s) {

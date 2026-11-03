@@ -226,6 +226,8 @@ export const NAV: NavItem[] = [
           { label: 'Templates', path: '/reports/templates', pageKeys: ['report-templates', 'report-generate'], icon: 'template' },
           // Owner 2026-10-19: 'Library', not a second 'Reports' -- the trail read See results › Reports › Reports.
           { label: 'Library', path: '/reports/library', pageKey: 'report-library', icon: 'file' },
+          // Reports redesign (features 3 and 4): generate many on a schedule, delivered once approved; Generate's page key.
+          { label: 'Schedules', path: '/reports/schedules', pageKey: 'report-generate', icon: 'clock' },
           { label: 'Data', path: '/reports/data', pageKey: 'report-data', icon: 'database' },
           // MIG-406: logos, images, signatures and stamps, and brand profiles. The trail reads See results › Reports ›
           // Assets & branding, then the asset or brand profile's own name: no word twice.

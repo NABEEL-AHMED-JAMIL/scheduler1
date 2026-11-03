@@ -1,5 +1,6 @@
 import { ReportVersionRow } from './report-studio.model';
 import { rsTime } from './rs-time.pipe';
+import { CHANNEL_WORDS, ReportDeliveries } from './schedules/schedules.api';
 
 /** One step of a report version's life cycle, as the strip over the viewer shows it. */
 export interface Stage {
@@ -21,7 +22,7 @@ export function daysAgo(at: string | null | undefined, now = Date.now()): string
  * (one, or a first and a second when the workspace asks for two), Delivered -- with who and when, from what the report
  * already says about the version: its job, its warnings, its review and its approval.
  */
-export function reportStages(v: ReportVersionRow, took: (ms: number) => string, now = Date.now()): Stage[] {
+export function reportStages(v: ReportVersionRow, took: (ms: number) => string, now = Date.now(), sent?: ReportDeliveries | null): Stage[] {
   const out: Stage[] = [];
   out.push({ key: 'generated', label: 'Generated', state: 'done',
     detail: [rsTime(v.createdAt, 'recent'), v.jobMs ? took(v.jobMs) : '', v.pages ? `${v.pages} page${v.pages === 1 ? '' : 's'}` : '']
@@ -61,8 +62,30 @@ export function reportStages(v: ReportVersionRow, took: (ms: number) => string, 
   } else {
     out.push({ key: 'approval', label: 'Approval', state: 'todo', detail: 'not asked yet' });
   }
-  out.push({ key: 'delivered', label: 'Delivered', state: 'todo', detail: 'no delivery set for this report' });
+  out.push(delivered(v, sent));
   return out;
+}
+
+/**
+ * Features 3 and 4: the Delivered step from the version's deliveries -- where it went (library, email, bucket, webhook),
+ * still going, or failed; before approval, where its schedule will send it; none for a report no schedule made.
+ */
+export function delivered(v: ReportVersionRow, sent?: ReportDeliveries | null): Stage {
+  const mine = (sent?.deliveries ?? []).filter(d => d.version === v.version);
+  if (!mine.length) {
+    return { key: 'delivered', label: 'Delivered', state: 'todo',
+      detail: sent?.schedule ? `after approval: ${sent.schedule.then}` : 'no delivery set for this report' };
+  }
+  const failed = mine.filter(d => d.status === 'FAILED');
+  const pending = mine.filter(d => d.status === 'PENDING');
+  const where = [...new Set(mine.filter(d => d.status === 'SENT').map(d => CHANNEL_WORDS[d.channel].toLowerCase()))].join(' · ');
+  if (failed.length) {
+    return { key: 'delivered', label: 'Delivered', state: 'warn',
+      detail: `${failed.map(d => CHANNEL_WORDS[d.channel].toLowerCase()).join(', ')} failed${where ? ' · sent: ' + where : ''}` };
+  }
+  if (pending.length) return { key: 'delivered', label: 'Delivering', state: 'now', detail: `${where ? where + ' · ' : ''}${pending.length} still going` };
+  const at = mine.map(d => d.sentAt ?? d.createdAt).sort().pop();
+  return { key: 'delivered', label: 'Delivered', state: 'done', detail: [where, rsTime(at, 'recent')].filter(Boolean).join(' · ') };
 }
 
 /** The first QR code a template definition prints (anywhere: body, header or footer), with what it encodes. */

@@ -15,6 +15,8 @@ import { RsTabCounts } from './rs-tab-counts';
 import { AppLoading } from '../../shared/ui/loading';
 import { LibraryRow, LibrarySummary, ReportLibraryApi, stateChip, stateTone } from './report-library.api';
 import { daysAgo } from './report-stages';
+import { STATE_WORDS as SCHEDULE_WORDS, SchedulesApi, Upcoming, scheduleTone } from './schedules/schedules.api';
+import { rsTime } from './rs-time.pipe';
 
 /** Error codes that mean the data does not fit the template: the way out is the field mapping. */
 const MAPPING_CODES = new Set(['REQUIRED_FIELD_MISSING', 'BINDING_NOT_RESOLVED', 'DATA_SCHEMA_MISMATCH']);
@@ -79,6 +81,7 @@ export class ReportOverview implements OnInit {
   plain(text: string | null | undefined): string { return plainHint(text ?? ''); }
   private readonly api = inject(ReportStudioApi);
   private readonly lib = inject(ReportLibraryApi);
+  private readonly schedulesApi = inject(SchedulesApi);
   private readonly auth = inject(AuthService);
   private readonly tabCounts = inject(RsTabCounts);
   private readonly router = inject(Router);
@@ -89,6 +92,10 @@ export class ReportOverview implements OnInit {
   readonly data = signal<StudioOverview | null>(null);
   readonly summary = signal<LibrarySummary | null>(null);
   readonly summaryError = signal('');
+  /** Features 3 and 4: the next runs of the workspace's schedules (the Next delivery tile, the Scheduled deliveries card). */
+  readonly upcoming = signal<Upcoming | null>(null);
+  readonly scheduleWords = SCHEDULE_WORDS;
+  readonly scheduleTone = scheduleTone;
   readonly loading = signal(true);
   readonly error = signal('');
   /** The chart by day or by week. */
@@ -125,6 +132,9 @@ export class ReportOverview implements OnInit {
       error: e => { this.error.set(studioError(e, 'The overview could not be read.').message); this.loading.set(false); },
     });
     // The 30-day figures are the library's (report-library): a reader without the library still has the rest.
+    if (this.canLibrary() && !this.auth.isPlatformAdmin()) {
+      this.schedulesApi.upcoming(14).subscribe({ next: u => this.upcoming.set(u), error: () => this.upcoming.set(null) });
+    }
     if (this.canLibrary()) {
       this.lib.summary(this.scope()).subscribe({
         next: s => { this.summary.set(s); this.loadThumbs(s.recent); },
@@ -171,6 +181,22 @@ export class ReportOverview implements OnInit {
     const oldest = [...w.reports].map(r => r.askedAt).filter(Boolean).sort()[0];
     return { count: w.count, mine: w.mine, oldest: oldest ? `oldest asked ${daysAgo(oldest)}` : 'none waiting' };
   });
+
+  /** The Next delivery tile: the soonest run of an On schedule, its time in the workspace's zone, and what it sends. */
+  readonly nextDelivery = computed(() => {
+    const u = this.upcoming();
+    const n = u?.upcoming.find(x => x.at);
+    if (!u || !n) return null;
+    return { when: `${rsTime(n.at, 'day', u.zone)}, ${rsTime(n.at, 'time', u.zone)}`, what: `${n.name} · ${n.then}`, scheduleId: n.scheduleId };
+  });
+
+  /** The card's rows: a day's short name and date, then the schedule. */
+  dayOf(at: string | undefined, zone: string): { day: string; date: string } {
+    if (!at) return { day: '—', date: '' };
+    const d = rsTime(at, 'date', zone) ?? '';
+    const weekday = new Intl.DateTimeFormat('en-GB', { weekday: 'short', timeZone: zone }).format(new Date(at));
+    return { day: weekday, date: d.split(' ')[0] };
+  }
 
   // ------------------------------------------------------------------ Needs you
 

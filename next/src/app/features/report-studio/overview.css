@@ -51,3 +51,9 @@
 .ov-bar { height: 0.375rem; border-radius: var(--radius-full); background: var(--surface-sunken); overflow: hidden; }
 .ov-bar i { display: block; height: 100%; background: var(--chart-2); border-radius: var(--radius-full); }
 .ov-ni-asked { background: var(--surface-sunken); color: var(--text-muted); }
+.ov-sched { list-style: none; margin: 0; padding: 0 1rem 0.75rem; }
+.ov-sched li { display: grid; grid-template-columns: 3rem minmax(0, 1fr) auto; gap: 0.75rem; align-items: center; padding: 0.5rem 0;
+  border-top: 1px solid var(--border-subtle); font-size: 0.875rem; }
+.ov-day { display: flex; flex-direction: column; align-items: center; line-height: 1.1; font-size: 0.75rem; color: var(--text-muted); }
+.ov-day b { font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.ov-day span { font-size: 1.0625rem; font-weight: 600; color: var(--text-primary); }

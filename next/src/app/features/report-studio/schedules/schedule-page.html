@@ -1,0 +1,324 @@
+<div class="page">
+  <app-page-header>
+    <div class="page-head">
+      <div class="min-w-0">
+        <h1 class="page-title flex items-center gap-2 flex-wrap">
+          <span class="truncate">{{ body().name || (isNew() ? 'New schedule' : 'Schedule') }}</span>
+          @if (isNew()) { <span class="pill pill-info">New schedule</span> }
+          @else if (detail(); as d) { <span class="pill" [class]="'pill pill-' + tone(d.state)" data-test="sched-state">{{ stateWords[d.state] }}</span> }
+        </h1>
+        <p class="page-subtitle">Make many reports at once, on a schedule, and send each one where it needs to go once it is approved.</p>
+      </div>
+      <div class="flex items-center gap-2 flex-wrap">
+        @if (isNew()) {
+          <button type="button" class="btn btn-default btn-sm" (click)="cancel()">Cancel</button>
+        } @else if (detail(); as d) {
+          @if (canEdit()) {
+            <button type="button" class="btn btn-default btn-sm" [disabled]="busy()" (click)="pauseOrResume()" data-test="sched-pause">
+              <app-icon [name]="d.status === 'PAUSED' ? 'play' : 'pause'" />{{ d.status === 'PAUSED' ? 'Turn on' : 'Pause' }}</button>
+            <button type="button" class="btn btn-default btn-sm" [disabled]="busy()" (click)="runNow()" data-test="sched-run-now"><app-icon name="zap" />Run now</button>
+            <button type="button" class="btn btn-default btn-sm" (click)="archive()" data-test="sched-archive"><app-icon name="trash" />Archive</button>
+          }
+        }
+        @if (canEdit() || isNew()) {
+          <button type="button" class="btn btn-default btn-sm" [disabled]="testing()" (click)="test()" data-test="sched-test"><app-icon name="play" />Make the first 3 now (test)</button>
+          <button type="button" class="btn btn-primary btn-sm" [disabled]="saving()" (click)="save()" data-test="sched-save"><app-icon name="check" />{{ isNew() ? 'Save and turn on' : 'Save' }}</button>
+        }
+      </div>
+    </div>
+  </app-page-header>
+
+  @if (error()) {
+    <app-load-error [message]="error()" (retry)="load()" />
+  } @else if (loading()) {
+    <app-loading shape="cards" label="Loading the schedule…" [count]="3" />
+  } @else {
+    @if (saveError()) { <p class="sp-alert" role="alert" data-test="sched-save-error"><app-icon name="alert" />{{ saveError() }}</p> }
+    @if (choicesError()) { <p class="text-xs text-[color:var(--text-muted)] mb-2">{{ choicesError() }}</p> }
+    <div class="sp-grid">
+      <div class="card sp-steps"><fieldset class="form-lock" [disabled]="!canEdit() && !isNew()">
+        <section class="sp-step" aria-labelledby="sp-name">
+          <span class="sp-num" aria-hidden="true"><app-icon name="edit" /></span>
+          <div class="sp-body">
+            <h2 class="section-title" id="sp-name">Name</h2>
+            <input id="sp-name-input" class="input" maxlength="120" placeholder="Weekly wound summary" [ngModel]="body().name"
+                   (ngModelChange)="set('name', $event)" aria-labelledby="sp-name" data-test="sched-name" />
+          </div>
+        </section>
+
+        <section class="sp-step" aria-labelledby="sp-1">
+          <span class="sp-num">1</span>
+          <div class="sp-body">
+            <h2 class="section-title" id="sp-1">Template</h2>
+            <div class="sp-row3">
+              <div><label class="label" for="sp-template">Template</label>
+                <app-advanced-select id="sp-template" [options]="templateOptions()" [value]="body().template.templateId" (valueChange)="setTemplate($event)"
+                                     placeholder="Pick a published template" searchPlaceholder="Search templates" emptyText="No published template yet." /></div>
+              <div><label class="label" for="sp-version">When the template changes</label>
+                <app-advanced-select id="sp-version" [options]="versionOptions()" [value]="'' + body().template.version" (valueChange)="setVersion($event)" /></div>
+              <div><label class="label" for="sp-watermark">Watermark until approved</label>
+                <app-advanced-select id="sp-watermark" [options]="watermarkOptions" [value]="body().template.watermark"
+                                     (valueChange)="set('watermark', $event)" /></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="sp-step" aria-labelledby="sp-2">
+          <span class="sp-num">2</span>
+          <div class="sp-body">
+            <h2 class="section-title" id="sp-2">Data</h2>
+            <div class="sp-row3">
+              <div><label class="label" for="sp-source">Read from</label>
+                <app-advanced-select id="sp-source" [options]="sourceOptions()" [value]="sourceValue()" (valueChange)="setSource($event)"
+                                     placeholder="A pipeline or a saved data source" searchPlaceholder="Search pipelines and sources" /></div>
+              <div><label class="label" for="sp-rows">Rows</label>
+                <div class="flex gap-2">
+                  <app-advanced-select class="flex-1 min-w-0" id="sp-rows" [options]="dateOptions()" [value]="body().data.rows.dateField ?? ''"
+                                       (valueChange)="set('dateField', $event)"
+                                       emptyText="The fields show once the data is read." />
+                  @if (body().data.rows.dateField) {
+                    <label class="sp-days"><span class="sr-only">Last days</span>
+                      <input class="input" type="number" min="1" max="366" [ngModel]="body().data.rows.lastDays" (ngModelChange)="set('lastDays', $event)"
+                             aria-label="Rows of the last days" data-test="sched-last-days" /><span class="text-xs">days</span></label>
+                  }
+                </div></div>
+              @if (body().data.kind === 'PIPELINE') {
+                <div><label class="label" for="sp-failed">If the run failed</label>
+                  <app-advanced-select id="sp-failed" [options]="failedOptions" [value]="body().data.ifFailed ?? 'SKIP'" (valueChange)="set('ifFailed', $event)" /></div>
+              }
+            </div>
+            @if (plan()?.data; as d) {
+              <p class="sp-note" data-test="sched-data-note">{{ d.label }}@if (d.runEndedAt) { · ended {{ d.runEndedAt | rsTime: 'recent': zone() }} } ·
+                {{ d.rowsRead }} row{{ d.rowsRead === 1 ? '' : 's' }} read, {{ d.rowsKept }} for a run now@if (d.undated) { ({{ d.undated }} without a date left out) } ·
+                @if (d.missingFields.length) { <span class="sp-crit">{{ d.missingFields.length }} field{{ d.missingFields.length === 1 ? '' : 's' }} the template needs are missing</span> }
+                @else { all {{ d.fieldsNeeded }} field{{ d.fieldsNeeded === 1 ? '' : 's' }} the template needs are present }
+                @if (d.note) { <br />{{ d.note }} }</p>
+            } @else if (planning()) { <p class="sp-note">Reading the data…</p> }
+            @else if (planError()) { <p class="sp-note sp-crit" role="alert">{{ planError() }}</p> }
+          </div>
+        </section>
+
+        <section class="sp-step" aria-labelledby="sp-3">
+          <span class="sp-num">3</span>
+          <div class="sp-body">
+            <h2 class="section-title" id="sp-3">How many reports @if (plan()?.reportsPlanned != null) { <span class="rs-count">{{ plan()!.reportsPlanned }}</span> }</h2>
+            <div class="sp-cards" role="radiogroup" aria-label="How many reports">
+              <label class="sp-choice" [class.is-on]="body().split.mode === 'ALL'">
+                <input type="radio" name="sp-mode" class="checkbox" [checked]="body().split.mode === 'ALL'" (change)="set('mode', 'ALL')" />
+                <span><b>One report of all rows</b><small>a digest of every row</small></span></label>
+              <label class="sp-choice" [class.is-on]="body().split.mode === 'PER_GROUP'">
+                <input type="radio" name="sp-mode" class="checkbox" [checked]="body().split.mode === 'PER_GROUP'" (change)="set('mode', 'PER_GROUP')" data-test="sched-per-group" />
+                <span><b>One report per value of a field</b><small>e.g. one per patient · at most {{ plan()?.maxReports ?? 1000 }} a run</small></span></label>
+            </div>
+            <div class="sp-row2">
+              @if (body().split.mode === 'PER_GROUP') {
+                <div><label class="label" for="sp-group">Grouped by</label>
+                  <app-advanced-select id="sp-group" [options]="columnOptions()" [value]="body().split.groupBy ?? ''" (valueChange)="set('groupBy', $event)"
+                                       placeholder="A field of the data" emptyText="The fields show once the data is read." /></div>
+              }
+              <div class="sp-wide"><label class="label" for="sp-pattern">Name each report</label>
+                <input id="sp-pattern" class="input font-mono" maxlength="200" [ngModel]="body().split.name" (ngModelChange)="set('pattern', $event)"
+                       placeholder="Wound summary · {patient_id} · week {week}" data-test="sched-pattern" />
+                @if (plan()?.exampleName; as ex) { <p class="sp-note" data-test="sched-example">→ {{ ex }}</p> }
+                @for (u of unknownNames(); track u) { <p class="sp-note sp-warn">{{ '{' + u + '}' }} is not a field of the data.</p> }
+                <p class="sp-hint">Fields of the data in braces, and {{ '{year}' }}, {{ '{month}' }}, {{ '{week}' }}, {{ '{date}' }}, {{ '{n}' }}.</p></div>
+            </div>
+            @if (tests().length || testing()) {
+              <p class="sp-note"><app-icon name="eye" /> First {{ tests().length }} of {{ plan()?.reportsPlanned ?? '…' }}, made from the data now (nothing is kept or sent):</p>
+              <div class="sp-tests" data-test="sched-tests">
+                @for (t of tests(); track t.position) {
+                  <figure class="sp-test">
+                    @if (t.url) { <app-sched-test-thumb [src]="t.url" [name]="t.name" /> }
+                    @else { <div class="sp-test-none" role="alert">{{ t.error }}</div> }
+                    <figcaption class="truncate" [title]="t.name">{{ t.name }}</figcaption>
+                    @if (t.url) { <span class="text-xs text-[color:var(--text-muted)]">{{ t.pages }} page{{ t.pages === 1 ? '' : 's' }}@if (t.errors) { · <span class="sp-crit">{{ t.errors }} problem{{ t.errors === 1 ? '' : 's' }}</span> }@if (t.warnings) { · {{ t.warnings }} warning{{ t.warnings === 1 ? '' : 's' }} }</span> }
+                  </figure>
+                }
+                @if (testing()) { <app-loading shape="spinner" label="Making the test reports…" /> }
+              </div>
+            }
+          </div>
+        </section>
+
+        <section class="sp-step" aria-labelledby="sp-4">
+          <span class="sp-num">4</span>
+          <div class="sp-body">
+            <h2 class="section-title" id="sp-4">Approval</h2>
+            <div class="sp-row3">
+              <div><label class="label" for="sp-who">Who approves</label>
+                <app-advanced-select id="sp-who" [options]="whoOptions()" [value]="whoValue()" (valueChange)="setWho($event)" searchPlaceholder="Search teams" /></div>
+              <div><label class="label" for="sp-needed">Approvals needed</label>
+                <app-advanced-select id="sp-needed" [options]="neededOptions()" [value]="neededValue()" (valueChange)="setNeeded($event)" /></div>
+              <div><label class="label" for="sp-remind">Not approved in</label>
+                <app-advanced-select id="sp-remind" [options]="remindOptions" [value]="'' + body().approval.remindAfterDays" (valueChange)="set('remind', $event)" /></div>
+            </div>
+            <p class="sp-hint">Nobody approves a report they made: a run is made in the name of whoever set up the schedule (or asked for the run).</p>
+          </div>
+        </section>
+
+        <section class="sp-step" aria-labelledby="sp-5">
+          <span class="sp-num">5</span>
+          <div class="sp-body">
+            <h2 class="section-title" id="sp-5">Deliver once approved</h2>
+            <div class="sp-cards">
+              <label class="sp-choice is-on"><input type="checkbox" class="checkbox" checked disabled />
+                <span><b>Report library</b><small>always; versions, approvals and the verify QR</small></span></label>
+              <div class="sp-choice" [class.is-on]="!!body().delivery.email">
+                <input type="checkbox" class="checkbox" id="sp-email" [checked]="!!body().delivery.email" (change)="toggleEmail($any($event.target).checked)" data-test="sched-email" />
+                <span class="min-w-0 flex-1"><label for="sp-email"><b>Email a sign-in link</b></label>
+                  @if (body().delivery.email) {
+                    <span class="sp-chips">@for (p of chosenPeople(); track p.userId) {
+                      <span class="sp-chip">{{ p.name }}@if (p.email) { · {{ p.email }} }
+                        <button type="button" class="sp-x" (click)="removePerson(p.userId)" [attr.aria-label]="'Remove ' + p.name"><app-icon name="close" /></button></span> }</span>
+                    <app-advanced-select [options]="peopleOptions()" value="" [resetOnPick]="true" (valueChange)="addPerson($event)" ariaLabel="Add a person"
+                                         placeholder="Add a person of this workspace" searchPlaceholder="Search people" [compact]="true"
+                                         emptyText="Everyone who can be emailed is on the list." />
+                  }
+                  <small>The email has no patient data, only the link; they sign in to read it. People of this workspace only.</small></span>
+              </div>
+              <div class="sp-choice" [class.is-on]="!!body().delivery.bucket">
+                <input type="checkbox" class="checkbox" id="sp-bucket" [checked]="!!body().delivery.bucket" (change)="toggleBucket($any($event.target).checked)" data-test="sched-bucket" />
+                <span class="min-w-0 flex-1"><label for="sp-bucket"><b>Put the PDF in a bucket folder</b></label>
+                  @if (body().delivery.bucket; as bk) {
+                    <span class="sp-row2 mt-1">
+                      <app-advanced-select [options]="bucketOptions()" [value]="bk.connection" (valueChange)="set('bucketConnection', $event)" ariaLabel="Bucket"
+                                           [compact]="true" emptyText="No bucket connection you can reach." />
+                      <input class="input input-sm font-mono" [ngModel]="bk.path" (ngModelChange)="set('bucketPath', $event)" aria-label="Folder"
+                             placeholder="reports/{year}/{week}/" data-test="sched-path" /></span>
+                    @if (plan()?.bucketExample; as ex) { <small class="font-mono">→ {{ ex }}</small> }
+                    <button type="button" class="btn btn-default btn-sm mt-1" (click)="runPlan(true)" data-test="sched-check-folder"><app-icon name="check" />Check the folder is writable</button>
+                  }
+                  <small>The approved, signed PDF, named by its number. A folder is named by the date only, never by a value of the data.</small></span>
+              </div>
+              <label class="sp-choice" [class.is-on]="body().delivery.webhook">
+                <input type="checkbox" class="checkbox" [checked]="body().delivery.webhook" (change)="set('webhook', $any($event.target).checked)" data-test="sched-webhook" />
+                <span><b>Call a webhook</b><small>event <code>report.approved</code> with the report's number and a sign-in link, to the workspace's webhooks (Developers › Webhooks)</small></span></label>
+              <div class="sp-choice is-off" aria-disabled="true">
+                <input type="checkbox" class="checkbox" disabled aria-label="Send to the EHR (later)" />
+                <span><b>Send to the EHR</b> <span class="pill pill-neutral">Later</span><small>as a FHIR DocumentReference through a connection</small></span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="sp-step" aria-labelledby="sp-6">
+          <span class="sp-num">6</span>
+          <div class="sp-body">
+            <h2 class="section-title" id="sp-6">When</h2>
+            <div class="sp-row3">
+              <div><label class="label" for="sp-repeat">Repeat</label>
+                <app-advanced-select id="sp-repeat" [options]="repeatOptions" [value]="body().timing.repeat" (valueChange)="setRepeat($event)" /></div>
+              <div>
+                @switch (body().timing.repeat) {
+                  @case ('WEEKLY') {
+                    <span class="label" id="sp-on">On</span>
+                    <div class="seg sp-week" role="group" aria-labelledby="sp-on">
+                      @for (d of days; track d) {
+                        <button type="button" class="seg-btn" [class.seg-on]="(body().timing.days ?? []).includes(d)" [attr.aria-pressed]="(body().timing.days ?? []).includes(d)"
+                                (click)="toggleDay(d)">{{ dayWords[d] }}</button>
+                      }
+                    </div>
+                  }
+                  @case ('MONTHLY') {
+                    <label class="label" for="sp-dom">On</label>
+                    <app-advanced-select id="sp-dom" [options]="domOptions" [value]="'' + (body().timing.dayOfMonth ?? 1)" (valueChange)="set('dayOfMonth', $event)" />
+                  }
+                  @case ('ONCE') {
+                    <label class="label" for="sp-date">On</label>
+                    <input id="sp-date" class="input" type="date" [ngModel]="body().timing.date" (ngModelChange)="set('date', $event)" />
+                  }
+                }
+              </div>
+              <div><label class="label" for="sp-at">At</label>
+                <app-advanced-select id="sp-at" [options]="timeOptions" [value]="body().timing.at" (valueChange)="set('at', $event)" />
+                <p class="sp-hint">{{ zone() }} (workspace), 24-hour</p></div>
+            </div>
+            @if (body().data.kind === 'PIPELINE') {
+              <label class="flex items-center gap-2 text-sm mt-2">
+                <input type="checkbox" class="checkbox" [checked]="(body().data.waitMinutes ?? 0) > 0" (change)="set('wait', $any($event.target).checked)" data-test="sched-wait" />
+                Wait for the “{{ body().data.pipelineName || 'pipeline' }}” pipeline if it is still running (up to 2 hours)</label>
+              <label class="flex items-center gap-2 text-sm mt-1">
+                <input type="checkbox" class="checkbox" [checked]="body().data.skipUnchanged !== false" (change)="set('skipUnchanged', $any($event.target).checked)" />
+                Skip a run when the pipeline has not run again since the last one</label>
+            }
+          </div>
+        </section>
+      </fieldset></div>
+
+      <aside class="flex flex-col gap-4 min-w-0" aria-label="Summary and checks">
+        <section class="card" aria-labelledby="sp-summary">
+          <div class="rs-head"><h2 class="section-title" id="sp-summary">Summary</h2>@if (planning()) { <span class="text-xs text-[color:var(--text-muted)]">updating…</span> }</div>
+          <dl class="sp-dl">
+            <dt>Every</dt><dd>{{ summary().every || '—' }}@if (summary().next) { <br /><span class="text-[color:var(--text-muted)]">{{ summary().next }}</span> }</dd>
+            <dt>Makes</dt><dd>{{ summary().makes || '—' }}</dd>
+            <dt>Approval</dt><dd>{{ summary().approval || '—' }}</dd>
+            <dt>Then</dt><dd>{{ summary().then || '—' }}</dd>
+            <dt>Cost</dt><dd>{{ summary().cost || '—' }}</dd>
+          </dl>
+        </section>
+        <section class="card" aria-labelledby="sp-checks" data-test="sched-checks">
+          <div class="rs-head"><h2 class="section-title" id="sp-checks">Checks before it runs</h2></div>
+          <ul class="sp-checks">
+            @for (t of todo(); track t) { <li class="is-todo"><app-icon name="info" />{{ t }}</li> }
+            @for (c of checks(); track c.text) {
+              <li [class.is-ok]="c.level === 'OK'" [class.is-warn]="c.level === 'WARNING'" [class.is-crit]="c.level === 'ERROR'">
+                <app-icon [name]="c.level === 'OK' ? 'checkCircle' : c.level === 'ERROR' ? 'xCircle' : 'alert'" />{{ c.text }}</li>
+            } @empty { @if (!todo().length) { <li class="is-todo"><app-icon name="info" />The checks run when the template and data are chosen.</li> } }
+          </ul>
+        </section>
+      </aside>
+    </div>
+
+    @if (detail(); as d) {
+      <section class="card mt-4" aria-labelledby="sp-runs" data-test="sched-runs">
+        <div class="rs-head"><h2 class="section-title" id="sp-runs">Runs <span class="rs-count">{{ d.runsTotal }}</span></h2>
+          <span class="text-xs text-[color:var(--text-muted)]">times in {{ city() }}</span></div>
+        @if (d.runs.length) {
+          <div class="overflow-x-auto"><table class="table" aria-label="Runs of this schedule">
+            <thead><tr><th>Due</th><th>Run</th><th>State</th><th class="text-right">Reports</th><th>What happened</th></tr></thead>
+            <tbody>
+              @for (r of d.runs; track r.runId) {
+                <tr class="sp-run" (click)="toggleRun(r.runId)" [attr.aria-expanded]="openRun() === r.runId">
+                  <td class="whitespace-nowrap">{{ r.dueAt | rsTime: 'recent': zone() }}</td>
+                  <td>{{ r.kind === 'MANUAL' ? 'Run now' : 'Scheduled' }}</td>
+                  <td><span class="pill" [class]="'pill pill-' + runTone(r.status)">{{ runWords[r.status] }}</span></td>
+                  <td class="text-right tabular">{{ r.reportsMade }}@if (r.reportsPlanned) { / {{ r.reportsPlanned }} }@if (r.reportsFailed) { · <span class="sp-crit">{{ r.reportsFailed }} failed</span> }</td>
+                  <td class="text-sm">{{ r.message }}</td>
+                </tr>
+                @if (openRun() === r.runId) {
+                  <tr><td colspan="5" class="sp-run-items">
+                    @if (runDetail(); as rd) {
+                      <ul>@for (it of rd.reports; track it.position) {
+                        <li><span class="tabular text-[color:var(--text-muted)]">{{ it.position }}</span>
+                          @if (it.reportId) { <a class="link-inline" [routerLink]="['/reports/library', it.reportId]">{{ it.reportLabel }}</a> }
+                          <span class="truncate">{{ it.name }}</span><span class="text-xs text-[color:var(--text-muted)]">{{ it.rows }} row{{ it.rows === 1 ? '' : 's' }}</span>
+                          @if (it.error) { <span class="sp-crit text-xs">{{ it.error }}</span> }
+                          @else if (it.version) { <span class="pill" [class]="it.approved ? 'pill pill-ok' : 'pill pill-warn'">{{ it.approved ? 'Approved' : 'Waiting for approval' }}</span> }
+                          @else { <span class="pill pill-neutral">{{ it.status === 'PENDING' ? 'To make' : 'Making' }}</span> }</li>
+                      } @empty { <li class="text-[color:var(--text-muted)]">No reports in this run.</li> }</ul>
+                    } @else { <app-loading shape="rows" label="Loading the run's reports…" [count]="2" /> }
+                  </td></tr>
+                }
+              }
+            </tbody></table></div>
+        } @else { <p class="p-4 pt-0 text-sm text-[color:var(--text-muted)]">Not run yet. @if (d.nextRunAt) { It runs first {{ d.nextRunAt | rsTime: 'recent': zone() }}. }</p> }
+      </section>
+
+      <section class="card mt-4" aria-labelledby="sp-deliveries" data-test="sched-deliveries">
+        <div class="rs-head"><h2 class="section-title" id="sp-deliveries">Deliveries</h2>
+          <span class="text-xs text-[color:var(--text-muted)]">where approved reports went</span></div>
+        @if (d.deliveries.length) {
+          <div class="overflow-x-auto"><table class="table" aria-label="Deliveries of this schedule's reports">
+            <thead><tr><th>Report</th><th>To</th><th>State</th><th>When</th></tr></thead>
+            <tbody>@for (x of d.deliveries; track x.deliveryId) {
+              <tr><td class="whitespace-nowrap"><a class="link-inline" [routerLink]="['/reports/library', x.reportId]">{{ x.reportLabel }}</a> v{{ x.version }}</td>
+                <td>{{ channelWords[x.channel] }} · <span class="text-[color:var(--text-muted)]">{{ x.target }}</span></td>
+                <td><span class="pill" [class]="x.status === 'SENT' ? 'pill pill-ok' : x.status === 'FAILED' ? 'pill pill-crit' : 'pill pill-neutral'">{{ x.status === 'SENT' ? 'Sent' : x.status === 'FAILED' ? 'Failed' : 'Sending' }}</span>
+                  @if (x.error) { <div class="text-xs sp-crit">{{ x.error }}</div> }</td>
+                <td class="whitespace-nowrap">{{ (x.sentAt ?? x.createdAt) | rsTime: 'recent': zone() }}</td></tr>
+            }</tbody></table></div>
+        } @else { <p class="p-4 pt-0 text-sm text-[color:var(--text-muted)]">Nothing delivered yet: reports go out once they are approved.</p> }
+      </section>
+    }
+  }
+</div>

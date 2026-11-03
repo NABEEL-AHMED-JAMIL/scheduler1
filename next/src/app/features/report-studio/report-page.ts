@@ -36,6 +36,7 @@ import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { askReason } from '../../shared/ui/reason';
 import { ReportViewer } from './report-viewer';
 import { Meaning, ReportLibraryApi, TemplateFeatures } from './report-library.api';
+import { ReportDeliveries, SchedulesApi } from './schedules/schedules.api';
 import { Stage, reportStages } from './report-stages';
 import { encodeQr } from './designer/qr-encoder';
 import { qrPath } from './designer/qr-inspector';
@@ -69,6 +70,9 @@ export class ReportPage implements OnInit {
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
   private readonly library = inject(ReportLibraryApi);
+  private readonly schedulesApi = inject(SchedulesApi);
+  /** Features 3 and 4: where a schedule's report went, by version (the Delivered step). */
+  readonly deliveries = signal<ReportDeliveries | null>(null);
 
   readonly r = signal<ReportDetail | null>(null);
   readonly loading = signal(true);
@@ -202,6 +206,7 @@ export class ReportPage implements OnInit {
         this.loading.set(false);
         if (this.shown() != null && !r.versions.some(v => v.version === this.shown())) this.shown.set(null);
         if (this.canGenerate()) this.loadVersions(r.templateId);
+        this.schedulesApi.deliveries(r.reportId).subscribe({ next: d => this.deliveries.set(d), error: () => this.deliveries.set(null) });
         const asked = Number(this.version());
         const v = this.verify() === '1' && !this.verifyOpened ? r.versions.find(x => x.version === asked) : undefined;
         if (v) {
@@ -362,7 +367,7 @@ export class ReportPage implements OnInit {
   /** The life-cycle strip: Generated, Checked, the approvals, Delivered. */
   readonly stages = computed<Stage[]>(() => {
     const v = this.current();
-    return v ? reportStages(v, this.took.bind(this)) : [];
+    return v ? reportStages(v, this.took.bind(this), Date.now(), this.deliveries()) : [];
   });
 
   /** May this person void a version (the people who generate reports). */
