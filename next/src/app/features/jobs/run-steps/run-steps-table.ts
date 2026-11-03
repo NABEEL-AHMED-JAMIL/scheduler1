@@ -10,7 +10,7 @@ import { Avatar } from '../../../shared/ui/avatar';
 import { sidePanelConfig } from '../../../shared/ui/side-panel';
 import { RetryDialog, RetryDialogData } from '../retry/retry-dialog';
 import { RetryFrom, attemptSentence, backfillLink, backfillRetryNote, stepLabel } from '../retry/run-retry';
-import { StepApproval, approvalOutcome, failedStep } from './run-steps.model';
+import { StepApproval, approvalOutcome, failedStep, StepExecution } from './run-steps.model';
 import { OutputChip, StepRow, stepRows } from './run-page.model';
 import { RunApprovalStore } from './run-approval.store';
 import { RunTimelineStore } from './run-timeline.store';
@@ -159,6 +159,11 @@ import { BlurLoader } from '../../../shared/ui/blur-loader';
                         <app-icon [name]="r.tone === 'crit' ? 'xCircle' : 'alert'" size="0.9em" class="mt-0.5 shrink-0" />{{ r.problem }}
                       </div>
                     }
+                    <!-- MIG-450: a Route's split -- how many rows went down each branch. -->
+                    @if (branchSplit(r.step); as split) {
+                      <div class="rs-problem flex items-center gap-1 text-[color:var(--text-secondary)]" data-test="step-branches">
+                        <app-icon name="branch" size="0.9em" class="shrink-0" />{{ split }}</div>
+                    }
                     @if (r.step.approval; as a) {
                       <div class="rs-problem flex items-center gap-1.5 text-[color:var(--text-secondary)]" data-test="step-approval">
                         @if (!a.waiting && a.decidedByUserId) { <app-avatar [appUserId]="a.decidedByUserId" [name]="a.decidedBy" [size]="1.1" [decorative]="true" /> }
@@ -305,6 +310,8 @@ export class RunStepsTable {
 
   outcome(approval: StepApproval): string { return approvalOutcome(approval, this.approvals?.teamNames()); }
 
+  readonly branchSplit = branchSplit;
+
   chooseAttempt(value: string): void {
     const attempt = Number(value);
     if (!Number.isInteger(attempt) || attempt === this.store.timeline()?.attempt) return;
@@ -332,4 +339,10 @@ export class RunStepsTable {
   }
 
   chipTitle(o: OutputChip): string { return o.detail ? `${o.name} · ${o.detail}` : o.name; }
+}
+
+/** MIG-450: "urgent 12 · routine 88" for a Route, from the branch datasets Core kept on it; null for any other step. */
+export function branchSplit(step: StepExecution): string | null {
+  const branches = (step.datasets ?? []).filter(d => d.name.startsWith('branch '));
+  return branches.length ? branches.map(d => `${d.name.slice('branch '.length)} ${(d.rowCount ?? 0).toLocaleString('en-GB')}`).join(' · ') : null;
 }
