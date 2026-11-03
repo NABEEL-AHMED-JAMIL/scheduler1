@@ -840,6 +840,25 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
+      "path": "/reports/library/:reportId/compare",
+      "title": "Compare versions",
+      "pageKey": "report-library",
+      "guards": [
+        "ownSignInOnly",
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/reports/library/:reportId/compare",
+      "title": "Compare versions",
+      "pageKey": "report-library",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
       "path": "/reports/schedules",
       "title": "Report schedules",
       "pageKey": "report-generate",

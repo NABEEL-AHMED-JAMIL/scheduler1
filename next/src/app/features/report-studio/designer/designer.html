@@ -415,6 +415,51 @@
             <label class="rsd-check"><input type="checkbox" class="checkbox" [checked]="pdfBookmarks()" [disabled]="!editable()"
                    (change)="setPdfBookmarks($any($event.target).checked)" /><span>Bookmarks in the PDF from the headings</span></label>
           </section>
+          <section class="rsd-props-group" aria-label="Archive and accessibility" data-test="pdf-conformance">
+            <h3 class="rsd-eyebrow">Archive and accessibility</h3>
+            <label class="field"><span class="label">Archive format</span>
+              <select class="input" [ngModel]="conformance().archive" (ngModelChange)="setConformance('archive', $event)" [disabled]="!editable()" aria-label="Archive format">
+                <option value="">As the brand profile says</option>
+                <option value="none">A plain PDF</option>
+                <option value="PDF/A-2b">PDF/A-2b, for records kept for years</option>
+              </select></label>
+            <label class="field"><span class="label">Accessible</span>
+              <select class="input" [ngModel]="conformance().tagged === undefined ? '' : conformance().tagged ? 'yes' : 'no'"
+                      (ngModelChange)="setConformance('tagged', $event === '' ? undefined : $event === 'yes')" [disabled]="!editable()" aria-label="Tagged PDF">
+                <option value="">As the brand profile says</option>
+                <option value="yes">Tagged PDF, read by screen readers</option>
+                <option value="no">Not tagged</option>
+              </select></label>
+            <p class="text-xs text-[color:var(--text-muted)]">PDF/A embeds every font and keeps the approval's signature valid. A tagged PDF carries headings, tables and the charts' descriptions for screen readers.</p>
+          </section>
+          <section class="rsd-props-group" aria-label="Personal data" data-test="personal-data">
+            <h3 class="rsd-eyebrow">Personal data@if (personalCount()) { <span class="text-[color:var(--text-muted)]"> · {{ personalCount() }}</span> }</h3>
+            <p class="text-xs text-[color:var(--text-muted)]">Tick the fields that identify a person (name, record number, date of birth). Compare versions hides them from readers without See personal data, and a copy without names replaces them.</p>
+            @for (row of shownPersonalRows(); track row.path) {
+              <div class="flex flex-col gap-1 min-w-0">
+                <label class="rsd-check"><input type="checkbox" class="checkbox" [checked]="row.personal" [disabled]="!editable()"
+                       (change)="setPersonal(row, $any($event.target).checked)" [attr.aria-label]="'Personal: ' + row.path" />
+                  <span class="mono text-xs truncate" [title]="row.label === row.path ? row.path : row.label + ' (' + row.path + ')'">{{ row.label === row.path ? row.path : row.label }}</span></label>
+                @if (row.personal) {
+                  <select class="input input-sm" [ngModel]="row.rule" (ngModelChange)="setPersonal(row, true, $event)" [disabled]="!editable()" [attr.aria-label]="'In a copy without names: ' + row.path">
+                    <option value="">{{ row.type === 'date' || row.type === 'datetime' ? 'The year only (default)' : 'A pseudonym (default)' }}</option>
+                    @for (r of rules; track r) { <option [value]="r">{{ ruleWords[r] }}</option> }
+                  </select>
+                }
+              </div>
+            } @empty { <p class="text-xs text-[color:var(--text-muted)]">No fields yet: bind blocks to the data first.</p> }
+            @if (personalRows().length > 8) {
+              <button type="button" class="link-inline text-xs self-start" (click)="showAllFields.set(!showAllFields())">{{ showAllFields() ? 'Show fewer' : 'Show all ' + personalRows().length + ' fields' }}</button>
+            }
+            <label class="field"><span class="label">Other dates in a copy without names</span>
+              <select class="input" [ngModel]="deidentify().dates" (ngModelChange)="setDeidentify('dates', $event)" [disabled]="!editable()" aria-label="Dates in a copy without names">
+                <option value="shift">Shifted by the same days (intervals stay true)</option>
+                <option value="year">The year only</option>
+                <option value="keep">Kept as they are</option>
+              </select></label>
+            <label class="rsd-check"><input type="checkbox" class="checkbox" [checked]="deidentify().freeText" [disabled]="!editable()"
+                   (change)="setDeidentify('freeText', $any($event.target).checked)" /><span>Also replace names and dates written in notes and summaries</span></label>
+          </section>
           <section class="rsd-props-group" aria-label="Data">
             <h3 class="rsd-eyebrow">Data</h3>
             <p class="text-xs text-[color:var(--text-muted)]">Blocks read <span class="mono">{{ names()[0] }}</span>, which starts at <span class="mono">{{ testRoot() }}</span> in the data.</p>

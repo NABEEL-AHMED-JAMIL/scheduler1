@@ -35,7 +35,7 @@ import { idOf, idValue } from '../../shared/ui/advanced-options';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { askReason } from '../../shared/ui/reason';
 import { ReportViewer } from './report-viewer';
-import { Meaning, ReportLibraryApi, TemplateFeatures } from './report-library.api';
+import { DeidentifiedStatus, Meaning, ReportLibraryApi, TemplateFeatures } from './report-library.api';
 import { ReportDeliveries, SchedulesApi } from './schedules/schedules.api';
 import { Stage, reportStages } from './report-stages';
 import { encodeQr } from './designer/qr-encoder';
@@ -207,6 +207,7 @@ export class ReportPage implements OnInit {
         if (this.shown() != null && !r.versions.some(v => v.version === this.shown())) this.shown.set(null);
         if (this.canGenerate()) this.loadVersions(r.templateId);
         this.schedulesApi.deliveries(r.reportId).subscribe({ next: d => this.deliveries.set(d), error: () => this.deliveries.set(null) });
+        this.loadCopyStatus(r);
         const asked = Number(this.version());
         const v = this.verify() === '1' && !this.verifyOpened ? r.versions.find(x => x.version === asked) : undefined;
         if (v) {
@@ -217,6 +218,41 @@ export class ReportPage implements OnInit {
       error: e => { this.error.set(studioError(e, 'The report could not be read.').message); this.loading.set(false); },
     });
   }
+
+  /** Feature 12: whether the current version has a copy without names (its template says which fields are personal). */
+  readonly copyStatus = signal<DeidentifiedStatus | null>(null);
+  readonly copying = signal('');
+
+  private loadCopyStatus(r: ReportDetail): void {
+    this.copyStatus.set(null);
+    if (!r.currentVersion) return;
+    const v = r.versions.find(x => x.version === r.currentVersion);
+    if (!v || v.expired || v.downloadable === false) return;
+    this.library.deidentified(r.reportId, r.currentVersion).subscribe({ next: c => this.copyStatus.set(c), error: () => this.copyStatus.set(null) });
+  }
+
+  /** Feature 12: the version's copy without names as a file (made now when it was not, then kept). */
+  downloadCopy(v: ReportVersionRow, format: 'PDF' | 'HTML'): void {
+    const r = this.r();
+    if (!r) return;
+    this.copying.set(format);
+    this.library.downloadDeidentified(r.reportId, v.version, format).subscribe({
+      next: res => {
+        this.copying.set('');
+        if (res.body) saveBlob(res.body, fileNameOf(res.headers.get('Content-Disposition'), `DEIDENTIFIED-${r.label}-v${v.version}.${format.toLowerCase()}`));
+        if (!this.copyStatus()?.copy) this.loadCopyStatus(r);
+      },
+      error: e => { this.copying.set(''); this.toast.error(studioError(e, 'The copy without names could not be made.').message); },
+    });
+  }
+
+  /** Feature 10: the two versions Versions offers to compare -- the one before the current, and the current. */
+  readonly compareWith = computed<{ a: number; b: number } | null>(() => {
+    const r = this.r();
+    if (!r || r.versions.length < 2 || !r.currentVersion) return null;
+    const older = [...r.versions].map(v => v.version).filter(n => n < r.currentVersion!).sort((x, y) => y - x)[0];
+    return older ? { a: older, b: r.currentVersion } : null;
+  });
 
   /** The Signed column's word for a version, as the cell shows it (for its sort). */
   signedWord(v: ReportVersionRow): string | null {

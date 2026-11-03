@@ -513,6 +513,14 @@ export const routes: Routes = [
         canActivate: [pageGuard],
       },
       {
+        // Reports redesign (feature 10): two versions of a report side by side, and what changed (?a=1&b=2).
+        path: 'reports/library/:reportId/compare',
+        title: 'Compare versions',
+        loadComponent: () => import('./features/report-studio/compare/compare-page').then(m => m.CompareVersions),
+        data: { pageKey: 'report-library', workspaceData: workspace('A report is', 'see, approve and send its reports', 'file') },
+        canActivate: [pageGuard],
+      },
+      {
         // Reports redesign (features 3 and 4): generate many reports on a schedule and deliver them once approved; the
         // schedules are Generate's (report-generate), as making a report is.
         path: 'reports/schedules',

@@ -29,7 +29,9 @@ export interface ScheduleSpec {
   };
   split: { mode: 'ALL' | 'PER_GROUP'; groupBy?: string; name: string };
   approval: { reviewers: Assignee | null; needed: 1 | 2; meaning: string; remindAfterDays: number };
-  delivery: { email: { userIds: number[] } | null; bucket: { connection: string; path: string } | null; webhook: boolean };
+  delivery: { email: { userIds: number[] } | null; bucket: { connection: string; path: string } | null; webhook: boolean;
+    /** Reports redesign (feature 12): "Also a version without names" -- made once approved, kept, and put beside the PDF in the bucket. */
+    deidentifiedCopy?: boolean };
   timing: { repeat: Repeat; days?: Day[]; dayOfMonth?: number; at: string; date?: string };
 }
 

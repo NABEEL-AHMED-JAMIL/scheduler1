@@ -211,6 +211,10 @@
               <button type="button" class="btn btn-primary btn-sm" [disabled]="!!busy()" (click)="approveOpen()" data-panel-approve><app-icon name="sign" />Approve and sign v{{ r.currentVersion }}</button>
             }
             <a class="btn btn-default btn-sm" [routerLink]="['/reports/library', r.reportId]"><app-icon name="eye" />Open the report</a>
+            @if ((r.currentVersion ?? 0) > 1) {
+              <a class="btn btn-default btn-sm" [routerLink]="['/reports/library', r.reportId, 'compare']" [queryParams]="{ a: r.currentVersion! - 1, b: r.currentVersion }"
+                 data-panel-compare><app-icon name="split" />Compare with v{{ r.currentVersion! - 1 }}</a>
+            }
           </div>
         </div>
         <dl class="lx-facts">

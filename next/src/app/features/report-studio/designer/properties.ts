@@ -48,6 +48,7 @@ const LABELS: Record<string, string> = {
   maxRows: 'At most rows', allowPageBreak: 'May split across pages', markdown: 'Simple Markdown (bold, italic, bullets)', ordered: 'Numbered',
   layout: 'Layout', role: 'Part of the page', gap: 'Gap', width: 'Width', height: 'Height', assetRef: 'Image', alt: 'Alt text', align: 'Align',
   fit: 'Fit', missing: 'When the image is missing', thickness: 'Thickness', color: 'Colour', items: 'Items', itemField: 'Field of each item',
+  identifying: 'May identify the person (left out of a copy without names)',
   format: 'Format', style: 'Style', size: 'Size', keepTogether: "Keep together · don't split across pages", pageBreakBefore: 'Start a new page before it',
   pageBreakAfter: 'Start a new page after it', hidden: 'Hidden (not in the report)', sort: 'Sort', size_spacer: 'Space',
   // MIG-406: signatures, stamps, images from the data, the grid.
@@ -594,6 +595,9 @@ export function filterRows(rows: unknown[], f: RowFilter | null): unknown[] {
                       @if (c.type === 'image') {
                         <input class="input mono text-xs" [value]="c.imageSource?.bucket ?? ''" [disabled]="readonly()" placeholder="Bucket of the pictures"
                                [attr.aria-label]="'Column ' + (i + 1) + ' bucket'" (change)="setColumnBucket(i, $any($event.target).value)" />
+                        <label class="rsd-check"><input type="checkbox" class="checkbox" [checked]="$any(c).identifying === true" [disabled]="readonly()"
+                               (change)="setColumnIdentifying(i, $any($event.target).checked)" [attr.aria-label]="'Column ' + (i + 1) + ' may identify the person'" />
+                          <span>May identify the person (left out of a copy without names)</span></label>
                       }
                     </div>
                   }
@@ -1260,6 +1264,14 @@ export class PropertiesPanel {
     const cols = this.columnList() as ({ chip?: string })[];
     if (!cols[i]) return;
     if (TONES.some(t => t.id === tone)) cols[i].chip = tone; else delete cols[i].chip;
+    this.set('columns', cols);
+  }
+
+  /** Feature 12: a picture column that may identify the person is left out of a copy without names. */
+  setColumnIdentifying(i: number, on: boolean): void {
+    const cols = this.columnList() as ({ identifying?: boolean })[];
+    if (!cols[i]) return;
+    if (on) cols[i].identifying = true; else delete cols[i].identifying;
     this.set('columns', cols);
   }
 

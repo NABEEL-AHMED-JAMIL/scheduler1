@@ -34,6 +34,18 @@
                 @for (o of outputsOf(v); track o.format) {
                   <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="download(v, o)"><app-icon [name]="o.format === 'PDF' ? 'file' : 'code'" />{{ o.format }}@if (o.format === 'PDF' && v.approval?.signed) { (signed) } · {{ size(o.format === 'PDF' && v.approval?.signed ? v.approval!.signedBytes : o.bytes) }}</button>
                 } @empty { <span class="menu-item opacity-60">No files to download</span> }
+                @if (copyStatus(); as c) {
+                  <div class="my-1 border-t border-subtle" role="separator"></div>
+                  @if (c.available) {
+                    @for (o of outputsOf(v); track o.format) {
+                      <button cdkMenuItem class="menu-item" [disabled]="!!copying()" (cdkMenuItemTriggered)="downloadCopy(v, o.format)" [attr.data-test]="'copy-' + o.format"
+                              [title]="'Personal details replaced (' + c.personalFields.length + ' field' + (c.personalFields.length === 1 ? '' : 's') + '); DE-IDENTIFIED COPY on every page; not signed'">
+                        <app-icon name="lock" />Copy without names · {{ o.format }}@if (copying() === o.format) { (making it…) }</button>
+                    }
+                  } @else {
+                    <span class="menu-item opacity-60" [title]="c.reason || ''" data-test="copy-unavailable"><app-icon name="lock" />Copy without names: not set up in the template</span>
+                  }
+                }
               </div>
             </ng-template>
           }
@@ -328,7 +340,11 @@
 
         <section class="card" data-test="versions-card">
           <div class="rs-head"><h2 class="section-title">Versions <span class="rs-count">{{ r.versions.length }}</span></h2>
-            <span class="text-xs text-[color:var(--text-muted)]">Nothing is overwritten.</span></div>
+            @if (compareWith(); as cw) {
+              <a class="btn btn-default btn-sm" [routerLink]="['/reports/library', r.reportId, 'compare']" [queryParams]="{ a: cw.a, b: cw.b }" data-test="compare-versions"><app-icon name="split" />Compare v{{ cw.a }} and v{{ cw.b }}</a>
+            } @else {
+              <span class="text-xs text-[color:var(--text-muted)]">Nothing is overwritten.</span>
+            }</div>
           <ul class="rsp-versions">
             @for (v of sortedVersions(); track v.versionId) {
               <li [class.is-shown]="v.version === (shown() ?? r.currentVersion)">

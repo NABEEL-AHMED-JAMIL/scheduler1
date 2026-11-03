@@ -217,6 +217,11 @@ export class BrandProfilePage implements OnInit {
     this.change(d => { d.signOnApproval = on; });
   }
 
+  /** Feature 11: PDF/A-2b for archiving, or a tagged PDF for screen readers, for every report in the profile. */
+  setPdf(key: 'archivePdf' | 'taggedPdf', on: boolean): void {
+    this.change(d => { if (on) d[key] = true; else delete d[key]; });
+  }
+
   setLock(key: 'look' | 'fontsContact' | 'confidentiality', v: Lock): void {
     this.change(d => { d.locks[key] = v; });
   }

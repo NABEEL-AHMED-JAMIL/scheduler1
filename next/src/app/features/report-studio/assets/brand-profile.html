@@ -165,6 +165,18 @@
               <input type="checkbox" role="switch" class="checkbox" [checked]="def().signOnApproval" aria-label="Digitally sign PDFs when approved"
                      (change)="setSign($any($event.target).checked)" />
             </label>
+            <label class="rsb-switch">
+              <span><b>Archive format: PDF/A-2b</b><br>
+                <span class="text-xs text-[color:var(--text-muted)]">For records kept for years: every font embedded; the approval's signature keeps it PDF/A. A template may say otherwise.</span></span>
+              <input type="checkbox" role="switch" class="checkbox" [checked]="def().archivePdf === true" aria-label="Archive format PDF/A-2b"
+                     (change)="setPdf('archivePdf', $any($event.target).checked)" data-test="brand-archive" />
+            </label>
+            <label class="rsb-switch">
+              <span><b>Accessible: tagged PDF</b><br>
+                <span class="text-xs text-[color:var(--text-muted)]">Headings, tables and chart descriptions a screen reader reads, in the report's language. A template may say otherwise.</span></span>
+              <input type="checkbox" role="switch" class="checkbox" [checked]="def().taggedPdf === true" aria-label="Accessible tagged PDF"
+                     (change)="setPdf('taggedPdf', $any($event.target).checked)" data-test="brand-tagged" />
+            </label>
           </fieldset>
         </section>
       </div>

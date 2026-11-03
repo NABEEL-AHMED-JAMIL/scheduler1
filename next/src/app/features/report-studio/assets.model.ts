@@ -126,6 +126,9 @@ export interface BrandDefinition {
   signatures: { assetId: string; version?: number }[];
   stamps: { assetId: string; version?: number }[];
   signOnApproval: boolean;
+  /** Reports redesign (feature 11): every report in the profile is PDF/A-2b and/or tagged, unless its template says otherwise. */
+  archivePdf?: boolean;
+  taggedPdf?: boolean;
   locks: { look: Lock; fontsContact: Lock; confidentiality: Lock };
 }
 

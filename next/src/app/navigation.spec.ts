@@ -285,6 +285,7 @@ describe('MIG-246: the renamed pages keep their gates', () => {
     ['/reports/overview', 'Reports overview', 'report-studio', undefined],
     ['/reports/library', 'Report library', 'report-library', undefined],
     ['/reports/library/:reportId', 'Report', 'report-library', undefined],
+    ['/reports/library/:reportId/compare', 'Compare versions', 'report-library', undefined],
     ['/reports/data', 'Report data', 'report-data', undefined],
     ['/tools/transcript', 'Audio Transcript', 'tools-transcript', undefined],
     ['/data/analytics', 'Analytics Studio', 'analytics', undefined],

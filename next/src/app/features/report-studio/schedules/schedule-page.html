@@ -192,6 +192,9 @@
               <label class="sp-choice" [class.is-on]="body().delivery.webhook">
                 <input type="checkbox" class="checkbox" [checked]="body().delivery.webhook" (change)="set('webhook', $any($event.target).checked)" data-test="sched-webhook" />
                 <span><b>Call a webhook</b><small>event <code>report.approved</code> with the report's number and a sign-in link, to the workspace's webhooks (Developers › Webhooks)</small></span></label>
+              <label class="sp-choice" [class.is-on]="body().delivery.deidentifiedCopy">
+                <input type="checkbox" class="checkbox" [checked]="body().delivery.deidentifiedCopy === true" (change)="set('deidentifiedCopy', $any($event.target).checked)" data-test="sched-deidentified" />
+                <span><b>Also a version without names</b><small>the template's personal fields replaced and DE-IDENTIFIED COPY on every page, for a quality board or a partner; kept with the report, and in the bucket folder beside the signed PDF</small></span></label>
               <div class="sp-choice is-off" aria-disabled="true">
                 <input type="checkbox" class="checkbox" disabled aria-label="Send to the EHR (later)" />
                 <span><span class="flex items-center gap-2"><b>Send to the EHR</b><span class="pill pill-neutral">Later</span></span><small>as a FHIR DocumentReference through a connection</small></span>

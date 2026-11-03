@@ -1,0 +1,151 @@
+<div class="page">
+  <app-page-header [trail]="trail()" crumb="Compare">
+    <div class="page-head">
+      <div class="min-w-0">
+        <div class="page-head-title"><h1 class="page-title">Compare versions</h1></div>
+        <p class="page-subtitle">{{ report()?.name ?? 'Report' }} · what changed between two versions, in the data, the template and the approvals.</p>
+      </div>
+      <div class="flex items-center gap-2 shrink-0">
+        <button type="button" class="btn btn-default btn-sm" [disabled]="!comparison() || downloading()" (click)="downloadPdf()" data-test="compare-pdf">
+          <app-icon name="download" />Download comparison PDF</button>
+        <a class="btn btn-default btn-sm" [routerLink]="['/reports/library', reportId()]"><app-icon name="close" />Close</a>
+      </div>
+    </div>
+  </app-page-header>
+
+  @if (error()) {
+    <app-load-error [message]="error()" (retry)="retry()" />
+  } @else if (!report()) {
+    <app-loading shape="panel" label="Loading the report…" [count]="6" />
+  } @else {
+    <div class="cv-grid">
+      <section class="card cv-pages" aria-label="The two versions' pages">
+        <div class="cv-bar">
+          <label class="cv-pick"><span class="sr-only">Earlier version</span>
+            <select class="input input-sm" [value]="pickA()" (change)="pick('a', $any($event.target).value)" aria-label="Earlier version" data-test="pick-a">
+              @for (v of versions(); track v.versionId) { <option [value]="v.version" [selected]="v.version === pickA()">{{ versionWords(v) }}</option> }
+            </select></label>
+          <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="swap()" aria-label="Swap the two versions" title="Swap"><app-icon name="arrowRight" /></button>
+          <label class="cv-pick"><span class="sr-only">Later version</span>
+            <select class="input input-sm" [value]="pickB()" (change)="pick('b', $any($event.target).value)" aria-label="Later version" data-test="pick-b">
+              @for (v of versions(); track v.versionId) { <option [value]="v.version" [selected]="v.version === pickB()">{{ versionWords(v) }}</option> }
+            </select></label>
+          <div class="seg" role="group" aria-label="How the pages are shown">
+            <button type="button" class="seg-btn" [class.seg-on]="mode() === 'side'" [attr.aria-pressed]="mode() === 'side'" (click)="mode.set('side')">Side by side</button>
+            <button type="button" class="seg-btn" [class.seg-on]="mode() === 'changes'" [attr.aria-pressed]="mode() === 'changes'" (click)="mode.set('changes')" data-test="mode-changes">Changes only</button>
+            <button type="button" class="seg-btn" [class.seg-on]="mode() === 'overlay'" [attr.aria-pressed]="mode() === 'overlay'" (click)="mode.set('overlay')" data-test="mode-overlay">Overlay</button>
+          </div>
+          <div class="cv-nav">
+            <button type="button" class="btn btn-default btn-icon btn-sm" (click)="previous()" [disabled]="!pages().length || page() <= pages()[0]" aria-label="Previous page" title="Previous page"><app-icon name="chevronLeft" /></button>
+            <span class="text-sm tabular whitespace-nowrap" aria-live="polite" data-test="compare-page">Page {{ page() }} of {{ pageCount() }} · {{ changesOnPage() }} change{{ changesOnPage() === 1 ? '' : 's' }} on this page</span>
+            <button type="button" class="btn btn-default btn-icon btn-sm" (click)="nextPage()" [disabled]="!pages().length || page() >= pages()[pages().length - 1]" aria-label="Next page" title="Next page"><app-icon name="chevronRight" /></button>
+          </div>
+          @if (mode() !== 'overlay') {
+            <label class="cv-switch"><input type="checkbox" class="checkbox" role="switch" [checked]="together()" (change)="together.set($any($event.target).checked)" data-test="scroll-together" />Scroll together</label>
+          }
+        </div>
+
+        @if (comparing() && !comparison()) {
+          <app-loading shape="panel" label="Comparing the two versions…" [count]="4" />
+        } @else if (comparison(); as c) {
+          @if (mode() === 'overlay') {
+            <div class="cv-overlay-note text-xs">v{{ c.a.version }} and v{{ c.b.version }} on top of each other: where the pages differ shows light, the rest is dark. Boxes mark v{{ c.b.version }}'s changes.</div>
+            <div class="cv-scroll" data-test="overlay">
+              @for (p of pages(); track p) {
+                <div class="cv-sheet cv-overlay" [attr.data-page-id]="'o-' + p">
+                  @if (picturesA()[p]; as srcA) { <img [src]="srcA" alt="" class="cv-img" /> }
+                  @if (picturesB()[p]; as srcB) { <img [src]="srcB" [alt]="'Page ' + p + ' of v' + c.b.version + ' over v' + c.a.version" class="cv-img cv-diff" /> }
+                  @if (!picturesA()[p] && !picturesB()[p]) { <div class="cv-wait">Drawing page {{ p }}…</div> }
+                  @for (h of boxes('b', p); track $index) { <span class="cv-mark" [style.left.%]="pct(h.x)" [style.top.%]="pct(h.y)" [style.width.%]="pct(h.w, 0.006)" [style.height.%]="pct(h.h, 0.008)"></span> }
+                  <span class="cv-pno">{{ p }}</span>
+                </div>
+              }
+            </div>
+          } @else {
+            <div class="cv-pair-head">
+              <div class="cv-vh"><span class="pill mono">v{{ c.a.version }}</span><span class="truncate">{{ sideFacts(c.a) }}</span>
+                @if (c.a.state === 'VOID') { <span class="pill pill-crit">Void</span> }</div>
+              <div class="cv-vh"><span class="pill pill-warn mono">v{{ c.b.version }}</span><span class="truncate">{{ sideFacts(c.b) }}</span>
+                <span class="cv-end text-xs">highlighted: changed</span></div>
+            </div>
+            @if (!pages().length) {
+              <p class="cv-empty text-sm">No page shows a change: what differs is in the list.</p>
+            }
+            <div class="cv-pair" [class.cv-scroll]="together()" data-test="pair">
+              @for (side of ['a', 'b']; track side) {
+                <div class="cv-col" [class.cv-scroll]="!together()">
+                  @for (p of pages(); track p) {
+                    <div class="cv-sheet" [attr.data-page-id]="side + '-' + p" [class.is-on]="p === page()">
+                      @if (!hasPage($any(side), p)) {
+                        <div class="cv-wait">v{{ side === 'a' ? c.a.version : c.b.version }} has no page {{ p }}.</div>
+                      } @else if ((side === 'a' ? c.a : c.b).expired) {
+                        <div class="cv-wait">This version's files were removed by the workspace's retention policy.</div>
+                      } @else if ((side === 'a' ? picturesA() : picturesB())[p]; as src) {
+                        <img [src]="src" [alt]="'Page ' + p + ' of version ' + (side === 'a' ? c.a.version : c.b.version)" class="cv-img" />
+                        @for (h of boxes($any(side), p); track $index) { <span class="cv-mark" [class.cv-mark-old]="side === 'a'" [style.left.%]="pct(h.x)" [style.top.%]="pct(h.y)" [style.width.%]="pct(h.w, 0.006)" [style.height.%]="pct(h.h, 0.008)"></span> }
+                        @if ((side === 'a' ? c.a : c.b).state === 'VOID') { <span class="cv-void" aria-hidden="true">VOID</span> }
+                      } @else {
+                        <div class="cv-wait">Drawing page {{ p }}…</div>
+                      }
+                      <span class="cv-pno">{{ p }}</span>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          }
+        }
+      </section>
+
+      <section class="card cv-list" aria-label="What changed">
+        @if (comparison(); as c) {
+          <div class="cv-list-head">
+            <h2 class="section-title">{{ c.counts.all }} change{{ c.counts.all === 1 ? '' : 's' }}</h2>
+            <div class="seg cv-filter" role="group" aria-label="Show changes of">
+              <button type="button" class="seg-btn" [class.seg-on]="filter() === 'all'" [attr.aria-pressed]="filter() === 'all'" (click)="filter.set('all')">All</button>
+              <button type="button" class="seg-btn" [class.seg-on]="filter() === 'data'" [attr.aria-pressed]="filter() === 'data'" (click)="filter.set('data')">Data {{ count('data') }}</button>
+              <button type="button" class="seg-btn" [class.seg-on]="filter() === 'template'" [attr.aria-pressed]="filter() === 'template'" (click)="filter.set('template')">Template {{ count('template') }}</button>
+              <button type="button" class="seg-btn" [class.seg-on]="filter() === 'approval'" [attr.aria-pressed]="filter() === 'approval'" (click)="filter.set('approval')">Approval {{ count('approval') }}</button>
+            </div>
+          </div>
+          @if (c.b.reason) { <p class="cv-why text-xs">Why v{{ c.b.version }} was made: {{ c.b.reason }}</p> }
+          <ul class="cv-changes" data-test="changes">
+            @for (ch of shownChanges(); track ch.id) {
+              <li>
+                <button type="button" class="cv-change" [class.is-on]="selected() === ch.id" (click)="choose(ch)" [attr.aria-pressed]="selected() === ch.id">
+                  <span class="cv-k" [class.cv-k-d]="ch.kind === 'data'" [class.cv-k-t]="ch.kind === 'template'" [class.cv-k-a]="ch.kind === 'approval'">
+                    <app-icon [name]="ch.kind === 'data' ? 'database' : ch.kind === 'template' ? 'layers' : 'sign'" /></span>
+                  <span class="min-w-0">
+                    <span class="cv-title">{{ ch.title }}</span>
+                    @if (ch.kind === 'data') {
+                      @if (ch.change === 'changed') {
+                        <span class="cv-vals"><span class="cv-old" [attr.aria-label]="'Was ' + (ch.before ?? 'empty')">{{ ch.before ?? '—' }}</span><app-icon name="arrowRight" /><span class="cv-new" [attr.aria-label]="'Now ' + (ch.after ?? 'empty')">{{ ch.after ?? '—' }}</span></span>
+                      } @else {
+                        <span class="cv-detail">{{ ch.change === 'added' ? 'A row added in v' + c.b.version : 'A row removed: v' + c.a.version + ' had it' }}</span>
+                      }
+                    } @else {
+                      <span class="cv-detail">{{ ch.detail }}</span>
+                      @if (ch.lines && ch.lines.length > 3) { <span class="cv-detail">{{ ch.lines.slice(3).join(' ') }}</span> }
+                    }
+                    @if (ch.where) { <span class="cv-where">{{ ch.where }}</span> }
+                    @if (ch.kind === 'template' && ch.templateId) {
+                      <a class="link-inline text-xs" [routerLink]="['/reports/templates', ch.templateId]" (click)="$event.stopPropagation()">Open the template</a>
+                    }
+                  </span>
+                </button>
+              </li>
+            } @empty {
+              <li class="cv-empty text-sm">{{ c.counts.all ? 'No ' + filter() + ' changes.' : 'The two versions are the same: the same data, template and approvals.' }}</li>
+            }
+          </ul>
+          @if (c.dataShown < c.counts.data) { <p class="cv-note text-xs"><app-icon name="info" />The first {{ c.dataShown }} of {{ c.counts.data }} data changes are listed.</p> }
+          @for (n of c.notes; track n) { <p class="cv-note text-xs"><app-icon name="info" />{{ n }}</p> }
+          @if (c.personalMasked) { <p class="cv-note text-xs" data-test="masked-note"><app-icon name="lock" />Personal values show as •••: reading them needs See personal data.</p> }
+          <p class="cv-note text-xs cv-foot"><app-icon name="info" />Values come from each version's frozen data, so the list is exact; the page highlights follow it.</p>
+        } @else {
+          <app-loading shape="list" label="Listing the changes…" [count]="5" />
+        }
+      </section>
+    </div>
+  }
+</div>

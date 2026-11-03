@@ -303,6 +303,7 @@ export class ReportSchedulePage implements OnInit {
         case 'bucketConnection': if (b.delivery.bucket) b.delivery.bucket.connection = v; break;
         case 'bucketPath': if (b.delivery.bucket) b.delivery.bucket.path = v; break;
         case 'webhook': b.delivery.webhook = !!value; break;
+        case 'deidentifiedCopy': b.delivery.deidentifiedCopy = !!value; break;
         case 'dayOfMonth': b.timing.dayOfMonth = Number(v); break;
         case 'date': b.timing.date = v; break;
         case 'at': b.timing.at = v; break;

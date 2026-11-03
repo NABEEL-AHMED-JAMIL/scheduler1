@@ -85,6 +85,47 @@ export interface BulkResult { reportId: string; version?: number; ok: boolean; s
   notSignedReason?: string; }
 export interface BulkAnswer { results: BulkResult[]; approved: number; refused: number; }
 
+// ---------------------------------------------------------------- reports redesign, features 10 and 12
+
+/** One side of a comparison: the version, when it was made, from which template version and frozen data, its state. */
+export interface CompareSide {
+  version: number; createdAt: string; templateVersion: number; pages?: number | null; reason?: string | null;
+  state: 'VOID' | 'APPROVED' | 'WAITING' | 'REJECTED' | 'GENERATED'; snapshotId: string; dataFrozenAt?: string | null; source?: string | null;
+  expired: boolean; sensitive: boolean;
+}
+
+/** One change: a value of the frozen data, the template, or the approvals. */
+export interface CompareChange {
+  id: string; kind: 'data' | 'template' | 'approval'; title: string;
+  /** data: changed, added (a row) or removed (a row). */
+  change?: 'changed' | 'added' | 'removed';
+  before?: string | null; after?: string | null; masked?: boolean; path?: string;
+  /** Where: "page 1 · table “Wounds this visit” · row 2"; page and the side it is on (b, or a for a removed row). */
+  where?: string; page?: number; side?: 'a' | 'b';
+  /** template and approval: in words. */
+  detail?: string; lines?: string[]; templateId?: string; fromTemplateVersion?: number; toTemplateVersion?: number;
+  stateA?: string; stateB?: string;
+}
+
+/** A box to highlight on a page, as fractions of the page from its top left. */
+export interface HighlightBox { page: number; x: number; y: number; w: number; h: number; }
+
+export interface Comparison {
+  reportId: string; name: string; label: string; a: CompareSide; b: CompareSide; notes: string[]; changes: CompareChange[];
+  counts: { all: number; data: number; template: number; approval: number }; dataShown: number; personalMasked: boolean;
+  highlights: { a: HighlightBox[]; b: HighlightBox[] };
+}
+
+/** Feature 12: whether a version has a copy without names, its rules, and the copy when made. */
+export interface DeidentifiedStatus {
+  reportId: string; version: number; available: boolean; reason?: string;
+  personalFields: { path: string; label: string; rule?: string | null }[];
+  rules: { dates: 'shift' | 'year' | 'keep'; freeText: boolean; picturesLeftOut: number };
+  copy?: { copyId: string; version: number; pages?: number | null; pdf: boolean; html: boolean; madeAt: string; madeByName?: string | null;
+    source: string; summary?: Record<string, unknown> };
+  snapshotKept: boolean;
+}
+
 /** The console's time zone, for days in the histogram (the browser's; Chicago when it cannot say). */
 export function consoleZone(): string {
   try {
@@ -130,6 +171,39 @@ export class ReportLibraryApi {
       params: { reportId, wide: 'true', page: String(page), ...(version ? { version: String(version) } : {}),
         ...(tenantId ? { tenantId: String(tenantId) } : {}) },
       responseType: 'blob', observe: 'response' });
+  }
+
+  /** Feature 10: versions a and b of a report compared -- the change list, and the boxes to highlight on their pages. */
+  compare(reportId: string, a: number, b: number): Observable<Comparison> {
+    return ReportLibraryApi.data$(this.http.get<ApiResponse<Comparison>>(`${this.library}/compare`,
+      { params: { reportId, a: String(a), b: String(b) } }));
+  }
+
+  /** Feature 10: the comparison as a PDF (the change list). */
+  comparePdf(reportId: string, a: number, b: number): Observable<HttpResponse<Blob>> {
+    return this.http.get(`${this.library}/comparePdf`, { params: { reportId, a: String(a), b: String(b) }, responseType: 'blob', observe: 'response' });
+  }
+
+  /** Feature 12: whether a version has a copy without names. */
+  deidentified(reportId: string, version: number): Observable<DeidentifiedStatus> {
+    return ReportLibraryApi.data$(this.http.get<ApiResponse<DeidentifiedStatus>>(`${this.library}/deidentifiedCopy`,
+      { params: { reportId, version: String(version) } }));
+  }
+
+  /** Feature 12: the version's copy without names as a file (made now if it was not): a signed link, then the download. */
+  downloadDeidentified(reportId: string, version: number, format: 'PDF' | 'HTML'): Observable<HttpResponse<Blob>> {
+    return new Observable<HttpResponse<Blob>>(subscriber => {
+      const inner = this.http.post<ApiResponse<{ token: string }>>(`${this.library}/deidentifiedLink`, { reportId, version, format },
+        { params: { reportId, version, format } }).subscribe({
+        next: r => {
+          const token = r.data?.token;
+          if (!token) { subscriber.error(new Error(r.message || 'No download link.')); return; }
+          this.http.get(`${this.library}/deidentifiedDownload`, { params: { token }, responseType: 'blob', observe: 'response' }).subscribe(subscriber);
+        },
+        error: e => subscriber.error(e),
+      });
+      return () => inner.unsubscribe();
+    });
   }
 
   meanings(): Observable<Meanings> {

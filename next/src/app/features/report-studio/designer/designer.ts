@@ -1,6 +1,7 @@
 import {
   Component, DestroyRef, ElementRef, HostListener, OnInit, computed, effect, inject, input, signal, untracked, viewChild, viewChildren,
 } from '@angular/core';
+import { DeidentifyRule, PersonalRow, RULE_WORDS, deidentifyRules, pdfConformance, personalRows, setDeidentifyRule, setPdfConformance, setPersonal } from './personal-fields';
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkDrag, CdkDragDrop, CdkDragMove, CdkDragPreview, CdkDropList, CdkDropListGroup } from '@angular/cdk/drag-drop';
 import { UpperCasePipe } from '@angular/common';
@@ -1314,6 +1315,33 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
       def.template['output'] = output;
       return true;
     }, 'output:pdf.bookmarks');
+  }
+
+  // ---------------------------------------------------------------- reports redesign, features 11 and 12
+
+  /** Feature 12: the fields a person may tag personal (the contract's, and those the blocks read). */
+  readonly personalRows = computed(() => personalRows(this.def(), this.blocks(), this.names(), this.sample()));
+  readonly personalCount = computed(() => this.personalRows().filter(r => r.personal).length);
+  readonly deidentify = computed(() => deidentifyRules(this.def()));
+  readonly conformance = computed(() => pdfConformance(this.def()));
+  readonly ruleWords = RULE_WORDS;
+  readonly rules = Object.keys(RULE_WORDS) as (keyof typeof RULE_WORDS)[];
+  readonly showAllFields = signal(false);
+  readonly shownPersonalRows = computed(() => {
+    const rows = this.personalRows();
+    return this.showAllFields() || rows.length <= 8 ? rows : rows.filter((r, i) => r.personal || i < 8);
+  });
+
+  setPersonal(row: PersonalRow, on: boolean, rule: DeidentifyRule = ''): void {
+    this.edit((_blocks, def) => { setPersonal(def, row, on, rule); return true; }, `personal:${row.path}`);
+  }
+
+  setDeidentify(key: 'dates' | 'freeText', value: string | boolean): void {
+    this.edit((_blocks, def) => { setDeidentifyRule(def, key, value); return true; }, `deidentify:${key}`);
+  }
+
+  setConformance(key: 'archive' | 'tagged', value: string | boolean | undefined): void {
+    this.edit((_blocks, def) => { setPdfConformance(def, key, value); return true; }, `output:pdf.${key}`);
   }
 
   setOutput(key: string, on: boolean): void {
