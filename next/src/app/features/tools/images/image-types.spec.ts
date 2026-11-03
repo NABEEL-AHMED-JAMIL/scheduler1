@@ -2,14 +2,14 @@ import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { DIALOG_DATA, Dialog, DialogRef } from '@angular/cdk/dialog';
 import { provideRouter } from '@angular/router';
-import { NEVER, of } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { ImageApi } from './image.api';
-import { ImageAiApi, ImageAiSettings, ImageType } from './image-ai';
+import { AiPromptOption, ImageAiApi, ImageAiSettings, ImageType, measuredText } from './image-ai';
 import { PhotoPage } from './photo-page';
 import { DescriptionCard } from './photo-parts';
 import { AskThread, askState } from './ask-thread';
-import { AiSettingsSheet, modelLine, typeChanges, typeSave } from './ai-settings-sheet';
+import { AiSettingsSheet, modelLine, promptsForSide, promptsForType, typeChanges, typeSave } from './ai-settings-sheet';
 import { ImageTypesPage } from './image-types-page';
 import { UploadSheet, takenNote } from './upload-sheet';
 import {
@@ -26,9 +26,13 @@ const TYPES: ImageType[] = [
     never: ['diagnosis', '“benign” or “suspicious”', 'any risk score'], fields: ['colour', 'border', 'shape', 'surface'], promptId: 2,
     promptName: 'Skin lesion description (built in)', promptVersion: 1, promptBuiltIn: true, model: null, sortOrder: 2 },
   { key: 'xray', name: 'X-ray', builtIn: true, measured: false, target: null, offered: true, never: 'fractures, findings, “normal” or “abnormal”',
-    note: 'Local vision models are weak on X-rays. Check each field against the image.', fields: ['bodyPart', 'view', 'imageQuality', 'markers'],
+    note: 'Local vision models are weak on X-rays. Check each field against the image.', noteWarning: true,
+    measureNote: 'no paper ruler. Its scale is in DICOM pixel spacing, which is not read.',
+    bannerText: 'An X-ray has no paper ruler, and this tool never reports fractures or findings. A radiologist reads the image.',
+    fields: ['bodyPart', 'view', 'imageQuality', 'markers'],
     promptId: 4, promptName: 'X-ray image description (built in)', promptVersion: 1, promptBuiltIn: true, model: 'qwen3.5:9b', sortOrder: 4 },
-  { key: 'slide', name: 'Tissue slide', builtIn: true, measured: false, target: null, offered: false, never: 'findings', fields: ['stainSeen'], sortOrder: 5 },
+  { key: 'slide', name: 'Tissue slide', builtIn: true, measured: false, target: null, offered: false, never: 'findings', fields: ['stainSeen'], sortOrder: 5,
+    measureNote: 'microscope scale, not a paper ruler', note: 'Magnification only when it is printed on the image.', noteWarning: false },
 ];
 
 const XRAY = (over: Partial<PhotoDetail> = {}): PhotoDetail => ({ photoId: 2001, title: 'P-1093 · left forearm', fileName: 'xray-XR42.jpg', status: 'UNMEASURED',
@@ -94,6 +98,19 @@ describe('Image types rules (design image-tool-types, contract 2026-11-03)', () 
     expect(askState(REFUSED_ASK)).toEqual(expect.objectContaining({ pill: 'Not answered', meta: 'fixed reply · no model was asked', refused: true }));
     expect(askState(OK_ASK).pill).toBe('Draft · not a diagnosis');
     expect(askState(OK_ASK).meta).toBe('Image question (Riverside) v1 · qwen3.5:9b · 7.8 sec');
+  });
+
+  it('says a measurement with its note, and lists a type\'s prompts: its own built-in, the tagged ones, then others that fit', () => {
+    expect(measuredText({ measured: true, target: 'red_region', measureNote: 'area only' })).toBe('Paper ruler · red region (area only)');
+    expect(measuredText({ measured: false, measureNote: 'microscope scale, not a paper ruler' })).toBe('Never: microscope scale, not a paper ruler');
+    expect(measuredText({ measured: false })).toBe('Never');
+    const P = (o: Partial<AiPromptOption>): AiPromptOption => ({ promptId: 0, name: '', version: 1, builtIn: false, fields: [], fits: false, kind: 'describe', ...o });
+    const prompts = [P({ promptId: 1, fits: true }), P({ promptId: 2, tags: 'Image review' }), P({ promptId: 3, builtIn: true, builtInKey: 'image-burn', fits: true }),
+      P({ promptId: 4, builtIn: true, builtInKey: 'image-lesion', fits: true }), P({ promptId: 5 }), P({ promptId: 6, builtIn: true, builtInKey: 'image-ask', kind: 'ask', fits: true }),
+      P({ promptId: 7, fitsAsk: true, kind: 'describe' }), P({ promptId: 8, builtIn: true, builtInKey: 'image-suggest', kind: 'suggest', fits: true })];
+    expect(promptsForType(prompts, 'lesion').map(p => p.promptId)).toEqual([4, 2, 1]);
+    expect(promptsForSide(prompts, 'ask').map(p => p.promptId)).toEqual([6, 7]);
+    expect(promptsForSide(prompts, 'suggest').map(p => p.promptId)).toEqual([8]);
   });
 
   it('keeps a type\'s setting and says what changed', () => {
@@ -171,7 +188,8 @@ describe('Photo page per type', () => {
     expect(el.querySelector('[data-tab="description"]')!.classList).toContain('tab-active');
     expect(el.querySelector('[data-tab="ask"]')).not.toBeNull();
     expect(el.querySelector('[data-test="description-only"]')!.textContent).toContain('Description only · no size · not a diagnosis.');
-    expect(el.querySelector('[data-test="description-only"]')!.textContent).toContain('never reports fractures, findings');
+    expect(el.querySelector('[data-test="description-only"]')!.textContent!.replace(/\s+/g, ' ').trim())
+      .toBe('Description only · no size · not a diagnosis. An X-ray has no paper ruler, and this tool never reports fractures or findings. A radiologist reads the image.');
     expect(el.querySelector('[data-test="page-type"]')!.textContent).toContain('X-ray');
     expect(el.querySelector('[data-test="page-status"]')).toBeNull();
     expect(el.querySelector('[data-test="size-card"]')).toBeNull();
@@ -245,10 +263,13 @@ const SETTINGS: ImageAiSettings = {
   types: TYPES, canChange: true, fallbackModel: 'gemma3:4b',
   suggest: { promptId: null, model: null, on: true }, ask: { promptId: null, model: null, on: true },
   prompts: [
-    { promptId: 1, name: 'Wound photo description (built in)', version: 1, builtIn: true, builtInKey: 'wound', fields: ['woundBed', 'moisture', 'edges', 'around'], fits: true, kind: 'describe' },
-    { promptId: 2, name: 'Skin lesion description (built in)', version: 1, builtIn: true, builtInKey: 'lesion', fields: ['colour', 'border', 'shape', 'surface'], fits: true, kind: 'describe' },
-    { promptId: 4, name: 'X-ray image description (built in)', version: 1, builtIn: true, builtInKey: 'xray', fields: ['bodyPart'], fits: true, kind: 'describe' },
-    { promptId: 11, name: 'Lesion one-liner', version: 1, builtIn: false, fields: [], fits: false, reason: 'answers in text. Needs JSON output and a photo input.', kind: 'describe' },
+    { promptId: 1, name: 'Wound photo description (built in)', version: 1, builtIn: true, builtInKey: 'image-wound', fields: ['woundBed', 'moisture', 'edges', 'around'], fits: true, kind: 'describe' },
+    { promptId: 2, name: 'Skin lesion description (built in)', version: 1, builtIn: true, builtInKey: 'image-lesion', fields: ['colour', 'border', 'shape', 'surface'], fits: true, kind: 'describe' },
+    { promptId: 4, name: 'X-ray image description (built in)', version: 1, builtIn: true, builtInKey: 'image-xray', fields: ['bodyPart'], fits: true, kind: 'describe' },
+    { promptId: 11, name: 'Lesion one-liner', version: 1, builtIn: false, fields: [], fits: false, reason: "Doesn't fit: answers in text. Needs JSON output and a photo input.", kind: 'describe', tags: 'Image review' },
+    { promptId: 12, name: 'AI eval · prompt · mobility', version: 14, builtIn: false, fields: [], fits: false, reason: "Doesn't fit: has no photo input.", kind: 'describe' },
+    { promptId: 21, name: 'Image type suggestion (built in)', version: 1, builtIn: true, builtInKey: 'image-suggest', fields: [], fits: true, kind: 'suggest' },
+    { promptId: 22, name: 'Image question (built in)', version: 1, builtIn: true, builtInKey: 'image-ask', fields: [], fits: true, kind: 'ask' },
   ],
   models: [
     { model: 'gemma3:4b', active: true, readsPhotos: true, usable: true },
@@ -299,7 +320,11 @@ describe('AI settings sheet', () => {
     expect(editor.querySelector('[data-prompt="1"]')).toBeNull();
     expect((editor.querySelector('[data-prompt="11"] input') as HTMLInputElement).disabled).toBe(true);
     expect(editor.querySelector('[data-prompt="11"]')!.textContent).toContain("Doesn't fit: answers in text.");
-    expect((editor.querySelector('[data-model="qwen3:8b"] input') as HTMLInputElement).disabled).toBe(true);
+    expect(editor.querySelector('[data-prompt="11"]')!.textContent).not.toContain("Doesn't fit: Doesn't fit");
+    expect(editor.querySelector('[data-prompt="12"]'), 'an untagged prompt that does not fit is not listed').toBeNull();
+    expect(editor.querySelector('[data-prompt="21"]'), 'the suggestion\'s built-in is not a type\'s').toBeNull();
+    expect([...editor.querySelectorAll('[data-prompt]')].map(e => e.getAttribute('data-prompt'))).toEqual(['2', '11']);
+    expect(editor.querySelector('[data-model="qwen3:8b"]'), 'a model that cannot be used is not a choice').toBeNull();
     expect(editor.querySelector('[data-unusable="qwen3:8b"]')!.textContent).toContain('text only: cannot read photos');
     expect(editor.textContent).toContain('Dark region: a darker area on skin.');
     expect(el.querySelectorAll('[data-test="as-rules"] .as-rule').length).toBe(5);
@@ -356,6 +381,9 @@ describe('Image types catalog', () => {
     expect(xray.querySelector('[data-test="type-prompt"]')!.textContent).toContain('X-ray image description (built in)');
     expect(xray.querySelector('[data-test="type-note"]')).not.toBeNull();
     expect(el.querySelector('[data-type="lesion"]')!.textContent).toContain('Paper ruler · dark region');
+    expect(xray.querySelector('[data-test="type-measured"]')!.textContent).toBe('Never: no paper ruler. Its scale is in DICOM pixel spacing, which is not read.');
+    expect(el.querySelector('[data-type="slide"] [data-test="type-note"]'), 'a plain note is not a warning').toBeNull();
+    expect(el.querySelector('[data-type="slide"] [data-test="type-plain-note"]')!.textContent).toContain('Magnification only');
     expect(el.querySelector('[data-test="type-duplicate"]')).toBeNull();
     expect(el.querySelector('[data-test="types-ai-settings"]')).toBeNull();
     expect(el.querySelector('[data-test="types-read-only"]')).not.toBeNull();
@@ -413,6 +441,61 @@ describe('Upload with a type', () => {
     expect(el.textContent).toContain('choose a type for 1');
     await fixture.componentInstance.choose(1, 'other');
     expect(api.edit).toHaveBeenCalledWith(2003, { imageType: 'other' });
+  });
+
+  it('suggests a type before the upload, a draft the person can change, and asks for one when there is none', async () => {
+    TestBed.resetTestingModule();
+    const answers: Record<string, unknown> = {
+      'xray-XR42.jpg': { status: 'ok', typeKey: 'xray', typeName: 'X-ray' },
+      'other-O1.jpg': { status: 'ok', typeKey: null, typeName: null },
+      'IMG_1.heic': { status: 'skipped' },
+    };
+    const api = { suggest: vi.fn((f: File) => of({ status: 'SUCCESS', data: answers[f.name] })), upload: vi.fn(() => of({ status: 'SUCCESS', data: { photos: [XRAY()] } })) };
+    const files = Object.keys(answers).map(n => new File(['x'], n, { type: 'image/jpeg' }));
+    TestBed.configureTestingModule({ providers: [
+      { provide: ImageApi, useValue: api }, { provide: DialogRef, useValue: { close: vi.fn() } },
+      { provide: DIALOG_DATA, useValue: { limits: DEFAULT_IMAGE_LIMITS, files, types: [{ key: 'wound', name: 'Wound', measured: true }, { key: 'xray', name: 'X-ray', measured: false },
+        { key: 'other', name: 'Other photo', measured: false }] } },
+    ] });
+    const fixture = TestBed.createComponent(UploadSheet);
+    fixture.detectChanges();
+    await new Promise(r => setTimeout(r)); // the sheet asks once it is open
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(api.suggest).toHaveBeenCalledTimes(3);
+    const [xray, other, heic] = [...el.querySelectorAll('[data-upload-item]')];
+    expect(xray.querySelector('[data-test="upload-suggested"]')!.textContent).toContain('Looks like an X-ray');
+    expect((xray.querySelector('[data-test="upload-type"]') as HTMLSelectElement).value).toBe('xray');
+    expect(other.querySelector('[data-test="upload-no-suggestion"]')!.textContent).toContain('No suggestion: please choose');
+    expect(heic.querySelector('[data-test="upload-type"] option')!.textContent!.trim()).toBe('Let AI suggest');
+    const send = el.querySelector('[data-test="upload-send"]') as HTMLButtonElement;
+    expect(send.textContent).toContain('Upload 3 (choose a type for 1)');
+    expect(send.disabled).toBe(true);
+    await fixture.componentInstance.choose(1, 'other');
+    await fixture.componentInstance.choose(0, 'wound');
+    fixture.detectChanges();
+    expect(send.disabled).toBe(false);
+    expect(xray.querySelector('[data-test="upload-suggested"]'), 'the person\'s choice wins').toBeNull();
+    await fixture.componentInstance.send();
+    expect(api.upload).toHaveBeenNthCalledWith(1, expect.any(File), expect.objectContaining({ imageType: 'wound', suggestedType: 'xray' }));
+    expect(api.upload).toHaveBeenNthCalledWith(2, expect.any(File), expect.objectContaining({ imageType: 'other', suggestedType: undefined }));
+    expect(api.upload).toHaveBeenNthCalledWith(3, expect.any(File), expect.objectContaining({ imageType: undefined }));
+  });
+
+  it('falls back to the suggestion after the upload when the endpoint is missing', async () => {
+    TestBed.resetTestingModule();
+    const api = { suggest: vi.fn(() => throwError(() => ({ status: 404 }))) };
+    const files = [new File(['x'], 'a.jpg'), new File(['x'], 'b.jpg')];
+    TestBed.configureTestingModule({ providers: [
+      { provide: ImageApi, useValue: api }, { provide: DialogRef, useValue: { close: vi.fn() } },
+      { provide: DIALOG_DATA, useValue: { limits: DEFAULT_IMAGE_LIMITS, files, types: [{ key: 'xray', name: 'X-ray', measured: false }] } },
+    ] });
+    const fixture = TestBed.createComponent(UploadSheet);
+    fixture.detectChanges();
+    await new Promise(r => setTimeout(r)); // the sheet asks once it is open
+    fixture.detectChanges();
+    expect(api.suggest).toHaveBeenCalledTimes(1);
+    expect(((fixture.nativeElement as HTMLElement).querySelector('[data-test="upload-send"]') as HTMLButtonElement).disabled).toBe(false);
   });
 
   it('says a refused upload\'s message at upload', async () => {
