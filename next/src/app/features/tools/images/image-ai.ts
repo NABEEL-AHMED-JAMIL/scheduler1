@@ -35,8 +35,10 @@ export interface ImageType {
   promptName?: string | null;
   promptVersion?: number | null;
   promptBuiltIn?: boolean;
-  /** The model chosen for it; null: the platform's fallback model. */
+  /** The model that writes its next description (the chosen one, else the platform's fallback). */
   model?: string | null;
+  /** The model the workspace chose for it; null: the platform's fallback model. */
+  chosenModel?: string | null;
   sortOrder?: number;
   timeoutSeconds?: number | null;
   answerTokens?: number | null;
@@ -80,6 +82,8 @@ export interface AiSide {
   promptName?: string | null;
   promptVersion?: number | null;
   model: string | null;
+  /** The model the workspace chose; null: the platform's fallback (model is then the fallback). */
+  chosenModel?: string | null;
   on: boolean;
 }
 

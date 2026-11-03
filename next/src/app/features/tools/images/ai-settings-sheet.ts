@@ -26,7 +26,7 @@ type SideDraft = Pick<AiSide, 'promptId' | 'model' | 'on'>;
 
 /** A type's saved setting, as the editor holds it. */
 export function typeSave(t: ImageType): TypeSave {
-  return { promptId: t.promptBuiltIn ? null : t.promptId ?? null, model: t.model ?? null, measured: !!t.measured && canMeasure(t),
+  return { promptId: t.promptBuiltIn ? null : t.promptId ?? null, model: ('chosenModel' in t ? t.chosenModel : t.model) ?? null, measured: !!t.measured && canMeasure(t),
     target: (t.target ?? (t.measured ? 'red_region' : null)) as Target | null, offered: !!t.offered,
     timeoutSeconds: t.timeoutSeconds ?? null, answerTokens: t.answerTokens ?? null };
 }
@@ -444,7 +444,7 @@ export class AiSettingsSheet implements OnInit {
   }
 
   private sideSave(s: AiSide | null | undefined): SideDraft {
-    return { promptId: s?.promptId ?? null, model: s?.model ?? null, on: s?.on ?? true };
+    return { promptId: s?.promptId ?? null, model: (s && 'chosenModel' in s ? s.chosenModel : s?.model) ?? null, on: s?.on ?? true };
   }
 
   private loadThumbs(): void {
