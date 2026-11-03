@@ -26,7 +26,7 @@ export const SHAPED = {
       { key: 'patient.name', column: 'patient_name' },
       { key: 'acuity', column: 'acuity', type: 'number' },
       { key: 'findings', from: 'rows', fields: [{ key: 'code', column: 'code' }, { key: 'text', column: 'text' }] },
-      { key: 'source', from: 'value', value: 'etl-console' }] } },
+      { key: 'source', from: 'value', value: 'etl-console' }], output: 'column', column: 'json' } },
   ],
 };
 
@@ -70,8 +70,11 @@ test.describe('Build JSON step (MIG-451)', () => {
     await expect(first).not.toContainText('Patient A (fictional)');
 
     // A new key, from a column the rows lack: previewed again, and Core says it had no value.
-    await editor.locator('[data-test="bj-add-key"]').click();
     const keys = editor.locator('input[aria-label^="Key "]');
+    const before = await keys.count();
+    await editor.locator('[data-test="bj-add-key"]').click();
+    await expect(keys).toHaveCount(before + 1);
+    await expect(keys.last()).toHaveValue('');
     await keys.last().fill('ward');
     await editor.locator('input[aria-label="Column of ward"]').fill('ward');
     await expect(preview.locator('[data-test="bj-preview-warning"]')).toContainText('No value for ward in every document', { timeout: 15_000 });

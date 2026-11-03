@@ -53,6 +53,8 @@
         @if (jsonStep && configMode() === 'form') {
           <app-build-json-editor class="block mb-3" [keys]="jsonKeys()" [columns]="columns" [disabled]="readOnly" [problems]="formProblems()"
                                  (changed)="setKeys($event)" />
+          <!-- MIG-451: the documents the shape makes, right under it, run by Core on sample rows as it is edited. -->
+          <app-build-json-preview class="block mb-3" [config]="s.config ?? {}" [rows]="data.sampleRows ?? null" />
         }
         @if (configMode() === 'form' && formSchema; as schema) {
           <app-schema-form [schema]="schema" [value]="s.config" [problems]="formProblems()" idPrefix="cfg" [disabled]="readOnly"
@@ -65,8 +67,7 @@
                       spellcheck="false" (input)="typeConfig($any($event.target).value)"></textarea>
           </app-field>
         }
-        @if (jsonStep) {
-          <!-- MIG-451: the documents the shape makes, run by Core on sample rows as it is edited. -->
+        @if (jsonStep && configMode() === 'json') {
           <app-build-json-preview class="block mt-3" [config]="s.config ?? {}" [rows]="data.sampleRows ?? null" />
         }
         @if (s.task === 'call_api') {
