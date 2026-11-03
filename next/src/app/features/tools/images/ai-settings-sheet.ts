@@ -43,6 +43,35 @@ export function typeChanges(before: TypeSave, after: TypeSave, promptName: (id: 
   return out;
 }
 
+const IMAGE_REVIEW_TAG = 'image review';
+
+/** Whether a prompt option carries the Image review tag. */
+export function taggedImageReview(p: AiPromptOption): boolean {
+  const tags = Array.isArray(p.tags) ? p.tags : (p.tags ?? '').split(',');
+  return tags.some(t => t.trim().toLowerCase() === IMAGE_REVIEW_TAG);
+}
+
+/** The built-in prompt of a type: builtInKey image-<base> (a bare <base> is read the same). */
+export function isOwnBuiltIn(p: AiPromptOption, base: string): boolean {
+  return p.builtIn && (p.builtInKey === `image-${base}` || p.builtInKey === base);
+}
+
+/** A type's prompt choices: its own built-in, the workspace's Image review prompts, then the workspace's others that fit. */
+export function promptsForType(prompts: readonly AiPromptOption[], base: string): AiPromptOption[] {
+  const sideKind = (p: AiPromptOption) => p.kind === 'suggest' || p.kind === 'ask';
+  const own = prompts.filter(p => isOwnBuiltIn(p, base));
+  const mine = prompts.filter(p => !p.builtIn && !sideKind(p));
+  const tagged = mine.filter(taggedImageReview);
+  const others = mine.filter(p => !taggedImageReview(p) && p.fits);
+  return [...own, ...tagged, ...others];
+}
+
+/** The suggestion's or Ask's choices: its built-in prompt, then the workspace's that fit it. */
+export function promptsForSide(prompts: readonly AiPromptOption[], k: 'suggest' | 'ask'): AiPromptOption[] {
+  const fitsSide = (p: AiPromptOption) => (k === 'suggest' ? p.fitsSuggest : p.fitsAsk) ?? (p.kind === k && p.fits);
+  return [...prompts.filter(p => p.builtIn && (p.kind === k || p.builtInKey === `image-${k}`)), ...prompts.filter(p => !p.builtIn && fitsSide(p))];
+}
+
 /** "local · Active · reads photos · thinks", or why a model cannot be used. */
 export function modelLine(m: AiModelOption | null | undefined): string {
   if (!m) return '';
@@ -108,6 +137,7 @@ export function modelLine(m: AiModelOption | null | undefined): string {
     .as-cmp > .chg { background: var(--info-soft); }
     .as-add { display: grid; grid-template-columns: minmax(0, 1fr) 11rem auto auto; gap: 0.5rem; align-items: end; margin-top: 0.5rem; }
     .as-side { display: grid; grid-template-columns: 8rem minmax(0, 1fr) minmax(0, 1fr) auto; gap: 0.5rem 0.75rem; align-items: center; font-size: 0.8125rem; }
+    .as-limits summary { cursor: pointer; }
     .as-lim { display: grid; grid-template-columns: repeat(2, minmax(0, 12rem)); gap: 0.5rem 1rem; }
     .as-muted { color: var(--text-muted); }
     .as-row > span.as-name { color: var(--text-primary); }
@@ -186,7 +216,7 @@ export function modelLine(m: AiModelOption | null | undefined): string {
                         @if (p.fits) {
                           <div class="as-chips">@for (f of p.fields; track f) { <span class="pill pill-neutral mono">{{ f }}</span> }</div>
                         } @else {
-                          <div class="as-why">Doesn't fit: {{ p.reason || 'needs JSON output and a photo input.' }}</div>
+                          <div class="as-why">{{ whyNot(p) }}</div>
                         }
                       </div>
                       @if (p.builtIn) {
@@ -204,17 +234,19 @@ export function modelLine(m: AiModelOption | null | undefined): string {
                     <label class="as-opt" [class.on]="d.model === null" data-model="">
                       <input type="radio" [name]="'as-model-' + t.key" [checked]="d.model === null" [disabled]="!s.canChange" (change)="patch(t.key, { model: null })" />
                       <span>Platform default@if (s.fallbackModel) { · <span class="mono">{{ s.fallbackModel }}</span> }</span></label>
-                    @for (m of s.models; track m.model) {
+                    @for (m of modelChoices(d.model); track m.model) {
                       <label class="as-opt" [class.on]="d.model === m.model" [class.off]="!m.usable" [attr.data-model]="m.model" [title]="m.usable ? '' : modelLine(m)">
                         <input type="radio" [name]="'as-model-' + t.key" [checked]="d.model === m.model" [disabled]="!m.usable || !s.canChange" (change)="patch(t.key, { model: m.model })" />
                         <span class="mono">{{ m.model }}</span></label>
                     }
                   </div>
                   <p class="text-xs text-[color:var(--text-muted)] mt-2 mb-0" data-test="as-model-line">{{ d.model ? modelLine(modelOf(d.model)) : 'The platform\\'s default model for photos' + (s.fallbackModel ? ' (' + s.fallbackModel + ')' : '') }}</p>
-                  @for (m of unusable(); track m.model) {
-                    <p class="as-why mt-1 mb-0" [attr.data-unusable]="m.model"><span class="mono">{{ m.model }}</span>: {{ modelLine(m) }}</p>
+                  @for (g of unusableGroups(); track g.reason) {
+                    <p class="text-xs text-[color:var(--text-muted)] mt-1 mb-0" [attr.data-unusable]="g.models.join(' ')">Not offered: <span class="mono">{{ g.models.join(', ') }}</span> ({{ g.reason }})</p>
                   }
-                  <div class="as-lim mt-3">
+                  <details class="as-limits mt-2" [open]="d.timeoutSeconds != null || d.answerTokens != null">
+                    <summary class="text-xs text-[color:var(--text-secondary)]">Limits for this type (optional)</summary>
+                  <div class="as-lim mt-2">
                     <div class="field m-0"><label class="label" [attr.for]="'as-to-' + t.key">Call timeout (seconds)</label>
                       <input class="input input-sm" type="number" min="5" max="900" [id]="'as-to-' + t.key" [value]="d.timeoutSeconds ?? ''" [disabled]="!s.canChange"
                              [placeholder]="limitHint(d.model, 'callTimeoutSeconds')" (input)="patch(t.key, { timeoutSeconds: num($any($event.target).value) })" /></div>
@@ -222,6 +254,7 @@ export function modelLine(m: AiModelOption | null | undefined): string {
                       <input class="input input-sm" type="number" min="50" max="32000" [id]="'as-tok-' + t.key" [value]="d.answerTokens ?? ''" [disabled]="!s.canChange"
                              [placeholder]="limitHint(d.model, 'answerTokens')" (input)="patch(t.key, { answerTokens: num($any($event.target).value) })" /></div>
                   </div>
+                  </details>
                 </div>
               </div>
               <div class="as-row"><span>Measurement</span>
@@ -249,26 +282,6 @@ export function modelLine(m: AiModelOption | null | undefined): string {
           }
         </section>
 
-        <section class="as-sec" data-test="as-sides">
-          <h3>The suggestion and Ask</h3>
-          @for (k of sideKeys; track k) {
-            @let d = sideOf(k);
-            <div class="as-side mb-2" [attr.data-side]="k">
-              <span class="font-medium">{{ k === 'suggest' ? 'Type suggestion' : 'Ask' }}</span>
-              <select class="input input-sm" [attr.aria-label]="(k === 'suggest' ? 'Suggestion' : 'Ask') + ' prompt'" [disabled]="!s.canChange" (change)="patchSide(k, { promptId: idOrNull($any($event.target).value) })">
-                @for (p of promptsOfKind(k); track p.promptId) { <option [value]="p.builtIn ? '' : p.promptId" [selected]="sidePrompt(k) === p.promptId" [disabled]="!p.fits">{{ p.name }} v{{ p.version }}{{ p.builtIn ? ' (Platform)' : '' }}{{ p.fits ? '' : ' · doesn\\'t fit' }}</option> }
-              </select>
-              <select class="input input-sm" [attr.aria-label]="(k === 'suggest' ? 'Suggestion' : 'Ask') + ' model'" [disabled]="!s.canChange" (change)="patchSide(k, { model: $any($event.target).value || null })">
-                <option value="" [selected]="!d.model">Platform default{{ s.fallbackModel ? ' · ' + s.fallbackModel : '' }}</option>
-                @for (m of s.models; track m.model) { <option [value]="m.model" [selected]="d.model === m.model" [disabled]="!m.usable">{{ m.model }}{{ m.usable ? '' : ' · ' + modelLine(m) }}</option> }
-              </select>
-              <label class="sw-row"><input type="checkbox" role="switch" class="sw" [checked]="d.on" [disabled]="!s.canChange" (change)="patchSide(k, { on: $any($event.target).checked })"
-                     [attr.aria-label]="(k === 'suggest' ? 'Suggest a type at upload' : 'Ask about an image') + ' on'" />{{ d.on ? 'On' : 'Off' }}</label>
-            </div>
-          }
-          <p class="text-xs text-[color:var(--text-muted)] m-0">The suggestion is one small call at upload when nobody chose a type; it is a draft and the person's choice wins. Ask answers questions about what is visible; a question asking for a diagnosis gets a fixed reply and no model is asked.</p>
-        </section>
-
         <section class="as-sec" data-test="as-rules">
           <h3><app-icon name="lock" size="0.95em" />Always applied, every type <span class="as-end as-quiet">added by the platform in code; not editable</span></h3>
           @for (r of rules(); track r) { <div class="as-rule"><app-icon name="lock" size="0.9em" /><span>{{ r }}</span></div> }
@@ -278,7 +291,7 @@ export function modelLine(m: AiModelOption | null | undefined): string {
           <section class="as-sec" data-test="as-try">
             <h3>Try it on a photo</h3>
             <div class="as-try">
-              @for (ph of tryPhotos(); track ph.name) {
+              @for (ph of shownTryPhotos(); track ph.name) {
                 <button type="button" class="as-thumb" [class.on]="tryPick() === ph.name" (click)="tryPick.set(ph.name)"
                         [attr.aria-label]="'Synthetic test image · ' + (ph.label || ph.name)" [attr.aria-pressed]="tryPick() === ph.name">
                   @if (thumb(ph.name); as src) { <img [src]="src" alt="" /> }</button>
@@ -303,6 +316,26 @@ export function modelLine(m: AiModelOption | null | undefined): string {
             }
           </section>
         }
+        <section class="as-sec" data-test="as-sides">
+          <h3>The suggestion and Ask</h3>
+          @for (k of sideKeys; track k) {
+            @let d = sideOf(k);
+            <div class="as-side mb-2" [attr.data-side]="k">
+              <span class="font-medium">{{ k === 'suggest' ? 'Type suggestion' : 'Ask' }}</span>
+              <select class="input input-sm" [attr.aria-label]="(k === 'suggest' ? 'Suggestion' : 'Ask') + ' prompt'" [disabled]="!s.canChange" (change)="patchSide(k, { promptId: idOrNull($any($event.target).value) })">
+                @for (p of promptsOfKind(k); track p.promptId) { <option [value]="p.builtIn ? '' : p.promptId" [selected]="sidePrompt(k) === p.promptId">{{ p.name }} v{{ p.version }}{{ p.builtIn ? ' (Platform)' : '' }}</option> }
+              </select>
+              <select class="input input-sm" [attr.aria-label]="(k === 'suggest' ? 'Suggestion' : 'Ask') + ' model'" [disabled]="!s.canChange" (change)="patchSide(k, { model: $any($event.target).value || null })">
+                <option value="" [selected]="!d.model">Platform default{{ s.fallbackModel ? ' · ' + s.fallbackModel : '' }}</option>
+                @for (m of modelChoices(d.model); track m.model) { <option [value]="m.model" [selected]="d.model === m.model" [disabled]="!m.usable">{{ m.model }}{{ m.usable ? '' : ' · ' + modelLine(m) }}</option> }
+              </select>
+              <label class="sw-row"><input type="checkbox" role="switch" class="sw" [checked]="d.on" [disabled]="!s.canChange" (change)="patchSide(k, { on: $any($event.target).checked })"
+                     [attr.aria-label]="(k === 'suggest' ? 'Suggest a type at upload' : 'Ask about an image') + ' on'" />{{ d.on ? 'On' : 'Off' }}</label>
+            </div>
+          }
+          <p class="text-xs text-[color:var(--text-muted)] m-0">The suggestion is one small call at upload when nobody chose a type; it is a draft and the person's choice wins. Ask answers questions about what is visible; a question asking for a diagnosis gets a fixed reply and no model is asked.</p>
+        </section>
+
         @if (s.lastChange?.byName) {
           <p class="as-audit" data-test="as-audit">Last changed by {{ s.lastChange!.byName }}@if (s.lastChange!.at) { · {{ s.lastChange!.at | serverTime: 'recent' }} }</p>
         }
@@ -349,6 +382,17 @@ export class AiSettingsSheet implements OnInit {
   readonly current = computed(() => this.settings()?.types.find(t => t.key === this.selected()) ?? null);
   readonly builtIns = computed(() => (this.settings()?.types ?? []).filter(t => t.builtIn));
   readonly unusable = computed(() => (this.settings()?.models ?? []).filter(m => !m.usable));
+  /** The models that cannot be used, one line per reason ("text only: cannot read photos"). */
+  readonly unusableGroups = computed(() => {
+    const by = new Map<string, string[]>();
+    for (const m of this.unusable()) { const r = modelLine(m); by.set(r, [...(by.get(r) ?? []), m.model]); }
+    return [...by.entries()].map(([reason, models]) => ({ reason, models }));
+  });
+  /** The try photos shown: the type's own synthetic photo (design types-settings), or all when none is its own. */
+  readonly shownTryPhotos = computed(() => {
+    const own = this.tryPhotos().filter(p => p.name === this.tryPick());
+    return own.length ? own : this.tryPhotos();
+  });
   readonly rules = computed(() => this.settings()?.rules?.length ? this.settings()!.rules! : FIXED_RULES);
   readonly tryPhotos = computed<TryPhoto[]>(() => {
     const list = this.settings()?.tryPhotos;
@@ -451,14 +495,30 @@ export class AiSettingsSheet implements OnInit {
     return saved.promptId !== now.promptId || saved.model !== now.model || saved.on !== now.on;
   }
 
-  /** The describe prompts a type can choose: its own built-in one, and the workspace's. */
+  /**
+   * The prompts a type can choose, in order: its own built-in one (builtInKey image-<base>), then the workspace's prompts tagged
+   * Image review (fitting or not, with why), then any other workspace prompt that fits. Other types' built-ins and the
+   * suggestion's and Ask's are never listed here.
+   */
   promptsFor(t: ImageType): AiPromptOption[] {
-    const base = t.baseKey ?? t.key;
-    return (this.settings()?.prompts ?? []).filter(p => (p.kind ?? 'describe') === 'describe' && (!p.builtIn || (p.builtInKey ?? '') === base));
+    return promptsForType(this.settings()?.prompts ?? [], t.baseKey ?? t.key);
   }
 
+  /** The suggestion's or Ask's choices: its built-in prompt, and the workspace's prompts that fit it (fitsSuggest, fitsAsk). */
   promptsOfKind(k: SideKey): AiPromptOption[] {
-    return (this.settings()?.prompts ?? []).filter(p => p.kind === k);
+    return promptsForSide(this.settings()?.prompts ?? [], k);
+  }
+
+  /** "Doesn't fit: has no photo input…": ai's reason already says Doesn't fit. */
+  whyNot(p: AiPromptOption): string {
+    const r = (p.reason ?? '').trim();
+    if (!r) return "Doesn't fit: needs JSON output and a photo input.";
+    return /^doesn['’]t fit/i.test(r) ? r : `Doesn't fit: ${r}`;
+  }
+
+  /** The usable models, and the chosen one even when it cannot be used any more. */
+  modelChoices(chosen: string | null): AiModelOption[] {
+    return (this.settings()?.models ?? []).filter(m => m.usable || m.model === chosen);
   }
 
   private builtInPrompt(t: ImageType): AiPromptOption | null {
