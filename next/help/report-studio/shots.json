@@ -216,8 +216,7 @@
    }
   ],
   "clip": "app-rs-rule-builder",
-  "pad": 16,
-  "retake": "phase 5: taken once the console with the rule builder is deployed"
+  "pad": 16
  },
  {
   "name": "rs-fax-check",
@@ -234,8 +233,7 @@
    {
     "wait": 1500
    }
-  ],
-  "retake": "phase 5: taken once the console with the fax check is deployed"
+  ]
  },
  {
   "name": "rs-comments",
@@ -249,7 +247,6 @@
    {
     "wait": 1500
    }
-  ],
-  "retake": "phase 5: taken once the console with review comments is deployed"
+  ]
  }
 ]

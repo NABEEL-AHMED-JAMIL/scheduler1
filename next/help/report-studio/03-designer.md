@@ -63,7 +63,7 @@ The rules are kept as a short formula (for example `primary.hba1c > 8 and contai
 **Edit as text** shows and edits it; **Use the builder** goes back when the formula is made of rules. A formula the
 builder cannot show (arithmetic, *not*, a mix of *and* and *or* without brackets) stays as text and is never rewritten.
 
-![The rule builder](rs-rule-builder "Show when: two rules joined by any, and the test records the block shows for")
+![The rule builder](rs-rule-builder "Show when: two rules that must both hold, and the test records the block shows for")
 
 ## Page settings
 Click **Page settings** in the toolbar (or click outside every block) to set the whole report:
