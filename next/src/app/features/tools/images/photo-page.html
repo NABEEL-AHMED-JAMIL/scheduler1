@@ -170,7 +170,7 @@
                       @for (b of bodyParts; track b) { <option [value]="b" [selected]="f.bodyPart === b">{{ siteWords[b] }}</option> }
                     </select></div>
                   <div class="field"><label class="label" for="pd-taken">Taken</label>
-                    <input id="pd-taken" class="input" type="datetime-local" [max]="nowLocal" [value]="f.takenAt" (input)="setField('takenAt', $any($event.target).value)" /></div>
+                    <app-taken-field inputId="pd-taken" [max]="nowLocal" [value]="f.takenAt" (valueChange)="setField('takenAt', $event)" /></div>
                   <div class="field pg-wide"><label class="label" for="pd-where">Where exactly</label>
                     <input id="pd-where" class="input" [value]="f.siteDetail" (input)="setField('siteDetail', $any($event.target).value)" /></div>
                   <div class="field pg-wide"><label class="label" for="pd-note">Note</label>
@@ -199,7 +199,7 @@
               <div class="ir-tool">
                 <app-segmented [value]="shown()" (valueChange)="shown.set($event)" [options]="shownOptions" ariaLabel="What is drawn over the photo" />
                 @if (!advice() || d.status === 'NO_RULER' || d.status === 'NO_REGION') {
-                  <button type="button" class="btn btn-sm" [class.btn-primary]="mode() === 'outline'" [class.btn-default]="mode() !== 'outline'" (click)="adjust()" data-test="adjust-outline"><app-icon name="pen" />Adjust outline</button>
+                  <button type="button" class="btn btn-sm" [class.btn-primary]="mode() === 'outline'" [class.btn-default]="mode() !== 'outline'" (click)="adjust()" data-test="adjust-outline"><app-icon name="edit" />Adjust outline</button>
                 }
                 <button type="button" class="btn btn-default btn-sm" (click)="open('privacy'); startBlur()" [disabled]="d.sentToDocuments || d.inReport" data-test="blur-from-measure"><app-icon name="eye" />Blur a region</button>
                 <span class="ir-end">{{ d.outlineSource === 'drawn' ? 'Outline adjusted by hand' : d.outlineSource === 'auto' ? 'Outline found in code' : '' }}</span>

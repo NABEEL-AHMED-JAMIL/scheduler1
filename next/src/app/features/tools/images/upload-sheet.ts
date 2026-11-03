@@ -8,6 +8,7 @@ import { formatSize } from '../../../shared/ui/format-size';
 import { ImageApi } from './image.api';
 import { BodyPart, ImageLimits, PhotoDetail, PhotoDetails, SITE_WORDS, fileProblem } from './image.model';
 import { messageOf } from './image-actions';
+import { TakenField } from './taken-field';
 
 export interface UploadSheetData {
   limits: ImageLimits;
@@ -40,8 +41,11 @@ export function localNow(now = new Date()): string {
  */
 @Component({
   selector: 'app-image-upload-sheet',
-  imports: [SidePanel, Icon],
+  imports: [SidePanel, Icon, TakenField],
   styles: `
+    .us-pick { display: flex; align-items: center; gap: 0.625rem; margin: 0 0 0.75rem; padding: 0.875rem 1rem; border: 1.5px dashed var(--border-strong);
+      border-radius: var(--radius-lg); background: var(--surface-inset); font-size: 0.8125rem; cursor: pointer; }
+    .us-pick b { font-weight: 600; }
     .us-files { display: flex; flex-direction: column; gap: 0.375rem; margin: 0 0 1rem; padding: 0; list-style: none; }
     .us-files li { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8125rem; padding: 0.4375rem 0.625rem; border: 1px solid var(--border-subtle);
       border-radius: var(--radius-md); }
@@ -53,6 +57,12 @@ export function localNow(now = new Date()): string {
   `,
   template: `
     <app-side-panel heading="Upload photos" [subtitle]="subtitle()">
+      @if (!data.bucket && !data.document) {
+        <label class="us-pick" (dragover)="$event.preventDefault()" (drop)="dropped($event)" data-test="upload-pick">
+          <app-icon name="upload" /><span><b>Choose photos</b> or drop them here</span>
+          <input type="file" class="sr-only" multiple accept=".jpg,.jpeg,.png,.heic,.heif,image/jpeg,image/png,image/heic" (change)="picked($event)" />
+        </label>
+      }
       <ul class="us-files" data-test="upload-files">
         @for (i of items(); track $index) {
           <li [attr.data-state]="i.state">
@@ -86,7 +96,7 @@ export function localNow(now = new Date()): string {
         </div>
         <div class="field">
           <label class="label" for="us-taken">Taken</label>
-          <input id="us-taken" class="input" type="datetime-local" [value]="taken()" [max]="now" (input)="taken.set($any($event.target).value)" data-test="upload-taken" />
+          <app-taken-field inputId="us-taken" [value]="taken()" [max]="now" (valueChange)="taken.set($event)" data-test="upload-taken" />
         </div>
         <div class="field us-wide">
           <label class="label" for="us-where">Where exactly</label>
@@ -99,7 +109,7 @@ export function localNow(now = new Date()): string {
         <span class="text-xs text-[color:var(--text-muted)] mr-auto">{{ footText() }}</span>
         <button type="button" class="btn btn-default btn-sm" (click)="close()" [disabled]="sending()">{{ made().length ? 'Close' : 'Cancel' }}</button>
         <button type="button" class="btn btn-primary btn-sm" (click)="send()" [disabled]="sending() || !sendable().length || finished()" data-test="upload-send">
-          <app-icon name="upload" />{{ sendable().length === 1 ? 'Upload photo' : 'Upload ' + sendable().length + ' photos' }}</button>
+          <app-icon name="upload" />{{ sendable().length <= 1 ? 'Upload photo' : 'Upload ' + sendable().length + ' photos' }}</button>
       </ng-container>
     </app-side-panel>
   `,
@@ -129,6 +139,26 @@ export class UploadSheet {
 
   size(n: number): string {
     return formatSize(n);
+  }
+
+  picked(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    this.add([...(input.files ?? [])]);
+    input.value = '';
+  }
+
+  dropped(event: DragEvent): void {
+    event.preventDefault();
+    this.add([...(event.dataTransfer?.files ?? [])]);
+  }
+
+  /** More photos, up to the limit at once. */
+  add(files: File[]): void {
+    const room = this.data.limits.maxAtOnce - this.items().filter(i => i.state === 'waiting').length;
+    const more = files.slice(0, Math.max(0, room)).map(file => ({ name: file.name, size: file.size, file, problem: null, state: 'waiting' as const,
+      note: fileProblem(file, this.data.limits) ? 'is kept as a line saying why' : '' }));
+    this.finished.set(false);
+    this.items.update(list => [...list, ...more]);
   }
 
   private initial(): Item[] {

@@ -48,23 +48,24 @@ const DAY_OPTIONS: { id: ImageDays; label: string }[] = [{ id: '7', label: '7 da
     .il-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin: 0.75rem 0.875rem; padding: 0.75rem 0.875rem;
       border: 1.5px dashed var(--border-strong); border-radius: var(--radius-lg); background: var(--surface-inset); font-size: 0.8125rem; }
     .il-strip-on { border-color: var(--color-info-600); background: var(--info-soft); }
-    .il-strip-text { flex: 1 1 18rem; min-width: 0; }
+    .il-strip-text { flex: 1 1 34rem; min-width: 0; }
     .il-strip-text b { font-weight: 600; }
     .il-strip-acts { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-left: auto; }
     .il-thumb { width: 3.5rem; }
+    .il-t th, .il-t td { padding-left: 0.625rem; padding-right: 0.625rem; }
     .il-thumb-none { width: 3.5rem; height: 2.625rem; border-radius: 0.3125rem; background: var(--surface-sunken); display: grid; place-items: center;
       color: var(--text-muted); }
-    .il-c-th { width: 5.25rem; }
-    .il-c-size { width: 13.5rem; }
-    .il-c-chg { width: 5.5rem; }
-    .il-c-st { width: 11rem; }
-    .il-c-by { width: 8.5rem; }
-    .il-c-taken { width: 7.5rem; }
+    .il-c-th { width: 4.75rem; }
+    .il-c-size { width: 10.875rem; white-space: nowrap; }
+    .il-c-chg { width: 4rem; }
+    .il-c-st { width: 9.875rem; }
+    .il-c-by { width: 5.75rem; }
+    .il-c-taken { width: 7rem; white-space: nowrap; }
     .il-sub { font-size: 0.75rem; color: var(--text-muted); }
     .il-down { color: var(--ok-text); }
     .il-up { color: var(--crit-text); }
     .il-drop { outline: 2px dashed var(--color-info-600); outline-offset: 4px; }
-    @media (max-width: 1499px) { .il-c-size { width: 11.5rem; } .il-c-st { width: 10rem; } }
+    @media (max-width: 1499px) { .il-c-by { width: 5.25rem; } }
     @media (max-width: 1179px) { .il-c-by { display: none; } .il-c-chg { width: 4.5rem; } }
   `,
 })

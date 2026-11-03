@@ -39,7 +39,7 @@
         <div class="p-4"><app-loading shape="rows" label="Loading photos…" [count]="5" /></div>
       } @else {
         <div class="tx-scroll">
-          <table class="tx-t" [class.tx-busy]="listState.pending()">
+          <table class="tx-t il-t" [class.tx-busy]="listState.pending()">
             <thead><tr>
               <th class="il-c-th"><span class="sr-only">Photo</span></th><th>Patient · site</th><th class="il-c-size">Size (in code)</th>
               <th class="tx-num il-c-chg">Change</th><th class="il-c-st">Status</th><th class="il-c-by">By</th><th class="il-c-taken">Taken</th>
@@ -56,7 +56,7 @@
                   </td>
                   <td class="min-w-0"><div class="tx-name truncate" [title]="r.title">{{ r.title }}</div>
                     <div class="il-sub truncate">{{ subLine(r) }}</div></td>
-                  <td class="tabular">
+                  <td class="tabular il-c-size">
                     @if (size) { {{ size.lw }} · <b>{{ size.area }}</b> }
                     @else if (r.status === 'NO_RULER') { <span class="text-[color:var(--text-secondary)]">No ruler: no size</span> }
                     @else if (r.status === 'MEASURING') { <span class="text-[color:var(--text-muted)]">Measuring…</span> }

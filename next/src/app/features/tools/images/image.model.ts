@@ -203,7 +203,7 @@ export function measurePill(p: PhotoSummary): Pill {
 /** The description's pill, when there is one to show. */
 export function descriptionPill(p: PhotoSummary): Pill | null {
   switch (p.descriptionStatus) {
-    case 'DRAFT': return { tone: 'warn', label: (p.unsureCount ?? 0) > 0 ? 'Draft · unsure' : 'Description to confirm' };
+    case 'DRAFT': return { tone: 'warn', label: 'Description to confirm' };
     case 'PENDING': return { tone: 'info', label: 'Describing…' };
     case 'CONFIRMED': return { tone: 'ok', icon: 'check', label: 'Description confirmed' };
     default: return null;
@@ -236,7 +236,7 @@ export function subLine(p: PhotoSummary): string {
   if (p.visit && p.patientRef) parts.push(`visit ${p.visit}`);
   if (p.note) parts.push(p.note);
   // The newest visit, or a photo with nothing else to say, names its file.
-  if (!parts.length || (p.visit != null && p.visit === p.visits && p.visit > 1)) parts.push(p.fileName);
+  if (!parts.length || (!p.note && p.visit != null && p.visit === p.visits && p.visit > 1)) parts.push(p.fileName);
   return parts.join(' · ');
 }
 

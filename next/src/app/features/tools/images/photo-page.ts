@@ -5,6 +5,7 @@ import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { Subscription, firstValueFrom } from 'rxjs';
 import { API_SUCCESS } from '../../../core/api/api.config';
 import { AuthService } from '../../../core/auth/auth.service';
+import { instantOf } from '../../../core/instant';
 import { Icon } from '../../../shared/ui/icon';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { Segmented } from '../../../shared/ui/segmented';
@@ -22,6 +23,7 @@ import {
   sizeParts, stateAdvice, trendWords,
 } from './image.model';
 import { localNow } from './upload-sheet';
+import { TakenField } from './taken-field';
 
 const POLL_MS = 4000;
 export type PhotoTab = 'measurement' | 'description' | 'compare' | 'privacy' | 'details';
@@ -37,7 +39,7 @@ type Shown = 'outline' | 'ruler' | 'photo';
 @Component({
   selector: 'app-photo-page',
   imports: [PageHeader, Icon, Segmented, ServerTimePipe, AppLoading, InlineStatus, CdkMenu, CdkMenuItem, CdkMenuTrigger, PhotoView, DescriptionCard,
-    PhotoState, AreaChart],
+    PhotoState, AreaChart, TakenField],
   templateUrl: './photo-page.html',
   styleUrls: ['./images.css'],
   styles: `
@@ -121,7 +123,11 @@ export class PhotoPage implements OnInit {
   readonly compareMeta = computed(() => {
     const c = this.comparison();
     const n = c?.photos.length ?? this.detail()?.visits ?? 1;
-    return `${n} ${n === 1 ? 'photo' : 'photos'} of this wound · each measured in code against its own ruler`;
+    // "in 30 days": all of them inside the history's days (a photo sent on may be older).
+    const keep = this.detail()?.keepDays ?? 30;
+    const first = c?.photos[0]?.takenAt ? instantOf(c.photos[0].takenAt) : null;
+    const inside = !!first && Date.now() - first.getTime() <= keep * 86_400_000;
+    return `${n} ${n === 1 ? 'photo' : 'photos'} of this wound${inside ? ` in ${keep} days` : ''} · each measured in code against its own ruler`;
   });
   readonly compareRows = computed(() => (this.comparison()?.photos ?? []).slice(-3));
 
