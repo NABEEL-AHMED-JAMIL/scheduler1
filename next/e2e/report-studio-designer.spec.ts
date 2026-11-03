@@ -23,7 +23,7 @@ const layers = (page: Page) => page.getByRole('list', { name: 'Layers' });
 
 /** The Layers rows' labels, top to bottom. */
 async function layerOrder(page: Page): Promise<string[]> {
-  await page.getByRole('tab', { name: 'Layers' }).click();
+  await page.getByRole('tab', { name: 'Outline' }).click();
   await expect(layers(page).locator('.rsd-layer').first()).toBeVisible();
   return (await layers(page).locator('.rsd-layer > span.truncate').allTextContents()).map(t => t.trim());
 }
@@ -66,7 +66,7 @@ test.describe('Report Studio: the designer (live)', () => {
     await expect(page.getByRole('button', { name: /^Test data: / })).toContainText('1 record');
 
     // A heading after the blank template's intro text.
-    await page.getByRole('tab', { name: 'Layers' }).click();
+    await page.getByRole('tab', { name: 'Outline' }).click();
     await layers(page).getByRole('button', { name: /Describe what this report shows/ }).click();
     await add(page, 'Heading');
     await props(page).getByLabel('Text', { exact: true }).fill('Wound assessment summary');

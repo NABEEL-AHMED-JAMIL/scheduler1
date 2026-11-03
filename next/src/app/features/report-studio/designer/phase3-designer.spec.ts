@@ -3,7 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { BarcodeMeasure } from '../report-studio.model';
 import { BarcodeInspector, barcodeCheck, personalField } from './barcode-inspector';
 import { Block } from './designer-model';
-import { outlineRows } from './outline-panel';
+import { pageLabels } from './outline-panel';
 import { PALETTE_GROUPS } from './palette';
 import { barcodeFieldShown } from './properties';
 
@@ -73,16 +73,14 @@ describe('outline', () => {
     { id: 'gone', type: 'table', title: 'Infection flags' },
   ];
 
-  it('lists each block with the page it starts on, the header on every page', () => {
-    const rows = outlineRows(blocks, { title: 1, toc: 1, chart: 2 });
-    expect(rows.map(r => `${r.label}:${r.page}`)).toEqual(['Header:every page', 'Image or logo:every page', 'Wound assessment report:1', 'Contents:1',
-      'Area over six visits:2', 'Old visits:hidden', 'Infection flags:not shown']);
-    expect(rows.find(r => r.id === 'chart')?.depth).toBe(0);
-    expect(rows.find(r => r.id === 'title')?.heading).toBe(true);
+  it('says the page each block starts on, the header and footer on every page', () => {
+    const at = pageLabels(blocks, { title: 1, toc: 1, row: 2, c1: 2, chart: 2 })!;
+    expect(at).toEqual({ hdr: 'every page', logo: 'every page', title: 'p. 1', toc: 'p. 1', row: 'p. 2', c1: 'p. 2', chart: 'p. 2', old: 'hidden',
+      gone: 'not shown' });
   });
 
   it('says nothing about pages before they are counted', () => {
-    expect(outlineRows(blocks, null).find(r => r.id === 'title')?.page).toBe('—');
+    expect(pageLabels(blocks, null)).toBeNull();
   });
 });
 

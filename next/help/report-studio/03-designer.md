@@ -11,7 +11,7 @@ popular: Lay out a report template
 The designer is where a template's draft is laid out: the components on the left, the page in the middle, the settings
 of what you selected on the right. It draws the page as the PDF will print it, filled with your test data as you go.
 
-![The designer](rs-designer "The designer: Components, Layers and Data on the left, the page with its ruler, Page settings on the right")
+![The designer](rs-designer "The designer: Components, Outline and Data on the left, the page with its ruler, Page settings on the right")
 
 ## Open it
 1. In **Reports › Templates**, choose **Edit draft** on a template, or **New draft from vN** on a published one (a
@@ -28,12 +28,11 @@ of what you selected on the right. It draws the page as the PDF will print it, f
    pages, with their first heading; click one to jump to it.
 3. Click a block on the page to select it. Its settings open on the right, grouped as content, data, format, style and
    layout. A selected block has a handle: drag it to move the block.
-4. The **Layers** tab shows every block as a tree. Drag to reorder; the arrow keys select the block above or below, and
-   **Alt** + an arrow moves it.
-5. The **Outline** tab lists the report's structure with the page each block starts on, as the PDF lays out with the test
-   data (header and footer: every page). Its headings are what a **Contents** block lists and the PDF's bookmarks. The
-   pages are counted when the tab opens and again a moment after a change; **Count pages** counts them now.
-6. **Undo** (Ctrl+Z) and **Redo** (Ctrl+Y) are in the toolbar, beside the zoom (50 % to 200 %), **Fit** and full screen.
+4. The **Outline** tab shows every block as a tree, with the page it starts on as the PDF lays out with the test data
+   (the header and footer: every page). Drag to reorder; the arrow keys select the block above or below, and **Alt** + an
+   arrow moves it. Its headings are what a **Contents** block lists and the PDF's bookmarks. The pages are counted when the
+   tab opens and again a moment after a change; **Count pages** counts them now.
+5. **Undo** (Ctrl+Z) and **Redo** (Ctrl+Y) are in the toolbar, beside the zoom (50 % to 200 %), **Fit** and full screen.
 
 ## Bind data
 A component shows data through a **binding**: a path into the report's data, such as `primary.patient.name` or a list

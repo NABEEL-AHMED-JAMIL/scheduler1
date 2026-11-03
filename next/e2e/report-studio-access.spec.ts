@@ -116,7 +116,7 @@ test.describe('Report Studio: isolation and access (live)', () => {
       await expect(page.getByRole('button', { name }), String(name)).toHaveCount(0);
     }
     await expect(page.getByRole('button', { name: 'Undo (Ctrl+Z)' })).toBeDisabled();
-    await page.getByRole('tab', { name: 'Layers' }).click();
+    await page.getByRole('tab', { name: 'Outline' }).click();
     await page.getByRole('list', { name: 'Layers' }).getByRole('button', { name: /Wounds this visit/ }).click();
     await expect(page.getByRole('complementary', { name: 'Properties' }).getByLabel('Collection')).toBeDisabled();
     await expect(page.getByRole('button', { name: 'Delete (Delete)' })).toHaveCount(0);

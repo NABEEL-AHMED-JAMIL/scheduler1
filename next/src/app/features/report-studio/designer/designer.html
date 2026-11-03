@@ -114,8 +114,7 @@
       <aside class="rsd-left" aria-label="Components, layers and data">
         <div class="tabs rsd-tabs" role="tablist">
           <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'components'" [attr.aria-selected]="tab() === 'components'" (click)="openTab('components')">Components</button>
-          <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'layers'" [attr.aria-selected]="tab() === 'layers'" (click)="openTab('layers')">Layers</button>
-          <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'outline'" [attr.aria-selected]="tab() === 'outline'" (click)="openTab('outline')">Outline</button>
+          <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'layers'" [attr.aria-selected]="tab() === 'layers'" (click)="openTab('layers')">Outline</button>
           <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'data'" [attr.aria-selected]="tab() === 'data'" (click)="openTab('data')">Data</button>
         </div>
         <div class="rsd-left-body">
@@ -165,6 +164,7 @@
               <p class="text-xs text-[color:var(--text-muted)] mt-2">Drag components onto a page, or click one to add it after the selected block. The panel on the right sets what data each one shows.</p>
             }
             @case ('layers') {
+              <app-rs-outline-head [total]="outlineTotal()" [busy]="outlineBusy()" [error]="outlineError()" [stale]="outlineStale()" (refresh)="countPages(true)" />
               <ul class="rsd-layers" cdkDropList id="rsd-layers" [cdkDropListConnectedTo]="dropTargets()" [cdkDropListDisabled]="!editable()"
                   (cdkDropListDropped)="dropOnLayers($event)" aria-label="Layers">
                 @for (r of layers(); track r.id) {
@@ -174,7 +174,7 @@
                             [class.is-hidden]="r.hidden" (click)="select(r.id)">
                       <app-icon [name]="typeIcon(r.type)" class="text-[color:var(--text-muted)]" />
                       <span class="truncate flex-1 text-left">{{ r.label }}</span>
-                      <span class="text-xs text-[color:var(--text-muted)]">{{ typeWord(r.type) }}</span>
+                      <span class="text-xs text-[color:var(--text-muted)] whitespace-nowrap" [attr.data-page-of]="r.id">{{ typeWord(r.type) }}@if (pageLabels()?.[r.id]; as at) { · {{ at }} }</span>
                     </button>
                   </li>
                 } @empty {
@@ -182,10 +182,6 @@
                 }
               </ul>
               <p class="text-xs text-[color:var(--text-muted)] mt-2">Drag to reorder. Arrow keys select the block above or below; Alt+arrow moves it.</p>
-            }
-            @case ('outline') {
-              <app-rs-outline [blocks]="blocks()" [pages]="outlinePages()" [total]="outlineTotal()" [busy]="outlineBusy()" [error]="outlineError()"
-                              [stale]="outlineStale()" [selected]="selected()" (selectedChange)="select($event)" (refresh)="countPages(true)" />
             }
             @case ('data') {
               <div class="flex flex-col gap-2">

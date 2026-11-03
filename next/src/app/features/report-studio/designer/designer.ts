@@ -33,7 +33,7 @@ import { Palette, groupPalette } from './palette';
 import { DataProblems, isDataProblem } from './data-problems';
 import { ShowAs, ShowAsSwitch, showAsNote } from './show-as';
 import { PropChange, PropertiesPanel, TONES } from './properties';
-import { OutlinePanel } from './outline-panel';
+import { OutlineHead, pageLabels } from './outline-panel';
 import { TestDataChoice, TestDataData, TestDataPanel } from './test-data-panel';
 import { AssetCard, UsableProfile, profileOption } from '../assets.model';
 import { AiDataContext, Proposal } from '../ai-designer.api';
@@ -44,7 +44,7 @@ import { applyPatch } from './json-patch';
 import { AppLoading, InlineStatus, createLoadState, loadErrorText } from '../../../shared/ui/loading';
 import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
 
-type LeftTab = 'components' | 'layers' | 'outline' | 'data';
+type LeftTab = 'components' | 'layers' | 'data';
 
 /** The Outline counts pages a moment after the last change (it lays the PDF out: 30 a minute with the previews). */
 const OUTLINE_MS = 2500;
@@ -78,7 +78,7 @@ const DRAW_MS = 300;
 @Component({
   selector: 'app-report-designer',
   imports: [Icon, LoadError, ProblemList, PropertiesPanel, PageFrame, FormsModule, RouterLink, UpperCasePipe, CdkDrag, CdkDragPreview, CdkDropList,
-    CdkDropListGroup, WorkspaceSelect, AiPanel, AppLoading, InlineStatus, AdvancedSelect, Palette, DataProblems, ShowAsSwitch, OutlinePanel],
+    CdkDropListGroup, WorkspaceSelect, AiPanel, AppLoading, InlineStatus, AdvancedSelect, Palette, DataProblems, ShowAsSwitch, OutlineHead],
   templateUrl: './designer.html',
   styleUrl: './designer.css',
 })
@@ -841,7 +841,7 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
         if (r.label) this.testLabel.set(r.label);
         this.checkedAt.set(new Date());
         if (r.html) this.canvas.set(splitCanvas(r.html));
-        if (this.tab() === 'outline' && this.outlineStale()) this.countPages();
+        if (this.tab() === 'layers' && (this.outlinePages() === null || this.outlineStale())) this.countPages();
         if (!this.fitted) { this.fitted = true; requestAnimationFrame(() => this.fitIfWider()); }
       },
       error: e => {
@@ -857,11 +857,14 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
 
   // ---------------------------------------------------------------- the Outline (reports redesign, feature 6)
 
-  /** Opens a left tab; the Outline counts its pages when it opens with none, or with pages of an earlier version. */
+  /** Opens a left tab; the Outline (the layers with their pages) counts its pages when it opens with none, or stale ones. */
   openTab(tab: LeftTab): void {
     this.tab.set(tab);
-    if (tab === 'outline' && (this.outlinePages() === null || this.outlineStale())) this.countPages(true);
+    if (tab === 'layers' && (this.outlinePages() === null || this.outlineStale())) this.countPages(true);
   }
+
+  /** Each block's page in the PDF ("p. 2", "every page", "hidden"), once counted. */
+  readonly pageLabels = computed(() => pageLabels(this.blocks(), this.outlinePages()));
 
   /** The pages, counted by the server as the PDF lays out (soon, or now): the definition as it stands, with the test data. */
   countPages(now = false): void {

@@ -111,7 +111,7 @@
     "wait": 1200
    },
    {
-    "click": "button:has-text('Layers') >> nth=0"
+    "click": "button[role=tab]:has-text('Outline') >> nth=0"
    },
    {
     "wait": 500
@@ -182,7 +182,7 @@
     "wait": 1200
    },
    {
-    "click": "button:has-text('Layers') >> nth=0"
+    "click": "button[role=tab]:has-text('Outline') >> nth=0"
    },
    {
     "wait": 500

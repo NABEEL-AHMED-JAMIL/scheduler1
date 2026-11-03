@@ -29,10 +29,33 @@
   "settle": 2500,
   "steps": [
    {
-    "click": "button:has-text('Layers')"
+    "click": "button[role=tab]:has-text('Outline')"
    },
    {
     "click": ".rsd-layer:has-text('Chart')"
+   },
+   {
+    "wait": 1500
+   }
+  ]
+ },
+ {
+  "name": "rs-barcode",
+  "route": "/reports/templates/01M6FV21D6MKFM8JDZ4PGY94BF/design",
+  "as": "riverside.admin",
+  "settle": 3000,
+  "steps": [
+   {
+    "click": "button[role=tab]:has-text('Outline')"
+   },
+   {
+    "waitFor": "[data-outline-total]"
+   },
+   {
+    "click": ".rsd-layer:has-text('Accession')"
+   },
+   {
+    "waitFor": "[data-scan-check]"
    },
    {
     "wait": 1500
