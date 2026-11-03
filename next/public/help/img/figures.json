@@ -696,6 +696,26 @@
   "topic": "dashboards",
   "taken": "2026-10-27"
  },
+ "dash-images": {
+  "width": 3840,
+  "height": 2160,
+  "route": "/tools/images",
+  "as": "riverside.admin",
+  "theme": "light",
+  "scale": 2,
+  "topic": "dashboards",
+  "taken": "2026-11-03"
+ },
+ "dash-images-compare": {
+  "width": 3840,
+  "height": 2160,
+  "route": "/tools/images",
+  "as": "riverside.admin",
+  "theme": "light",
+  "scale": 2,
+  "topic": "dashboards",
+  "taken": "2026-11-03"
+ },
  "dash-kind-picker": {
   "width": 1856,
   "height": 1304,

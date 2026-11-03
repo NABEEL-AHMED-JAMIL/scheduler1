@@ -1,17 +1,18 @@
 ---
 id: dash-tools
-title: Tools: Document Converter and Audio Transcript
-summary: Convert several documents at once and check each result beside its original, and turn recordings into timed text you can play back, search and use.
+title: Tools: Document Converter, Audio Transcript and Image review
+summary: Convert several documents at once and check each result beside its original, turn recordings into timed text you can play back, search and use, and measure wound photos against the ruler in them.
 section: Files and tools
-who: Anyone whose page access includes Document Converter or Audio Transcript
-where: See results › Tools › Document Converter (/tools/converter); See results › Tools › Audio Transcript (/tools/transcript)
+who: Anyone whose page access includes Document Converter, Audio Transcript or Image review
+where: See results › Tools › Document Converter (/tools/converter); See results › Tools › Audio Transcript (/tools/transcript); See results › Tools › Image review (/tools/images)
 related: dash-files, bill-usage
 ---
-The two tools do by hand what a pipeline's steps do for many files: the **Document Converter** converts documents, and
-**Audio Transcript** turns recordings into text, the same way a scheduled run does it. Both keep what they made, so
-nothing is lost when you leave the page, and both are billed like the steps they stand in for.
+The tools do by hand what a pipeline's steps do for many files: the **Document Converter** converts documents,
+**Audio Transcript** turns recordings into text, and **Image review** measures wound photos, the same way a scheduled run
+does it. Each keeps what it made, so nothing is lost when you leave the page, and each is billed like the steps it stands
+in for.
 
-Both pages work like the Report library: **facets** on the left with their counts (tick one or more to narrow the list),
+The pages work like the Report library: **facets** on the left with their counts (tick one or more to narrow the list),
 one **search**, a window of **7 days**, **30 days**, **90 days** or **All time**, and the list itself. Choosing a row opens
 its **side panel** on the right; **×** closes it. Under 1180 px the facets sit behind **Filters** and the panel lies over
 the list.
@@ -114,8 +115,52 @@ Each failure says why and what to do next: **too long** (up to 30 minutes; **Spl
 transcribed one by one), **no speech heard** (**Choose another**), **the transcriber is busy** (it is queued and starts
 by itself), and **not a recording** (a Word file goes to the Document Converter).
 
+## Measure a wound photo
+**Image review** is for wound photos and other clinical photos. It measures the wound against the paper ruler in the photo,
+in code, and drafts a description for a nurse to confirm. It does not diagnose.
+
+1. Open **See results › Tools › Image review**. Drop photos anywhere on the page (JPG, PNG or HEIC, up to 20 at once, 25 MB
+   each), or use **Upload photos**, **Choose photos…**, **From a bucket** or **From Documents**.
+2. Say what they show: the **Patient**, the **Wound** (W1), the **Body site** and where exactly, and when it was **Taken**.
+   The camera's own date-time is removed on upload, so the time is yours to give. Photos of the same patient and wound are
+   compared over time.
+3. Each photo is measured at once. The list shows its **size in code** (length × width · area), its **change** in area since
+   the wound's first photo with a size, its status, who uploaded it and when it was taken. Narrow it with **Status**
+   (Measured, No ruler: no size, Description to confirm, Could not read), **Body site**, **Patient** and **Made by**.
+
+![Image review](dash-images "Image review: facets, the drop strip and the photos, with one open in the side panel")
+
+Choose a photo to see it in the side panel with its **outline** (blue), the **ruler as found** (green, "Ruler found · 10 cm
+· 70.2 px/cm") and its length and width lines. **Open** shows its own page: **Measurement**, **Description**, **Compare**,
+**Privacy** and **Details**.
+
+- **The size comes only from the ruler in the photo.** A photo without a ruler says **No ruler found: no size**: its outline
+  is kept, but a size is never estimated. **Adjust outline** lets you draw the outline yourself (click round the wound, then
+  **Done**): it is measured in cm against the photo's ruler, or in pixels only when there is none.
+- **The description is a draft and not a diagnosis.** A local vision model writes the wound bed, moisture, edges and the
+  skin around it from the photo alone. A field it is unsure of reads **Not sure: please fill in**. **Confirm**, **Edit** or
+  **Discard** it; only a confirmed description goes into a visit note or a report.
+- **Compare** shows the same wound's photos side by side, the area over time and "area down 56% since 19 Oct". Only
+  photos with a ruler are on the chart; each uses its own ruler, so photos taken from different distances still compare.
+![Compare](dash-images-compare "A photo's Compare tab: the same wound over time, the area chart and its table")
+
+- **Privacy.** Location, date-time original and camera details are removed on upload and never stored. **Blur a region**
+  (a face, a tattoo, a name band): draw a box over it and it is blurred in the stored photo itself, so in every copy
+  (download, Documents, reports). The unblurred original is not kept, so blur before you send the photo on.
+
+**Next steps:** **Send to Documents as a visit note** (a PDF with the photo, its size and the confirmed description),
+**Download** (the photo, the photo with its measurement drawn, or the visit note), and under **⋮** **Add to a report** (an
+image in Report Studio's Assets & branding) and **Start a pipeline** (the photo is kept in a bucket, then you describe the
+pipeline to the AI Assistant).
+
+### When a photo cannot be measured
+Each state says why and what to do: **No ruler found** (upload a photo with the ruler flat beside the wound, or keep it
+without a size), **Too dark** (retake it with the room light or the flash), **Too large** (send it at a smaller size, or
+put it in a bucket and pick it from there) and **Upload failed** (not a photo: a scanned PDF goes to the Document
+Converter).
+
 ## Limits
-The drop strip and **Transcribe recordings** say this platform's limits; when this was written they were:
+The drop strips, **Transcribe recordings** and **Upload photos** say this platform's limits; when this was written they were:
 
 | What | Limit |
 |---|---|
@@ -129,14 +174,19 @@ The drop strip and **Transcribe recordings** say this platform's limits; when th
 | A recording | .mp3, .m4a, .wav or .ogg; upload up to 250 MB, from a bucket up to 500 MB; up to 30 minutes |
 | A recording kept for playback | 30 days |
 | A transcript | Kept until you delete it, or your workspace's retention removes it |
+| A photo | JPG, PNG or HEIC; 25 MB each, 20 at once |
+| A photo in Image review | Kept 30 days, unless sent to Documents or a report (then until your workspace's retention removes it) |
 
-Both kinds of result follow your workspace's **Data policies › Retention** (Transcripts, Audio recordings, Converted
-files), and a legal hold keeps them. A conversion kept in a bucket is billed per document, as before; a transcript by the
-minute of audio (see [How usage is counted](#bill-usage)).
+The results follow your workspace's **Data policies › Retention** (Transcripts, Audio recordings, Converted files, Image
+review photos), and a legal hold keeps them. A conversion kept in a bucket is billed per document, as before; a transcript
+by the minute of audio; a photo once for each draft description (Images described); measuring is free (see
+[How usage is counted](#bill-usage)).
 
 ## Example
 Greta Fischer in health information at Summit Valley Health System receives a referral packet of four files. She drops
 them on the Document Converter, chooses the discharge letter in the list, checks its result beside the original (its
 table kept its columns), and sends it to Documents. Later she transcribes a 6-minute care call with exactly 2 speakers,
 opens its page, searches it for "dressing", plays the nurse's advice from its time, and downloads the transcript with
-personal details masked for the care team's meeting.
+personal details masked for the care team's meeting. On Friday the wound nurse uploads the third photo of a foot wound;
+Image review measures it against the ruler, Compare shows the area down by half since the first visit, she confirms the
+draft description after correcting the edges, and sends it to Documents as a visit note.

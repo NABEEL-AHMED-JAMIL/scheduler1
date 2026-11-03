@@ -19,7 +19,7 @@ The menu follows that path from left to right (or top to bottom in the sidebar),
 | Get data in | **Get data in** | Connect storage, databases and APIs (**Connections**), send documents in to be read (**Documents**), and collect answers with **Forms**. |
 | Build | **Build** | Describe what a run does in **Pipelines**, when it runs (**Schedules & triggers**), what a model is asked (**Prompts**), and who approves what in **Approval workflows**. The **AI Assistant** can draft a pipeline from a plain description. |
 | Run and review | **Run & review** | Follow every run in **Runs**, retry what failed, and decide what waits for a person in **Review**. |
-| See results | **See results** | Read **Dashboards**, ask questions in **Analysis**, make signed PDF reports in **Reports**, and convert files or transcribe recordings in **Tools**. |
+| See results | **See results** | Read **Dashboards**, ask questions in **Analysis**, make signed PDF reports in **Reports**, and convert files, transcribe recordings or measure wound photos in **Tools**. |
 
 A workspace administrator also sees **Administration & billing**: the people and their access, sign-in rules, data policies, the bill, settings and the API for your own systems.
 

@@ -22,7 +22,7 @@ Each line on **Cost & usage** and on an invoice is one meter: its name, and unde
 | **Kafka topics** | Pipelines | Topics the workspace keeps, by the hour | topic-hour |
 | **Model tokens in** | Model calls | Text sent to a model: prompts, documents, questions | per 1,000 tokens |
 | **Model tokens out** | Model calls | Text a model wrote back | per 1,000 tokens |
-| **Images described** | Model calls | Each image a vision model looked at | image |
+| **Images described** | Model calls | Each image a vision model looked at (Image review: each draft description of a photo; its measuring is free) | image |
 | **Transcript minutes** | Model calls | Minutes of audio turned into text | minute |
 | **Pages read (OCR)** | Analytics & tools | Each page the platform's text reader read | per 1,000 pages |
 | **Documents converted** | Analytics & tools | Each document converted, each PDF made from a dataset or a run, each report version generated | document |

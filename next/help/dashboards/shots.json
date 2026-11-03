@@ -107,7 +107,7 @@
     "click": "[aria-label='Actions for Risk level']"
    },
    {
-    "click": "text=Choose a chart, with a preview\u2026"
+    "click": "text=Choose a chart, with a preview…"
    },
    {
     "waitFor": "app-side-panel"
@@ -318,6 +318,50 @@
    },
    {
     "scrollTop": true
+   }
+  ]
+ },
+ {
+  "name": "dash-images",
+  "route": "/tools/images",
+  "as": "riverside.admin",
+  "steps": [
+   {
+    "waitFor": "tr[data-photo-row]"
+   },
+   {
+    "click": "tr[data-photo-row]:has-text('SV-000117 · W1'):has-text('visit 3') >> nth=0"
+   },
+   {
+    "waitFor": "[data-test=panel-size]"
+   },
+   {
+    "wait": 1500
+   }
+  ]
+ },
+ {
+  "name": "dash-images-compare",
+  "route": "/tools/images",
+  "as": "riverside.admin",
+  "steps": [
+   {
+    "waitFor": "tr[data-photo-row]"
+   },
+   {
+    "click": "tr[data-photo-row]:has-text('SV-000117 · W1'):has-text('visit 3') >> nth=0"
+   },
+   {
+    "click": "[data-test=open-photo]"
+   },
+   {
+    "click": "[data-tab=compare]"
+   },
+   {
+    "waitFor": "[data-test=area-trend]"
+   },
+   {
+    "wait": 1500
    }
   ]
  }
