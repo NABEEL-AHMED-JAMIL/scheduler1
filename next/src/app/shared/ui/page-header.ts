@@ -107,6 +107,11 @@ export class PageHeader {
   readonly crumb = input('');
   /** The steps before the last, when the menu's tree is not where this page sits. */
   readonly trail = input<Crumb[] | null>(null);
+  /**
+   * Off on a detail page that shares its list's address (a transcript at /tools/transcript?id=): the page has its own
+   * tabs, and the hub's strip is its list's.
+   */
+  readonly hub = input(true);
 
   // Optional: a screen's own unit test often has no router; the header then shows the trail without following the URL.
   private readonly router = inject(Router, { optional: true });
@@ -140,7 +145,7 @@ export class PageHeader {
   }
 
   /** Whether the address is one of a hub's tabs: only then is the strip (and what it injects) created. */
-  readonly inHub = computed(() => !!tabAt(this.url()));
+  readonly inHub = computed(() => this.hub() && !!tabAt(this.url()));
 
   readonly crumbs = computed<Crumb[]>(() => {
     const last = this.crumb() || this.title() || this.projectedTitle();

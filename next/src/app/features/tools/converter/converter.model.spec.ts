@@ -1,10 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import {
-  ConversionRow, ConverterLimits, FormatFamily, QueueItem, assistantPrompt, badgeTone, defaultTarget, documentsTakes, doneText, dropHint,
-  folderOf, kindLabel, limitMbFor, notKeptText, problemOf, queueChip, queueProblem, resultText, statusNote, statusOf,
+  ConversionRow, ConverterLimits, FormatFamily, assistantPrompt, badgeTone, checkLines, conversionText, defaultTarget, documentsTakes,
+  folderOf, kindLabel, limitMbFor, notKeptText, panelMeta, problemOf, queueProblem, resultShort, resultText, statusNote, statusOf, stripHint,
 } from './converter.model';
 import { matchFamilies } from './formats-sheet';
-import { pagesOf } from './conversion-preview';
+import { pagesOf } from './conversion-panel';
+import { facetOptions, togglePick } from '../tools-facets';
+import { languageName, rangeText } from '../tools-shared';
 
 const FAMILIES: FormatFamily[] = [
   { key: 'text', label: 'Text document', inputFormats: ['docx', 'odt', 'txt'], outputFormats: ['pdf', 'docx', 'odt'] },
@@ -15,8 +17,6 @@ const LIMITS: ConverterLimits = { maxFileSizeMb: 50, tableMaxFileSizeMb: 500, xl
   maxOutputMb: 50, timeoutSeconds: 140, slots: 2, maxWaiting: 4, running: 0, waiting: 0 };
 const row = (over: Partial<ConversionRow> = {}): ConversionRow => ({ conversionId: 1, name: 'Discharge_letter_P-1042', inputFileName: 'Discharge_letter_P-1042.docx',
   inputFormat: 'docx', inputFileSize: 184 * 1024, outputFormat: 'pdf', outputFileSize: 212 * 1024, outputPages: 3, outcome: 'DONE', tookMs: 3100, ...over });
-const item = (over: Partial<QueueItem> = {}): QueueItem => ({ id: 1, name: 'a.docx', size: 10, extension: 'docx', file: null, source: null, target: 'pdf',
-  state: 'waiting', progress: null, asked: false, busy: false, problem: null, row: null, ...over });
 
 describe('Converter rules (tools redesign)', () => {
   it('gives a new file the format asked for all files when its family has it, else its first other format', () => {
@@ -31,7 +31,8 @@ describe('Converter rules (tools redesign)', () => {
     expect(limitMbFor(LIMITS, 'xlsx', 'pdf')).toBe(100);
     expect(limitMbFor(LIMITS, 'docx', 'pdf')).toBe(50);
     expect(limitMbFor(null, 'docx', 'pdf')).toBeNull();
-    expect(dropHint(LIMITS)).toBe('Up to 20 files at once · 50 MB a file (a CSV or TSV to PDF up to 500 MB) · Word, Excel, PowerPoint, OpenDocument, PDF, Markdown, HTML, images');
+    expect(stripHint(LIMITS)).toBe('up to 20 at once, 50 MB each');
+    expect(stripHint(null)).toBe('up to 20 at once, 50 MB each');
   });
 
   it('says a recording is Audio Transcript\'s, and any other unknown type points at Supported formats', () => {
@@ -63,11 +64,37 @@ describe('Converter rules (tools redesign)', () => {
     expect(statusNote(row(), LIMITS)).toBe('');
   });
 
-  it('writes a result and a finished queue row as the design does', () => {
+  it('writes a row\'s conversion and result, and the panel\'s meta line, as the design does', () => {
     expect(resultText(row())).toBe('184.0 KB → 212.0 KB · 3 pages');
     expect(resultText(row({ outcome: 'FAILED' }))).toBe('—');
-    expect(doneText(row())).toBe('Done in 3.1 s · PDF, 3 pages, 212.0 KB');
-    expect(doneText(row({ outcome: 'SHORTENED', outputPages: 1 }))).toBe('Shortened in 3.1 s · PDF, 1 page, 212.0 KB');
+    expect(conversionText(row())).toBe('DOCX → PDF');
+    expect(conversionText(row({ outcome: 'FAILED', inputFormat: 'pdf' }))).toBe('PDF → —');
+    expect(resultShort(row())).toBe('3 pages · 212.0 KB');
+    expect(resultShort(row({ outputPages: 1 }))).toBe('1 page · 212.0 KB');
+    expect(resultShort(row({ outcome: 'FAILED' }))).toBe('—');
+    expect(panelMeta(row())).toBe('DOCX → PDF · 3.1 s');
+    expect(panelMeta(row({ tookMs: null }))).toBe('DOCX → PDF');
+  });
+
+  it('says the converter\'s checks on one line, and apart what did not pass', () => {
+    const checks = [{ key: 'pages', ok: true, text: 'Same page count' }, { key: 'fonts', ok: true, text: 'Fonts embedded' },
+      { key: 'text', ok: true, text: 'Text can be selected and searched' }];
+    expect(checkLines(row({ checks }))).toEqual({ ok: 'Same page count · fonts embedded', warn: '' });
+    expect(checkLines(row({ checks: [...checks, { key: 'substitution', ok: false, text: 'Calibri replaced by Carlito' }] })).warn).toBe('Calibri replaced by Carlito');
+    expect(checkLines(row({ outcome: 'SHORTENED', rowCount: 7412, rowsShown: 5000, checks: [] })).warn).toBe('First 5,000 of 7,412 rows printed');
+    expect(checkLines(row({ checks: null }))).toEqual({ ok: '', warn: '' });
+  });
+
+  it('lists a facet\'s choices with their counts, a picked one kept at 0, and toggles a pick', () => {
+    const words = { DONE: 'Done', SHORTENED: 'Shortened', FAILED: 'Failed' };
+    expect(facetOptions({ DONE: 10, FAILED: 1 }, words, [], ['DONE', 'SHORTENED', 'FAILED']).map(o => `${o.label} ${o.count}`))
+      .toEqual(['Done 10', 'Shortened 0', 'Failed 1']);
+    expect(facetOptions({ word: 7 }, { word: 'Word', excel: 'Excel and CSV' }, ['excel']).map(o => o.value)).toEqual(['word', 'excel']);
+    expect(facetOptions({ en: 5, unknown: 1 }, {}, [], [], languageName).map(o => o.label)).toEqual(['English', 'Unknown']);
+    expect(togglePick({}, 'status', 'DONE')).toEqual({ status: ['DONE'] });
+    expect(togglePick({ status: ['DONE', 'FAILED'] }, 'status', 'DONE')).toEqual({ status: ['FAILED'] });
+    expect(rangeText(2, 25, 60)).toBe('26–50 of 60');
+    expect(rangeText(1, 25, 0)).toBe('0 of 0');
   });
 
   it('names where a result is kept, or until when it is listed', () => {
@@ -84,13 +111,6 @@ describe('Converter rules (tools redesign)', () => {
     expect(documentsTakes('tiff')).toBe(true);
     expect(documentsTakes('docx')).toBe(false);
     expect(documentsTakes(null)).toBe(false);
-  });
-
-  it('shows the queue as one chip', () => {
-    expect(queueChip([], LIMITS)).toEqual({ text: 'Converter ready', tone: 'ok' });
-    expect(queueChip([item({ state: 'converting' }), item({ id: 2 })], LIMITS).text).toBe('Converter ready · 1 converting, 1 waiting');
-    expect(queueChip([item({ busy: true })], LIMITS).tone).toBe('warn');
-    expect(queueChip([], { ...LIMITS, running: 1, waiting: 2 }).text).toBe('Converter ready · 3 from others in line');
   });
 
   it('names a file\'s kind and colour group, never a colour', () => {

@@ -1,265 +1,114 @@
-<div class="page-tool">
-  <app-page-header title="Document Converter"
-                   subtitle="Turn Word, Excel, PowerPoint, OpenDocument, Markdown, HTML and images into PDF, and back. Results stay 30 days unless you keep them.">
+<div class="page-tool" (dragover)="onDragOver($event)" (dragleave)="dragging.set(false)" (drop)="onDrop($event)">
+  <app-page-header title="Document Converter" subtitle="Turn Word, Excel, PowerPoint, OpenDocument, Markdown, HTML and images into PDF, and back.">
     <button type="button" class="btn btn-default btn-sm" (click)="openFormats()" data-test="converter-formats-toggle" [disabled]="!families().length">
-      <app-icon name="list" />Supported formats <span class="text-[color:var(--text-muted)]">{{ formatsState.pending() ? '…' : families().length + ' families' }}</span>
-    </button>
-    <a class="btn btn-default btn-sm" routerLink="/reports/from-pipelines" data-test="to-generated-reports"><app-icon name="file" />Reports from pipelines</a>
+      <app-icon name="list" />Supported formats</button>
+    <button type="button" class="btn btn-primary btn-sm" (click)="chooseFiles()" data-test="convert-files"><app-icon name="upload" />Convert files</button>
   </app-page-header>
 
-  <div class="conv">
-    <!-- The queue: drop several files, one row each, then convert them. -->
-    <section class="card p-0 min-w-0" data-test="converter-main" aria-labelledby="conv-queue-h">
-      <header class="conv-head">
-        <h2 id="conv-queue-h" class="text-base font-semibold m-0">Convert files</h2>
-        <span class="pill" [class.pill-ok]="chip().tone === 'ok'" [class.pill-info]="chip().tone === 'info'" [class.pill-warn]="chip().tone === 'warn'"
-              data-test="converter-now"><span class="status-dot"></span>{{ chip().text }}</span>
-        <button type="button" class="btn btn-default btn-sm ml-auto" [cdkMenuTriggerFor]="limitsMenu" data-test="converter-limits-toggle">
-          <app-icon name="info" />Limits
-        </button>
-        <ng-template #limitsMenu>
-          <div cdkMenu class="card shadow-xl p-4 text-sm limits-pop" data-test="converter-limits">
-            @if (limits(); as l) {
-              <dl class="kv">
-                <dt>A file</dt><dd>up to {{ l.maxFileSizeMb }} MB</dd>
-                <dt>CSV or TSV to PDF</dt><dd>up to {{ l.tableMaxFileSizeMb }} MB; the first {{ l.pdfMaxRows.toLocaleString('en-US') }} rows printed</dd>
-                <dt>XLSX to PDF</dt><dd>up to {{ l.xlsxMaxFileSizeMb }} MB</dd>
-                <dt>A result</dt><dd>up to {{ l.maxOutputMb }} MB, {{ l.pdfMaxPages.toLocaleString('en-US') }} pages</dd>
-                <dt>Time</dt><dd>{{ l.timeoutSeconds }} seconds a file</dd>
-                <dt>At once</dt><dd>{{ l.slots }} converting, {{ l.maxWaiting }} more waiting</dd>
-                <dt>Kept</dt><dd>30 days in Recent conversions, or in a bucket for as long as you keep it there</dd>
-              </dl>
-              <p class="text-xs text-[color:var(--text-muted)] mt-3 mb-0">If the converter is busy a file waits and is sent again by itself; nothing is lost.</p>
-            } @else if (limitsState.error()) {
-              <p class="m-0" role="status">The limits could not be read; the converter still checks every file.</p>
-            } @else {
-              <app-loading shape="inline" label="Loading the limits…" />
-            }
-            <button cdkMenuItem type="button" class="btn btn-default btn-xs mt-3" (click)="loadLimits()"><app-icon name="refresh" />Read again</button>
-          </div>
-        </ng-template>
-      </header>
+  <div class="tx" [class.tx-panel-on]="panelOpen()" [class.tx-filters-open]="facetsOpen()" data-test="recent-conversions">
+    <app-tools-facets [groups]="groups()" [picks]="picks()" (toggle)="toggleFacet($event)" />
 
-      <div class="p-4">
-        <div class="conv-drop" [class.conv-drop-on]="dragging()" (dragover)="$event.preventDefault(); dragging.set(true)"
-             (dragleave)="dragging.set(false)" (drop)="onDrop($event)" data-test="converter-drop">
-          <span class="conv-drop-glyph"><app-icon name="upload" /></span>
-          <div class="min-w-0 flex-1">
-            <div class="text-sm font-medium">Drop files here</div>
-            <div class="text-xs text-[color:var(--text-muted)] mt-1">{{ hint() }}</div>
-          </div>
-          <div class="flex flex-col gap-1.5">
-            <label class="btn btn-default btn-sm cursor-pointer">
-              <app-icon name="upload" />Choose files…
-              <input type="file" class="sr-only" multiple (change)="onPick($event)" data-test="converter-files" />
-            </label>
-            @if (!ownSignIn) {
-              <button type="button" class="btn btn-default btn-sm" (click)="fromBucket()"><app-icon name="folder" />From a bucket…</button>
-            }
-          </div>
+    <section class="tx-list" aria-label="Conversions">
+      <div class="tx-bar">
+        <button type="button" class="btn btn-default btn-sm tx-filters" (click)="facetsOpen.set(!facetsOpen())" [attr.aria-expanded]="facetsOpen()">
+          <app-icon name="filter" />Filters</button>
+        <div class="search-field tx-search">
+          <app-icon name="search" size="0.95em" />
+          <input class="input" placeholder="Search file name or format" [value]="query()" aria-label="Search conversions"
+                 (input)="setQuery($any($event.target).value)" data-test="conversions-search" />
         </div>
-        @if (ownSignIn) {
-          <p class="text-xs text-[color:var(--text-muted)] mt-2 mb-0" data-test="sources-in-workspace">A file in a workspace's bucket is converted in "Work in this workspace", opened from Platform › Workspaces.</p>
-        }
-        @if (formatsState.error()) {
-          <app-inline-status [error]="formatsState.error()" (retry)="loadFormats()" />
-        }
+        <app-segmented class="tx-days" [value]="days()" (valueChange)="setDays($event)" [options]="dayOptions" ariaLabel="How far back" />
+      </div>
 
-        @if (queue().length) {
-          <ul class="conv-q" aria-label="Files to convert" data-test="converter-queue">
-            @for (i of queue(); track i.id) {
-              <li class="conv-qi" [class.conv-qi-sel]="!!i.row && selected()?.conversionId === i.row.conversionId" [attr.data-state]="i.state"
-                  [attr.data-file]="i.name">
-                <span [class]="'ft ' + badgeTone(i.extension)" aria-hidden="true">{{ (i.extension || '?').toUpperCase().slice(0, 4) }}</span>
-                <div class="min-w-0">
-                  @if (i.row && i.row.outcome !== 'FAILED') {
-                    <button type="button" class="conv-qi-name link-quiet" (click)="select(i.row)">{{ i.name }}</button>
-                  } @else {
-                    <div class="conv-qi-name">{{ i.name }}</div>
-                  }
-                  <div class="text-xs text-[color:var(--text-muted)]">{{ kindLabel(i.extension) }}@if (i.size != null) { · {{ size(i.size) }} }@if (i.source) { · from {{ i.source.bucket }} }</div>
-                  @switch (i.state) {
-                    @case ('done') {
-                      <div class="conv-line conv-ok"><app-icon [name]="i.row?.outcome === 'SHORTENED' ? 'alert' : 'checkCircle'" />{{ doneText(i.row!) }}</div>
-                    }
-                    @case ('uploading') {
-                      <div class="conv-line"><span class="text-[color:var(--text-secondary)]">Uploading…</span>
-                        <div class="progress conv-bar" role="progressbar" aria-label="Upload progress" aria-valuemin="0" aria-valuemax="100" [attr.aria-valuenow]="i.progress ?? 0">
-                          <div class="progress-bar" [style.width.%]="i.progress ?? 0"></div></div>
-                        <span class="text-[color:var(--text-muted)] tabular">{{ i.progress ?? 0 }}%</span></div>
-                    }
-                    @case ('converting') {
-                      <div class="conv-line"><span class="text-[color:var(--text-secondary)]">Converting…</span>
-                        <div class="progress conv-bar conv-bar-busy" role="progressbar" aria-label="Converting"><div class="progress-bar"></div></div></div>
-                    }
-                    @case ('failed') {
-                      @if (i.problem; as p) {
-                        <div class="conv-err" role="alert"><app-icon [name]="p.icon" class="shrink-0" /><span><b>{{ p.title }}</b> {{ p.text }}</span></div>
-                      }
-                    }
-                    @default {
-                      <div class="conv-line text-[color:var(--text-muted)]" [class.conv-warn]="i.busy"><app-icon name="clock" />{{ waitingText(i) }}</div>
-                    }
-                  }
-                </div>
-                <div class="flex items-center gap-1.5">
-                  @if (i.state !== 'failed' && targetsOf(i).length) {
-                    <select class="input input-sm conv-fmt" [attr.aria-label]="'Convert ' + i.name + ' to'" [disabled]="i.state !== 'waiting' || i.asked"
-                            (change)="setTarget(i.id, $any($event.target).value)">
-                      @for (f of targetsOf(i); track f) { <option [value]="f" [selected]="f === i.target">{{ f.toUpperCase() }}</option> }
-                    </select>
-                  }
-                  @if (i.state === 'done' && i.row) {
-                    <button type="button" class="btn btn-default btn-icon btn-xs" [attr.aria-label]="'Download ' + (i.row.outputFileName || i.name)"
-                            title="Download" (click)="download(i.row)"><app-icon name="download" /></button>
-                  }
-                  @if (i.state !== 'uploading' && i.state !== 'converting') {
-                    <button type="button" class="btn btn-ghost btn-icon btn-xs" [attr.aria-label]="'Remove ' + i.name + ' from the list'" title="Remove"
-                            (click)="remove(i.id)"><app-icon name="close" /></button>
-                  }
-                </div>
-              </li>
-            }
-          </ul>
+      <div class="cv-strip" [class.cv-strip-on]="dragging()" data-test="converter-drop">
+        <app-icon name="upload" />
+        <span class="cv-strip-text"><b>Drop files to convert</b><span class="text-[color:var(--text-muted)]"> · {{ hint() }}</span></span>
+        <label class="cv-to" for="cv-to">to</label>
+        <select id="cv-to" class="input input-sm cv-target" [value]="convertAllTo()" (change)="setConvertAllTo($any($event.target).value)" data-test="converter-target">
+          @for (f of allTargets(); track f) { <option [value]="f" [selected]="f === convertAllTo()">{{ f.toUpperCase() }}</option> }
+        </select>
+        <label class="btn btn-default btn-sm cursor-pointer">Choose files…
+          <input #files type="file" class="sr-only" multiple (change)="onPick($event)" data-test="converter-files" /></label>
+        @if (!ownSignIn) {
+          <button type="button" class="btn btn-default btn-sm" (click)="fromBucket()" data-test="converter-bucket"><app-icon name="folder" />From a bucket</button>
         }
+      </div>
+      @if (ownSignIn) {
+        <p class="cv-note" data-test="sources-in-workspace">A file in a workspace's bucket is converted in "Work in this workspace", opened from Platform › Workspaces.</p>
+      }
+      @if (formatsState.error()) {
+        <div class="cv-note"><app-inline-status [error]="formatsState.error()" (retry)="loadFormats()" /></div>
+      }
 
-        <div class="conv-opts">
-          <div class="field">
-            <label class="label" for="conv-all">Convert all to</label>
-            <select id="conv-all" class="input input-sm" (change)="setConvertAllTo($any($event.target).value)">
-              @for (f of allTargets(); track f) { <option [value]="f" [selected]="f === convertAllTo()">{{ f.toUpperCase() }}</option> }
-            </select>
-          </div>
-          <div class="field min-w-0 flex-1">
-            <span class="label" id="conv-keep-l">Keep results</span>
-            <div class="flex items-center gap-1.5">
-              <button type="button" class="input input-sm conv-keep" aria-labelledby="conv-keep-l" (click)="chooseKeep()" data-test="converter-keep">
-                <app-icon name="folder" size="0.95em" class="icon-muted" />
-                @if (keep(); as k) { <span class="truncate mono">{{ k.bucket }} › {{ k.folder || '/' }}</span> }
-                @else { <span class="truncate">Not kept · 30 days in Recent conversions</span> }
-              </button>
-              @if (keep()) {
-                <button type="button" class="btn btn-ghost btn-icon btn-xs" aria-label="Do not keep results in a bucket" title="Do not keep" (click)="keep.set(null)">
-                  <app-icon name="close" /></button>
+      @if (historyState.error() && !tableRows().length) {
+        <div class="p-4"><app-inline-status [error]="historyState.error()" (retry)="loadHistory()" /></div>
+      } @else if (historyState.pending() && !tableRows().length) {
+        <div class="p-4"><app-loading shape="rows" label="Loading conversions…" [count]="5" /></div>
+      } @else {
+        <div class="tx-scroll">
+          <table class="tx-t" [class.tx-busy]="historyState.pending()">
+            <thead><tr>
+              <th>File</th><th class="cv-c-conv">Conversion</th><th class="cv-c-res">Result</th>
+              <th class="cv-c-st">Status</th><th class="cv-c-by">By</th><th class="cv-c-when">When</th>
+            </tr></thead>
+            <tbody>
+              @for (t of tableRows(); track t.kind === 'local' ? 'q' + t.item.id : 'r' + t.row.conversionId) {
+                @if (t.kind === 'local') {
+                  @let i = t.item;
+                  @let pill = localPill(i);
+                  <tr tabindex="0" [class.tx-open]="selectedLocal() === i.id || (!!i.row && selected()?.conversionId === i.row.conversionId)"
+                      [attr.data-state]="i.state" [attr.data-file]="i.name" (click)="selectLocal(i)" (keydown)="openKey($event) && selectLocal(i)">
+                    <td><div class="cv-file"><span [class]="'ft ' + badgeTone(i.extension)" aria-hidden="true">{{ (i.extension || '?').toUpperCase().slice(0, 4) }}</span>
+                      <div class="min-w-0"><div class="tx-name truncate" [title]="i.name">{{ i.name }}</div>
+                        <div class="text-xs text-[color:var(--text-muted)]">{{ i.size != null ? size(i.size) : (i.source ? 'from ' + i.source.bucket : '') }}</div></div></div></td>
+                    <td class="whitespace-nowrap">{{ localConversion(i) }}</td>
+                    <td class="tabular text-[color:var(--text-secondary)]">{{ i.row ? resultShort(i.row) : '—' }}</td>
+                    <td><span [class]="'pill pill-' + pill.tone" [title]="i.state === 'waiting' ? waitingText(i) : (i.problem?.text ?? '')">
+                      @if (i.state === 'uploading' || i.state === 'converting') { <app-icon name="refresh" [busy]="true" size="0.85em" /> }
+                      @else if (pill.tone === 'crit') { <app-icon name="alert" size="0.85em" /> }{{ pill.label }}</span></td>
+                    <td class="cv-c-by truncate">You</td>
+                    <td class="whitespace-nowrap tabular text-[color:var(--text-secondary)]">{{ i.addedAt ? (i.addedAt | serverTime: 'recent') : '—' }}</td>
+                  </tr>
+                } @else {
+                  @let r = t.row;
+                  @let st = statusOf(r);
+                  <tr tabindex="0" [class.tx-open]="selected()?.conversionId === r.conversionId" [attr.data-conversion]="r.conversionId"
+                      [attr.aria-selected]="selected()?.conversionId === r.conversionId" (click)="select(r)" (keydown)="openKey($event) && select(r)">
+                    <td><div class="cv-file"><span [class]="'ft ' + badgeTone(r.inputFormat)" aria-hidden="true">{{ r.inputFormat.toUpperCase().slice(0, 4) }}</span>
+                      <div class="min-w-0"><div class="tx-name truncate" [title]="r.inputFileName">{{ r.name }}</div>
+                        <div class="text-xs text-[color:var(--text-muted)]">{{ r.inputFileSize != null ? size(r.inputFileSize) : '' }}</div></div></div></td>
+                    <td class="whitespace-nowrap">{{ conversionText(r) }}</td>
+                    <td class="tabular text-[color:var(--text-secondary)] whitespace-nowrap">{{ resultShort(r) }}</td>
+                    <td><span [class]="'pill pill-' + st.tone" [title]="note(r)"><app-icon [name]="st.icon" size="0.85em" />{{ st.label }}</span></td>
+                    <td class="cv-c-by truncate">{{ byText(r) }}</td>
+                    <td class="whitespace-nowrap tabular text-[color:var(--text-secondary)]">{{ r.createdAt ? (r.createdAt | serverTime: 'recent') : '—' }}</td>
+                  </tr>
+                }
+              } @empty {
+                <tr><td colspan="6" class="tx-empty">
+                  {{ filtered() ? 'No conversion matches the filters.' : days() === '0' ? 'Nothing converted yet. Drop files above: every conversion is listed here, failed ones too.' : 'Nothing converted in this range. Drop files above, or choose a longer range.' }}
+                  @if (filtered()) { <button type="button" class="link-inline" (click)="clearFilters()">Clear filters</button> }
+                </td></tr>
               }
-            </div>
-          </div>
+            </tbody>
+          </table>
         </div>
-        <p class="text-xs text-[color:var(--text-muted)] mt-2 mb-0">Not kept: results stay 30 days in Recent conversions, then are removed. Kept: saved to the folder, and listed with a link to it.</p>
-        <div class="flex items-center gap-2 mt-4">
-          <button type="button" class="btn btn-ghost btn-sm" [disabled]="!finishedCount()" (click)="clearFinished()">Clear finished</button>
-          <button type="button" class="btn btn-primary ml-auto" [disabled]="!waitingCount()" (click)="convertWaiting()" data-test="convert">
-            <app-icon name="refresh" />{{ waitingCount() ? 'Convert ' + waitingCount() + ' waiting ' + (waitingCount() === 1 ? 'file' : 'files') : 'Convert' }}
-          </button>
+        <div class="tx-foot" data-test="conversions-foot">
+          <span>{{ footText() }} · results stay 30 days unless kept</span>
+          @if (pages() > 1) {
+            <span class="tx-pager">
+              <button type="button" class="btn btn-default btn-icon btn-xs" aria-label="Previous page" [disabled]="page() <= 1" (click)="goTo(page() - 1)"><app-icon name="chevronLeft" /></button>
+              <span class="tabular">Page {{ page() }} of {{ pages() }}</span>
+              <button type="button" class="btn btn-default btn-icon btn-xs" aria-label="Next page" [disabled]="page() >= pages()" (click)="goTo(page() + 1)"><app-icon name="chevronRight" /></button>
+            </span>
+          }
         </div>
-      </div>
+      }
     </section>
 
-    <!-- The result beside its original. -->
-    <section class="card p-0 min-w-0" data-test="conversion-preview">
-      <app-conversion-preview [row]="selected()" [canSend]="canSend()" (act)="onPreview($event)" />
-    </section>
-  </div>
-
-  <!-- Every conversion for 30 days, failed ones too, and where each was kept. -->
-  <section class="card p-0" data-test="recent-conversions" aria-labelledby="conv-hist-h">
-    <header class="conv-head conv-head-wrap">
-      <h2 id="conv-hist-h" class="text-base font-semibold m-0">Recent conversions
-        <span class="font-normal text-[color:var(--text-muted)]">({{ rows().length }} of {{ total() }})</span></h2>
-      <div class="search-field conv-search">
-        <app-icon name="search" size="0.95em" />
-        <input class="input input-sm" placeholder="Search file name or format" [value]="query()" aria-label="Search recent conversions"
-               (input)="setQuery($any($event.target).value)" />
-      </div>
-      <app-segmented [value]="view()" (valueChange)="setView($event)" [options]="viewOptions()" ariaLabel="Whose conversions" />
-      <app-segmented [value]="days()" (valueChange)="setDays($event)" [options]="dayOptions" ariaLabel="How far back" />
-      <button type="button" class="btn btn-default btn-sm ml-auto" [disabled]="!picked().size" (click)="downloadPicked()" data-test="download-selected">
-        <app-icon name="download" />Download selected@if (picked().size) { ({{ picked().size }}) }
-      </button>
-    </header>
-    @if (historyState.error() && !rows().length) {
-      <div class="p-4"><app-inline-status [error]="historyState.error()" (retry)="loadHistory()" /></div>
-    } @else if (historyState.pending() && !rows().length) {
-      <div class="p-4"><app-loading shape="rows" label="Loading recent conversions…" [count]="5" /></div>
-    } @else if (!rows().length) {
-      <div class="p-10 text-center text-sm text-[color:var(--text-muted)]">
-        <app-icon name="file" size="1.5rem" class="icon-muted" />
-        <p class="mt-2 mb-0">{{ query() || view() !== 'everyone' ? 'No conversion here matches.' : 'Nothing converted in this range yet. Every conversion is listed here for 30 days, failed ones too.' }}</p>
-      </div>
-    } @else {
-      <div class="scroll-table">
-        <table class="table-modern">
-          <thead>
-            <tr>
-              <th class="w-8"><input type="checkbox" class="checkbox" aria-label="Select every finished conversion on this page" [checked]="allPicked()" (change)="togglePickAll()" /></th>
-              <th>File</th><th>Conversion</th><th>Result</th><th>Status</th><th>Kept in</th><th>By</th><th>When</th>
-              <th class="th-actions"><span class="sr-only">Actions</span></th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (row of rows(); track row.conversionId) {
-              @let st = statusOf(row);
-              <tr [class.row-selected]="selected()?.conversionId === row.conversionId" [attr.data-conversion]="row.conversionId">
-                <td><input type="checkbox" class="checkbox" [attr.aria-label]="'Select ' + row.name" [disabled]="row.outcome === 'FAILED'"
-                           [checked]="picked().has(row.conversionId)" (change)="togglePick(row.conversionId)" /></td>
-                <td class="max-w-64">
-                  <div class="font-medium truncate" [title]="row.name">{{ row.name }}</div>
-                  <div class="mono text-xs text-[color:var(--text-muted)] truncate" [title]="row.inputFileName">{{ row.inputFileName }}</div>
-                </td>
-                <td class="whitespace-nowrap">
-                  <span class="pill pill-neutral">{{ row.inputFormat.toUpperCase() }}</span>
-                  <app-icon name="arrowRight" size="0.85em" class="icon-muted mx-1" />
-                  @if (row.outcome === 'FAILED') { <span class="text-[color:var(--text-muted)]">—</span> }
-                  @else { <span class="pill pill-brand">{{ row.outputFormat.toUpperCase() }}</span> }
-                </td>
-                <td class="tabular text-[color:var(--text-secondary)] conv-result">{{ resultText(row) }}</td>
-                <td>
-                  <span class="pill" [class.pill-ok]="st.tone === 'ok'" [class.pill-warn]="st.tone === 'warn'" [class.pill-crit]="st.tone === 'crit'">
-                    <app-icon [name]="st.icon" size="0.85em" />{{ st.label }}</span>
-                  @if (note(row); as n) { <div class="text-xs text-[color:var(--text-muted)] mt-1">{{ n }}</div> }
-                </td>
-                <td class="max-w-56">
-                  @if (row.keptIn === 'bucket' && row.bucketName) {
-                    <a class="link-inline truncate" routerLink="/data/files" [queryParams]="{ bucket: row.bucketName, prefix: folderOf(row) }"
-                       [title]="row.bucketName + '/' + folderOf(row)"><app-icon name="folder" size="0.85em" class="icon-info" />{{ folderOf(row) }}</a>
-                  } @else if (row.documents?.ocrDocumentId) {
-                    <a class="link-inline" routerLink="/documents/in" [title]="'Document ' + row.documents!.ocrDocumentId"><app-icon name="inbox" size="0.85em" class="icon-info" />Documents</a>
-                  } @else if (keptText(row); as k) {
-                    <span class="text-[color:var(--text-muted)]">{{ k }}</span>
-                  } @else { <span class="text-[color:var(--text-muted)]">—</span> }
-                </td>
-                <td class="whitespace-nowrap">{{ byText(row) }}</td>
-                <td class="whitespace-nowrap text-[color:var(--text-secondary)]">{{ row.createdAt ? (row.createdAt | serverTime: 'recent') : '—' }}</td>
-                <td>
-                  <div class="flex items-center justify-end gap-1">
-                    @if (row.outcome !== 'FAILED') {
-                      <button type="button" class="btn btn-ghost btn-icon btn-xs" [attr.aria-label]="'See ' + row.name + ' beside its original'" title="See it" (click)="view_(row)"><app-icon name="eye" /></button>
-                      <button type="button" class="btn btn-ghost btn-icon btn-xs" [attr.aria-label]="'Download ' + row.name" title="Download" (click)="download(row)"><app-icon name="download" /></button>
-                    }
-                    <button type="button" class="btn btn-ghost btn-icon btn-xs" [cdkMenuTriggerFor]="rowMenu" [attr.aria-label]="'More actions for ' + row.name">
-                      <app-icon name="dots" /></button>
-                    <ng-template #rowMenu>
-                      <div cdkMenu class="card shadow-xl py-1 min-w-52 text-sm">
-                        @if (row.outcome !== 'FAILED' && row.keptIn !== 'bucket') {
-                          <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="keepRow(row)"><app-icon name="folder" />Keep in a bucket…</button>
-                        }
-                        @if (row.outcome !== 'FAILED' && canSend() && documentsTakes(row.outputFormat) && !row.documents?.ocrDocumentId) {
-                          <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="sendToDocuments(row)"><app-icon name="inbox" />Send to Documents…</button>
-                        }
-                        @if (row.outcome !== 'FAILED') {
-                          <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="startPipeline(row)"><app-icon name="layers" />Start a pipeline…</button>
-                        }
-                        <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="removeRow(row)"><app-icon name="trash" class="icon-crit" />Delete</button>
-                      </div>
-                    </ng-template>
-                  </div>
-                </td>
-              </tr>
-            }
-          </tbody>
-        </table>
-      </div>
-      <app-pagination [total]="total()" [page]="page()" [size]="pageSize()" (goTo)="goTo($event)" (setSize)="setPageSize($event)" />
+    @if (panelOpen()) {
+      <app-conversion-panel [row]="selected()" [local]="localPanel()" [canSend]="canSend()" [by]="selected() ? byText(selected()!) : 'You'"
+                            [kept]="selected() ? keptText(selected()!) : ''" (act)="onPanel($event)" (closed)="closePanel()" data-test="conversion-preview" />
     }
-  </section>
+  </div>
 </div>

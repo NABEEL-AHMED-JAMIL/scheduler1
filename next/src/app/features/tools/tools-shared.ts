@@ -34,3 +34,28 @@ export function timeLeft(seconds: number | null | undefined): string {
   if (seconds < 60) return `about ${Math.max(1, Math.round(seconds))} s left`;
   return `about ${Math.round(seconds / 60)} min left`;
 }
+
+/** How far back a tools list reads: 7, 30 or 90 days, or all time (0). */
+export type ToolDays = '7' | '30' | '90' | '0';
+
+/** The lists' window, one control (tools Option A): 30 days unless the reader asks for more. */
+export const DAY_OPTIONS: { id: ToolDays; label: string }[] = [
+  { id: '7', label: '7 days' }, { id: '30', label: '30 days' }, { id: '90', label: '90 days' }, { id: '0', label: 'All time' },
+];
+
+/** "English" for "en", "Unknown" for unknown; the code itself when the browser cannot name it. */
+export function languageName(code: string | null | undefined): string {
+  if (!code || code === 'unknown') return 'Unknown';
+  try {
+    return new Intl.DisplayNames(['en'], { type: 'language' }).of(code) ?? code;
+  } catch {
+    return code;
+  }
+}
+
+/** "1–25 of 214": the rows a page shows. */
+export function rangeText(page: number, size: number, total: number): string {
+  if (!total) return '0 of 0';
+  const first = (page - 1) * size + 1;
+  return `${first}–${Math.min(page * size, total)} of ${total}`;
+}

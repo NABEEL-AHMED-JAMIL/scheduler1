@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
-  DEFAULT_TRANSCRIPT_LIMITS, RecordingDetail, RecordingSummary, Segment, adviceFor, audioProblem, barsOf, billedMinutes, clock, estimateSeconds,
-  exportName, isActive, lanesOf, lengthText, markParts, notARecording, personalText, plainText, railNote, searchHits, segmentAt, speakerName,
-  stagesOf, statusPill,
+  DEFAULT_TRANSCRIPT_LIMITS, RecordingDetail, Segment, adviceFor, audioProblem, billedMinutes, clock, estimateSeconds, exportName, isActive,
+  lengthText, listPill, markParts, metaLine, notARecording, personalText, plainText, searchHits, segmentAt, speakerName, stagesOf, statusPill,
+  trackSpans, transcriptLines,
 } from './transcript.model';
-import { aboutTime, ordinal, timeLeft } from '../tools-shared';
+import { aboutTime, languageName, ordinal, timeLeft } from '../tools-shared';
 import { costLine } from './new-transcript';
 
 const L = DEFAULT_TRANSCRIPT_LIMITS;
@@ -97,14 +97,41 @@ describe('Audio Transcript rules (tools redesign)', () => {
     expect(parts.filter(p => p.hit >= 0)).toEqual([{ text: 'dressing', hit: 1 }]);
   });
 
-  it('names speakers once and draws their lanes', () => {
+  it('names speakers once and draws one track coloured by speaker', () => {
     const speakers = [{ key: 0, label: 'Speaker 1', name: 'Alex Morgan, RN' }, { key: 1, label: 'Speaker 2' }];
     expect(speakerName(speakers, 0)).toBe('Alex Morgan, RN');
     expect(speakerName(speakers, 1)).toBe('Speaker 2');
     expect(speakerName(speakers, null)).toBe('');
-    const lanes = lanesOf(SEGS, speakers, 30_000);
-    expect(lanes[0].spans.map(s => Math.round(s.left))).toEqual([0, 60]);
-    expect(lanes[1].spans).toHaveLength(1);
+    const spans = trackSpans(SEGS, 30_000);
+    expect(spans.map(s => `${s.speaker}@${Math.round(s.left)}`)).toEqual(['0@0', '1@30', '0@60']);
+    expect(Math.round(spans[2].width)).toBe(40);
+    // A speaker's next segment right after the last is drawn as one stretch; no speakers is all one voice.
+    expect(trackSpans([{ i: 0, startMs: 0, endMs: 5000, text: 'a' }, { i: 1, startMs: 5020, endMs: 10_000, text: 'b' }], 10_000))
+      .toEqual([{ left: 0, width: 100, speaker: 0 }]);
+    expect(trackSpans(SEGS, 0)).toEqual([]);
+  });
+
+  it('folds long stretches away while a search is on, keeping the first lines, the hits and the playing one', () => {
+    const many: Segment[] = Array.from({ length: 40 }, (_, i) => ({ i, startMs: i * 10_000, endMs: i * 10_000 + 9000, text: `part ${i}` }));
+    const all = many.map((_, i) => i);
+    expect(transcriptLines(all, many, new Set(), new Set())).toHaveLength(40);
+    const lines = transcriptLines(all, many, new Set([20, 39]), new Set());
+    expect(lines.map(l => (l.kind === 'seg' ? l.index : `gap ${l.from}-${l.to}`))).toEqual([0, 1, 2, 3, 4, 'gap 5-18', 19, 20, 21, 'gap 22-37', 38, 39]);
+    const gap = lines[5];
+    expect(gap.kind === 'gap' && [clock(gap.startMs / 1000), clock(gap.endMs / 1000)]).toEqual(['00:50', '03:09']);
+    // "show" opens a stretch; a short one is never folded.
+    expect(transcriptLines(all, many, new Set([20, 39]), new Set([5])).filter(l => l.kind === 'gap')).toHaveLength(1);
+    expect(transcriptLines(all.slice(0, 10), many, new Set([9]), new Set()).every(l => l.kind === 'seg')).toBe(true);
+  });
+
+  it('says a recording\'s length, language and speakers, and a short pill in the table', () => {
+    expect(metaLine(rec({ language: 'en', speakers: [{ key: 0, label: 'S1' }, { key: 1, label: 'S2' }, { key: 2, label: 'S3' }] }), languageName))
+      .toBe('18:42 · English · 3 speakers');
+    expect(metaLine(rec({ language: 'es', speakers: [] }), languageName)).toBe('18:42 · Spanish · 1 speaker');
+    expect(metaLine(rec({ status: 'RUNNING' }), languageName)).toBe('18:42');
+    expect(listPill({ ...rec(), status: 'RUNNING', progressPct: 46.2 })).toEqual({ label: '46%', tone: 'info' });
+    expect(listPill({ ...rec(), status: 'FAILED', errorCode: 'TOO_LONG' }).label).toBe('Too long');
+    expect(languageName('unknown')).toBe('Unknown');
   });
 
   it('copies plain text with times and speakers, and names exports safely', () => {
@@ -118,17 +145,5 @@ describe('Audio Transcript rules (tools redesign)', () => {
     expect(personalText({ names: 1, datesOfBirth: 1, phones: 1 })).toBe('1 name, 1 date of birth, 1 phone number');
     expect(personalText({ names: 2 })).toBe('2 names');
     expect(personalText(null)).toBe('');
-  });
-
-  it('draws at most the bars asked, keeping each run\'s loudest', () => {
-    expect(barsOf([0.1, 0.9, 0.2, 0.4], 2)).toEqual([0.9, 0.4]);
-    expect(barsOf([2, -1], 10)).toEqual([1, 0]);
-    expect(barsOf(null, 10)).toEqual([]);
-  });
-
-  it('notes a recording in the rail as the design does', () => {
-    const r: RecordingSummary = { ...rec(), speakerCount: 3 };
-    expect(railNote(r, 'You', '2 Nov, 08:52', L)).toBe('3 speakers · You · 2 Nov, 08:52');
-    expect(railNote({ ...r, status: 'FAILED', errorCode: 'TOO_LONG' }, 'You', '31 Oct', L)).toBe('limit is 30 min · You · 31 Oct');
   });
 });

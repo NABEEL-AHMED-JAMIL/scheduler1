@@ -1,0 +1,20 @@
+/* Audio Transcript, Option A (owner 2026-11-02): speaker colours (chart tokens), the play button, times and search marks. */
+.spk-0 { --spk: var(--chart-0); } .spk-1 { --spk: var(--chart-2); } .spk-2 { --spk: var(--chart-4); }
+.spk-3 { --spk: var(--chart-3); } .spk-4 { --spk: var(--chart-5); } .spk-5 { --spk: var(--chart-6); }
+.dot { display: inline-block; width: 0.5rem; height: 0.5rem; border-radius: var(--radius-full); flex: none; background: var(--spk, var(--text-muted)); }
+.spk { display: inline-flex; align-items: center; gap: 0.375rem; font-weight: 500; white-space: nowrap; min-width: 0; }
+.play { display: grid; place-items: center; flex: none; width: 2.25rem; height: 2.25rem; border-radius: var(--radius-full); border: 0; cursor: pointer;
+  background: var(--btn-primary-bg); color: var(--btn-primary-fg); }
+.play:disabled { opacity: 0.5; cursor: default; }
+.time { font-size: 0.8125rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tlink { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0; border: 0; background: none; cursor: pointer; white-space: nowrap;
+  font: 500 0.78125rem var(--font-mono); color: var(--text-secondary); }
+.tlink:hover { color: var(--text-primary); }
+.tlink-now { color: var(--info-text); }
+mark { background: var(--highlight); color: var(--highlight-fg); border-radius: var(--radius-sm); padding: 0 1px; }
+mark.cur { background: var(--color-warn-400); color: var(--text-primary); box-shadow: 0 0 0 1px var(--color-warn-600); }
+.progress-bar { background: var(--color-info-600); }
+.steps { display: flex; list-style: none; margin: 0.75rem 0 0; padding: 0; }
+.steps li { flex: 1; font-size: 0.75rem; color: var(--text-muted); padding-top: 0.5rem; border-top: 3px solid var(--border-subtle); }
+.steps li.done { color: var(--ok-text); border-color: var(--color-ok-500); }
+.steps li.now { color: var(--text-primary); font-weight: 600; border-color: var(--color-info-600); }

@@ -86,7 +86,7 @@ export interface RecordingDetail extends RecordingSummary {
   model?: string | null;
   processingSeconds?: number | null;
   billedMinutes?: number | null;
-  speakersAsked?: 'auto' | 'one' | null;
+  speakersAsked?: SpeakerChoice | null;
   speakersAvailable?: boolean | null;
   speakers?: Speaker[] | null;
   segments?: Segment[] | null;
@@ -101,13 +101,49 @@ export interface RecordingDetail extends RecordingSummary {
   personal?: { names?: number; datesOfBirth?: number; phones?: number } | null;
 }
 
+/** Each facet's counts over the window and the search (each ignores its own picks), as media-service answers them. */
+export interface RecordingFacets {
+  status?: Record<string, number>;
+  by?: Record<string, number>;
+  speakers?: Record<string, number>;
+  language?: Record<string, number>;
+}
+
 export interface RecordingList {
   rows: RecordingSummary[];
   failedCount: number;
   total: number;
+  /** Every recording in the window, whatever the search and facets. */
+  all?: number;
+  page?: number;
+  size?: number;
+  facets?: RecordingFacets;
 }
 
-export type RailView = 'everyone' | 'mine' | 'failed';
+/** What the list asks for (tools Option A): the window (0 = all time), the search, a page, and the facets picked. */
+export interface RecordingQuery {
+  days: number;
+  q: string;
+  page: number;
+  size: number;
+  status: readonly string[];
+  by: readonly string[];
+  speakers: readonly string[];
+  language: readonly string[];
+}
+
+/** The facets' words; the language facet names its codes ("en" is English). */
+export const STATUS_WORDS: Readonly<Record<string, string>> = { done: 'Done', transcribing: 'Transcribing', failed: 'Failed' };
+export const BY_WORDS: Readonly<Record<string, string>> = { me: 'Me', others: 'Others' };
+export const SPEAKER_WORDS: Readonly<Record<string, string>> = { one: 'One', two: 'Two', many: 'Three to six' };
+
+/** How many speakers a transcript is asked to tell: found (2 to 6), one, or exactly 2 to 6. */
+export type SpeakerChoice = 'auto' | 'one' | '2' | '3' | '4' | '5' | '6';
+export const SPEAKER_CHOICES: { id: SpeakerChoice; label: string }[] = [
+  { id: 'auto', label: 'Detect speakers (2–6)' }, { id: 'one', label: 'One speaker' },
+  ...(['2', '3', '4', '5', '6'] as const).map(n => ({ id: n, label: `Exactly ${n} speakers` })),
+];
+
 export type ExportFormat = 'txt' | 'vtt' | 'srt' | 'json' | 'pdf';
 
 /** Still being worked on: the page polls it. */
@@ -170,15 +206,10 @@ export function statusPill(r: RecordingSummary): { label: string; tone: 'ok' | '
   }
 }
 
-/** The rail's second line after the pill: "3 speakers · You · 2 Nov, 08:52", "limit is 30 min · You · 31 Oct". */
-export function railNote(r: RecordingSummary, by: string, when: string, limits: TranscriptLimits): string {
-  const parts: string[] = [];
-  if (r.status === 'DONE' && r.speakerCount) parts.push(`${r.speakerCount} ${r.speakerCount === 1 ? 'speaker' : 'speakers'}`);
-  if (r.status === 'FAILED' && r.errorCode === 'TOO_LONG') parts.push(`limit is ${limits.maxMinutes ?? 30} min`);
-  if (r.partCount && r.partIndex) parts.push(`part ${r.partIndex} of ${r.partCount}`);
-  parts.push(by);
-  if (when) parts.push(when);
-  return parts.join(' · ');
+/** The table's shorter pill: a recording being transcribed says its share ("46%"), the rest as statusPill. */
+export function listPill(r: RecordingSummary): { label: string; tone: 'ok' | 'info' | 'warn' | 'crit' | 'neutral' } {
+  if (r.status === 'RUNNING' && r.progressPct != null) return { label: `${Math.round(r.progressPct)}%`, tone: 'info' };
+  return statusPill(r);
 }
 
 /** A failure in plain words with what to do next, and the one action that helps. */
@@ -296,14 +327,68 @@ export function speakerName(speakers: Speaker[] | null | undefined, key: number 
   return s?.name || s?.label || `Speaker ${key + 1}`;
 }
 
-/** Where each speaker talks, as fractions of the recording, for the lanes under the waveform. */
-export function lanesOf(segments: Segment[], speakers: Speaker[], durationMs: number): { key: number; spans: { left: number; width: number }[] }[] {
+/** One stretch of the player's track: where it starts and how wide (percent of the recording), and whose voice it is. */
+export interface TrackSpan { left: number; width: number; speaker: number; }
+
+/**
+ * The player's one track, coloured by speaker (tools Option A): each segment a span, a speaker's consecutive segments with
+ * no gap worth seeing drawn as one. A transcript without speakers is all one voice (0).
+ */
+export function trackSpans(segments: Segment[], durationMs: number): TrackSpan[] {
   if (!durationMs) return [];
-  return speakers.map(s => ({
-    key: s.key,
-    spans: segments.filter(seg => seg.speaker === s.key).map(seg => ({
-      left: (seg.startMs / durationMs) * 100, width: Math.max(0.3, ((seg.endMs - seg.startMs) / durationMs) * 100) })),
-  }));
+  const spans: TrackSpan[] = [];
+  for (const seg of segments) {
+    const speaker = seg.speaker ?? 0;
+    const left = (seg.startMs / durationMs) * 100;
+    const right = Math.min(100, (Math.max(seg.endMs, seg.startMs) / durationMs) * 100);
+    const last = spans[spans.length - 1];
+    if (last && last.speaker === speaker && left - (last.left + last.width) < 0.4) last.width = Math.max(last.width, right - last.left);
+    else spans.push({ left, width: Math.max(0.3, right - left), speaker });
+  }
+  return spans;
+}
+
+/** A line of the transcript table: a segment by its index, or a long stretch folded away ("32 segments · 00:41 – 05:44"). */
+export type TranscriptLine = { kind: 'seg'; index: number } | { kind: 'gap'; from: number; to: number; startMs: number; endMs: number };
+
+/**
+ * The table's lines while a search is on: the first few segments, each hit and the playing one with a little either side;
+ * a run of at least `minGap` other segments folds into one line the reader can open. With no anchors, every segment.
+ */
+export function transcriptLines(shown: number[], segments: Segment[], anchors: ReadonlySet<number>, opened: ReadonlySet<number>,
+                                options: { head?: number; around?: number; minGap?: number } = {}): TranscriptLine[] {
+  const head = options.head ?? 5, around = options.around ?? 1, minGap = options.minGap ?? 6;
+  if (!anchors.size) return shown.map(index => ({ kind: 'seg', index }));
+  const keep = new Set<number>();
+  shown.forEach((index, at) => {
+    if (at < head) keep.add(at);
+    if (anchors.has(index)) for (let k = at - around; k <= at + around; k++) keep.add(k);
+  });
+  const lines: TranscriptLine[] = [];
+  let at = 0;
+  while (at < shown.length) {
+    if (keep.has(at)) { lines.push({ kind: 'seg', index: shown[at] }); at++; continue; }
+    let end = at;
+    while (end < shown.length && !keep.has(end)) end++;
+    const from = shown[at], to = shown[end - 1];
+    if (end - at >= minGap && !opened.has(from)) {
+      lines.push({ kind: 'gap', from, to, startMs: segments[from].startMs, endMs: segments[to].endMs });
+    } else {
+      for (let k = at; k < end; k++) lines.push({ kind: 'seg', index: shown[k] });
+    }
+    at = end;
+  }
+  return lines;
+}
+
+/** "18:42 · English · 3 speakers": a recording's length, language and speakers, the meta line of its panel and page. */
+export function metaLine(r: RecordingDetail, language: (code: string) => string): string {
+  const parts = [clock(r.durationSeconds)];
+  if (r.language) parts.push(language(r.language));
+  const n = r.speakers?.length || r.speakerCount || 0;
+  if (n > 1) parts.push(`${n} speakers`);
+  else if (r.status === 'DONE') parts.push('1 speaker');
+  return parts.join(' · ');
 }
 
 /** The file name an export downloads as: the recording's name, made safe, with the format's extension. */
@@ -329,19 +414,4 @@ export function personalText(p: RecordingDetail['personal']): string {
   add(p.datesOfBirth, 'date of birth', 'dates of birth');
   add(p.phones, 'phone number', 'phone numbers');
   return parts.join(', ');
-}
-
-/** The waveform's bars, at most `bars` of them: the loudest of each run of peaks. */
-export function barsOf(peaks: number[] | null | undefined, bars: number): number[] {
-  const p = peaks ?? [];
-  if (!p.length || bars <= 0) return [];
-  if (p.length <= bars) return p.map(v => Math.max(0, Math.min(1, v)));
-  const out: number[] = [];
-  const step = p.length / bars;
-  for (let b = 0; b < bars; b++) {
-    let max = 0;
-    for (let i = Math.floor(b * step); i < Math.floor((b + 1) * step); i++) max = Math.max(max, p[i] ?? 0);
-    out.push(Math.max(0, Math.min(1, max)));
-  }
-  return out;
 }

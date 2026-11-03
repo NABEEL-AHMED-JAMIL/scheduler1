@@ -133,37 +133,52 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/list?limit=20&page=1",
       "GET /documentConverter.json/supportedFormats",
       "GET /documentConverter.json/limits",
-      "GET /documentConverter.json/conversions?days=30&page=1&size=50&view=everyone"
+      "GET /documentConverter.json/conversions?days=30&page=1&size=25"
     ],
     "headings": [
       "Document Converter",
-      "Convert files",
-      "Recent conversions (0 of 0)"
+      "Status",
+      "From",
+      "Kept",
+      "Made by"
     ],
     "buttons": [
       "30 days",
       "7 days",
       "90 days",
-      "Clear finished",
-      "Convert",
-      "Download selected",
-      "Everyone",
-      "Failed",
-      "From a bucket…",
-      "Limits",
-      "Mine",
-      "Not kept · 30 days in Recent conversions",
-      "Supported formats 2 families"
+      "All time",
+      "Convert files",
+      "Filters",
+      "From a bucket",
+      "Supported formats"
     ],
-    "columns": [],
+    "columns": [
+      [
+        "File",
+        "Conversion",
+        "Result",
+        "Status",
+        "By",
+        "When"
+      ]
+    ],
     "fields": [
       "Choose files…",
-      "Convert all to",
+      "Done, 0",
+      "Done0",
+      "Failed, 0",
+      "Failed0",
+      "Me, 0",
+      "Me0",
+      "Others, 0",
+      "Others0",
+      "Search conversions",
       "Search file name or format",
-      "Search recent conversions"
+      "Shortened, 0",
+      "Shortened0",
+      "to"
     ],
     "links": [
-      "/reports/from-pipelines",
       "/tools",
       "/tools/converter",
       "/tools/transcript"

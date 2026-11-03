@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpEvent, HttpResponse } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { API_BASE, ApiResponse } from '../../../core/api/api.config';
-import { ConversionPage, ConversionRow, ConverterLimits, FormatFamily, HistoryDays, HistoryView } from './converter.model';
+import { ConversionPage, ConversionQuery, ConversionRow, ConverterLimits, FormatFamily } from './converter.model';
 import { IntakeAnswer } from '../../documents/documents.model';
 
 const BASE = `${API_BASE}/documentConverter.json`;
@@ -32,9 +32,11 @@ export class ConverterApi {
     return this.http.post<ApiResponse<ConversionRow>>(`${BASE}/conversions`, form, { reportProgress: true, observe: 'events' });
   }
 
-  list(view: HistoryView, days: HistoryDays, q: string, page: number, size: number): Observable<ApiResponse<ConversionPage>> {
-    const params: Record<string, string> = { view, days: String(days), page: String(page), size: String(size) };
-    if (q.trim()) params['q'] = q.trim();
+  /** Recent conversions with each facet's counts (tools Option A): no `view`, so media-service answers with facets. */
+  list(query: ConversionQuery): Observable<ApiResponse<ConversionPage>> {
+    const params: Record<string, string> = { days: String(query.days), page: String(query.page), size: String(query.size) };
+    if (query.q.trim()) params['q'] = query.q.trim();
+    for (const key of ['status', 'from', 'kept', 'by'] as const) if (query[key].length) params[key] = query[key].join(',');
     return this.http.get<ApiResponse<ConversionPage>>(`${BASE}/conversions`, { params });
   }
 

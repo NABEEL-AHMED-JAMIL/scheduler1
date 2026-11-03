@@ -1,6 +1,6 @@
-<section class="card p-0" data-test="new-transcript" aria-labelledby="nt-h">
-  <header class="tr-head"><h2 id="nt-h" class="text-base font-semibold m-0">New transcript</h2></header>
-  <div class="p-4 flex flex-col gap-4">
+<section [class.card]="framed()" [class.p-0]="framed()" data-test="new-transcript" aria-label="New transcript">
+  @if (framed()) { <header class="tr-head"><h2 class="text-base font-semibold m-0">New transcript</h2></header> }
+  <div class="flex flex-col gap-4" [class.p-4]="framed()">
     <div class="nt-drop" [class.nt-drop-on]="dragging()" (dragover)="$event.preventDefault(); dragging.set(true)"
          (dragleave)="dragging.set(false)" (drop)="onDrop($event)" data-test="transcript-drop">
       <span class="nt-glyph"><app-icon name="mic" /></span>
@@ -63,14 +63,13 @@
         <label class="label" for="nt-spk">Speakers</label>
         <select id="nt-spk" class="input" [disabled]="!speakersAvailable()" (change)="speakers.set($any($event.target).value)">
           @if (speakersAvailable()) {
-            <option value="auto" [selected]="speakers() === 'auto'">Detect speakers (2–6)</option>
-            <option value="one" [selected]="speakers() === 'one'">One speaker</option>
+            @for (c of speakerChoices; track c.id) { <option [value]="c.id" [selected]="speakers() === c.id">{{ c.label }}</option> }
           } @else {
             <option value="one" selected>No speaker labels</option>
           }
         </select>
         <p class="field-note text-[color:var(--text-muted)]" data-test="speakers-note">
-          {{ speakersAvailable() ? 'One person dictating? Choose "One speaker" to skip it.' : (limits().speakers?.reason || "Speaker labels aren't installed on this platform.") }}</p>
+          {{ speakersAvailable() ? 'One person dictating? Choose "One speaker". Know how many talk? Choose the number.' : (limits().speakers?.reason || "Speaker labels aren't installed on this platform.") }}</p>
       </div>
     </div>
 

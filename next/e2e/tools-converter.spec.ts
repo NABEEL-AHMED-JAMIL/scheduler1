@@ -162,4 +162,16 @@ test.describe('Document Converter (live, owner #26)', () => {
     info.annotations.push({ type: 'burst', description: `${answers.length} at once: ${answers.length - busy.length} converted, ${busy.length} told busy` });
   });
 
+  test('TC-C09: Recent conversions answer facets with counts (status, from, kept, by), all time with days 0', async ({ request }) => {
+    const all = await getJson(request, s, '/documentConverter.json/conversions?days=0&page=1&size=5');
+    expect(Object.keys(all.data.facets)).toEqual(expect.arrayContaining(['status', 'from', 'kept', 'by']));
+    expect(all.data.rows.length).toBeLessThanOrEqual(5);
+    const words = await getJson(request, s, '/documentConverter.json/conversions?days=0&from=word&status=DONE,SHORTENED&page=1&size=50');
+    const word = ['doc', 'docx', 'docm', 'dot', 'dotx', 'odt', 'ott', 'rtf', 'txt', 'wpd', 'fodt'];
+    expect(words.data.rows.every((r: { inputFormat: string; outcome: string }) => word.includes(r.inputFormat) && r.outcome !== 'FAILED')).toBe(true);
+    // Each facet counts over the window and the search, whatever is picked in it.
+    expect(words.data.facets.from).toEqual(all.data.facets.from);
+    const refused = await request.get(`${api}/documentConverter.json/conversions`, { headers: authOf(s), params: { days: '0', from: 'zip' } });
+    expect((await refused.json()).status).toBe('ERROR');
+  });
 });

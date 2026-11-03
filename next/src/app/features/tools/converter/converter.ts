@@ -1,19 +1,17 @@
-import { Component, DestroyRef, LOCALE_ID, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, ElementRef, LOCALE_ID, OnInit, computed, inject, signal, viewChild } from '@angular/core';
 import { HttpEventType } from '@angular/common/http';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { Dialog } from '@angular/cdk/dialog';
-import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { Subscription } from 'rxjs';
 import { API_SUCCESS } from '../../../core/api/api.config';
 import { AuthService } from '../../../core/auth/auth.service';
 import { isOwnPlatformSignIn } from '../../../core/auth/workspace-data';
 import { instantOf } from '../../../core/instant';
+import { TabCounts } from '../../../core/nav/tab-counts';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { Icon } from '../../../shared/ui/icon';
 import { PageHeader } from '../../../shared/ui/page-header';
-import { Segmented, SegmentOption } from '../../../shared/ui/segmented';
-import { Pagination } from '../../../shared/ui/pagination';
-import { PAGE_SIZES } from '../../../shared/ui/pager';
+import { Segmented } from '../../../shared/ui/segmented';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { AppLoading, InlineStatus, createLoadState } from '../../../shared/ui/loading';
 import { confirmWith } from '../../../shared/ui/confirm';
@@ -22,28 +20,35 @@ import { sidePanelConfig } from '../../../shared/ui/side-panel';
 import { ObjectPicker, PickedObject, objectPickerConfig } from '../../../shared/ui/object-picker';
 import { StorageService } from '../../objects/storage.service';
 import { KeepChoice, KeepDialog, KeepDialogData, monthFolder } from '../keep-dialog';
-import { saveBlob } from '../tools-shared';
+import { DAY_OPTIONS, ToolDays, rangeText, saveBlob } from '../tools-shared';
+import { FacetGroup, FacetPicks, ToolsFacets, facetOptions, togglePick } from '../tools-facets';
 import { ConverterApi } from './converter.api';
-import { ConversionPreview, PreviewAction } from './conversion-preview';
+import { ConversionPanel, LocalItem, PanelAction } from './conversion-panel';
 import { FormatsSheet } from './formats-sheet';
 import {
-  BUSY_RETRY_MS, ConversionRow, ConverterLimits, FormatFamily, HistoryDays, HistoryView, QUEUE_MAX, QUEUE_PARALLEL, QueueItem,
-  assistantPrompt, badgeTone, defaultTarget, documentsTakes, doneText, dropHint, extensionOf, familyOf, folderOf, kindLabel,
-  notKeptText, problemOf, queueChip, queueProblem, resultText, statusNote, statusOf,
+  BUSY_RETRY_MS, BY_WORDS, ConversionFacets, ConversionRow, ConverterLimits, FROM_WORDS, FormatFamily, KEPT_WORDS, QUEUE_MAX,
+  QUEUE_PARALLEL, QueueItem, STATUS_WORDS, assistantPrompt, badgeTone, conversionText, defaultTarget, extensionOf, familyOf,
+  folderOf, notKeptText, problemOf, queueProblem, resultShort, statusNote, statusOf, stripHint,
 } from './converter.model';
 
+const PAGE_SIZE = 25;
+
+/** A row of the table: a file still in the page's queue, or a conversion the server recorded. */
+export type TableRow = { kind: 'local'; item: QueueItem } | { kind: 'row'; row: ConversionRow };
+
 /**
- * The Document Converter (tools redesign, owner-approved 2026-11-02): several files at once, each converted on the server
- * and recorded in Recent conversions for 30 days (failed ones too) unless kept in a bucket; the result beside its original
- * with the converter's checks; and the next step one click away -- Download, Send to Documents, Start a pipeline, Keep in a
- * bucket. A PDF from a dataset or a run is made from Reports › From pipelines (the old ?mode= links land there).
+ * The Document Converter (tools Option A, owner 2026-11-02; design converter-a.html): the conversion history is the page,
+ * as the Report library -- facets with counts (Status, From, Kept, Made by), one search, 7 / 30 / 90 days or all time, and
+ * the table. One slim strip above it takes files (dropped anywhere on the page, chosen, or from a bucket): they convert at
+ * once, at most two at a time, and show at the top of the table with their progress. A row opens the side panel: the
+ * result beside its original page by page, the converter's checks, and Next steps. A PDF from a dataset or a run is made
+ * from Reports › From pipelines (the old ?mode= links land there).
  */
 @Component({
   selector: 'app-converter',
-  imports: [PageHeader, Icon, RouterLink, Segmented, Pagination, ServerTimePipe, AppLoading, InlineStatus, ConversionPreview,
-    CdkMenu, CdkMenuItem, CdkMenuTrigger],
+  imports: [PageHeader, Icon, Segmented, ServerTimePipe, AppLoading, InlineStatus, ToolsFacets, ConversionPanel],
   templateUrl: './converter.html',
-  styleUrl: './converter.css',
+  styleUrls: ['../tools-explorer.css', './converter.css'],
 })
 export class Converter implements OnInit {
   private readonly api = inject(ConverterApi);
@@ -53,6 +58,7 @@ export class Converter implements OnInit {
   private readonly router = inject(Router, { optional: true });
   private readonly route = inject(ActivatedRoute, { optional: true });
   private readonly auth = inject(AuthService, { optional: true });
+  private readonly tabCounts = inject(TabCounts, { optional: true });
   private readonly when = new ServerTimePipe(inject(LOCALE_ID));
 
   /** The platform administrator's own sign-in converts uploads only (ZT-A12): a bucket is a workspace's data. */
@@ -60,63 +66,97 @@ export class Converter implements OnInit {
   readonly me = computed(() => (typeof this.auth?.user === 'function' ? this.auth.user()?.appUserId : null) ?? null);
   /** Send to Documents is offered to whoever may open Documents' intake. */
   readonly canSend = computed(() => !!this.auth?.canOpen?.('document-intelligence'));
+  readonly filesInput = viewChild<ElementRef<HTMLInputElement>>('files');
 
   readonly families = signal<FormatFamily[]>([]);
   readonly formatsState = createLoadState();
   readonly limits = signal<ConverterLimits | null>(null);
-  readonly limitsState = createLoadState();
-  readonly hint = computed(() => dropHint(this.limits()));
-  readonly allTargets = computed(() => [...new Set(this.families().flatMap(f => f.outputFormats))].sort());
+  readonly hint = computed(() => stripHint(this.limits()));
+  readonly allTargets = computed(() => {
+    const all = [...new Set(this.families().flatMap(f => f.outputFormats))].sort();
+    return all.length ? all : ['pdf'];
+  });
 
   // ------------------------------------------------------------------------------------------------------------ queue
   readonly queue = signal<QueueItem[]>([]);
   private nextId = 1;
   private readonly sending = new Map<number, Subscription>();
+  private readonly timers = new Set<ReturnType<typeof setTimeout>>();
+  /** The format files dropped now become (the strip's "to"): PDF unless the reader picks another. */
   readonly convertAllTo = signal('pdf');
-  /** Where results are kept: a bucket and folder, or null (30 days in Recent conversions). */
-  readonly keep = signal<KeepChoice | null>(null);
   readonly dragging = signal(false);
-  readonly chip = computed(() => queueChip(this.queue(), this.limits()));
-  readonly waitingCount = computed(() => this.queue().filter(i => i.state === 'waiting' && !i.asked).length);
-  readonly finishedCount = computed(() => this.queue().filter(i => i.state === 'done' || i.state === 'failed').length);
-  readonly selected = signal<ConversionRow | null>(null);
+  readonly inFlight = computed(() => this.queue().filter(i => i.state === 'waiting' || i.state === 'uploading' || i.state === 'converting'));
 
   // ---------------------------------------------------------------------------------------------------------- history
-  readonly viewOptions = computed<SegmentOption<HistoryView>[]>(() => [
-    { id: 'everyone', label: 'Everyone' },
-    { id: 'mine', label: 'Mine' },
-    { id: 'failed', label: this.failedCount() ? `Failed ${this.failedCount()}` : 'Failed' },
-  ]);
-  readonly dayOptions: SegmentOption<'7' | '30' | '90'>[] = [
-    { id: '7', label: '7 days' }, { id: '30', label: '30 days' }, { id: '90', label: '90 days' },
-  ];
-  readonly view = signal<HistoryView>('everyone');
-  readonly days = signal<'7' | '30' | '90'>('30');
+  readonly dayOptions = DAY_OPTIONS;
+  readonly days = signal<ToolDays>('30');
   readonly query = signal('');
   readonly page = signal(1);
-  readonly pageSize = signal(PAGE_SIZES[0]);
+  readonly pageSize = signal(PAGE_SIZE);
+  readonly picks = signal<FacetPicks>({});
   readonly rows = signal<ConversionRow[]>([]);
   readonly total = signal(0);
-  readonly failedCount = signal(0);
+  readonly all = signal(0);
+  readonly counts = signal<ConversionFacets>({});
   readonly historyState = createLoadState();
-  readonly picked = signal<ReadonlySet<number>>(new Set());
-  readonly allPicked = computed(() => this.rows().length > 0 && this.rows().every(r => this.picked().has(r.conversionId)));
+  readonly facetsOpen = signal(false);
   private historyLoad: Subscription | null = null;
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
 
+  /** The conversion open in the side panel (kept while the list reloads), or a file of the queue. */
+  readonly selected = signal<ConversionRow | null>(null);
+  readonly selectedLocal = signal<number | null>(null);
+  readonly panelOpen = computed(() => !!this.selected() || this.localPanel() !== null);
+
+  readonly groups = computed<FacetGroup[]>(() => {
+    const c = this.counts(), p = this.picks();
+    const status = { ...(c.status ?? {}), CONVERTING: this.inFlight().length };
+    const always = ['DONE', ...(this.inFlight().length ? ['CONVERTING'] : []), 'SHORTENED', 'FAILED'];
+    return [
+      { key: 'status', title: 'Status', options: facetOptions(status, STATUS_WORDS, p['status'] ?? [], always) },
+      { key: 'from', title: 'From', options: facetOptions(c.from, FROM_WORDS, p['from'] ?? []) },
+      { key: 'kept', title: 'Kept', options: facetOptions(c.kept, KEPT_WORDS, p['kept'] ?? []) },
+      { key: 'by', title: 'Made by', options: facetOptions(c.by, BY_WORDS, p['by'] ?? [], ['me', 'others']) },
+    ];
+  });
+
+  /** The queue's files on top (unless the facets leave them out), then the server's rows. */
+  readonly tableRows = computed<TableRow[]>(() => {
+    const p = this.picks(), status = p['status'] ?? [];
+    const listed = new Set(this.rows().map(r => r.conversionId));
+    const q = this.query().trim().toLowerCase();
+    const plain = !(p['from'] ?? []).length && !(p['kept'] ?? []).length && !(p['by'] ?? []).includes('others');
+    const local = this.queue().filter(i => {
+      if (i.row && listed.has(i.row.conversionId)) return false;
+      if (!plain || (q && !i.name.toLowerCase().includes(q))) return false;
+      const key = i.row ? i.row.outcome : i.state === 'failed' ? 'FAILED' : 'CONVERTING';
+      return !status.length || status.includes(key);
+    }).reverse();
+    const server = !status.length || status.some(s => s !== 'CONVERTING') ? this.rows() : [];
+    return [...local.map(item => ({ kind: 'local' as const, item })), ...server.map(row => ({ kind: 'row' as const, row }))];
+  });
+
+  readonly localPanel = computed<LocalItem | null>(() => {
+    const id = this.selectedLocal();
+    const item = id == null ? null : this.queue().find(i => i.id === id);
+    return item ? { name: item.name, pill: this.localPill(item), meta: this.localConversion(item), problem: item.problem } : null;
+  });
+
+  readonly footText = computed(() => rangeText(this.page(), this.pageSize(), this.total()));
+  readonly pages = computed(() => Math.max(1, Math.ceil(this.total() / this.pageSize())));
+  readonly filtered = computed(() => !!this.query().trim() || Object.values(this.picks()).some(v => v.length));
+
   readonly size = formatSize;
   readonly badgeTone = badgeTone;
-  readonly kindLabel = kindLabel;
-  readonly doneText = doneText;
-  readonly resultText = resultText;
+  readonly conversionText = conversionText;
+  readonly resultShort = resultShort;
   readonly statusOf = statusOf;
-  readonly folderOf = folderOf;
-  readonly documentsTakes = documentsTakes;
-  readonly queueMax = QUEUE_MAX;
 
   constructor() {
     inject(DestroyRef).onDestroy(() => {
       this.sending.forEach(s => s.unsubscribe());
+      this.timers.forEach(t => clearTimeout(t));
+      this.historyLoad?.unsubscribe();
       if (this.searchTimer) clearTimeout(this.searchTimer);
     });
   }
@@ -140,21 +180,18 @@ export class Converter implements OnInit {
         if (r.status !== API_SUCCESS) { this.formatsState.fail(r, 'The supported formats could not be read.'); return; }
         this.families.set(r.data ?? []);
         this.formatsState.done();
-        // Files dropped before the formats arrived get their family and target now.
-        this.queue.update(list => list.map(i => i.state === 'waiting' && !i.problem ? this.withTarget(i) : i));
+        // Files dropped before the formats arrived get their family and target now, and go.
+        this.queue.update(list => list.map(i => i.state === 'waiting' && !i.problem && !i.target ? this.withTarget(i) : i));
+        this.pump();
       },
       error: err => this.formatsState.fail(err, 'The supported formats could not be read.'),
     });
   }
 
   loadLimits(): void {
-    this.limitsState.start();
     this.api.limits().subscribe({
-      next: r => {
-        if (r.status === API_SUCCESS && typeof r.data?.maxFileSizeMb === 'number') { this.limits.set(r.data); this.limitsState.done(); }
-        else this.limitsState.fail(r, 'The limits could not be read.');
-      },
-      error: err => this.limitsState.fail(err, 'The limits could not be read.'),
+      next: r => { if (r.status === API_SUCCESS && typeof r.data?.maxFileSizeMb === 'number') this.limits.set(r.data); },
+      error: () => undefined,
     });
   }
 
@@ -162,7 +199,17 @@ export class Converter implements OnInit {
     this.dialog.open(FormatsSheet, sidePanelConfig({ families: this.families() }, 'narrow', 'right'));
   }
 
+  chooseFiles(): void {
+    this.filesInput()?.nativeElement.click();
+  }
+
   // ------------------------------------------------------------------------------------------------- adding to queue
+
+  onDragOver(event: DragEvent): void {
+    if (!event.dataTransfer?.types?.includes('Files')) return;
+    event.preventDefault();
+    this.dragging.set(true);
+  }
 
   onDrop(event: DragEvent): void {
     event.preventDefault();
@@ -176,12 +223,14 @@ export class Converter implements OnInit {
     input.value = '';
   }
 
-  /** Files join the queue (at most QUEUE_MAX in it); a type the converter does not read is said at once. */
+  /** Files join the queue (at most QUEUE_MAX on their way at once) and convert at once; a type it does not read is said. */
   add(files: File[]): void {
-    const room = QUEUE_MAX - this.queue().length;
-    if (files.length > room) this.toast.warn(`The queue holds ${QUEUE_MAX} files; ${files.length - Math.max(0, room)} were left out. Clear finished ones and add them again.`);
+    const room = QUEUE_MAX - this.inFlight().length;
+    if (files.length > room) this.toast.warn(`Up to ${QUEUE_MAX} files convert at once; ${files.length - Math.max(0, room)} were left out. Add them when these are done.`);
     const added = files.slice(0, Math.max(0, room)).map(file => this.item(file.name, file.size, file, null));
+    if (!added.length) return;
     this.queue.update(list => [...list, ...added]);
+    this.pump();
   }
 
   fromBucket(): void {
@@ -190,14 +239,15 @@ export class Converter implements OnInit {
       extensions: this.families().flatMap(f => f.inputFormats),
     })).closed.subscribe(picked => {
       if (!picked) return;
-      if (this.queue().length >= QUEUE_MAX) { this.toast.warn(`The queue holds ${QUEUE_MAX} files. Clear finished ones first.`); return; }
+      if (this.inFlight().length >= QUEUE_MAX) { this.toast.warn(`Up to ${QUEUE_MAX} files convert at once. Add it when these are done.`); return; }
       this.queue.update(list => [...list, this.item(picked.name, picked.size ?? null, null, { bucket: picked.bucket, key: picked.key })]);
+      this.pump();
     });
   }
 
   private item(name: string, size: number | null, file: File | null, source: { bucket: string; key: string } | null): QueueItem {
     const base: QueueItem = { id: this.nextId++, name, size, extension: extensionOf(name), file, source, target: '', state: 'waiting',
-      progress: null, asked: false, busy: false, problem: null, row: null };
+      progress: null, asked: true, busy: false, problem: null, row: null, addedAt: new Date() };
     return this.withTarget(base);
   }
 
@@ -208,49 +258,34 @@ export class Converter implements OnInit {
     return { ...i, target: i.target || defaultTarget(familyOf(this.families(), i.extension), i.extension, this.convertAllTo()) };
   }
 
-  targetsOf(i: QueueItem): string[] {
-    return familyOf(this.families(), i.extension)?.outputFormats ?? [];
-  }
-
-  setTarget(id: number, target: string): void {
-    this.queue.update(list => list.map(i => i.id === id ? { ...i, target } : i));
-  }
-
-  /** "Convert all to": every waiting file whose family has it takes it. */
+  /** The strip's "to": the files waiting take it when their family has it. */
   setConvertAllTo(target: string): void {
     this.convertAllTo.set(target);
-    this.queue.update(list => list.map(i => i.state === 'waiting' && !i.asked && this.targetsOf(i).includes(target) ? { ...i, target } : i));
+    this.queue.update(list => list.map(i => i.state === 'waiting' && (familyOf(this.families(), i.extension)?.outputFormats ?? []).includes(target)
+      ? { ...i, target } : i));
   }
 
-  remove(id: number): void {
+  removeLocal(id: number): void {
     this.sending.get(id)?.unsubscribe();
     this.sending.delete(id);
     this.queue.update(list => list.filter(i => i.id !== id));
-  }
-
-  clearFinished(): void {
-    this.queue.update(list => list.filter(i => i.state !== 'done' && i.state !== 'failed'));
-  }
-
-  chooseKeep(): void {
-    const current = this.keep();
-    this.dialog.open<KeepChoice | undefined>(KeepDialog, { data: {
-      heading: 'Keep results in a bucket', subtitle: 'Each result is saved to this folder and listed with a link to it.',
-      confirmLabel: 'Keep them here', folder: current?.folder ?? monthFolder('converted'), bucket: current?.bucket,
-    } satisfies KeepDialogData }).closed.subscribe(choice => { if (choice) this.keep.set(choice); });
+    if (this.selectedLocal() === id) this.selectedLocal.set(null);
+    this.pump();
   }
 
   // ------------------------------------------------------------------------------------------------------- converting
 
+  /** Kept for the unit specs and the old Convert button's callers: everything waiting is asked to go. */
   convertWaiting(): void {
     this.queue.update(list => list.map(i => i.state === 'waiting' && !i.problem ? { ...i, asked: true } : i));
     this.pump();
   }
 
-  /** Starts asked files while fewer than QUEUE_PARALLEL are on their way. */
+  /** Starts asked files while fewer than QUEUE_PARALLEL are on their way (none before the formats are known). */
   private pump(): void {
+    if (!this.families().length) return;
     const active = this.queue().filter(i => i.state === 'uploading' || i.state === 'converting').length;
-    const next = this.queue().filter(i => i.state === 'waiting' && i.asked && !i.busy).slice(0, Math.max(0, QUEUE_PARALLEL - active));
+    const next = this.queue().filter(i => i.state === 'waiting' && i.asked && !i.busy && !!i.target).slice(0, Math.max(0, QUEUE_PARALLEL - active));
     next.forEach(i => void this.send(i));
   }
 
@@ -277,8 +312,7 @@ export class Converter implements OnInit {
       }
     }
     if (!this.queue().some(i => i.id === item.id)) return;
-    const keep = this.keep();
-    const sub = this.api.convert(file!, now.target, keep ? { bucketName: keep.bucket, targetFolder: keep.folder } : null).subscribe({
+    const sub = this.api.convert(file!, now.target, null).subscribe({
       next: event => {
         if (event.type === HttpEventType.UploadProgress) {
           const done = event.total ? Math.round((event.loaded / event.total) * 100) : 0;
@@ -290,9 +324,8 @@ export class Converter implements OnInit {
         const r = event.body;
         if (r?.status === API_SUCCESS && r.data) {
           const row = r.data;
-          this.patch(item.id, { state: row.outcome === 'FAILED' ? 'failed' : 'done', row, progress: null,
-            problem: problemOf(row, this.limits()) });
-          if (!this.selected() && row.outcome !== 'FAILED') this.selected.set(row);
+          this.patch(item.id, { state: row.outcome === 'FAILED' ? 'failed' : 'done', row, progress: null, problem: problemOf(row, this.limits()) });
+          if (this.selectedLocal() === item.id) { this.selectedLocal.set(null); this.selected.set(row); }
         } else {
           this.patch(item.id, { state: 'failed', progress: null, problem: { title: 'The conversion failed.', icon: 'alert',
             text: r?.message || 'Try again; if it keeps failing, ask your administrator.' } });
@@ -304,7 +337,8 @@ export class Converter implements OnInit {
         if (err?.status === 429) {
           // Busy: nothing is wrong with the file. It waits and is asked again by itself.
           this.patch(item.id, { state: 'waiting', busy: true, progress: null });
-          setTimeout(() => { this.patch(item.id, { busy: false }); this.pump(); }, BUSY_RETRY_MS);
+          const timer = setTimeout(() => { this.timers.delete(timer); this.patch(item.id, { busy: false }); this.pump(); }, BUSY_RETRY_MS);
+          this.timers.add(timer);
           this.loadLimits();
           return;
         }
@@ -319,30 +353,66 @@ export class Converter implements OnInit {
   private afterOne(): void {
     this.pump();
     this.loadHistory();
-    this.loadLimits();
   }
 
-  /** Waiting · next in line / Waiting · 2nd in line / Waiting for Convert. */
+  /** "Waiting · press Convert" was the old queue's; now: busy, next in line, or n ahead. */
   waitingText(i: QueueItem): string {
     if (i.busy) return 'The converter is busy · trying again by itself';
-    if (!i.asked) return 'Waiting · press Convert';
     const ahead = this.queue().filter(q => q.state === 'waiting' && q.asked && q.id < i.id).length;
     return ahead === 0 ? 'Waiting · next in line' : `Waiting · ${ahead} ahead`;
   }
 
-  select(row: ConversionRow | null): void {
-    this.selected.set(row);
+  /** A queue file's status pill: Waiting, Converter busy, Converting 70%, or its failure. */
+  localPill(i: QueueItem): LocalItem['pill'] {
+    if (i.row) { const s = statusOf(i.row); return { label: s.label, tone: s.tone }; }
+    switch (i.state) {
+      case 'uploading': return { label: `Converting ${Math.min(99, i.progress ?? 0)}%`, tone: 'info' };
+      case 'converting': return { label: 'Converting', tone: 'info' };
+      case 'failed': return { label: i.problem?.title.startsWith('Not a format') || i.problem?.title.startsWith('A recording') ? 'Not supported' : 'Failed', tone: 'crit' };
+      default: return i.busy ? { label: 'Converter busy', tone: 'warn' } : { label: 'Waiting', tone: 'neutral' };
+    }
   }
 
-  // ------------------------------------------------------------------------------------------------------------ result
+  localConversion(i: QueueItem): string {
+    if (i.row) return conversionText(i.row);
+    return `${(i.extension || '?').toUpperCase()} → ${i.target && i.state !== 'failed' ? i.target.toUpperCase() : '—'}`;
+  }
 
-  onPreview(action: PreviewAction): void {
+  // ------------------------------------------------------------------------------------------------------- the panel
+
+  select(row: ConversionRow): void {
+    this.selectedLocal.set(null);
+    this.selected.set(this.selected()?.conversionId === row.conversionId ? null : row);
+  }
+
+  selectLocal(i: QueueItem): void {
+    if (i.row) { this.select(i.row); return; }
+    this.selected.set(null);
+    this.selectedLocal.set(this.selectedLocal() === i.id ? null : i.id);
+  }
+
+  closePanel(): void {
+    this.selected.set(null);
+    this.selectedLocal.set(null);
+  }
+
+  /** Enter or Space on a focused row opens it, as a click does. */
+  openKey(event: KeyboardEvent): boolean {
+    if (event.key !== 'Enter' && event.key !== ' ') return false;
+    event.preventDefault();
+    return true;
+  }
+
+  onPanel(action: PanelAction): void {
+    const local = this.selectedLocal();
+    if (action === 'remove' && local != null) { this.removeLocal(local); return; }
     const row = this.selected();
     if (!row) return;
     if (action === 'download') this.download(row);
     else if (action === 'documents') void this.sendToDocuments(row);
     else if (action === 'pipeline') this.startPipeline(row);
-    else this.keepRow(row);
+    else if (action === 'keep') this.keepRow(row);
+    else if (action === 'delete') void this.removeRow(row);
   }
 
   download(row: ConversionRow): void {
@@ -355,7 +425,7 @@ export class Converter implements OnInit {
   async sendToDocuments(row: ConversionRow): Promise<void> {
     const ok = await confirmWith(this.dialog, {
       title: 'Send to Documents',
-      body: `${row.outputFileName || row.name} goes to Documents as an upload: it is read, given a document type and put in the review queue.`,
+      body: `${row.outputFileName || row.name} goes to Documents as an upload: it is read, given a document type (for example Discharge summary) and put in the review queue.`,
       confirmLabel: 'Send',
     });
     if (!ok) return;
@@ -376,7 +446,7 @@ export class Converter implements OnInit {
   keepRow(row: ConversionRow, then?: (kept: ConversionRow) => void, words?: Partial<KeepDialogData>): void {
     this.dialog.open<KeepChoice | undefined>(KeepDialog, { data: {
       heading: 'Keep in a bucket', subtitle: 'The result is saved to this folder and kept until you remove it there.',
-      confirmLabel: 'Keep it', folder: this.keep()?.folder ?? monthFolder('converted'), bucket: this.keep()?.bucket, ...words,
+      confirmLabel: 'Keep it', folder: monthFolder('converted'), ...words,
     } satisfies KeepDialogData }).closed.subscribe(choice => {
       if (!choice) return;
       this.api.keep(row.conversionId, choice.bucket, choice.folder).subscribe({
@@ -402,59 +472,6 @@ export class Converter implements OnInit {
       subtitle: 'A pipeline reads its files from a bucket. Keep the result there, then describe the pipeline to the AI Assistant.' });
   }
 
-  private replaceRow(row: ConversionRow): void {
-    if (this.selected()?.conversionId === row.conversionId) this.selected.set(row);
-    this.rows.update(list => list.map(r => r.conversionId === row.conversionId ? row : r));
-    this.queue.update(list => list.map(i => i.row?.conversionId === row.conversionId ? { ...i, row } : i));
-  }
-
-  // ----------------------------------------------------------------------------------------------------------- history
-
-  loadHistory(): void {
-    this.historyLoad?.unsubscribe();
-    this.historyState.start();
-    this.historyLoad = this.api.list(this.view(), Number(this.days()) as HistoryDays, this.query(), this.page(), this.pageSize()).subscribe({
-      next: r => {
-        if (r.status !== API_SUCCESS || !r.data) { this.historyState.fail(r, 'Recent conversions could not be read.'); return; }
-        this.rows.set(r.data.rows ?? []);
-        this.total.set(r.data.total ?? 0);
-        this.failedCount.set(r.data.failedCount ?? 0);
-        const ids = new Set(this.rows().map(x => x.conversionId));
-        this.picked.update(set => new Set([...set].filter(id => ids.has(id))));
-        this.historyState.done();
-      },
-      error: err => this.historyState.fail(err, 'Recent conversions could not be read.'),
-    });
-  }
-
-  setView(view: HistoryView): void { this.view.set(view); this.page.set(1); this.loadHistory(); }
-  setDays(days: '7' | '30' | '90'): void { this.days.set(days); this.page.set(1); this.loadHistory(); }
-  goTo(page: number): void { this.page.set(page); this.loadHistory(); }
-  setPageSize(size: number): void { this.pageSize.set(size); this.page.set(1); this.loadHistory(); }
-
-  setQuery(value: string): void {
-    this.query.set(value);
-    if (this.searchTimer) clearTimeout(this.searchTimer);
-    this.searchTimer = setTimeout(() => { this.page.set(1); this.loadHistory(); }, 300);
-  }
-
-  togglePick(id: number): void {
-    this.picked.update(set => { const next = new Set(set); if (next.has(id)) next.delete(id); else next.add(id); return next; });
-  }
-
-  togglePickAll(): void {
-    this.picked.set(this.allPicked() ? new Set() : new Set(this.rows().filter(r => r.outcome !== 'FAILED').map(r => r.conversionId)));
-  }
-
-  downloadPicked(): void {
-    const ids = [...this.picked()];
-    if (!ids.length) return;
-    this.api.download(ids).subscribe({
-      next: blob => saveBlob(blob, `conversions-${ids.length}.zip`),
-      error: () => this.toast.error('The selected files could not be downloaded.'),
-    });
-  }
-
   async removeRow(row: ConversionRow): Promise<void> {
     const ok = await confirmWith(this.dialog, {
       title: 'Delete conversion',
@@ -468,6 +485,7 @@ export class Converter implements OnInit {
       next: r => {
         if (r.status !== API_SUCCESS) { this.toast.error(r.message || 'It could not be deleted.'); return; }
         if (this.selected()?.conversionId === row.conversionId) this.selected.set(null);
+        this.queue.update(list => list.filter(i => i.row?.conversionId !== row.conversionId));
         this.toast.success(`${row.name} deleted.`);
         this.loadHistory();
       },
@@ -475,21 +493,70 @@ export class Converter implements OnInit {
     });
   }
 
-  view_(row: ConversionRow): void {
-    this.selected.set(row);
-    if (typeof document !== 'undefined') document.querySelector('[data-test=conversion-preview]')?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+  private replaceRow(row: ConversionRow): void {
+    if (this.selected()?.conversionId === row.conversionId) this.selected.set(row);
+    this.rows.update(list => list.map(r => r.conversionId === row.conversionId ? row : r));
+    this.queue.update(list => list.map(i => i.row?.conversionId === row.conversionId ? { ...i, row } : i));
   }
 
-  byText(row: ConversionRow): string {
+  // ----------------------------------------------------------------------------------------------------------- history
+
+  loadHistory(): void {
+    this.historyLoad?.unsubscribe();
+    this.historyState.start();
+    const p = this.picks();
+    this.historyLoad = this.api.list({ days: Number(this.days()), q: this.query(), page: this.page(), size: this.pageSize(),
+      status: (p['status'] ?? []).filter(s => s !== 'CONVERTING'), from: p['from'] ?? [], kept: p['kept'] ?? [], by: p['by'] ?? [] }).subscribe({
+      next: r => {
+        if (r.status !== API_SUCCESS || !r.data) { this.historyState.fail(r, 'Recent conversions could not be read.'); return; }
+        this.rows.set(r.data.rows ?? []);
+        this.total.set(r.data.total ?? 0);
+        this.all.set(r.data.all ?? r.data.total ?? 0);
+        this.counts.set(r.data.facets ?? {});
+        this.tabCounts?.set({ '/tools/converter': this.all() });
+        // The open conversion follows its fresh copy (Sent to Documents, kept).
+        const open = this.selected();
+        const fresh = open ? this.rows().find(x => x.conversionId === open.conversionId) : null;
+        if (fresh) this.selected.set(fresh);
+        this.historyState.done();
+      },
+      error: err => this.historyState.fail(err, 'Recent conversions could not be read.'),
+    });
+  }
+
+  setDays(days: ToolDays): void { this.days.set(days); this.page.set(1); this.loadHistory(); }
+  goTo(page: number): void { this.page.set(Math.min(this.pages(), Math.max(1, page))); this.loadHistory(); }
+
+  toggleFacet(change: { key: string; value: string }): void {
+    this.picks.set(togglePick(this.picks(), change.key, change.value));
+    this.page.set(1);
+    this.loadHistory();
+  }
+
+  clearFilters(): void {
+    this.picks.set({});
+    this.query.set('');
+    this.page.set(1);
+    this.loadHistory();
+  }
+
+  setQuery(value: string): void {
+    this.query.set(value);
+    if (this.searchTimer) clearTimeout(this.searchTimer);
+    this.searchTimer = setTimeout(() => { this.page.set(1); this.loadHistory(); }, 300);
+  }
+
+  byText(row: { createdBy?: number | null; createdByName?: string | null }): string {
     if (row.createdBy != null && row.createdBy === this.me()) return 'You';
     return row.createdByName || '—';
   }
 
   keptText(row: ConversionRow): string {
     const at = instantOf(row.expiresAt ?? '');
-    return notKeptText(row, at ? this.when.transform(at, 'day') : null);
+    return notKeptText(row, at ? this.when.transform(at, 'day') : null).replace(/^Not kept · until /, 'Kept until ');
   }
 
+  /** The words under a failed or shortened row's pill, as its title: "61.2 MB, limit 50 MB". */
   note(row: ConversionRow): string {
     return statusNote(row, this.limits());
   }

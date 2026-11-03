@@ -1,0 +1,45 @@
+/* Tools Option A (owner 2026-11-02; designs converter-a and transcript-a): facets | list | side panel, as the Report library.
+   Under 1500 px the columns narrow; under 1180 px the facets go behind Filters and the panel lies over the list. */
+.tx { display: grid; grid-template-columns: 13.75rem minmax(0, 1fr); margin-top: 1.25rem; position: relative; min-height: 24rem;
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-card); background: var(--surface-raised); }
+.tx.tx-panel-on { grid-template-columns: 13.75rem minmax(0, 1fr) 28.75rem; }
+.tx > app-tools-facets { border-right: 1px solid var(--border-subtle); }
+.tx > .tx-panel { border-left: 1px solid var(--border-subtle); background: var(--surface-raised); border-radius: 0 var(--radius-card) var(--radius-card) 0; }
+.tx-list { min-width: 0; display: flex; flex-direction: column; }
+.tx-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; padding: 0.75rem 0.875rem; border-bottom: 1px solid var(--border-subtle); }
+.tx-search { flex: 1 1 16rem; max-width: 26.25rem; }
+.tx-days { margin-left: auto; }
+.tx-filters { display: none; }
+.tx-scroll { overflow-x: auto; }
+.tx-t { width: 100%; border-collapse: collapse; font-size: 0.8125rem; table-layout: fixed; }
+.tx-t th { text-align: left; font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-secondary);
+  padding: 0.5625rem 0.75rem; border-bottom: 1px solid var(--border-subtle); white-space: nowrap; }
+.tx-t td { padding: 0.5625rem 0.75rem; border-bottom: 1px solid var(--border-subtle); vertical-align: middle; overflow: hidden; text-overflow: ellipsis; }
+.tx-t th.tx-num, .tx-t td.tx-num { text-align: right; font-variant-numeric: tabular-nums; }
+.tx-t tbody tr { cursor: pointer; }
+.tx-t tbody tr:hover > td { background: color-mix(in oklab, var(--surface-sunken) 60%, transparent); }
+.tx-t tbody tr.tx-open > td { background: var(--row-selected-bg); }
+.tx-t tbody tr.tx-open > td:first-child { box-shadow: inset 3px 0 0 var(--text-primary); }
+.tx-t tbody tr:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.tx-t.tx-busy tbody { opacity: 0.6; }
+.tx-name { font-weight: 500; color: var(--text-primary); }
+.tx-empty { padding: 2.5rem 1.25rem !important; text-align: center; color: var(--text-muted); cursor: default; }
+.tx-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin-top: auto; padding: 0.625rem 0.875rem;
+  border-top: 1px solid var(--border-subtle); font-size: 0.75rem; color: var(--text-muted); }
+.tx-pager { display: inline-flex; align-items: center; gap: 0.375rem; margin-left: auto; color: var(--text-secondary); }
+
+@media (max-width: 1499px) {
+  .tx { grid-template-columns: 12.5rem minmax(0, 1fr); }
+  .tx.tx-panel-on { grid-template-columns: 12.5rem minmax(0, 1fr) 25rem; }
+}
+@media (max-width: 1179px) {
+  .tx, .tx.tx-panel-on { grid-template-columns: minmax(0, 1fr); }
+  .tx > app-tools-facets { display: none; }
+  .tx.tx-filters-open > app-tools-facets { display: block; position: absolute; top: 3.5rem; left: 0.75rem; z-index: 7; width: 16rem; max-height: 75vh;
+    overflow: auto; background: var(--surface-raised); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
+    box-shadow: 0 12px 32px -12px var(--shadow-color); }
+  .tx-filters { display: inline-flex; }
+  /* Over the list's right side, as tall as it needs: it may hang below a short list, and the page scrolls. */
+  .tx > .tx-panel { position: absolute; top: -1px; right: -1px; min-height: calc(100% + 2px); width: min(26.25rem, 100%); z-index: 6;
+    border: 1px solid var(--border-subtle); border-radius: var(--radius-card); box-shadow: -12px 0 32px -16px var(--shadow-color); }
+}

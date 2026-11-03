@@ -71,17 +71,45 @@ export interface ConversionRow {
   createdAt?: string | null;
 }
 
+/** Each facet's counts over the window and the search (each ignores its own picks), as media-service answers them. */
+export interface ConversionFacets {
+  status?: Record<string, number>;
+  from?: Record<string, number>;
+  kept?: Record<string, number>;
+  by?: Record<string, number>;
+}
+
 export interface ConversionPage {
   rows: ConversionRow[];
   total: number;
   failedCount: number;
+  /** Every conversion in the window, whatever the search and facets. */
+  all?: number;
+  page?: number;
+  size?: number;
+  facets?: ConversionFacets;
 }
 
-/** Who the history shows: everyone's conversions in the workspace, the reader's own, or the failed ones. */
-export type HistoryView = 'everyone' | 'mine' | 'failed';
-export type HistoryDays = 7 | 30 | 90;
+/** What Recent conversions asks for (tools Option A): the window (0 = all time), the search, a page, and the facets picked. */
+export interface ConversionQuery {
+  days: number;
+  q: string;
+  page: number;
+  size: number;
+  status: readonly string[];
+  from: readonly string[];
+  kept: readonly string[];
+  by: readonly string[];
+}
 
-/** The queue holds at most this many files at once (the design's "up to 20 files at once"). */
+/** The facets' words. Converting is the page's own (files still on their way); the rest are media-service's keys. */
+export const STATUS_WORDS: Readonly<Record<string, string>> = { DONE: 'Done', CONVERTING: 'Converting', SHORTENED: 'Shortened', FAILED: 'Failed' };
+export const FROM_WORDS: Readonly<Record<string, string>> = { word: 'Word', excel: 'Excel and CSV', slides: 'PowerPoint', pdf: 'PDF',
+  images: 'Images', markup: 'Markdown and HTML', other: 'Other' };
+export const KEPT_WORDS: Readonly<Record<string, string>> = { kept: 'In a bucket or Documents', temp: '30 days only' };
+export const BY_WORDS: Readonly<Record<string, string>> = { me: 'Me', others: 'Others' };
+
+/** The queue holds at most this many files at once (the design's "up to 20 at once"). */
 export const QUEUE_MAX = 20;
 /** Files converted at the same time from one page: the converter has two office slots. */
 export const QUEUE_PARALLEL = 2;
@@ -108,6 +136,8 @@ export interface QueueItem {
   /** Why it failed before the converter answered (not a format it converts, the bucket file unreadable). */
   problem: Problem | null;
   row: ConversionRow | null;
+  /** When it was dropped: its When in the table until the server's row replaces it. */
+  addedAt?: Date;
 }
 
 /** A failure in plain words: what happened, and what to do next. */
@@ -147,10 +177,9 @@ export function limitMbFor(limits: ConverterLimits | null, extension: string, ta
   return limits.maxFileSizeMb;
 }
 
-/** The drop zone's one line: how many, how big, which formats. */
-export function dropHint(limits: ConverterLimits | null): string {
-  const size = limits ? `${limits.maxFileSizeMb} MB a file (a CSV or TSV to PDF up to ${limits.tableMaxFileSizeMb} MB)` : '50 MB a file';
-  return `Up to ${QUEUE_MAX} files at once · ${size} · Word, Excel, PowerPoint, OpenDocument, PDF, Markdown, HTML, images`;
+/** The strip's line after "Drop files to convert": "up to 20 at once, 50 MB each". */
+export function stripHint(limits: ConverterLimits | null): string {
+  return `up to ${QUEUE_MAX} at once, ${limits?.maxFileSizeMb ?? 50} MB each`;
 }
 
 /** What kind of file this is, in words: "Word document", "Excel workbook". */
@@ -249,14 +278,36 @@ export function resultText(row: ConversionRow): string {
   return `${from}${formatSize(row.outputFileSize)}${pages}`;
 }
 
-/** "Done in 3.1 s · PDF, 3 pages, 212 KB" under a finished queue row. */
-export function doneText(row: ConversionRow): string {
-  const took = row.tookMs != null ? ` in ${(row.tookMs / 1000).toFixed(1)} s` : '';
-  const parts = [row.outputFormat.toUpperCase()];
-  if (row.outputPages != null) parts.push(`${row.outputPages} ${row.outputPages === 1 ? 'page' : 'pages'}`);
-  if (row.outputFileSize != null) parts.push(formatSize(row.outputFileSize));
-  const head = row.outcome === 'SHORTENED' ? `Shortened${took}` : `Done${took}`;
-  return `${head} · ${parts.join(', ')}`;
+/** The table's Conversion: "DOCX → PDF", "PDF → —" for one with no result. */
+export function conversionText(row: Pick<ConversionRow, 'inputFormat' | 'outputFormat' | 'outcome'>): string {
+  return `${row.inputFormat.toUpperCase()} → ${row.outcome === 'FAILED' || !row.outputFormat ? '—' : row.outputFormat.toUpperCase()}`;
+}
+
+/** The table's Result: "3 pages · 212 KB", or an em dash for a conversion with no result. */
+export function resultShort(row: ConversionRow): string {
+  if (row.outcome === 'FAILED' || row.outputFileSize == null) return '—';
+  const pages = row.outputPages != null ? `${row.outputPages} ${row.outputPages === 1 ? 'page' : 'pages'} · ` : '';
+  return `${pages}${formatSize(row.outputFileSize)}`;
+}
+
+/** The panel's meta line: "DOCX → PDF · 3.1 s". */
+export function panelMeta(row: ConversionRow): string {
+  return `${conversionText(row)}${row.tookMs != null ? ` · ${(row.tookMs / 1000).toFixed(1)} s` : ''}`;
+}
+
+/**
+ * The panel's one check line: the first two checks that passed ("Same page count · fonts embedded"), and apart, the ones
+ * that did not (a font substituted), or the rows a shortened table printed.
+ */
+export function checkLines(row: ConversionRow): { ok: string; warn: string } {
+  const words = (list: ConversionCheck[]) => list.map((c, i) => (i ? c.text.charAt(0).toLowerCase() + c.text.slice(1) : c.text)).join(' · ');
+  const checks = row.checks ?? [];
+  const warn = [words(checks.filter(c => !c.ok))];
+  if (row.outcome === 'SHORTENED' && row.rowCount != null) {
+    warn.unshift(`First ${(row.rowsShown ?? 0).toLocaleString('en-US')} of ${row.rowCount.toLocaleString('en-US')} rows printed`);
+  }
+  // One line under the page: the first two that passed (pages, fonts); every check is listed under Details.
+  return { ok: words(checks.filter(c => c.ok).slice(0, 2)), warn: warn.filter(Boolean).join(' · ') };
 }
 
 /** The folder a kept result is in ("converted/2026-11/"), from its key; the bucket root as "/". */
@@ -271,16 +322,6 @@ export function folderOf(row: Pick<ConversionRow, 'outputStorageKey' | 'targetFo
 /** Whether Send to Documents may take this result: Document Intelligence reads PDFs and images. */
 export function documentsTakes(format: string | null | undefined): boolean {
   return ['pdf', 'png', 'jpg', 'jpeg', 'tif', 'tiff', 'bmp'].includes((format ?? '').toLowerCase());
-}
-
-/** The queue's one chip: "Converter ready", "1 converting, 1 waiting", "Busy · trying again by itself". */
-export function queueChip(items: QueueItem[], limits: ConverterLimits | null): { text: string; tone: 'ok' | 'info' | 'warn' } {
-  const converting = items.filter(i => i.state === 'uploading' || i.state === 'converting').length;
-  const waiting = items.filter(i => i.state === 'waiting').length;
-  if (items.some(i => i.busy)) return { text: 'Converter busy · trying again by itself', tone: 'warn' };
-  if (converting || waiting) return { text: `Converter ready · ${converting} converting, ${waiting} waiting`, tone: 'info' };
-  const others = (limits?.running ?? 0) + (limits?.waiting ?? 0);
-  return others ? { text: `Converter ready · ${others} from others in line`, tone: 'ok' } : { text: 'Converter ready', tone: 'ok' };
 }
 
 /** "Not kept · until 2 Dec" for a result kept 30 days in the history; empty for a kept or failed one. */

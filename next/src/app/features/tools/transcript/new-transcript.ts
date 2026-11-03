@@ -9,7 +9,8 @@ import { ObjectPicker, PickedObject, objectPickerConfig } from '../../../shared/
 import { aboutTime } from '../tools-shared';
 import { TranscribeOptions, TranscriptApi } from './transcript.api';
 import {
-  Advice, RecordingDetail, TranscriptLimits, audioProblem, billedMinutes, clock, estimateSeconds, formatsText, notARecording,
+  Advice, RecordingDetail, SPEAKER_CHOICES, SpeakerChoice, TranscriptLimits, audioProblem, billedMinutes, clock, estimateSeconds,
+  formatsText, notARecording,
 } from './transcript.model';
 
 /** A recording waiting to be sent: from this computer (its length read before upload) or from a bucket. */
@@ -54,7 +55,7 @@ export function costLine(pending: Pick<Pending, 'seconds'>[], limits: Transcript
 
 /**
  * New transcript (tools redesign): several recordings at once, each's length read before upload; the name, language and
- * speakers; whether the recording is kept 30 days for playback, personal details masked in exports, and the transcript
+ * speakers (found, one, or exactly 2 to 6); whether the recording is kept 30 days for playback, personal details masked in exports, and the transcript
  * sent to Documents when done; the time and billed minutes before anything starts.
  */
 @Component({
@@ -72,6 +73,8 @@ export class NewTranscript {
   readonly canSend = input(false);
   /** A bucket may be used (not the platform administrator's own sign-in). */
   readonly bucketAllowed = input(true);
+  /** In a card of its own (with its heading), or bare inside a side panel that names it. */
+  readonly framed = input(true);
   readonly created = output<RecordingDetail[]>();
   readonly rejected = output<Advice>();
 
@@ -80,7 +83,8 @@ export class NewTranscript {
   readonly dragging = signal(false);
   readonly name = signal('');
   readonly language = signal('auto');
-  readonly speakers = signal<'auto' | 'one'>('auto');
+  readonly speakers = signal<SpeakerChoice>('auto');
+  readonly speakerChoices = SPEAKER_CHOICES;
   readonly keepRecording = signal(true);
   readonly maskExports = signal(false);
   readonly sendToDocuments = signal(false);

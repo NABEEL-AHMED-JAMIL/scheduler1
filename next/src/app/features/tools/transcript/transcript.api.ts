@@ -3,14 +3,14 @@ import { HttpClient, HttpEvent } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { API_BASE, ApiResponse } from '../../../core/api/api.config';
 import { IntakeAnswer } from '../../documents/documents.model';
-import { ExportFormat, RailView, RecordingDetail, RecordingList, RecordingSummary, TranscriptLimits } from './transcript.model';
+import { ExportFormat, RecordingDetail, RecordingList, RecordingQuery, RecordingSummary, SpeakerChoice, TranscriptLimits } from './transcript.model';
 
 const BASE = `${API_BASE}/audioTranscript.json`;
 
 /** What a new transcript asks for besides the recording. */
 export interface TranscribeOptions {
   name?: string;
-  speakers: 'auto' | 'one';
+  speakers: SpeakerChoice;
   keepRecording: boolean;
   maskExports: boolean;
   sendToDocuments: boolean;
@@ -34,9 +34,11 @@ export class TranscriptApi {
     return this.http.get<ApiResponse<TranscriptLimits>>(`${BASE}/limits`);
   }
 
-  list(view: RailView, q: string, days = 30): Observable<ApiResponse<RecordingList>> {
-    const params: Record<string, string> = { view, days: String(days) };
-    if (q.trim()) params['q'] = q.trim();
+  /** The list with each facet's counts (tools Option A): no `view`, so media-service answers with facets. */
+  list(query: RecordingQuery): Observable<ApiResponse<RecordingList>> {
+    const params: Record<string, string> = { days: String(query.days), page: String(query.page), size: String(query.size) };
+    if (query.q.trim()) params['q'] = query.q.trim();
+    for (const key of ['status', 'by', 'speakers', 'language'] as const) if (query[key].length) params[key] = query[key].join(',');
     return this.http.get<ApiResponse<RecordingList>>(`${BASE}/recordings`, { params });
   }
 
@@ -71,8 +73,9 @@ export class TranscriptApi {
     return this.http.post<ApiResponse<RecordingDetail>>(`${BASE}/recordings/${id}/stop`, {});
   }
 
-  retry(id: number): Observable<ApiResponse<RecordingDetail>> {
-    return this.http.post<ApiResponse<RecordingDetail>>(`${BASE}/recordings/${id}/retry`, {});
+  /** Try again (a failure, a stop), or Transcribe again a finished one, with the speakers asked (kept as before when none). */
+  retry(id: number, speakers?: SpeakerChoice): Observable<ApiResponse<RecordingDetail>> {
+    return this.http.post<ApiResponse<RecordingDetail>>(`${BASE}/recordings/${id}/retry`, speakers ? { speakers } : {});
   }
 
   split(id: number): Observable<ApiResponse<{ parts: RecordingSummary[] }>> {

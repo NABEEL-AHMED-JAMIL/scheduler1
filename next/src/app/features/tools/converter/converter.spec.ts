@@ -9,12 +9,13 @@ import { ConverterApi } from './converter.api';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { StorageService } from '../../objects/storage.service';
 import { ObjectPicker } from '../../../shared/ui/object-picker';
-import { ConversionRow } from './converter.model';
+import { ConversionQuery, ConversionRow } from './converter.model';
 
 const FAMILIES = [{ key: 'text', label: 'Text document', inputFormats: ['docx', 'txt'], outputFormats: ['pdf', 'docx', 'odt'] }];
 const DONE = (id: number, name = 'a'): ConversionRow => ({ conversionId: id, name, inputFileName: `${name}.txt`, inputFormat: 'txt',
   inputFileSize: 100, outputFormat: 'pdf', outputFileName: `${name}.pdf`, outputFileSize: 2000, outputPages: 1, outcome: 'DONE', tookMs: 1200,
-  createdBy: 1015, createdAt: '2026-11-02T09:41:00' });
+  createdBy: 1015, createdAt: '2026-11-02T09:41:00', checks: [{ key: 'pages', ok: true, text: 'Same page count' }, { key: 'fonts', ok: true, text: 'Fonts embedded' }] });
+const FACETS = { status: { DONE: 206, SHORTENED: 3, FAILED: 4 }, from: { word: 88, markup: 19 }, kept: { kept: 96, temp: 118 }, by: { me: 71, others: 143 } };
 
 interface Calls { convert: ReturnType<typeof vi.fn>; list: ReturnType<typeof vi.fn> }
 
@@ -22,7 +23,7 @@ function page(convert: (file: File) => Observable<unknown>, query: Record<string
   TestBed.resetTestingModule();
   const calls: Calls = {
     convert: vi.fn((file: File) => convert(file)),
-    list: vi.fn(() => of({ status: 'SUCCESS', data: { rows: [DONE(7, 'older')], total: 1, failedCount: 0 } })),
+    list: vi.fn(() => of({ status: 'SUCCESS', data: { rows: [DONE(7, 'older')], total: 214, all: 214, failedCount: 4, facets: FACETS } })),
   };
   const api = {
     formats: () => of({ status: 'SUCCESS', data: FAMILIES }),
@@ -47,31 +48,28 @@ function page(convert: (file: File) => Observable<unknown>, query: Record<string
 
 const answer = (row: ConversionRow) => of(new HttpResponse({ body: { status: 'SUCCESS', data: row } }));
 const file = (name: string) => new File(['x'], name);
+const lastQuery = (calls: Calls) => calls.list.mock.lastCall![0] as ConversionQuery;
 
-describe('Document Converter (tools redesign)', () => {
+describe('Document Converter (tools Option A)', () => {
   afterEach(() => vi.useRealTimers());
 
-  it('takes several files, refuses a recording in words, and converts only after Convert', () => {
+  it('converts dropped files at once, two at a time, and refuses a recording in words', () => {
     const { c, fixture, el, calls, text } = page(() => answer(DONE(1)));
     c.add([file('note.txt'), file('summary.docx'), file('ward-round.m4a')]);
     fixture.detectChanges();
-    expect(el.querySelectorAll('[data-test=converter-queue] li')).toHaveLength(3);
-    expect(text()).toContain('A recording, not a document.');
-    expect(calls.convert).not.toHaveBeenCalled();
-    expect(text()).toContain('Convert 2 waiting files');
-    c.convertWaiting();
-    fixture.detectChanges();
     expect(calls.convert).toHaveBeenCalledTimes(2);
     expect(c.queue().filter(i => i.state === 'done')).toHaveLength(2);
-    // The first result is shown beside its original.
-    expect(c.selected()?.conversionId).toBe(1);
+    const refused = el.querySelector('tr[data-file="ward-round.m4a"]')!;
+    expect(refused.textContent).toContain('Not supported');
+    (refused as HTMLElement).click();
+    fixture.detectChanges();
+    expect(text()).toContain('A recording, not a document.');
   });
 
   it('sends at most two at once and the rest when a slot frees', () => {
     const pending: Subject<unknown>[] = [];
     const { c, calls } = page(() => { const s = new Subject<unknown>(); pending.push(s); return s; });
     c.add([file('a.txt'), file('b.txt'), file('c.txt')]);
-    c.convertWaiting();
     expect(calls.convert).toHaveBeenCalledTimes(2);
     pending[0].next(new HttpResponse({ body: { status: 'SUCCESS', data: DONE(1) } }));
     expect(calls.convert).toHaveBeenCalledTimes(3);
@@ -85,40 +83,80 @@ describe('Document Converter (tools redesign)', () => {
       return answer(DONE(2));
     });
     c.add([file('a.txt')]);
-    c.convertWaiting();
     expect(c.queue()[0]).toMatchObject({ state: 'waiting', busy: true });
     expect(c.waitingText(c.queue()[0])).toContain('trying again by itself');
+    expect(c.localPill(c.queue()[0]).label).toBe('Converter busy');
     vi.advanceTimersByTime(15_000);
     expect(calls.convert).toHaveBeenCalledTimes(2);
     expect(c.queue()[0].state).toBe('done');
   });
 
-  it('records a refusal as a failed row with what to do next', () => {
-    const { c, fixture, text } = page(() => answer({ ...DONE(3), outcome: 'FAILED', errorCode: 'PASSWORD', outputFileSize: null }));
+  it('records a refusal as a failed row; its panel says what to do next', () => {
+    const { c, fixture, el, text } = page(() => answer({ ...DONE(3), outcome: 'FAILED', errorCode: 'PASSWORD', outputFileSize: null }));
     c.add([file('consent.docx')]);
-    c.convertWaiting();
     fixture.detectChanges();
     expect(c.queue()[0].state).toBe('failed');
-    expect(text()).toContain('Protected with a password.');
+    (el.querySelector('tr[data-file="consent.docx"]') as HTMLElement).click();
+    fixture.detectChanges();
+    expect(el.querySelector('[data-test=panel-problem]')!.textContent).toContain('Protected with a password.');
+    expect(text()).toContain('Remove from the list');
   });
 
-  it('shows upload progress, then Converting while the server works', () => {
+  it('shows a new file at the top of the table with its progress, then Converting while the server works', () => {
     const events = new Subject<unknown>();
-    const { c } = page(() => events);
+    const { c, fixture, el } = page(() => events);
     c.add([file('a.txt')]);
-    c.convertWaiting();
-    events.next({ type: HttpEventType.UploadProgress, loaded: 50, total: 100 });
-    expect(c.queue()[0]).toMatchObject({ state: 'uploading', progress: 50 });
+    events.next({ type: HttpEventType.UploadProgress, loaded: 70, total: 100 });
+    fixture.detectChanges();
+    expect(c.queue()[0]).toMatchObject({ state: 'uploading', progress: 70 });
+    const first = el.querySelector('tbody tr')!;
+    expect(first.getAttribute('data-file')).toBe('a.txt');
+    expect(first.textContent).toContain('Converting 70%');
+    expect(first.textContent).toContain('TXT → PDF');
     events.next({ type: HttpEventType.UploadProgress, loaded: 100, total: 100 });
     expect(c.queue()[0].state).toBe('converting');
+    // Converting is a facet of its own, counted from the page's queue.
+    expect(c.groups()[0].options.find(o => o.value === 'CONVERTING')?.count).toBe(1);
   });
 
-  it('lists Recent conversions from the server, with Failed and the days asked', () => {
-    const { c, calls, text } = page(() => NEVER);
-    expect(text()).toContain('older');
-    c.setView('failed');
-    c.setDays('90');
-    expect(calls.list).toHaveBeenLastCalledWith('failed', 90, '', 1, 50);
+  it('lists the history with facets and counts; a facet, the search and the days read it again', () => {
+    vi.useFakeTimers();
+    const { c, fixture, el, calls } = page(() => NEVER);
+    expect(lastQuery(calls)).toMatchObject({ days: 30, q: '', page: 1, status: [], from: [], kept: [], by: [] });
+    const status = el.querySelector('[data-facet=status]')!;
+    expect(status.querySelector('[data-option=DONE]')!.textContent).toContain('Done');
+    expect(status.querySelector('[data-option=DONE] b')!.textContent).toBe('206');
+    expect(el.querySelector('[data-facet=from]')!.textContent).toContain('Markdown and HTML');
+    expect(el.querySelector('[data-facet=kept]')!.textContent).toContain('In a bucket or Documents');
+    (status.querySelector('[data-option=FAILED] input') as HTMLInputElement).click();
+    expect(lastQuery(calls).status).toEqual(['FAILED']);
+    c.setDays('0');
+    expect(lastQuery(calls)).toMatchObject({ days: 0, page: 1 });
+    c.setQuery('discharge');
+    vi.advanceTimersByTime(300);
+    expect(lastQuery(calls).q).toBe('discharge');
+    fixture.detectChanges();
+    expect(el.querySelector('[data-test=conversions-foot]')!.textContent).toContain('1–25 of 214 · results stay 30 days unless kept');
+    expect(el.querySelector('[data-test=conversions-foot]')!.textContent).toContain('Page 1 of 9');
+  });
+
+  it('opens the side panel only when a row is chosen: status, DOCX → PDF meta, tabs and Next steps', () => {
+    const { fixture, el } = page(() => NEVER);
+    expect(el.querySelector('app-conversion-panel')).toBeNull();
+    expect(el.querySelector('.tx-panel-on')).toBeNull();
+    (el.querySelector('tr[data-conversion="7"]') as HTMLElement).click();
+    fixture.detectChanges();
+    const panel = el.querySelector('app-conversion-panel')!;
+    expect(panel.querySelector('[data-test=panel-meta]')!.textContent).toContain('TXT → PDF · 1.2 s');
+    expect(panel.querySelector('[data-test=panel-title]')!.textContent).toContain('older');
+    expect([...panel.querySelectorAll('[role=tab]')].map(t => t.textContent!.trim())).toEqual(['Result', 'Original', 'Details']);
+    expect(panel.querySelector('[data-test=preview-page]')!.textContent).toContain('Page 1 of 1');
+    expect(panel.querySelector('[data-test=preview-checks]')!.textContent).toContain('Same page count · fonts embedded');
+    expect(panel.querySelector('[data-test=preview-download]')!.textContent).toContain('Download PDF');
+    expect(panel.querySelector('[data-test=panel-kept]')!.textContent).toContain('Keep in a bucket from ⋮');
+    (panel.querySelector('button[aria-label=Close]') as HTMLElement).click();
+    fixture.detectChanges();
+    expect(el.querySelector('app-conversion-panel')).toBeNull();
   });
 
   it('opens the shared ObjectPicker on the formats the converter reads', () => {
