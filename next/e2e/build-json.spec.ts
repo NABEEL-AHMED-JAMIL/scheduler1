@@ -58,8 +58,7 @@ test.describe('Build JSON step (MIG-451)', () => {
   test('the panel edits the shape and previews the documents on the sample rows', async ({ browser }) => {
     const page = await pageAs(browser, s);
     await page.goto(`/pipelines/${task}/edit`);
-    await page.locator('[data-step="shape"]').getByRole('button', { name: /edit|open|settings/i }).first().click()
-      .catch(async () => page.locator('[data-step="shape"]').click());
+    await page.getByRole('button', { name: 'Open step shape', exact: true }).click();
     const editor = page.locator('[data-test="build-json-editor"]');
     await expect(editor).toBeVisible();
     await expect(editor.locator('[data-test="bj-outline"]')).toContainText('findings ← [{code, text}]');

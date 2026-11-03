@@ -206,5 +206,30 @@
    1920,
    2000
   ]
+ },
+ {
+  "name": "pl-build-json",
+  "route": "/pipelines/1523/edit",
+  "as": "riverside.admin",
+  "steps": [
+   {
+    "waitFor": "[data-step=shape]"
+   },
+   {
+    "click": "button[aria-label=\"Open step shape\"]"
+   },
+   {
+    "waitFor": "[data-test=bj-document]"
+   },
+   {
+    "wait": 1000
+   }
+  ],
+  "clip": "app-side-panel",
+  "pad": 0,
+  "viewport": [
+   1920,
+   1500
+  ]
  }
 ]
