@@ -17,7 +17,7 @@ import { WorkspaceDirectory } from '../../../core/workspaces/workspace-directory
 import { WorkspaceSelect } from '../../../shared/ui/workspace-select';
 import { RsTimePipe } from '../rs-time.pipe';
 import { ReportStudioApi, studioError } from '../report-studio.api';
-import { InspectResult, Problem, SampleRow, SourceRef, TemplateDefinition, TemplateDetail, sampleKindLabel } from '../report-studio.model';
+import { BarcodeMeasure, InspectResult, Problem, SampleRow, SourceRef, TemplateDefinition, TemplateDetail, sampleKindLabel } from '../report-studio.model';
 import { ProblemList } from '../problem-list';
 import { PublishData, PublishPanel } from '../template-panels';
 import { TestPanel, TestPanelData } from '../test-panel';
@@ -33,6 +33,7 @@ import { Palette, groupPalette } from './palette';
 import { DataProblems, isDataProblem } from './data-problems';
 import { ShowAs, ShowAsSwitch, showAsNote } from './show-as';
 import { PropChange, PropertiesPanel, TONES } from './properties';
+import { OutlinePanel } from './outline-panel';
 import { TestDataChoice, TestDataData, TestDataPanel } from './test-data-panel';
 import { AssetCard, UsableProfile, profileOption } from '../assets.model';
 import { AiDataContext, Proposal } from '../ai-designer.api';
@@ -43,7 +44,10 @@ import { applyPatch } from './json-patch';
 import { AppLoading, InlineStatus, createLoadState, loadErrorText } from '../../../shared/ui/loading';
 import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
 
-type LeftTab = 'components' | 'layers' | 'data';
+type LeftTab = 'components' | 'layers' | 'outline' | 'data';
+
+/** The Outline counts pages a moment after the last change (it lays the PDF out: 30 a minute with the previews). */
+const OUTLINE_MS = 2500;
 type SaveState = 'saved' | 'saving' | 'unsaved' | 'conflict' | 'error' | 'readonly';
 /** What a drag carries: a palette entry to add, or a block to move. */
 type DragData = { add: PaletteEntry } | { move: string };
@@ -74,7 +78,7 @@ const DRAW_MS = 300;
 @Component({
   selector: 'app-report-designer',
   imports: [Icon, LoadError, ProblemList, PropertiesPanel, PageFrame, FormsModule, RouterLink, UpperCasePipe, CdkDrag, CdkDragPreview, CdkDropList,
-    CdkDropListGroup, WorkspaceSelect, AiPanel, AppLoading, InlineStatus, AdvancedSelect, Palette, DataProblems, ShowAsSwitch],
+    CdkDropListGroup, WorkspaceSelect, AiPanel, AppLoading, InlineStatus, AdvancedSelect, Palette, DataProblems, ShowAsSwitch, OutlinePanel],
   templateUrl: './designer.html',
   styleUrl: './designer.css',
 })
@@ -160,6 +164,16 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
   readonly dropInto = signal<{ page: number; id: string } | null>(null);
   readonly overlay = signal<{ page: number; top: number; left: number; width: number; height: number } | null>(null);
   private drawTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Feature 5: each barcode as the canvas drew it (the barcode inspector's scan check). */
+  readonly measures = signal<Record<string, BarcodeMeasure>>({});
+  /** Feature 6, the Outline tab: the page each component starts on, the pages in all, and the definition they were counted for. */
+  readonly outlinePages = signal<Record<string, number> | null>(null);
+  readonly outlineTotal = signal<number | null>(null);
+  readonly outlineBusy = signal(false);
+  readonly outlineError = signal('');
+  private readonly outlineFor = signal('');
+  readonly outlineStale = computed(() => this.outlinePages() !== null && this.outlineFor() !== JSON.stringify(this.previewDef() ?? this.def()));
+  private outlineTimer: ReturnType<typeof setTimeout> | null = null;
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
   private drawSeq = 0;
 
@@ -304,6 +318,7 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
     this.destroy.onDestroy(() => {
       if (this.drawTimer) clearTimeout(this.drawTimer);
       if (this.saveTimer) clearTimeout(this.saveTimer);
+      if (this.outlineTimer) clearTimeout(this.outlineTimer);
     });
     // The selection's outline follows the block when the page is drawn again, zoomed or resized.
     effect(() => {
@@ -821,10 +836,12 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
         this.drawing.set(false);
         this.drawError.set('');
         this.problems.set(r.problems ?? []);
+        this.measures.set(r.measures ?? {});
         this.records.set(r.records ?? 0);
         if (r.label) this.testLabel.set(r.label);
         this.checkedAt.set(new Date());
         if (r.html) this.canvas.set(splitCanvas(r.html));
+        if (this.tab() === 'outline' && this.outlineStale()) this.countPages();
         if (!this.fitted) { this.fitted = true; requestAnimationFrame(() => this.fitIfWider()); }
       },
       error: e => {
@@ -834,6 +851,44 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
         if (body['source'] && LOST_DATA.includes(err.code)) { this.loseTestData(err.message); return; }
         this.drawError.set(err.message);
         if (err.problems.length) this.problems.set(err.problems);
+      },
+    });
+  }
+
+  // ---------------------------------------------------------------- the Outline (reports redesign, feature 6)
+
+  /** Opens a left tab; the Outline counts its pages when it opens with none, or with pages of an earlier version. */
+  openTab(tab: LeftTab): void {
+    this.tab.set(tab);
+    if (tab === 'outline' && (this.outlinePages() === null || this.outlineStale())) this.countPages(true);
+  }
+
+  /** The pages, counted by the server as the PDF lays out (soon, or now): the definition as it stands, with the test data. */
+  countPages(now = false): void {
+    if (this.outlineTimer) clearTimeout(this.outlineTimer);
+    this.outlineTimer = setTimeout(() => this.countPagesNow(), now ? 0 : OUTLINE_MS);
+  }
+
+  private countPagesNow(): void {
+    const def = this.previewDef() ?? this.def();
+    if (!def) return;
+    const body: Record<string, unknown> = { definition: def };
+    if (this.testSource()) { body['source'] = this.testSource(); body['rootPath'] = this.testRoot(); }
+    const counted = JSON.stringify(def);
+    this.outlineBusy.set(true);
+    this.api.outline(body).subscribe({
+      next: r => {
+        this.outlineBusy.set(false);
+        this.outlineError.set(r.pages === undefined ? 'The pages are counted once the template has no errors.' : '');
+        const pages: Record<string, number> = {};
+        for (const c of r.components ?? []) pages[c.id] = c.page;
+        this.outlinePages.set(r.pages === undefined ? null : pages);
+        this.outlineTotal.set(r.pages ?? null);
+        this.outlineFor.set(counted);
+      },
+      error: e => {
+        this.outlineBusy.set(false);
+        this.outlineError.set(studioError(e, 'The pages could not be counted.').message);
       },
     });
   }
@@ -1239,6 +1294,23 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
 
   outputSetting(key: string): boolean {
     return ((this.def()?.template['output'] ?? {}) as Record<string, unknown>)[key] === true;
+  }
+
+  /** Feature 6: the PDF's bookmarks are on unless the template turns them off (output.pdf.bookmarks: false). */
+  pdfBookmarks(): boolean {
+    const pdf = ((this.def()?.template['output'] ?? {}) as Record<string, unknown>)['pdf'] as Record<string, unknown> | undefined;
+    return pdf?.['bookmarks'] !== false;
+  }
+
+  setPdfBookmarks(on: boolean): void {
+    this.edit((_blocks, def) => {
+      const output = { ...((def.template['output'] ?? {}) as Record<string, unknown>) };
+      const pdf = { ...((output['pdf'] ?? {}) as Record<string, unknown>) };
+      if (on) delete pdf['bookmarks']; else pdf['bookmarks'] = false;
+      if (Object.keys(pdf).length) output['pdf'] = pdf; else delete output['pdf'];
+      def.template['output'] = output;
+      return true;
+    }, 'output:pdf.bookmarks');
   }
 
   setOutput(key: string, on: boolean): void {

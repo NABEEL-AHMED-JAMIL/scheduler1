@@ -208,6 +208,11 @@ export class ReportStudioApi {
     return ReportStudioApi.data$(this.http.post<ApiResponse<PreviewResult>>(`${this.previews}/canvas`, body));
   }
 
+  /** Feature 6: the definition laid out as the PDF -- the pages, and the page each component starts on (the designer's Outline). */
+  outline(body: Record<string, unknown>): Observable<PreviewResult> {
+    return ReportStudioApi.data$(this.http.post<ApiResponse<PreviewResult>>(`${this.previews}/outline`, body));
+  }
+
   previewPdf(body: Record<string, unknown>): Observable<HttpResponse<Blob>> {
     return this.http.post(`${this.previews}/pdf`, body, { responseType: 'blob', observe: 'response' });
   }

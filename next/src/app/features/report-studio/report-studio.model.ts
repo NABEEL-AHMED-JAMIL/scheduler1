@@ -235,6 +235,24 @@ export interface PreviewResult {
   fields?: number;
   problems: Problem[];
   summary: { errors: number; warnings: number; valid: boolean };
+  /** Reports redesign, feature 5: each barcode as the canvas drew it, by component id (the designer's scan check). */
+  measures?: Record<string, BarcodeMeasure>;
+  /** Feature 6, the outline's answer: the pages the PDF lays out to, and the page each component starts on. */
+  pages?: number;
+  components?: { id: string; page: number }[];
+}
+
+/** What media drew for a barcode: its symbology, content, modules, module size and printed size. */
+export interface BarcodeMeasure {
+  symbology: 'code128' | 'dataMatrix' | 'pdf417';
+  length: number;
+  modulesAcross: number;
+  rows: number;
+  moduleMm: number;
+  widthMm: number;
+  heightMm: number;
+  quietZone: number;
+  text: string;
 }
 
 /** A pipeline run reports were asked from lately (MIG-404, the Overview's "Connected pipelines"). */

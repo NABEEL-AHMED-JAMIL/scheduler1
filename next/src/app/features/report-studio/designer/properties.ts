@@ -9,13 +9,15 @@ import {
 } from './designer-model';
 import { AdvancedOption, AdvancedSelect } from '../../../shared/ui/advanced-select';
 import { QrInspector } from './qr-inspector';
+import { BarcodeInspector } from './barcode-inspector';
+import { BarcodeMeasure } from '../report-studio.model';
 
 /** One setting of a component, as the form draws it. */
 export interface PropField {
   key: string;
   label: string;
   kind: 'text' | 'textarea' | 'number' | 'boolean' | 'enum' | 'binding' | 'listBinding' | 'collection' | 'columns' | 'items'
-    | 'format' | 'style' | 'size' | 'itemField' | 'json' | 'asset' | 'imageSource' | 'filter' | 'rowField' | 'series' | 'object';
+    | 'format' | 'style' | 'size' | 'itemField' | 'json' | 'asset' | 'imageSource' | 'filter' | 'rowField' | 'series' | 'object' | 'bands';
   group: 'content' | 'data' | 'format' | 'style' | 'layout';
   options?: string[];
   /** The words for an enum's options, where its own values are not words (QA 2026-10-20: emphasis). */
@@ -62,6 +64,11 @@ const LABELS: Record<string, string> = {
   comparison: 'Compare with', direction: 'Better when', thresholds: 'Status rules', sparkline: 'Trend line', nullText: 'When empty',
   sizeMm: 'Size (mm)', errorCorrection: 'Error correction', quietZone: 'Quiet zone (modules)', text_qr: 'Text',
   condition: 'Show when', when: 'Or an expression', as: 'Each item is called', divider: 'A line between items',
+  // Reports redesign, phase 3: barcodes, Contents, range bars, reference bands, tables that break well.
+  showText: 'Write the code under the bars', levels: 'Headings down to level', pageNumbers: 'Page numbers in the PDF',
+  low: 'Normal from', high: 'Normal up to', lowBinding: 'Normal from (data)', highBinding: 'Normal up to (data)', unit: 'Unit',
+  unitBinding: 'Unit (data)', min: 'Scale starts at', max: 'Scale ends at', referenceBands: 'Reference bands (normal ranges)',
+  continuedCaption: 'Later PDF pages start with “(continued)”', groupBy: 'Group rows by',
 };
 
 /** The words for the phase-4 enums. */
@@ -77,6 +84,7 @@ const OPTION_WORDS: Record<string, Record<string, string>> = {
   operator: { eq: 'equals', ne: 'is not', lt: 'is below', lte: 'is at most', gt: 'is above', gte: 'is at least', isNull: 'is empty',
     isNotNull: 'is not empty', in: 'is one of', notIn: 'is none of', contains: 'contains', startsWith: 'starts with', endsWith: 'ends with' },
   approver: { first: 'The approver (the first of two)', second: 'The second approver' },
+  tone: { success: 'Green (normal)', warning: 'Amber (caution)', danger: 'Red (critical)', muted: 'Grey' },
   aggregate: { sum: 'Sum', avg: 'Average', min: 'Lowest', max: 'Highest', count: 'Count', rows: 'Rows', countDistinct: 'Distinct values',
     percentOfTotal: '% of total' },
 };
@@ -85,6 +93,7 @@ const OPTION_WORDS: Record<string, Record<string, string>> = {
 const OBJECT_HINTS: Record<string, string> = {
   target: 'A dashed line at this value, with its label.', comparison: 'A field of the data, or a fixed value, to compare the KPI with.',
   sparkline: 'A list in the data, and the field of each item, drawn as a small trend line.',
+  groupBy: 'Rows with the same value together. Header: a row with the value before each group, repeated “(continued)” on a new page. Keep together: a group that fits a page is never split.',
   condition: 'The field on the left, how it compares, and the value on the right (a number, a word, or values separated by commas).',
 };
 
@@ -92,7 +101,8 @@ const GROUPS: Record<string, PropField['group']> = {
   categoryField: 'data', seriesField: 'data', series: 'data', stacking: 'content', axis: 'format', target: 'content', comparison: 'data',
   sparkline: 'data', condition: 'data', when: 'data', as: 'data', maxCategories: 'data', palette: 'style', thresholds: 'format',
   binding: 'data', dataset: 'data', columns: 'data', itemField: 'data', emptyText: 'data', emptyState: 'data', maxRows: 'data', sort: 'data', captionFields: 'data',
-  repeatHeader: 'data', striped: 'data', allowPageBreak: 'layout', format: 'format', style: 'style', size: 'layout', keepTogether: 'layout',
+  repeatHeader: 'data', striped: 'data', allowPageBreak: 'layout', continuedCaption: 'layout', referenceBands: 'content',
+  low: 'data', high: 'data', lowBinding: 'data', highBinding: 'data', unitBinding: 'data', unit: 'format', min: 'format', max: 'format', format: 'format', style: 'style', size: 'layout', keepTogether: 'layout',
   pageBreakBefore: 'layout', pageBreakAfter: 'layout', hidden: 'layout', width: 'layout', height: 'layout', gap: 'layout',
 };
 
@@ -170,6 +180,9 @@ export function fieldsFor(type: string, definitions: Record<string, JsonSchema>)
       field = { key, label, kind: 'object', group, props: s.properties, hint: OBJECT_HINTS[key] };
     else if (key === 'columns' && type === 'imageGrid') field = { key, label: LABELS['columns_grid'], kind: 'enum', group: 'layout', options: ['1', '2', '3', '4', '5', '6'] };
     else if (key === 'binding') field = { key, label, kind: type === 'list' ? 'listBinding' : 'binding', group: 'data' };
+    else if (key.endsWith('Binding') && s.type === 'string') field = { key, label, kind: 'binding', group: 'data' };
+    else if (key === 'referenceBands') field = { key, label, kind: 'bands', group: 'content',
+      hint: 'Shaded behind the data: a normal range, a caution range. Leave From or To empty for an open end.' };
     else if (key === 'dataset') field = { key, label, kind: 'collection', group: 'data' };
     else if (key === 'columns') field = { key, label, kind: 'columns', group: 'data' };
     else if (key === 'items') field = { key, label, kind: 'items', group: 'content', hint: 'One per line, used when no data is bound.' };
@@ -196,6 +209,20 @@ export function qrFieldShown(key: string, b: Block): boolean {
   const source = b['content'] ?? 'verifyLink';
   if (key === 'text') return source === 'text';
   if (key === 'binding') return source === 'binding';
+  return true;
+}
+
+/**
+ * A barcode's settings the generic form still draws (feature 5): its inspector draws the symbology, what it holds, the
+ * module and the height; the text and the data field show only for the source that reads them, the words under the bars
+ * only for Code 128.
+ */
+export function barcodeFieldShown(key: string, b: Block): boolean {
+  if (['symbology', 'content', 'moduleMm', 'heightMm'].includes(key)) return false;
+  const source = b['content'] ?? 'reportId';
+  if (key === 'text') return source === 'text';
+  if (key === 'binding') return source === 'binding';
+  if (key === 'showText') return (b['symbology'] ?? 'code128') === 'code128';
   return true;
 }
 
@@ -244,7 +271,7 @@ export function filterRows(rows: unknown[], f: RowFilter | null): unknown[] {
  */
 @Component({
   selector: 'app-rs-properties',
-  imports: [Icon, NgTemplateOutlet, RsPickSearch, AdvancedSelect, QrInspector],
+  imports: [Icon, NgTemplateOutlet, RsPickSearch, AdvancedSelect, QrInspector, BarcodeInspector],
   template: `
     @if (block(); as b) {
       <div class="rsd-props-head">
@@ -260,6 +287,9 @@ export function filterRows(rows: unknown[], f: RowFilter | null): unknown[] {
       </div>
       @if (b.type === 'qrCode') {
         <app-rs-qr-inspector [block]="b" [readonly]="readonly()" [sample]="sample()" [names]="names()" [blocks]="blocks()" (changed)="changed.emit($event)" />
+      }
+      @if (b.type === 'barcode') {
+        <app-rs-barcode-inspector [block]="b" [readonly]="readonly()" [measure]="measures()[b.id]" (changed)="changed.emit($event)" />
       }
       @for (g of groups(); track g.id) {
         <section class="rsd-props-group" [attr.aria-label]="g.label">
@@ -442,7 +472,10 @@ export function filterRows(rows: unknown[], f: RowFilter | null): unknown[] {
                     @for (k of objectKeys(f); track k) {
                       <label class="field" [class.rsd-span]="k === 'title' || k === 'categoryTitle' || k === 'left' || k === 'binding'">
                         <span class="label text-xs">{{ subLabel(k) }}</span>
-                        @if (f.props![k].enum) {
+                        @if (f.props![k].type === 'boolean') {
+                          <label class="rsd-check"><input type="checkbox" class="checkbox" [checked]="subText(f.key, k) === 'true'" [disabled]="readonly()"
+                                 [attr.aria-label]="f.label + ' ' + subLabel(k)" (change)="setSubFlag(f.key, k, $any($event.target).checked)" /><span class="text-xs">Yes</span></label>
+                        } @else if (f.props![k].enum) {
                           <select class="input text-xs" [disabled]="readonly()" [attr.aria-label]="f.label + ' ' + subLabel(k)" (change)="setSub(f.key, k, $any($event.target).value, f.props![k])">
                             <option value="" [selected]="!subText(f.key, k)">—</option>
                             @for (o of f.props![k].enum!; track o) { <option [value]="o" [selected]="String(o) === subText(f.key, k)">{{ words.operator[String(o)] ?? o }}</option> }
@@ -454,6 +487,29 @@ export function filterRows(rows: unknown[], f: RowFilter | null): unknown[] {
                       </label>
                     }
                   </div>
+                  @if (f.hint) { <span class="text-xs text-[color:var(--text-muted)]">{{ f.hint }}</span> }
+                </div>
+              }
+              @case ('bands') {
+                <div class="rsd-group flex flex-col gap-1.5" role="group" [attr.aria-label]="f.label">
+                  <span class="label">{{ f.label }}</span>
+                  @for (band of bands(); track $index; let k = $index) {
+                    <div class="rsd-rule">
+                      <input class="input text-xs" type="number" [value]="band.from ?? ''" [disabled]="readonly()" placeholder="From" [attr.aria-label]="'Band ' + (k + 1) + ' from'"
+                             (change)="setBand(k, 'from', $any($event.target).value)" />
+                      <input class="input text-xs" type="number" [value]="band.to ?? ''" [disabled]="readonly()" placeholder="To" [attr.aria-label]="'Band ' + (k + 1) + ' to'"
+                             (change)="setBand(k, 'to', $any($event.target).value)" />
+                      <input class="input text-xs" maxlength="60" [value]="band.label ?? ''" [disabled]="readonly()" placeholder="Label" [attr.aria-label]="'Band ' + (k + 1) + ' label'"
+                             (change)="setBand(k, 'label', $any($event.target).value)" />
+                      <select class="input text-xs" [disabled]="readonly()" [attr.aria-label]="'Band ' + (k + 1) + ' tone'" (change)="setBand(k, 'tone', $any($event.target).value)">
+                        @for (t of bandTones; track t) { <option [value]="t" [selected]="t === (band.tone ?? 'success')">{{ words['tone'][t] }}</option> }
+                      </select>
+                      @if (!readonly()) { <button type="button" class="btn btn-ghost btn-icon btn-sm" [attr.aria-label]="'Remove band ' + (k + 1)" (click)="removeBand(k)"><app-icon name="close" /></button> }
+                    </div>
+                  }
+                  @if (!readonly() && bands().length < 4) {
+                    <button type="button" class="btn btn-default btn-sm self-start" (click)="addBand()"><app-icon name="plus" />Band</button>
+                  }
                   @if (f.hint) { <span class="text-xs text-[color:var(--text-muted)]">{{ f.hint }}</span> }
                 </div>
               }
@@ -476,17 +532,28 @@ export function filterRows(rows: unknown[], f: RowFilter | null): unknown[] {
                                              [value]="c.field" (valueChange)="setColumn(i, 'field', $event)" placeholder="Choose a field" unknownText="Not in the items"
                                              searchLabel="Search the fields" panelWidth="20rem" emptyText="The list's items have no fields in the test data." />
                         <app-advanced-select [disabled]="readonly()" [ariaLabel]="'Column ' + (i + 1) + ' format'" [options]="columnFormatOptions"
-                                             [value]="c.type === 'image' ? '__image' : $any(c.format?.type) || ''" (valueChange)="setColumnFormat(i, $event)"
+                                             [value]="c.type === 'image' ? '__image' : c.type === 'sparkline' ? '__sparkline' : $any(c.format?.type) || ''" (valueChange)="setColumnFormat(i, $event)"
                                              searchLabel="Search the formats" panelWidth="20rem" />
                       </div>
-                      @if (c.type !== 'image') {
+                      @if (c.type === 'sparkline') {
+                        <div class="rsd-two">
+                          <app-advanced-select [disabled]="readonly()" [ariaLabel]="'Column ' + (i + 1) + ' normal from'" [options]="itemOptions()['dataset']"
+                                               [value]="c.lowField ?? ''" (valueChange)="setColumnSpark(i, 'lowField', $event)" placeholder="Normal from (field)"
+                                               [allowClear]="true" clearLabel="No range" searchLabel="Search the fields" panelWidth="20rem" />
+                          <app-advanced-select [disabled]="readonly()" [ariaLabel]="'Column ' + (i + 1) + ' normal up to'" [options]="itemOptions()['dataset']"
+                                               [value]="c.highField ?? ''" (valueChange)="setColumnSpark(i, 'highField', $event)" placeholder="Normal up to (field)"
+                                               [allowClear]="true" clearLabel="No range" searchLabel="Search the fields" panelWidth="20rem" />
+                        </div>
+                        <span class="text-xs text-[color:var(--text-muted)]">The field is a list of numbers (a patient's last results); its normal range is shaded behind the line.</span>
+                      }
+                      @if (c.type !== 'image' && c.type !== 'sparkline') {
                         <select class="input text-xs" [disabled]="readonly()" [attr.aria-label]="'Column ' + (i + 1) + ' chip'"
                                 (change)="setColumnChip(i, $any($event.target).value)">
                           <option value="" [selected]="!c.chip">Plain value (no chip)</option>
                           @for (t of tones; track t.id) { <option [value]="t.id" [selected]="t.id === c.chip">Chip · {{ t.colour }} ({{ t.id }})</option> }
                         </select>
                       }
-                      @if (c.type !== 'image') {
+                      @if (c.type !== 'image' && c.type !== 'sparkline') {
                         <div class="rsd-two">
                           <select class="input text-xs" [disabled]="readonly()" [attr.aria-label]="'Column ' + (i + 1) + ' total'" (change)="setColumnTotal(i, $any($event.target).value)">
                             <option value="" [selected]="!c.total">No total</option>
@@ -697,6 +764,8 @@ export class PropertiesPanel {
   readonly names = input<string[]>(['primary']);
   /** The template's blocks (the QR inspector reads a repeated item's value from them). */
   readonly blocks = input<Block[]>([]);
+  /** Feature 5: each barcode as the canvas drew it, by component id (its inspector's scan check). */
+  readonly measures = input<Record<string, BarcodeMeasure>>({});
   /** MIG-406: what this person may place (approved assets, their own or granted), and the template's asset entries. */
   readonly assets = input<AssetCard[]>([]);
   /**
@@ -738,7 +807,9 @@ export class PropertiesPanel {
   readonly filterFieldOptions = computed<AdvancedOption[]>(() => this.filterFields().map(fieldOption));
   readonly formatOptions: AdvancedOption[] = [{ value: '', label: 'As written', sample: 'as in the data' }, ...FORMAT_TYPES.map(formatOption)];
   readonly columnFormatOptions: AdvancedOption[] = [{ value: '', label: 'As written', sample: 'as in the data' },
-    { value: '__image', label: 'Picture (a bucket key)', description: 'The field names a picture; it prints in the cell' }, ...FORMAT_TYPES.map(formatOption)];
+    { value: '__image', label: 'Picture (a bucket key)', description: 'The field names a picture; it prints in the cell' },
+    { value: '__sparkline', label: 'Trend line (sparkline)', description: 'The field is a list of numbers, drawn as a small line in the cell' },
+    ...FORMAT_TYPES.map(formatOption)];
   /** The approved assets the two kinds of setting pick from: a stamp, and the block's own kind. */
   readonly assetOptions = computed<{ stamp: AdvancedOption[]; main: AdvancedOption[] }>(() => ({
     stamp: this.assetChoices('stampRef').map(assetPick), main: this.assetChoices('').map(assetPick),
@@ -750,7 +821,8 @@ export class PropertiesPanel {
   readonly groups = computed(() => {
     const b = this.block();
     if (!b) return [];
-    const all = fieldsFor(b.type, this.definitions()).filter(f => b.type !== 'qrCode' || qrFieldShown(f.key, b));
+    const all = fieldsFor(b.type, this.definitions()).filter(f => (b.type !== 'qrCode' || qrFieldShown(f.key, b))
+      && (b.type !== 'barcode' || barcodeFieldShown(f.key, b)));
     const order: { id: PropField['group']; label: string }[] = [
       { id: 'content', label: 'Content' }, { id: 'data', label: 'Data' }, { id: 'format', label: 'Format' },
       { id: 'style', label: 'Style' }, { id: 'layout', label: 'Layout' },
@@ -760,7 +832,58 @@ export class PropertiesPanel {
 
   readonly columns = computed(() => (Array.isArray(this.block()?.['columns']) ? this.block()!['columns'] : []) as
     { id: string; label?: string; field: string; format?: { type?: string }; type?: string; imageSource?: { kind?: string; bucket?: string }; chip?: string;
-      total?: string; rules?: ColumnRule[] }[]);
+      total?: string; rules?: ColumnRule[]; lowField?: string; highField?: string }[]);
+
+  // ---------------------------------------------------------------- reports redesign, phase 3: reference bands, sparklines
+
+  readonly bandTones = ['success', 'warning', 'danger', 'muted'];
+  readonly bands = computed(() => (Array.isArray(this.block()?.['referenceBands']) ? this.block()!['referenceBands'] : []) as
+    { from?: number; to?: number; label?: string; tone?: string }[]);
+
+  private bandsCopy(): Record<string, unknown>[] {
+    return JSON.parse(JSON.stringify(this.bands())) as Record<string, unknown>[];
+  }
+
+  /** One band's from, to (numbers; empty is an open end), label or tone. */
+  setBand(k: number, key: 'from' | 'to' | 'label' | 'tone', raw: string): void {
+    const list = this.bandsCopy();
+    if (!list[k]) return;
+    const v = raw.trim();
+    if (!v || (key === 'tone' && v === 'success')) delete list[k][key];
+    else if (key === 'from' || key === 'to') {
+      const n = Number(v);
+      if (!Number.isFinite(n)) return;
+      list[k][key] = n;
+    } else list[k][key] = v;
+    this.set('referenceBands', list);
+  }
+
+  addBand(): void {
+    const list = this.bandsCopy();
+    list.push({ from: 0, to: 1, label: 'Normal' });
+    this.set('referenceBands', list);
+  }
+
+  removeBand(k: number): void {
+    const list = this.bandsCopy();
+    list.splice(k, 1);
+    this.set('referenceBands', list.length ? list : undefined);
+  }
+
+  /** A sparkline column's normal range: the fields of the row that hold its low and high limits. */
+  setColumnSpark(i: number, key: 'lowField' | 'highField', field: string | null): void {
+    const cols = this.columnList() as Record<string, unknown>[];
+    if (!cols[i]) return;
+    if (field) cols[i][key] = field; else delete cols[i][key];
+    this.set('columns', cols);
+  }
+
+  /** A yes-or-no setting of an object setting (a table's group header, keeping groups together). */
+  setSubFlag(key: string, k: string, on: boolean): void {
+    const o = { ...((this.block()?.[key] ?? {}) as Record<string, unknown>) };
+    if (on) o[k] = true; else delete o[k];
+    this.set(key, Object.keys(o).length ? o : undefined);
+  }
 
   // ---------------------------------------------------------------- phase 4: series, small objects, totals and rules
 
@@ -804,7 +927,8 @@ export class PropertiesPanel {
 
   subLabel(k: string): string {
     return ({ min: 'From', max: 'To', title: 'Axis title', categoryTitle: 'Category axis title', value: 'Value', label: 'Label', binding: 'Data',
-      field: 'Field of each item', left: 'Field', operator: 'Comparison', right: 'Value' } as Record<string, string>)[k] ?? k;
+      field: 'Field of each item', left: 'Field', operator: 'Comparison', right: 'Value', subtotals: 'Subtotal rows', header: 'Header row',
+      keepTogether: 'Keep each group on one page' } as Record<string, string>)[k] ?? k;
   }
 
   subText(key: string, k: string): string {
@@ -1098,7 +1222,14 @@ export class PropertiesPanel {
   setColumnFormat(i: number, type: string): void {
     const cols = this.columnList() as ({ type?: string; imageSource?: Record<string, unknown>; imageWidth?: string } & { format?: Record<string, unknown> })[];
     if (!cols[i]) return;
-    if (type === '__image') {
+    if (type === '__sparkline') {
+      cols[i].type = 'sparkline';
+      delete cols[i].imageSource;
+      delete (cols[i] as { chip?: string }).chip;
+      delete (cols[i] as { total?: string }).total;
+      delete (cols[i] as { rules?: unknown }).rules;
+      cols[i].imageWidth = cols[i].imageWidth ?? '24mm';
+    } else if (type === '__image') {
       cols[i].type = 'image';
       delete cols[i].format;
       delete (cols[i] as { chip?: string }).chip;
@@ -1108,6 +1239,8 @@ export class PropertiesPanel {
       delete cols[i].type;
       delete cols[i].imageSource;
       delete cols[i].imageWidth;
+      delete (cols[i] as { lowField?: string }).lowField;
+      delete (cols[i] as { highField?: string }).highField;
       if (!type) delete cols[i].format; else cols[i].format = { ...(cols[i].format ?? {}), type };
     }
     this.set('columns', cols);

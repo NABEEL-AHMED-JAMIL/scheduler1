@@ -13,9 +13,9 @@ export interface PaletteGroup { group: string; entries: PaletteEntry[]; }
  * layout, and pictures with the page's facts. A type the server adds later keeps the server's own group, after these.
  */
 export const PALETTE_GROUPS: { group: string; types: string[] }[] = [
-  { group: 'Clinical & compliance', types: ['approverSignature', 'signature', 'qrCode', 'confidentiality', 'stamp'] },
+  { group: 'Clinical & compliance', types: ['approverSignature', 'signature', 'barcode', 'contents', 'qrCode', 'confidentiality', 'stamp'] },
   { group: 'Text', types: ['heading', 'text', 'labelValue', 'list'] },
-  { group: 'Data', types: ['table', 'chart', 'metric'] },
+  { group: 'Data', types: ['table', 'chart', 'metric', 'rangeBar'] },
   { group: 'Layout', types: ['section', 'row', 'conditional', 'repeat', 'divider', 'spacer'] },
   { group: 'Images and page facts', types: ['image', 'imageGrid', 'pageNumber', 'dateTime', 'reportId', 'templateVersion', 'sourceLabel', 'generatedBy'] },
 ];

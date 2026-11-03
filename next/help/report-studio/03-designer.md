@@ -30,7 +30,10 @@ of what you selected on the right. It draws the page as the PDF will print it, f
    layout. A selected block has a handle: drag it to move the block.
 4. The **Layers** tab shows every block as a tree. Drag to reorder; the arrow keys select the block above or below, and
    **Alt** + an arrow moves it.
-5. **Undo** (Ctrl+Z) and **Redo** (Ctrl+Y) are in the toolbar, beside the zoom (50 % to 200 %), **Fit** and full screen.
+5. The **Outline** tab lists the report's structure with the page each block starts on, as the PDF lays out with the test
+   data (header and footer: every page). Its headings are what a **Contents** block lists and the PDF's bookmarks. The
+   pages are counted when the tab opens and again a moment after a change; **Count pages** counts them now.
+6. **Undo** (Ctrl+Z) and **Redo** (Ctrl+Y) are in the toolbar, beside the zoom (50 % to 200 %), **Fit** and full screen.
 
 ## Bind data
 A component shows data through a **binding**: a path into the report's data, such as `primary.patient.name` or a list
@@ -51,6 +54,11 @@ Click **Page settings** in the toolbar (or click outside every block) to set the
   strength, angle, pages, layer and colour, and **Only when** a condition holds (for example `isReprint = true`).
 - **Page background**: a soft **Tint** on every page or the first, and a **Letterhead** from your approved assets.
 - **Every download after the first says COPY**.
+- **Until approved, every page says DRAFT**: each download, delivery and page picture of a version nobody has approved
+  yet is marked DRAFT on every page. The stored files are never changed, so the approved and the signed PDF carry no
+  mark, and the fingerprints the public verify page lists are those of the files as issued (a DRAFT copy matches none of
+  them, which is the truth: it is not the issued report).
+- **Bookmarks in the PDF from the headings** (on by default): the reader's side panel lists the report's headings.
 - **Brand** (in the toolbar): the workspace default, a brand profile, or **No branding**.
 
 > **Note:** Previews always say DRAFT across the page, so a preview is never mistaken for the real report.

@@ -40,6 +40,8 @@ const TYPE_WORDS: Record<string, string> = {
   approverSignature: "Approver's signature",
   // Report Studio phase 4.
   chart: 'Chart', metric: 'Metric', qrCode: 'QR code', conditional: 'Show only when', repeat: 'Repeat for each',
+  // Reports redesign, phase 3.
+  barcode: 'Barcode', contents: 'Contents', rangeBar: 'Range bar',
 };
 
 /** The icon (shared/ui/icon) a type is drawn with in the palette and the layers. */
@@ -49,6 +51,7 @@ const TYPE_ICONS: Record<string, string> = {
   templateVersion: 'history', sourceLabel: 'database', generatedBy: 'user', confidentiality: 'shield',
   imageGrid: 'image', signature: 'edit', stamp: 'checkCircle', approverSignature: 'shield',
   chart: 'chart', metric: 'trendingUp', qrCode: 'qr', conditional: 'filter', repeat: 'copy',
+  barcode: 'barcode', contents: 'list', rangeBar: 'activity',
 };
 
 export function typeWord(type: string): string {
@@ -73,7 +76,7 @@ export function blockLabel(b: Block): string {
   if (typeof b['name'] === 'string' && b['name'].trim()) return b['name'].trim();
   if (b.type === 'section' && roleOf(b) !== 'body') return roleOf(b) === 'header' ? 'Header' : 'Footer';
   // A QR code's content is what it opens (verifyLink, binding ...), not words: it is named by its caption.
-  const keys = b.type === 'qrCode' ? ['caption'] : ['title', 'content', 'label', 'binding', 'dataset'];
+  const keys = b.type === 'qrCode' || b.type === 'barcode' ? ['caption'] : ['title', 'content', 'label', 'binding', 'dataset'];
   for (const key of keys) {
     const v = b[key];
     if (typeof v === 'string' && v.trim()) {
