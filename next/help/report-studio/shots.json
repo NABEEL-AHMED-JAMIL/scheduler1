@@ -198,5 +198,58 @@
   "route": "/reports/library/01M6G141SX9JH4H43PW9DCH7AX/compare?a=1&b=2",
   "as": "riverside.admin",
   "settle": 6000
+ },
+ {
+  "name": "rs-rule-builder",
+  "route": "/reports/templates/01M6GH14V6TERJ18Y2RS4CKBB5/design",
+  "as": "riverside.admin",
+  "settle": 2500,
+  "steps": [
+   {
+    "click": "button[role=tab]:has-text('Outline')"
+   },
+   {
+    "click": ".rsd-layer:has-text('Worsening wounds')"
+   },
+   {
+    "wait": 1500
+   }
+  ],
+  "clip": "app-rs-rule-builder",
+  "pad": 16,
+  "retake": "phase 5: taken once the console with the rule builder is deployed"
+ },
+ {
+  "name": "rs-fax-check",
+  "route": "/reports/templates/01M6GH14V6TERJ18Y2RS4CKBB5/design",
+  "as": "riverside.admin",
+  "settle": 2500,
+  "steps": [
+   {
+    "click": "button.seg-btn:has-text('Fax (black and white)')"
+   },
+   {
+    "waitFor": "[data-fax-problems]"
+   },
+   {
+    "wait": 1500
+   }
+  ],
+  "retake": "phase 5: taken once the console with the fax check is deployed"
+ },
+ {
+  "name": "rs-comments",
+  "route": "/reports/library/01M6GH15793P0D0E2ND6RSM9G1?comments=1",
+  "as": "riverside.admin",
+  "settle": 3500,
+  "steps": [
+   {
+    "waitFor": ".rv-pin"
+   },
+   {
+    "wait": 1500
+   }
+  ],
+  "retake": "phase 5: taken once the console with review comments is deployed"
  }
 ]
