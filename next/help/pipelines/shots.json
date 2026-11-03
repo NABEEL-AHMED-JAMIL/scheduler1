@@ -181,5 +181,30 @@
     "wait": 800
    }
   ]
+ },
+ {
+  "name": "pl-route",
+  "route": "/pipelines/1514/edit",
+  "as": "riverside.admin",
+  "steps": [
+   {
+    "waitFor": "[data-step=triage]"
+   },
+   {
+    "click": "app-segmented >> text=\"Flow\""
+   },
+   {
+    "waitFor": "app-step-flow app-flow-graph"
+   },
+   {
+    "wait": 1500
+   }
+  ],
+  "clip": "app-step-flow app-flow-graph",
+  "pad": 8,
+  "viewport": [
+   1920,
+   2000
+  ]
  }
 ]

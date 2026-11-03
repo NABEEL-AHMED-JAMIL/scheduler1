@@ -1385,6 +1385,16 @@
   "topic": "pipelines",
   "taken": "2026-10-27"
  },
+ "pl-route": {
+  "width": 3160,
+  "height": 1948,
+  "route": "/pipelines/1514/edit",
+  "as": "riverside.admin",
+  "theme": "light",
+  "scale": 2,
+  "topic": "pipelines",
+  "taken": "2026-11-03"
+ },
  "pl-sample": {
   "width": 1120,
   "height": 986,

@@ -105,6 +105,7 @@
   "help/pipelines/06-pipeline-settings.md": "8156ba03b016c0259ad3996fc0f2f1821664992f5f19346b0a023590cb7d39b8",
   "help/pipelines/07-placeholders.md": "9f4487cd995d321f5269432b7c8b4c14be30f857ef5054c9b08939142e2d9943",
   "help/pipelines/08-run-pipeline-step.md": "cb298dd8e98161bc627907bd81e88a83e046cfe60d2db528d2cd7e8c1d813532",
+  "help/pipelines/09-route-branches.md": "79e03caae9b46538b0710bf359823a08a1cdbc304f88822a4b8798ae0624a504",
   "help/pipelines/_topic.md": "d5d0575bbafa76ecafe71f42b730921b5d6d7eece58a4e161fb939aaf9a62691",
   "help/recipes/01-journey-referral.md": "9400eb0f8bb523e15cac080fa7a9a4180ec12f6c7ccb1b4578596c2ec934a955",
   "help/recipes/02-journey-registration.md": "ac78f993e7891c5db364578241d550b2abd40f1c218fe6ec8e8afa56a4f2dadf",
@@ -731,7 +732,8 @@
     "pl-versions",
     "pl-settings",
     "pl-placeholders",
-    "pl-run-pipeline"
+    "pl-run-pipeline",
+    "pl-route"
    ]
   },
   {
@@ -4652,6 +4654,27 @@
    ],
    "minutes": 3,
    "md": "A **Run pipeline** step calls another pipeline of the same workspace with parameters, waits for its run to end and\ntakes its answer as rows. Build a piece of work once (a patient lookup, a risk score) and use it from several pipelines,\ninstead of copying its steps into each.\n\nEach call is a run of its own: it shows in **Runs** under the called pipeline, with its own steps and outputs, and it is\nbilled like any run.\n\n## Add a Run pipeline step\n\n1. Open the calling pipeline's **Steps** tab and add **Run pipeline** from **Add step**.\n2. **Pipeline**: choose the schedule of the pipeline to call. It must be one of this workspace's, active, and built from\n   steps.\n3. **Call**: `once` makes one call for the step, its parameters filled from the run and the first row; `each` makes one\n   call per input row.\n4. **Parameters**: the called pipeline's parameters by name, filled from the row and the run, such as `{{mrn}}`,\n   `{{param.region}}` or `{{run.date}}`. They are checked against what the called pipeline declares, as **Run with…**\n   checks them.\n5. **Answer from**: `final` takes the called run's last output; or name the key of one of its steps.\n6. **Fields**: the answer's columns to keep (a column, or a column holding JSON and a dot path into it, such as\n   `summary.risk`), each with an **As** name. None: every column.\n7. Choose **Apply**, then **Save**.\n\n## What the step gives back\n\n- With `once`: the called run's rows, at most **At most rows** of them (10,000 by default); the step warns when there\n  were more.\n- With `each`: the input rows, each with its call's first answer row and four columns about the call: its run id,\n  status, ok and error, named with the **Column prefix** (`called_` by default: `called_run_id`, `called_status`,\n  `called_ok`, `called_error`).\n\n**When a call does not complete**: `fail` fails the step; `continue` (with `each`) keeps the row with its status and\nerror, so a later **Filter** can pick out the failed calls.\n\n## From an approval workflow\n\nAn approval workflow can run a pipeline too, with a **Run pipeline** step of its own, and wait for it before the next\nperson decides. See [From an approval workflow](#trg-workflow).\n\n## Example\n\nA Summit Valley care-coordination pipeline reads the patients due a visit tomorrow, then calls **Journey 9 · Care-plan\ndraft** once per patient (`each`, parameter `mrn` = `{{mrn}}`), keeping the draft's `risk` field as `care_risk`. A\n**Filter** then keeps the patients whose draft risk is High for the nurse's list.\n\n## Limits\n\n| What | Limit |\n|---|---|\n| Calls one step may make (`each`) | **At most calls**: 20 by default, up to 100; an input needing more fails before any call |\n| How deep a chain may go | 3 calls deep (A calls B calls C calls D); a pipeline already in the chain cannot be called again |\n| Rows taken from the answer (`once`) | **At most rows**, 10,000 by default |\n| Time limit of the step | 3,600 seconds unless its panel says otherwise |\n| Who may add it | A workspace administrator |\n"
+  },
+  {
+   "id": "pl-route",
+   "topic": "pipelines",
+   "section": "Build and try",
+   "title": "Send rows down different paths with a Route step",
+   "summary": "Split rows into named branches by conditions (if / otherwise), give each branch its own steps, and bring them together again with Merge.",
+   "who": "Anyone who builds pipelines",
+   "where": [
+    {
+     "label": "Build › Pipelines › a pipeline › Steps",
+     "path": "/pipelines/list"
+    }
+   ],
+   "related": [
+    "pl-builder",
+    "pl-run-pipeline",
+    "step-glance"
+   ],
+   "minutes": 3,
+   "md": "A **Route** step sends each row down one of several named **branches**. You give each branch conditions, built the same\nway as a **Filter** step's: a column, what it must be, and a value, with **all** or **any** of them. A row goes down the\nfirst branch whose conditions it meets. Every row that meets none goes down **Otherwise**.\n\nUse it when rows need different work. For example, referrals an AI step marks urgent get a second opinion from an API,\nand the rest skip that call. Without a Route you would filter the same rows twice.\n\n![A Route step in the Flow view: the urgent branch and the routine branch side by side, joined again by a Merge step](pl-route \"Route: each branch is its own chain of steps, and Merge brings them together\")\n\n## Add a Route\n\n1. On the pipeline's **Steps** tab, add **Route (if / otherwise)** from **Add step**.\n2. Under **Branches**, add one branch per path, in order: a **name** (lowercase, such as `urgent`) and its\n   **conditions**. A row goes down the first branch it meets, so put the narrowest branch first.\n3. Name the **Otherwise** branch, or keep `otherwise`. You can have up to 9 branches plus Otherwise.\n4. Each row also gets a **branch** column that says where it went. Change the column's name under **Branch column** if\n   your rows already have one.\n\n## Give a branch its steps\n\n1. Add the branch's first step. In its panel, set **Reads** to the branch, such as `triage.urgent` (the Route's key, a\n   dot, the branch's name).\n2. The steps you add after it read the step before them, as usual, so they stay in the same branch.\n3. Start the next branch the same way: its first step reads `triage.otherwise` (or your Otherwise name).\n\nThe step list sets a branch's steps in and says **Branch urgent of triage** under each. **Flow** draws the branches side\nby side. A branch with no steps simply passes its rows on.\n\n## Bring the branches together, or end them separately\n\n- To continue as one line, add **Merge branches** and choose the Route. It stacks every branch's last step, in the\n  Route's order, matching columns by name. A column a branch does not have is empty, and the **branch** column says\n  where each row came from. The steps after the Merge read its rows.\n- To end branches separately, give each its own output step, such as **Save File** or **Upload to bucket**.\n\n## What a run shows\n\n- The Route's line on the run page says how many rows went down each branch, for example **urgent 2 · routine 3**. Each\n  branch's rows are also kept as a dataset of the Route step (**branch urgent**), which you can open or download.\n- The **Map** draws each branch from the Route, labelled with the branch and its rows.\n- If a step inside a branch fails, **Retry from step N** reruns from that step. The Route and the branches'\n  rows are reused.\n\n## Things to know\n\n| What | How it works |\n| --- | --- |\n| Which branch a row takes | The first one whose conditions it meets, else Otherwise |\n| An empty value in a condition | Never counts as less or more than anything; use **is_empty** to pick empty rows |\n| A branch's name | Lowercase letters, digits and `_`, unique in the Route |\n| Branches per Route | 1 to 9, plus Otherwise |\n| Rules on AI and API steps | A branch's steps follow the same data policies, billing and retention as any step |\n"
   },
   {
    "id": "rcp-journey-referral",
@@ -8879,6 +8902,10 @@
   "pl-review": [
    1590,
    279
+  ],
+  "pl-route": [
+   1580,
+   974
   ],
   "pl-sample": [
    560,
