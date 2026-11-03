@@ -44,8 +44,10 @@ export function personalRows(def: TemplateDefinition | null, blocks: Block[], na
   const out: PersonalRow[] = [];
   const seen = new Set<string>();
   for (const f of contractFields(def)) {
-    if (!f.path || seen.has(f.path) || (!PLAIN_TYPES.has(f.type) && !f.personal)) continue;
+    if (!f.path || seen.has(f.path)) continue;
     seen.add(f.path);
+    // A list or record of the contract is not a field to tag (its rows' fields are), unless someone tagged it already.
+    if (!PLAIN_TYPES.has(f.type) && !f.personal) continue;
     out.push({ path: f.path, label: f.label || f.path, type: f.type, inContract: true, personal: f.personal === true, rule: f.deidentify ?? '' });
   }
   const read = new Set<string>();

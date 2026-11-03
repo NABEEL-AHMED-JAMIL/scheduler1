@@ -30,6 +30,15 @@ export function pagesShown(pagesA: number, pagesB: number, c: Comparison | null,
   return all.filter(p => changed.has(p));
 }
 
+/** The changes on page {@code p}: the listed ones that name it, else the boxes the later (or earlier) version highlights there. */
+export function changesOn(c: Comparison | null, p: number): number {
+  if (!c) return 0;
+  const listed = c.changes.filter(ch => ch.page === p).length;
+  if (listed) return listed;
+  const later = c.highlights.b.filter(h => h.page === p).length;
+  return later || c.highlights.a.filter(h => h.page === p).length;
+}
+
 /** A version's choice in the pickers: "v1 · 21 Oct, 21:49 · Void". */
 export function versionWords(v: ReportVersionRow): string {
   const state = v.void ? 'Void' : v.approval?.signed ? 'Signed' : v.approval ? 'Approved' : v.review && !v.review.decidedAt ? 'Waiting' : 'Ready';
@@ -105,12 +114,8 @@ export class CompareVersions {
   readonly pagesB = computed(() => this.comparison()?.b.pages ?? 0);
   readonly pages = computed(() => pagesShown(this.pagesA(), this.pagesB(), this.comparison(), this.mode()));
   readonly pageCount = computed(() => Math.max(this.pagesA(), this.pagesB(), 1));
-  readonly changesOnPage = computed(() => {
-    const c = this.comparison();
-    const p = this.page();
-    if (!c) return 0;
-    return c.highlights.b.filter(h => h.page === p).length + c.highlights.a.filter(h => h.page === p && !c.highlights.b.some(x => x.page === p)).length;
-  });
+  /** The listed changes on the page shown (by the page the list gives each); a page only the highlights mark counts its boxes. */
+  readonly changesOnPage = computed(() => changesOn(this.comparison(), this.page()));
   readonly shownChanges = computed(() => {
     const f = this.filter();
     return (this.comparison()?.changes ?? []).filter(c => f === 'all' || c.kind === f);

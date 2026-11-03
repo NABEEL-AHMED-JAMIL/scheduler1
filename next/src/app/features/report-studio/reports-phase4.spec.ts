@@ -5,7 +5,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { API_BASE } from '../../core/api/api.config';
 import { Comparison, ReportLibraryApi } from './report-library.api';
-import { pagesShown, pct, versionWords } from './compare/compare-page';
+import { changesOn, pagesShown, pct, versionWords } from './compare/compare-page';
 import { ReportVersionRow, TemplateDefinition } from './report-studio.model';
 import {
   contractFields, deidentifyRules, pdfConformance, personalRows, setDeidentifyRule, setPdfConformance, setPersonal, typeOf,
@@ -32,6 +32,14 @@ describe('Compare versions -- what it shows', () => {
     expect(pagesShown(3, 3, comparison(), 'changes')).toEqual([1, 2]);
     expect(pagesShown(3, 3, comparison({ changes: [], highlights: { a: [], b: [] } }), 'changes')).toEqual([]);
     expect(pagesShown(0, 0, null, 'side')).toEqual([1]);
+  });
+
+  it('the changes on a page are the listed ones that name it, else its boxes', () => {
+    expect(changesOn(comparison(), 1)).toBe(1);
+    expect(changesOn(comparison(), 2)).toBe(1);
+    expect(changesOn(comparison({ changes: [] }), 1)).toBe(1);
+    expect(changesOn(comparison(), 3)).toBe(0);
+    expect(changesOn(null, 1)).toBe(0);
   });
 
   it('a highlight box is a percentage of the page, kept visible and inside it', () => {
@@ -111,8 +119,10 @@ describe('the designer -- personal data, a copy without names, PDF/A and tagged 
   const sample = { visits: [{ patient: 'P-1077', visitDate: '2026-10-21' }], patient: { name: 'Synthetic A' } };
 
   it('lists the contract fields and the fields the blocks read, tagged or not', () => {
-    const d = def({ dataContract: { fields: [{ path: 'patient.name', type: 'string', label: 'Patient', personal: true }, { path: 'visits', type: 'array' }] } });
-    const rows = personalRows(d, blocks, ['primary'], sample);
+    const d = def({ dataContract: { fields: [{ path: 'patient.name', type: 'string', label: 'Patient', personal: true }, { path: 'visits', type: 'array' },
+      { path: 'gallery', type: 'array' }] } });
+    const withGrid = [...blocks, { id: 'g', type: 'imageGrid', binding: 'primary.gallery' } as Block];
+    const rows = personalRows(d, withGrid, ['primary'], sample);
     expect(rows.map(r => [r.path, r.personal, r.type])).toEqual([
       ['patient.name', true, 'string'], ['visits[*].patient', false, 'string'], ['visits[*].visitDate', false, 'date']]);
     expect(rows[0].label).toBe('Patient');

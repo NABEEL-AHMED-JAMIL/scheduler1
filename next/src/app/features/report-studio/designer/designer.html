@@ -439,7 +439,7 @@
               <div class="flex flex-col gap-1 min-w-0">
                 <label class="rsd-check"><input type="checkbox" class="checkbox" [checked]="row.personal" [disabled]="!editable()"
                        (change)="setPersonal(row, $any($event.target).checked)" [attr.aria-label]="'Personal: ' + row.path" />
-                  <span class="mono text-xs truncate" [title]="row.label === row.path ? row.path : row.label + ' (' + row.path + ')'">{{ row.label === row.path ? row.path : row.label }}</span></label>
+                  <span class="min-w-0 truncate" [title]="row.label === row.path ? row.path : row.label + ' (' + row.path + ')'">@if (row.label !== row.path) { {{ row.label }} · }<span class="mono text-xs">{{ row.path }}</span></span></label>
                 @if (row.personal) {
                   <select class="input input-sm" [ngModel]="row.rule" (ngModelChange)="setPersonal(row, true, $event)" [disabled]="!editable()" [attr.aria-label]="'In a copy without names: ' + row.path">
                     <option value="">{{ row.type === 'date' || row.type === 'datetime' ? 'The year only (default)' : 'A pseudonym (default)' }}</option>
@@ -453,9 +453,9 @@
             }
             <label class="field"><span class="label">Other dates in a copy without names</span>
               <select class="input" [ngModel]="deidentify().dates" (ngModelChange)="setDeidentify('dates', $event)" [disabled]="!editable()" aria-label="Dates in a copy without names">
-                <option value="shift">Shifted by the same days (intervals stay true)</option>
+                <option value="shift">Shifted, intervals kept</option>
                 <option value="year">The year only</option>
-                <option value="keep">Kept as they are</option>
+                <option value="keep">Kept</option>
               </select></label>
             <label class="rsd-check"><input type="checkbox" class="checkbox" [checked]="deidentify().freeText" [disabled]="!editable()"
                    (change)="setDeidentify('freeText', $any($event.target).checked)" /><span>Also replace names and dates written in notes and summaries</span></label>

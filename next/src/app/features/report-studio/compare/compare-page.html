@@ -103,9 +103,9 @@
             <h2 class="section-title">{{ c.counts.all }} change{{ c.counts.all === 1 ? '' : 's' }}</h2>
             <div class="seg cv-filter" role="group" aria-label="Show changes of">
               <button type="button" class="seg-btn" [class.seg-on]="filter() === 'all'" [attr.aria-pressed]="filter() === 'all'" (click)="filter.set('all')">All</button>
-              <button type="button" class="seg-btn" [class.seg-on]="filter() === 'data'" [attr.aria-pressed]="filter() === 'data'" (click)="filter.set('data')">Data {{ count('data') }}</button>
-              <button type="button" class="seg-btn" [class.seg-on]="filter() === 'template'" [attr.aria-pressed]="filter() === 'template'" (click)="filter.set('template')">Template {{ count('template') }}</button>
-              <button type="button" class="seg-btn" [class.seg-on]="filter() === 'approval'" [attr.aria-pressed]="filter() === 'approval'" (click)="filter.set('approval')">Approval {{ count('approval') }}</button>
+              <button type="button" class="seg-btn" [class.seg-on]="filter() === 'data'" [attr.aria-pressed]="filter() === 'data'" (click)="filter.set('data')" [disabled]="!count('data')">Data {{ count('data') }}</button>
+              <button type="button" class="seg-btn" [class.seg-on]="filter() === 'template'" [attr.aria-pressed]="filter() === 'template'" (click)="filter.set('template')" [disabled]="!count('template')">Template {{ count('template') }}</button>
+              <button type="button" class="seg-btn" [class.seg-on]="filter() === 'approval'" [attr.aria-pressed]="filter() === 'approval'" (click)="filter.set('approval')" [disabled]="!count('approval')">Approval {{ count('approval') }}</button>
             </div>
           </div>
           @if (c.b.reason) { <p class="cv-why text-xs">Why v{{ c.b.version }} was made: {{ c.b.reason }}</p> }
