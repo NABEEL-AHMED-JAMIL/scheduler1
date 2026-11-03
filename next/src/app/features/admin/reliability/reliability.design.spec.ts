@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
@@ -66,7 +66,16 @@ const FIRING = [
   burn('billing_events_priced', 'PAGE_1H', false, 0, '1h'),
 ];
 
+/**
+ * The page asks for the last 28 days before now and draws the days of that window, so the fixture's days are drawn only
+ * while "now" is the moment the fixture was taken (RUNS.to). Unpinned, the chart went empty once 2026-10-05 fell out of
+ * the window (2 Nov 2026) and the axis read only "0". Only Date is faked: the HTTP test double keeps its own timers.
+ */
+afterEach(() => vi.useRealTimers());
+
 function screen(opts: { billing?: BillingSlo; burns?: BurnRate[] } = {}) {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date(RUNS.to));
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({ imports: [Reliability], providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()] });
   const fixture = TestBed.createComponent(Reliability);
