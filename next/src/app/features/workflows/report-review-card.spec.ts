@@ -156,4 +156,30 @@ describe('Report review card -- a failed read (owner 2026-10-27)', () => {
     expect(fixture.componentInstance.pageError()).toBe('');
     expect(api.reviewPage).toHaveBeenLastCalledWith(ID, 3, 2, true);
   });
+
+  it('shows a decided stamp task its picture only -- no note and no Approve or Reject (owner 2026-11-03)', async () => {
+    const assetId = '01M5WZHAPA0QF4MQ6S1EKQ841D';
+    const api = {
+      asset: vi.fn(() => of({ assetId, kind: 'STAMP', name: 'E2E reach stamp', ownerName: null, ownerTitle: null })),
+      assetFile: vi.fn(() => of(new HttpResponse({ body: new Blob(['png'], { type: 'image/png' }) }))),
+      reviewAsset: vi.fn(() => of({})),
+    };
+    globalThis.URL.createObjectURL = vi.fn(() => 'blob:x');
+    globalThis.URL.revokeObjectURL = vi.fn();
+    for (const taskId of [912, null]) {
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({ providers: [provideZonelessChangeDetection(), provideRouter([]), { provide: ReportStudioApi, useValue: api }] });
+      const fixture = TestBed.createComponent(ReportReviewCard);
+      fixture.componentRef.setInput('subjectId', `report-asset:${assetId}:v3`);
+      fixture.componentRef.setInput('taskId', taskId);
+      fixture.detectChanges();
+      await fixture.whenStable();
+      fixture.detectChanges();
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('[data-test="asset-review-card"]')).not.toBeNull();
+      expect(!!el.querySelector('#rvc-note')).toBe(taskId !== null);
+      expect([...el.querySelectorAll('button')].some(b => b.textContent?.includes('Approve'))).toBe(taskId !== null);
+    }
+  });
 });
+

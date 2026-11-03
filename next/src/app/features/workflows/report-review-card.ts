@@ -189,7 +189,9 @@ export const CARD_PAGES = 4;
           <div class="rvc-page">@if (pageUrl(); as src) { <img class="rvc-asset" [src]="src" [alt]="a.name" /> } @else if (pageError()) { <ng-container [ngTemplateOutlet]="pictureFailed" /> } @else { <app-loading shape="inline" label="Loading the picture…" /> }</div>
           <div class="flex flex-col gap-3 min-w-0">
             <div><b class="text-base">{{ a.name }}</b>@if (a.ownerName) { <br><span class="text-sm text-[color:var(--text-muted)]">{{ a.ownerName }}@if (a.ownerTitle) { · {{ a.ownerTitle }} }</span> }</div>
-            @if (!done()) {
+            <!-- Owner 2026-11-03: a decided stamp or signature task (the inbox gives no taskId once it is not Open) shows the
+                 picture only -- its decision is in the task's History, and Approve or Reject there would decide nothing. -->
+            @if (taskId() !== null && !done()) {
               <div class="rvc-decide">
                 <label class="label" for="rvc-note">Note</label>
                 <textarea id="rvc-note" class="input resize-y" rows="2" [ngModel]="note()" (ngModelChange)="note.set($event)"></textarea>
