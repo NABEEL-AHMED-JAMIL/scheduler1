@@ -6,7 +6,7 @@ import { LIST_LIMIT } from '../../../core/api/list-limit';
 import { jobActionRequest } from '../../jobs/job-actions';
 import { DocumentsApi } from '../../documents/documents.service';
 import { TaskChange, TaskControlState, TaskUsage, UsageOf, UsagePipeline, UsageRuns, usageParams } from './task-usage.model';
-import { DefinitionView, LinkedJob, BucketChoice, DocumentTypeChoice, PromptChoice, RunRow, StepLog, StepTaskEntry, Timeline, ValidateResult, STEP_WEBHOOK_EVENT, WebhookChoice, ApiRequestChoice, ScheduleChoice } from './steps.model';
+import { DefinitionView, StepPreviewResult, LinkedJob, BucketChoice, DocumentTypeChoice, PromptChoice, RunRow, StepLog, StepTaskEntry, Timeline, ValidateResult, STEP_WEBHOOK_EVENT, WebhookChoice, ApiRequestChoice, ScheduleChoice } from './steps.model';
 
 export type DefinitionFormat = 'json' | 'yaml';
 
@@ -28,6 +28,14 @@ export class StepsApi {
   /** The draft's problems, each at its path; and -- when it reads -- the definition, its JSON and its YAML. */
   validate(format: DefinitionFormat, text: string): Observable<ApiResponse<ValidateResult>> {
     return this.http.post<ApiResponse<ValidateResult>>(`${API_BASE}/pipeline.json/steps/validate`, { format, text });
+  }
+
+  /**
+   * MIG-451: one step run on at most 50 rows, outside any run, as the person (Core's StepPreview): rows-to-rows tasks only,
+   * nothing kept; the output's columns, at most 20 rows (a person's details masked), the step's log and warnings.
+   */
+  preview(task: string, config: Record<string, unknown>, rows: Record<string, unknown>[]): Observable<ApiResponse<StepPreviewResult>> {
+    return this.http.post<ApiResponse<StepPreviewResult>>(`${API_BASE}/pipeline.json/steps/preview`, { task, config, rows });
   }
 
   /** Saves the draft as the pipeline's next version (unchanged text is no new version). */

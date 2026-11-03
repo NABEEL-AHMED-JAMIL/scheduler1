@@ -7,6 +7,9 @@ import { Icon } from '../../../shared/ui/icon';
 import { Field } from '../../../shared/ui/field';
 import { SchemaForm } from './schema-form';
 import { CallApiPreview } from './call-api-preview';
+import { BuildJsonEditor } from './build-json-editor';
+import { BuildJsonPreview } from './build-json-preview';
+import { JsonKey, keysOf } from './build-json.model';
 import { REPORT_DESIGN_KEYS, ReportDesignSettings, ReportStepDesign } from './report-step-design';
 import {
   LIMITS, ON_ERRORS, ApiRequestChoice, BucketChoice, DocumentTypeChoice, JsonSchema, PromptChoice, WebhookChoice, Step, StepProblem, StepTaskEntry, canonicalStep, fieldsOf, onErrorLabel, parseJson, problemsAt, taskLabel,
@@ -59,7 +62,7 @@ type ConfigMode = 'form' | 'json';
  */
 @Component({
   selector: 'app-step-panel',
-  imports: [SidePanel, Icon, Field, SchemaForm, FormRow, Section, ReportStepDesign, CallApiPreview, AdvancedSelect],
+  imports: [SidePanel, Icon, Field, SchemaForm, FormRow, Section, ReportStepDesign, CallApiPreview, AdvancedSelect, BuildJsonEditor, BuildJsonPreview],
   templateUrl: './step-panel.html',
 })
 export class StepPanel {
@@ -84,8 +87,12 @@ export class StepPanel {
     return !!task.inputSchema && !/^not read/i.test(String(task.inputSchema.description ?? ''));
   });
   readonly reportStep = this.data.task?.code === 'generate_report';
+  /** MIG-451: a Build JSON step's keys are its shape editor's; the rest of its settings the form's. */
+  readonly jsonStep = this.data.task?.code === 'build_json';
   readonly formSchema = this.reportStep && this.data.task?.configSchema ? withoutProperties(this.data.task.configSchema, REPORT_DESIGN_KEYS)
+    : this.jsonStep && this.data.task?.configSchema ? withoutProperties(this.data.task.configSchema, ['fields'])
     : this.data.task?.configSchema;
+  readonly jsonKeys = computed(() => keysOf(this.edit().config));
   readonly hasForm = !!this.formSchema && fieldsOf(this.formSchema).length > 0;
   /** The step the report reads: the one its input names, else the one before it. */
   /** The steps before this one, nearest last, as the Input picker lists them. */
@@ -145,10 +152,17 @@ export class StepPanel {
   }
 
   setConfig(config: Record<string, unknown>): void {
-    // The form knows only its own keys: the design's are kept as they are.
-    const design = this.reportStep ? Object.fromEntries(REPORT_DESIGN_KEYS.filter(k => this.edit().config?.[k] !== undefined)
-      .map(k => [k, this.edit().config![k]])) : {};
+    // The form knows only its own keys: the design's (and a Build JSON step's keys) are kept as they are.
+    const kept = this.reportStep ? REPORT_DESIGN_KEYS : this.jsonStep ? ['fields'] : [];
+    const design = Object.fromEntries(kept.filter(k => this.edit().config?.[k] !== undefined).map(k => [k, this.edit().config![k]]));
     this.patch({ config: { ...config, ...design } });
+  }
+
+  /** MIG-451: the shape editor's keys, into the step's settings. */
+  setKeys(keys: JsonKey[]): void {
+    const config: Record<string, unknown> = { ...(this.edit().config ?? {}), fields: keys };
+    this.patch({ config });
+    this.configText.set(this.jsonOf(config));
   }
 
   setDesign(d: ReportDesignSettings): void {

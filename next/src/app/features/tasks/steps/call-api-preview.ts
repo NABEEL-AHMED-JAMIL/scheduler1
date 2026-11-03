@@ -16,6 +16,7 @@ export interface CallPreview {
 type Row = Record<string, unknown>;
 const PLACEHOLDER = /\{\{\s*([A-Za-z0-9_.\- ]+?)\s*}}/g;
 const JSON_VALUE = /\{\{\s*(row|rows_json)\s*}}/;
+const BODY_VALUE = /\{\{\s*body\s*}}/;
 
 /** A row as one object, as Core sends it: the chosen columns (every one when none), named by As, a dot nesting. */
 export function rowObject(row: Row, chosen: { column?: unknown; as?: unknown }[]): Record<string, unknown> {
@@ -42,12 +43,16 @@ export function callApiPreview(config: Record<string, unknown> | null | undefine
   const mode = String(cfg['mode'] ?? 'each');
   const chosen = Array.isArray(cfg['columns']) ? cfg['columns'] as { column?: unknown; as?: unknown }[] : [];
   const size = Math.max(1, Math.min(1000, Number(cfg['batchSize'] ?? 50) || 50));
+  // MIG-451: Send a JSON column as the body -- each row's document as it is ({{row}}, {{body}}), a list of them in a batch.
+  const bodyColumn = typeof cfg['bodyColumn'] === 'string' ? cfg['bodyColumn'] as string : '';
+  const objectOf = (r: Row): unknown => bodyColumn ? documentOf(r[bodyColumn]) : rowObject(r, chosen);
   const values: Record<string, unknown> = {};
   let calls: number;
   if (mode === 'batch') {
     const part = sample.slice(0, size);
     calls = Math.ceil(sample.length / size);
-    values['rows_json'] = JSON.stringify(part.map(r => rowObject(r, chosen)));
+    values['rows_json'] = JSON.stringify(part.map(objectOf));
+    if (bodyColumn) values['body'] = values['rows_json'];
     values['batch'] = 1;
     values['batches'] = calls;
     values['batch_rows'] = part.length;
@@ -55,7 +60,8 @@ export function callApiPreview(config: Record<string, unknown> | null | undefine
     const first = sample[0];
     calls = mode === 'once' ? 1 : sample.length;
     Object.assign(values, first);
-    if (!('row' in first)) values['row'] = JSON.stringify(rowObject(first, chosen));
+    if (bodyColumn) values['row'] = values['body'] = JSON.stringify(objectOf(first));
+    else if (!('row' in first)) values['row'] = JSON.stringify(rowObject(first, chosen));
     values['rows'] = mode === 'once' ? 1 : sample.length;
   }
   const templates = cfg['variables'] && typeof cfg['variables'] === 'object' ? cfg['variables'] as Record<string, unknown> : {};
@@ -64,7 +70,7 @@ export function callApiPreview(config: Record<string, unknown> | null | undefine
     const text = written.replace(PLACEHOLDER, (whole, key: string) =>
       Object.prototype.hasOwnProperty.call(values, key) ? String(values[key] ?? '') : whole);
     // As Core: only when the row or rows it names are this step's own JSON (a column named row stays its text).
-    const named = JSON_VALUE.exec(written)?.[1];
+    const named = JSON_VALUE.exec(written)?.[1] ?? (bodyColumn && BODY_VALUE.test(written) ? 'body' : undefined);
     const value = named ? values[named] : undefined;
     const sendsJson = typeof value === 'string' && (value.startsWith('[') || value.startsWith('{'));
     if (sendsJson) {
@@ -76,7 +82,20 @@ export function callApiPreview(config: Record<string, unknown> | null | undefine
     }
     return { name, text, json: false };
   });
+  if (bodyColumn && !variables.some(v => v.name === 'body')) {
+    variables.push({ name: 'body', text: JSON.stringify(JSON.parse(String(values['body'])), null, 2), json: true });
+  }
   return { calls, variables };
+}
+
+/** A Build JSON column's document: the object or list it is, or the JSON its text holds; anything else as it is. */
+export function documentOf(value: unknown): unknown {
+  if (typeof value !== 'string') return value ?? null;
+  const t = value.trim();
+  if (t.startsWith('{') || t.startsWith('[')) {
+    try { return JSON.parse(t); } catch { return value; }
+  }
+  return value;
 }
 
 @Component({

@@ -262,6 +262,8 @@ export function layoutFlow(nodes: FlowNode[], edges: FlowEdge[], opts: FlowLayou
  */
 export const FLOW_ICONS: Record<string, string> = {
   play: 'M6 3l14 9-14 9V3Z',
+  // MIG-451: Build JSON's braces.
+  braces: 'M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5a2 2 0 0 0 2 2h1 M16 3h1a2 2 0 0 1 2 2v5a2 2 0 0 0 2 2 2 2 0 0 0-2 2v5a2 2 0 0 1-2 2h-1',
   // MIG-450: a Route's fork.
   branch: 'M6 3v12 M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z M6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z M18 9a9 9 0 0 1-9 9',
   clock: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20ZM12 6v6l4 2',

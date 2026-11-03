@@ -99,6 +99,8 @@ const TASK_ICONS: Record<string, string> = {
   dedupe: 'layers', split_column: 'code', pivot: 'table', unpivot: 'list', fill_missing: 'check',
   // MIG-450: a Route forks the rows; a Merge brings the branches together.
   route: 'branch', merge: 'layers',
+  // MIG-451: rows shaped into nested JSON.
+  build_json: 'braces',
   // Files a run reads, turned into rows (media-service; kind Process, so stepKind's fallback leaves them 'process'): a
   // recording's text under the microphone, and a file in another format under the turning arrows -- 'file' already
   // stands for Read file, Render PDF and Generate report, so a conversion beside them would not read as one.
@@ -258,6 +260,15 @@ export type StepNameLookup = (format: string, value: unknown, step: PipelineStep
 export function stepSummary(step: PipelineStepLike, max = 2, schema?: SchemaLike | null, names?: StepNameLookup): FlowMetric[] {
   // MIG-450: a Route says its branches by name, Otherwise last ("1 items" told nothing).
   if (step.task === 'route' && max > 0) return [{ label: 'Branches', value: branchNames(step).join(' · ') }];
+  // MIG-451: Build JSON says how many documents it makes and its top keys ("6 items" told nothing).
+  if (step.task === 'build_json' && max > 0) {
+    const mode = String(step.config?.['mode'] ?? 'row');
+    const makes = mode === 'group' ? 'One per group' : mode === 'all' ? 'One for the run' : 'One per row';
+    const fields = Array.isArray(step.config?.['fields']) ? step.config!['fields'] as { key?: unknown }[] : [];
+    const top: string[] = [];
+    for (const f of fields) { const k = String(f?.key ?? '').split('.')[0]; if (k && !top.includes(k)) top.push(k); }
+    return [{ label: 'Makes', value: makes }, { label: 'Keys', value: top.join(', ') || '—' }].slice(0, max);
+  }
   const out: FlowMetric[] = [];
   for (const [name, value] of Object.entries(step.config ?? {})) {
     const property = schema?.properties?.[name];

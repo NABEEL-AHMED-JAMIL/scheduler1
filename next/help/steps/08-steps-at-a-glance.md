@@ -53,6 +53,7 @@ to bucket, Generate report, Render PDF), is also tried again by itself on a pass
 | Remove duplicates | Key columns, Keep, Ignore case | Every column; first; off | 1,800 s |
 | Sort | Sort by (column, direction, empty values) | asc; empty last | 10 columns; 1,800 s |
 | Limit / top N | Rows to keep, Skip first, Top N by | 0 skipped | |
+| Build JSON | Keys (column, fixed value, formula, list of a column, list of objects), Make, Group by, Write it, Column, File name, File format, Leave out empty keys, Largest document | row; column `json`; json; off; 1,024 KB | 200 keys, 100 per item; 10 group columns; 8 MB a document |
 
 ## Combine
 
@@ -64,6 +65,8 @@ to bucket, Generate report, Render PDF), is also tried again by itself on a pass
 | Pivot (rows to columns) | Row per, Names from, Values from, When a group has several, Only these | first | 200 columns; 1,800 s |
 | Unpivot (columns to rows) | Columns to turn into rows, Name column, Value column, Keep empty values | name; value; off | 200 columns |
 | Run pipeline | Pipeline, Call, Parameters, Answer from, Fields | once; final; 20 calls; 10,000 rows; 3,600 s | Administrators only; 100 calls; 3 deep |
+| Route (if / otherwise) | Branches (name, conditions), Otherwise branch, Branch column | otherwise; `branch` | 9 branches plus Otherwise |
+| Merge branches | Route, Columns, Branch column | all; the Route's | |
 
 ## Check and enrich
 
@@ -71,7 +74,7 @@ to bucket, Generate report, Render PDF), is also tried again by itself on a pass
 |---|---|---|---|
 | Validate | Contract (or Contract name), Contract version, Rows that do not hold | Active version; fail; 2 tries; 300 s | |
 | Enrich | API request, Variables, Fields, When a call fails | fail; 100 calls; 1,800 s | 500 calls |
-| Call API | API request, Send, Columns sent, Variables, Fields, Ok only when, When a call is not ok, A file from an earlier step | each; 50 rows per call; fail; `api_`; 1 at once; 100 calls; 1,800 s | Administrators only; 500 calls; 1,000 rows per call; 8 at once |
+| Call API | API request, Send, Columns sent, Send a JSON column as the body, Variables, Fields, Ok only when, When a call is not ok, A file from an earlier step | each; 50 rows per call; fail; `api_`; 1 at once; 100 calls; 1,800 s | Administrators only; 500 calls; 1,000 rows per call; 8 at once |
 
 ## AI and media
 

@@ -64,6 +64,9 @@ asked, and keeps the status and fields of each answer.
   - `once`: one call for the step, filled from the run and the first row.
 - **Columns sent**: what `{{row}}` and `{{rows_json}}` hold: these columns, each renamed with **As** (a dot nests:
   `patient.id`). None: every column.
+- **Send a JSON column as the body**: a column holding a document a **Build JSON** step made (`json`). Each call sends
+  that document as it is, as `{{row}}` and as `{{body}}`, which the request's body can use with no variable added; a
+  batch sends a list of them. See [Shape rows into JSON](#pl-build-json).
 - **Variables**: the request's variables, filled from the row and the run (`{{patient_id}}`, `{{row}}`, `{{run}}`,
   `{{call_key}}`).
 - **Fields**: each **From the answer at** a dot path (`id`, `result.status`, `errors[0].message`) **As column**.

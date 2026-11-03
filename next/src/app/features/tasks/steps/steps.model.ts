@@ -2,6 +2,7 @@ import { plainHint } from '../../../shared/ui/plain-words';
 import type { RunParameter } from '../../jobs/run-parameters/run-parameters';
 import { formatDuration } from '../../../shared/ui/time-format';
 import { branchRefs, mergeHeads, routeColumn } from '../../../shared/flow-graph/routes';
+import { buildJsonColumns } from './build-json.model';
 
 /**
  * MIG-249: the step builder's shapes and the pure rules behind them.
@@ -637,6 +638,12 @@ const union = (...lists: (string[] | null)[]): string[] | null => {
   return out;
 };
 
+/** MIG-451: what Core's step preview answers (StepPreview): the output's columns and its first rows, masked. */
+export interface StepPreviewResult {
+  task: string; rowsIn: number; rowCount: number; columns: string[]; shown: number; rows: Record<string, unknown>[];
+  masked: string[]; log: string[]; warnings: string[]; note?: string | null; problems?: { path: string; message: string }[];
+}
+
 /**
  * The columns a step writes, as far as the definition says: its task's outputSchema when that names them, else what
  * the built-in tasks are known to do with their config. null when it cannot be told (a source, an API, a file).
@@ -682,6 +689,9 @@ export function outputColumns(definition: Definition, index: number, tasks: Step
       });
       return lists.some(l => l === null) ? null : union(...lists, [typeof config['column'] === 'string' && config['column'] ? config['column'] as string : routeColumn(route)]);
     }
+    // MIG-451: Build JSON's documents -- in a column beside the row's (or the group's) columns, or as columns of their own.
+    case 'build_json':
+      return buildJsonColumns(config, input);
     case 'filter': case 'save_file': case 'upload_bucket': case 'send_notification': case 'validate':
     case 'dedupe': case 'fill_missing': case 'sort': case 'limit':
       return input();
