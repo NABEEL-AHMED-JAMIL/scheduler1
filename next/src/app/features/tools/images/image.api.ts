@@ -3,7 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { API_BASE, ApiResponse } from '../../../core/api/api.config';
 import { IntakeAnswer } from '../../documents/documents.model';
-import { BlurRegion, Comparison, Description, ImageDocument, ImageLimits, PhotoDetail, PhotoDetails, PhotoList, PhotoQuery } from './image.model';
+import { AskRow, BlurRegion, Comparison, Description, ImageDocument, ImageLimits, PhotoDetail, PhotoDetails, PhotoList, PhotoQuery } from './image.model';
 
 const BASE = `${API_BASE}/imageReview.json`;
 
@@ -19,7 +19,7 @@ export class ImageApi {
   list(query: PhotoQuery): Observable<ApiResponse<PhotoList>> {
     const params: Record<string, string> = { days: String(query.days), page: String(query.page), size: String(query.size) };
     if (query.q.trim()) params['q'] = query.q.trim();
-    for (const key of ['status', 'site', 'patient', 'by'] as const) if (query[key].length) params[key] = query[key].join(',');
+    for (const key of ['type', 'status', 'site', 'patient', 'by'] as const) if (query[key]?.length) params[key] = query[key]!.join(',');
     return this.http.get<ApiResponse<PhotoList>>(`${BASE}/photos`, { params });
   }
 
@@ -96,6 +96,15 @@ export class ImageApi {
 
   keep(id: number, bucketName: string, targetFolder: string): Observable<ApiResponse<{ bucket: string; key: string }>> {
     return this.http.post<ApiResponse<{ bucket: string; key: string }>>(`${BASE}/photos/${id}/keep`, { bucketName, targetFolder });
+  }
+
+  /** Ask about the image: a question that asks for a diagnosis gets the fixed reply, and no model is asked. */
+  ask(id: number, question: string): Observable<ApiResponse<AskRow>> {
+    return this.http.post<ApiResponse<AskRow>>(`${BASE}/photos/${id}/ask`, { question });
+  }
+
+  asks(id: number): Observable<ApiResponse<AskRow[] | { rows: AskRow[] }>> {
+    return this.http.get<ApiResponse<AskRow[] | { rows: AskRow[] }>>(`${BASE}/photos/${id}/asks`);
   }
 
   remove(id: number): Observable<ApiResponse> {

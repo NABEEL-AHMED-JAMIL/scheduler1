@@ -1,11 +1,13 @@
 /** Image review (the third Tools page, owner-approved design 2026-11-03): what media-service's /imageReview.json answers. */
 import { formatSize } from '../../../shared/ui/format-size';
 
-export type PhotoStatus = 'MEASURING' | 'MEASURED' | 'NO_RULER' | 'NO_REGION' | 'TOO_DARK' | 'NOT_READ' | 'REFUSED';
+/** UNMEASURED: a type that is never measured (X-ray, slide, other): "Description only". */
+export type PhotoStatus = 'MEASURING' | 'MEASURED' | 'NO_RULER' | 'NO_REGION' | 'TOO_DARK' | 'NOT_READ' | 'REFUSED' | 'UNMEASURED';
 export type DescriptionStatus = 'NONE' | 'PENDING' | 'DRAFT' | 'CONFIRMED' | 'DISCARDED' | 'FAILED' | 'OFF';
 export type BodyPart = 'foot' | 'heel' | 'leg' | 'sacrum' | 'hip' | 'hand' | 'arm' | 'other';
-export type DescriptionField = 'woundBed' | 'moisture' | 'edges' | 'around';
-export type Description = Partial<Record<DescriptionField, string | null>>;
+/** A description's field: a key of the type's prompt's output schema (wound: woundBed, moisture, edges, around). */
+export type DescriptionField = string;
+export type Description = Record<DescriptionField, string | null | undefined>;
 
 /** Where the measurement was made, in the photo's own pixels (x right, y down). */
 export interface Geometry {
@@ -62,6 +64,15 @@ export interface PhotoSummary {
   changePct?: number | null;
   sinceFirstPct?: number | null;
   firstAt?: string | null;
+  /** The image type's key (wound, lesion, burn, xray, slide, other, custom-<n>) and name. */
+  imageType?: string | null;
+  imageTypeName?: string | null;
+  /** The type came from the AI suggestion at upload and nobody changed it: a draft. */
+  typeSuggested?: boolean;
+  /** The key the AI suggested (kept as a draft), or null: no suggestion. */
+  typeSuggestion?: string | null;
+  /** Whether the photo's type is measured; false: "Description only", never a size. */
+  measuredType?: boolean | null;
 }
 
 export interface BlurRegion { x: number; y: number; width: number; height: number; }
@@ -74,7 +85,12 @@ export interface PhotoDetail extends PhotoSummary {
   geometry?: Geometry | null;
   description?: Description | null;
   descriptionDraft?: Description | null;
+  /** The description's fields, in the type's prompt's order. */
+  descriptionFields?: string[] | null;
   descriptionModel?: string | null;
+  /** Which prompt wrote the draft (its name and version), for the byline. */
+  descriptionPromptName?: string | null;
+  descriptionPromptVersion?: number | null;
   descriptionMessage?: string | null;
   describedAt?: string | null;
   confirmedByName?: string | null;
@@ -85,7 +101,7 @@ export interface PhotoDetail extends PhotoSummary {
   keepDays?: number;
 }
 
-export type PhotoFacets = Partial<Record<'status' | 'site' | 'patient' | 'by', Record<string, number>>>;
+export type PhotoFacets = Partial<Record<'type' | 'status' | 'site' | 'patient' | 'by', Record<string, number>>>;
 
 export interface PhotoList {
   rows: PhotoSummary[];
@@ -101,6 +117,7 @@ export interface PhotoQuery {
   q: string;
   page: number;
   size: number;
+  type?: readonly string[];
   status: readonly string[];
   site: readonly string[];
   patient: readonly string[];
@@ -117,7 +134,16 @@ export interface ImageLimits {
   bodyParts: BodyPart[];
   documents: boolean;
   reports: boolean;
+  /** The types offered for the picker, in order. */
+  types?: OfferedType[];
+  /** The AI suggests a type at upload when none is chosen. */
+  suggestOn?: boolean;
+  /** Ask about this image is on. */
+  askOn?: boolean;
 }
+
+/** A type the upload offers (limits.types). */
+export interface OfferedType { key: string; name: string; measured: boolean; targetLabel?: string | null; }
 
 export const DEFAULT_IMAGE_LIMITS: ImageLimits = {
   formats: ['jpg', 'png', 'heic'], heic: true, maxMb: 25, maxAtOnce: 20, keepDays: 30, describe: true,
@@ -156,18 +182,28 @@ export interface PhotoDetails {
   siteDetail?: string;
   note?: string;
   takenAt?: string;
+  /** The image type's key; without one, media asks the AI for a suggestion (a draft). */
+  imageType?: string;
 }
 
 export interface ImageDocument { ocrDocumentId: number; name: string; contentType: string; size?: number | null; status?: string | null; createdAt?: string | null; }
 
 export const STATUS_WORDS: Record<string, string> = {
-  measured: 'Measured', no_ruler: 'No ruler: no size', to_confirm: 'Description to confirm', could_not_read: 'Could not read', measuring: 'Measuring',
+  measured: 'Measured', unmeasured: 'Description only', no_ruler: 'No ruler: no size', to_confirm: 'Description to confirm',
+  could_not_read: 'Could not read', measuring: 'Measuring',
 };
+/** The built-in types' names, for a facet before the types are read (the server's names win). */
+export const TYPE_WORDS: Record<string, string> = {
+  wound: 'Wound', lesion: 'Skin lesion', burn: 'Burn', xray: 'X-ray', slide: 'Tissue slide', other: 'Other photo',
+};
+/** Built-in types that are never measured: no paper ruler (a custom type copied from one is not measured either). */
+export const NEVER_MEASURED = ['xray', 'slide', 'other'];
 export const SITE_WORDS: Record<BodyPart, string> = {
   foot: 'Foot', heel: 'Heel', leg: 'Leg', sacrum: 'Sacrum', hip: 'Hip', hand: 'Hand', arm: 'Arm', other: 'Other',
 };
 export const BY_WORDS: Record<string, string> = { me: 'Me', others: 'Others' };
-export const FIELD_LABELS: Record<DescriptionField, string> = { woundBed: 'Wound bed', moisture: 'Moisture', edges: 'Edges', around: 'Around it' };
+export const FIELD_LABELS: Record<string, string> = { woundBed: 'Wound bed', moisture: 'Moisture', edges: 'Edges', around: 'Around it' };
+/** A wound's four fields: a photo from before image types, or one whose fields are not said. */
 export const FIELDS: DescriptionField[] = ['woundBed', 'moisture', 'edges', 'around'];
 export const NOT_SURE = 'Not sure: please fill in';
 export const DRAFT_LABEL = 'Draft · not a diagnosis';
@@ -185,6 +221,7 @@ export function listPill(p: PhotoSummary): Pill {
   if (p.descriptionStatus === 'DRAFT') return { tone: 'warn', label: 'Confirm description' };
   if (p.descriptionStatus === 'PENDING') return { tone: 'info', label: 'Describing…' };
   if (p.descriptionStatus === 'CONFIRMED') return { tone: 'ok', icon: 'check', label: 'Confirmed' };
+  if (p.status === 'UNMEASURED') return { tone: 'neutral', label: 'Description only' };
   return { tone: 'ok', icon: 'check', label: 'Measured' };
 }
 
@@ -197,6 +234,7 @@ export function measurePill(p: PhotoSummary): Pill {
     case 'TOO_DARK': return { tone: 'crit', label: 'Not measured' };
     case 'MEASURING': return { tone: 'info', label: 'Measuring…' };
     case 'REFUSED': return { tone: 'crit', label: 'Not uploaded' };
+    case 'UNMEASURED': return { tone: 'neutral', label: 'Description only' };
     default: return { tone: 'crit', label: 'Not measured' };
   }
 }
@@ -272,4 +310,80 @@ export function fileProblem(file: { name: string; size: number }, limits: ImageL
   if (!['jpg', 'jpeg', 'png', 'heic', 'heif'].includes(ext)) return 'Not a photo: JPG, PNG or HEIC';
   if (file.size > limits.maxMb * 1024 * 1024) return `${(file.size / (1024 * 1024)).toFixed(1)} MB; the limit is ${limits.maxMb} MB`;
   return null;
+}
+
+// ------------------------------------------------------------------------------------------------ image types (design image-tool-types)
+
+/** A field's label made from its key: woundBed "Wound bed", bodyPart "Body part", imageQuality "Image quality". */
+export function fieldLabel(key: string): string {
+  if (FIELD_LABELS[key]) return FIELD_LABELS[key];
+  const words = key.replace(/[_-]+/g, ' ').replace(/([a-z0-9])([A-Z])/g, '$1 $2').trim().toLowerCase();
+  return words ? words[0].toUpperCase() + words.slice(1) : key;
+}
+
+/** The fields a photo's description has, in its type's order: descriptionFields, else the description's keys, else a wound's four. */
+export function photoFields(p: Pick<PhotoDetail, 'descriptionFields' | 'description' | 'descriptionDraft'>): string[] {
+  if (p.descriptionFields?.length) return p.descriptionFields;
+  const keys = Object.keys(p.description ?? p.descriptionDraft ?? {});
+  return keys.length ? keys : FIELDS;
+}
+
+/** Whether a photo's type is measured (a photo from before types: yes, unless it says Description only). */
+export function isMeasuredPhoto(p: Pick<PhotoSummary, 'measuredType' | 'status'>): boolean {
+  if (p.status === 'UNMEASURED') return false;
+  return p.measuredType ?? true;
+}
+
+/** The measurement's target in words: red_region "red region", contrast "dark region". */
+export function targetWords(target: string | null | undefined): string {
+  if (target === 'contrast') return 'dark region';
+  if (target === 'red_region') return 'red region';
+  return target ? target.replace(/_/g, ' ') : '';
+}
+
+/** "Looks like an X-ray", "Looks like a skin lesion": a suggestion in plain words. */
+export function looksLike(name: string): string {
+  const acronym = /^[A-Z]{1,3}\b|^[A-Z]-/.test(name);
+  const word = acronym ? name : name.toLowerCase();
+  if (/^other\b/i.test(name)) return 'Looks like another kind of photo';
+  const an = /^[aeiou]/i.test(word) || /^X-/.test(word);
+  return `Looks like ${an ? 'an' : 'a'} ${word}`;
+}
+
+/** "X-ray and Other photo are described only, never measured." for the offered types that are not measured. */
+export function describedOnlyNote(types: readonly { name: string; measured: boolean }[]): string {
+  const names = types.filter(t => !t.measured).map(t => t.name);
+  if (!names.length) return '';
+  const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+  return `${list} ${names.length === 1 ? 'is' : 'are'} described only, never measured.`;
+}
+
+/** A photo's type name: its own, else the built-in name for its key. */
+export function typeName(p: Pick<PhotoSummary, 'imageType' | 'imageTypeName'>): string {
+  return p.imageTypeName || (p.imageType ? TYPE_WORDS[p.imageType] ?? p.imageType : '');
+}
+
+/** The type's icon, the design's: wound image, lesion eye, burn alert, X-ray layers, slide table, other file. */
+export function typeIcon(key: string | null | undefined, baseKey?: string | null): string {
+  const k = key && TYPE_ICONS[key] ? key : baseKey ?? '';
+  return TYPE_ICONS[k] ?? 'image';
+}
+const TYPE_ICONS: Record<string, string> = { wound: 'image', lesion: 'eye', burn: 'alert', xray: 'layers', slide: 'table', other: 'file' };
+
+/** A question asked about a photo, and its answer (GET /photos/{id}/asks). */
+export interface AskRow {
+  askId: number;
+  question: string;
+  /** refused: the fixed reply in answer, no model was asked, nothing billed. */
+  status: 'ok' | 'refused' | 'off' | 'failed' | 'held';
+  answer?: string | null;
+  refusedBecause?: string | null;
+  model?: string | null;
+  promptName?: string | null;
+  promptVersion?: number | null;
+  tookMs?: number | null;
+  askedBy?: number | null;
+  askedByName?: string | null;
+  askedAt?: string | null;
+  message?: string | null;
 }
