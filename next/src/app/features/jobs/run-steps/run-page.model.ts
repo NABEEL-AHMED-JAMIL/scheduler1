@@ -1,6 +1,6 @@
 import { formatDuration } from '../../../shared/ui/time-format';
 import { formatSize } from '../../../shared/ui/format-size';
-import { DatasetFormat, PDF_FORMAT, RunOutput, StepDataset, StepExecution, StepTimeline, errorText, formatsFor } from './run-steps.model';
+import { DatasetFormat, PDF_FORMAT, RunOrigin, RunOutput, StepDataset, StepExecution, StepTimeline, errorText, formatsFor } from './run-steps.model';
 
 /**
  * The run page's readings (UX review 2026-10-12, run page fix): which tab an address opens, the one status the header
@@ -73,9 +73,21 @@ export function runStatusLook(runStatus: string | null | undefined, reviewStatus
   }
 }
 
-/** Who or what started the run: a person by hand, the schedule's timetable, or a trigger (an arrival, an API call). */
-export function startedBy(run: { runManual?: boolean | null } | null, job: { execution?: string | null } | null): string {
+/**
+ * Who or what started the run: a person by hand, an arrival Core names (approved documents, an inbox file), the
+ * schedule's timetable, or another trigger (an API call). An arrival comes before the timetable: a job that runs on a
+ * schedule may also start when a document is approved (owner 2026-11-03: that run said "Its timetable").
+ */
+export function startedBy(run: { runManual?: boolean | null } | null, job: { execution?: string | null } | null,
+  origin?: RunOrigin | null): string {
   if (run?.runManual) return 'By hand';
+  if (origin?.kind === 'document' && origin.count > 0) {
+    return origin.count === 1 && origin.extractionIds?.length ? `Approved document #${origin.extractionIds[0]}`
+      : `${origin.count.toLocaleString('en-GB')} approved documents`;
+  }
+  if (origin?.kind === 'file' && origin.count > 0) {
+    return origin.count === 1 && origin.fileName ? `File ${origin.fileName}` : `${origin.count.toLocaleString('en-GB')} arriving files`;
+  }
   if (job?.execution === 'Auto') return 'Its timetable';
   return 'A trigger';
 }

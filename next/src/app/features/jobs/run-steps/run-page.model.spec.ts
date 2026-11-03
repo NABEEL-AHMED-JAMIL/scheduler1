@@ -54,6 +54,17 @@ describe('run page: the header\'s one status', () => {
     expect(startedBy({ runManual: false }, { execution: 'Auto' })).toBe('Its timetable');
     expect(startedBy({ runManual: false }, { execution: 'Manual' })).toBe('A trigger');
   });
+
+  it('says the approved documents or the file that started it, before its timetable (owner 2026-11-03)', () => {
+    const auto = { execution: 'Auto' };
+    expect(startedBy({ runManual: false }, auto, { kind: 'document', count: 1, extractionIds: [1159], documentTypeId: 1065 }))
+      .toBe('Approved document #1159');
+    expect(startedBy({ runManual: false }, auto, { kind: 'document', count: 4, extractionIds: [1, 2, 3, 4] })).toBe('4 approved documents');
+    expect(startedBy({ runManual: false }, auto, { kind: 'file', count: 1, fileName: 'claims.csv' })).toBe('File claims.csv');
+    expect(startedBy({ runManual: false }, auto, { kind: 'file', count: 3 })).toBe('3 arriving files');
+    expect(startedBy({ runManual: true }, auto, { kind: 'document', count: 1, extractionIds: [7] })).toBe('By hand');
+    expect(startedBy({ runManual: false }, auto, null)).toBe('Its timetable');
+  });
 });
 
 describe('run page: the summary strip', () => {

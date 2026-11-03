@@ -125,6 +125,17 @@ export interface StepTimeline {
   attemptDetails?: AttemptDetail[];
   /** MIG-346: the run waits at an Approval step of this attempt. */
   waitingForApproval?: boolean;
+  /** What arrived and started the run: approved documents or inbox files; absent for any other run. */
+  startedBy?: RunOrigin | null;
+}
+
+/** Owner 2026-11-03: the approved documents (document trigger) or the inbox files that started a run, as Core says. */
+export interface RunOrigin {
+  kind: 'document' | 'file' | string;
+  count: number;
+  extractionIds?: number[];
+  documentTypeId?: number | null;
+  fileName?: string | null;
 }
 
 export interface StepLogLine {
