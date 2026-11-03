@@ -48,7 +48,7 @@ export type DrawMode = 'view' | 'outline' | 'blur';
  */
 @Component({
   selector: 'app-photo-view',
-  host: { class: 'pv', '[class.pv-sm]': 'small()', '[class.pv-drawing]': "mode() !== 'view'", '[attr.data-photo]': 'photoId()' },
+  host: { class: 'pv', '[class.pv-sm]': 'small()', '[class.pv-dark]': "target() === 'contrast'", '[class.pv-drawing]': "mode() !== 'view'", '[attr.data-photo]': 'photoId()' },
   styles: `
     :host { position: relative; display: block; border-radius: var(--radius-lg); overflow: hidden; background: var(--color-ink-950); line-height: 0; }
     :host(.pv-sm) { border-radius: var(--radius-sm); }
@@ -64,6 +64,8 @@ export type DrawMode = 'view' | 'outline' | 'blur';
     .pv-tag.pv-warn { background: var(--color-warn-600); }
     .pv-corner { left: 3%; bottom: 4%; }
     .pv-outline { fill: color-mix(in oklab, var(--color-info-500) 10%, transparent); stroke: var(--color-info-500); }
+    /* A dark region (a skin lesion, target contrast) is outlined in amber, as the design draws it; a red region stays blue. */
+    :host(.pv-dark) .pv-outline { fill: color-mix(in oklab, var(--color-warn-400) 12%, transparent); stroke: var(--color-warn-400); }
     .pv-lw { stroke: var(--on-solid); }
     .pv-ruler { fill: none; stroke: var(--color-ok-400); }
     .pv-blur { fill: none; stroke: var(--color-warn-400); }
@@ -137,6 +139,8 @@ export class PhotoView {
   readonly widthCm = input<number | null | undefined>(null);
   readonly blurRegions = input<readonly BlurRegion[]>([]);
   readonly hideNoRuler = input(false);
+  /** The measurement's target: contrast (a dark region) draws the outline in amber. */
+  readonly target = input<string | null | undefined>(null);
   readonly mode = input<DrawMode>('view');
   readonly alt = input('Wound photo');
   readonly outlineDrawn = output<number[]>();

@@ -52,7 +52,7 @@
     } @else {
       @if (!measured()) {
         <div class="ir-only mt-4" role="note" data-test="description-only"><app-icon name="info" />
-          <span><b>Description only · no size · not a diagnosis.</b> {{ onlyText() }}</span></div>
+          <span><b>Description only · no size · not a diagnosis.</b>@if (onlyText()) { {{ ' ' + onlyText() }} }</span></div>
       }
       <nav class="tabs mt-4" role="tablist" aria-label="The photo">
         @if (measured()) {
@@ -79,7 +79,7 @@
                   @for (r of compareRows(); track r.photoId) {
                     <div [attr.data-compare]="r.photoId">
                       @if (r.hasPhoto) {
-                        <app-photo-view [photoId]="r.photoId" [geometry]="r.geometry" [width]="r.width" [height]="r.height" [overlays]="compareShown() === 'on' ? ['outline'] : []"
+                        <app-photo-view [target]="d.target" [photoId]="r.photoId" [geometry]="r.geometry" [width]="r.width" [height]="r.height" [overlays]="compareShown() === 'on' ? ['outline'] : []"
                                         [scaleFound]="r.sized" [hideNoRuler]="true" />
                       }
                       <div class="cap"><b>{{ day(r.takenAt) }}</b>
@@ -122,10 +122,10 @@
           </div>
         }
         @case ('ask') {
-          <div class="dg">
-            <section class="card p-0 min-w-0 overflow-hidden">
-              <div class="ir-sunken">
-                <app-photo-view [photoId]="d.photoId" [version]="d.blurCount ?? 0" [geometry]="d.geometry" [width]="d.width" [height]="d.height"
+          <div class="ag">
+            <section class="card p-4 min-w-0" data-test="ask-photo">
+              <div>
+                <app-photo-view [target]="d.target" [photoId]="d.photoId" [version]="d.blurCount ?? 0" [geometry]="d.geometry" [width]="d.width" [height]="d.height"
                                 [overlays]="measured() ? ['outline'] : []" [hideNoRuler]="true" />
               </div>
             </section>
@@ -137,7 +137,7 @@
             @if (!measured()) {
               <section class="card p-0 min-w-0 overflow-hidden" data-test="description-photo">
                 <div class="ir-sunken">
-                  <app-photo-view [photoId]="d.photoId" [version]="d.blurCount ?? 0" [width]="d.width" [height]="d.height" [overlays]="[]" [hideNoRuler]="true" />
+                  <app-photo-view [target]="d.target" [photoId]="d.photoId" [version]="d.blurCount ?? 0" [width]="d.width" [height]="d.height" [overlays]="[]" [hideNoRuler]="true" />
                 </div>
               </section>
               <div class="col">
@@ -178,7 +178,7 @@
                   <button type="button" class="btn btn-ghost btn-xs" (click)="boxes.set([]); mode.set('view')">Cancel</button></div>
               }
               <div class="ir-sunken">
-                <app-photo-view #big [photoId]="d.photoId" [version]="d.blurCount ?? 0" [geometry]="d.geometry" [width]="d.width" [height]="d.height"
+                <app-photo-view [target]="d.target" #big [photoId]="d.photoId" [version]="d.blurCount ?? 0" [geometry]="d.geometry" [width]="d.width" [height]="d.height"
                                 [overlays]="['outline']" [blurRegions]="mode() === 'blur' ? boxes() : (d.blurRegions ?? [])" [mode]="mode()" (boxDrawn)="boxed($event)" [hideNoRuler]="true" />
               </div>
             </section>
@@ -271,7 +271,7 @@
                   <button type="button" class="btn btn-ghost btn-xs" (click)="mode.set('view')">Cancel</button></div>
               }
               <div class="ir-sunken">
-                <app-photo-view #big [photoId]="d.photoId" [version]="d.blurCount ?? 0" [geometry]="d.geometry" [width]="d.width" [height]="d.height"
+                <app-photo-view [target]="d.target" #big [photoId]="d.photoId" [version]="d.blurCount ?? 0" [geometry]="d.geometry" [width]="d.width" [height]="d.height"
                                 [overlays]="overlays()" [scaleFound]="d.scaleFound" [pxPerCm]="d.pxPerCm" [lengthCm]="d.lengthCm" [widthCm]="d.widthCm"
                                 [mode]="mode()" (outlineDrawn)="outlined($event)" data-test="big-photo" />
               </div>

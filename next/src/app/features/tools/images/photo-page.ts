@@ -20,7 +20,7 @@ import { DOWNLOADS, ImageActions, messageOf } from './image-actions';
 import { AreaChart, DescriptionCard, PhotoState } from './photo-parts';
 import { DrawMode, Overlay, PhotoView } from './photo-view';
 import { AskThread, askRows } from './ask-thread';
-import { ImageTypesStore, neverText } from './image-ai';
+import { ImageTypesStore } from './image-ai';
 import {
   AskRow, BlurRegion, BodyPart, Comparison, DEFAULT_IMAGE_LIMITS, ImageLimits, PhotoDetail, SITE_WORDS, descriptionPill, fieldLabel, isMeasuredPhoto,
   measurePill, pctText, sizeParts, stateAdvice, targetWords, trendWords, typeIcon, typeName,
@@ -53,6 +53,7 @@ type Shown = 'outline' | 'ruler' | 'photo';
     .pg-count { margin-left: 0.25rem; font-size: 0.75rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
     .pg-ext { margin-left: auto; padding-left: 1rem; font-size: 0.75rem; color: var(--text-muted); }
     .dg { display: grid; grid-template-columns: minmax(0, 1fr) 27.5rem; gap: 1.25rem; margin-top: 1.25rem; align-items: start; }
+    .ag { display: grid; grid-template-columns: 32.5rem minmax(0, 1fr); gap: 1.25rem; margin-top: 1.25rem; align-items: start; }
     .cg { display: grid; grid-template-columns: minmax(0, 1fr) 26.25rem; gap: 1.25rem; margin-top: 1.25rem; align-items: start; }
     .col { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
     .three { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; padding: 1rem; background: var(--surface-sunken); }
@@ -69,7 +70,8 @@ type Shown = 'outline' | 'ruler' | 'photo';
     .pg-t tr:last-child td { border-bottom: 0; }
     .pg-t .num { text-align: right; }
     .pg-ok { color: var(--ok-text); display: flex; gap: 0.5rem; align-items: center; font-size: 0.875rem; }
-    @media (max-width: 1179px) { .dg, .cg { grid-template-columns: minmax(0, 1fr); } }
+    @media (max-width: 1499px) { .ag { grid-template-columns: 24rem minmax(0, 1fr); } }
+    @media (max-width: 1179px) { .dg, .cg, .ag { grid-template-columns: minmax(0, 1fr); } }
     @media (max-width: 900px) { .three { grid-template-columns: minmax(0, 1fr); } }
   `,
 })
@@ -125,13 +127,10 @@ export class PhotoPage implements OnInit {
     if (d?.imageType && !offered.some(t => t.key === d.imageType)) offered.push({ key: d.imageType, name: typeName(d) });
     return offered;
   });
-  /** "An X-ray has no paper ruler… It never reports fractures, findings…": the banner over a type that is never measured. */
+  /** The banner's words after "Description only · no size · not a diagnosis.": the type's own bannerText (design types-xray). */
   readonly onlyText = computed(() => {
-    const t = this.type();
-    const never = neverText(t?.never);
-    const name = this.typeLabel() || 'This image';
-    return `${t?.description ? t.description.replace(/\.?$/, '.') + ' ' : ''}${name} is not measured: sizes come only from a paper ruler in the photo, and there is none to read.`
-      + (never ? ` This tool never reports ${never}.` : '');
+    const own = this.type()?.bannerText ?? this.limits().types?.find(t => t.key === this.detail()?.imageType)?.bannerText ?? '';
+    return own.trim();
   });
   readonly askOn = computed(() => this.limits().askOn ?? true);
   readonly label = fieldLabel;

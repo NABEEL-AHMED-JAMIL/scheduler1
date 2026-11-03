@@ -52,7 +52,7 @@ type PanelTab = 'measurement' | 'description' | 'ask' | 'compare';
 
     @if (advice() && p.status !== 'NO_RULER') {
       <div class="tp-body" data-test="panel-state">
-        @if (p.hasPhoto) { <app-photo-view [photoId]="p.photoId" [version]="p.blurCount ?? 0" [width]="p.width" [height]="p.height" [overlays]="[]" /> }
+        @if (p.hasPhoto) { <app-photo-view [target]="view().target" [photoId]="p.photoId" [version]="p.blurCount ?? 0" [width]="p.width" [height]="p.height" [overlays]="[]" /> }
         <app-photo-state [photo]="p" (upload)="another.emit()" (remove)="remove()" (bucket)="bucket.emit()" />
       </div>
     } @else {
@@ -68,7 +68,7 @@ type PanelTab = 'measurement' | 'description' | 'ask' | 'compare';
       <div class="tp-body">
         @switch (tab()) {
           @case ('description') {
-            @if (!measured() && p.hasPhoto) { <app-photo-view [photoId]="p.photoId" [version]="p.blurCount ?? 0" [width]="p.width" [height]="p.height" [overlays]="[]" [hideNoRuler]="true" /> }
+            @if (!measured() && p.hasPhoto) { <app-photo-view [target]="view().target" [photoId]="p.photoId" [version]="p.blurCount ?? 0" [width]="p.width" [height]="p.height" [overlays]="[]" [hideNoRuler]="true" /> }
             @if (detail(); as d) { <app-description-card [photo]="d" [type]="type()" [bare]="true" [compact]="true" (changed)="onChanged($event)" /> }
             @if (!measured()) { <div class="ir-line"><app-icon name="info" size="0.95em" />Description only · no size · not a diagnosis.</div> }
           }
@@ -80,7 +80,7 @@ type PanelTab = 'measurement' | 'description' | 'ask' | 'compare';
               <div class="pp-cmp" data-test="panel-compare">
                 @for (r of c.photos.slice(-4); track r.photoId) {
                   <figure>
-                    @if (r.hasPhoto) { <app-photo-view [photoId]="r.photoId" [geometry]="r.geometry" [width]="r.width" [height]="r.height" [overlays]="['outline']" [small]="true" /> }
+                    @if (r.hasPhoto) { <app-photo-view [target]="view().target" [photoId]="r.photoId" [geometry]="r.geometry" [width]="r.width" [height]="r.height" [overlays]="['outline']" [small]="true" /> }
                     <figcaption><b>{{ day(r.takenAt) }}</b> {{ r.sized ? r.areaCm2!.toFixed(1) + ' cm²' : 'no size' }}</figcaption>
                   </figure>
                 }
@@ -91,7 +91,7 @@ type PanelTab = 'measurement' | 'description' | 'ask' | 'compare';
           }
           @default {
             @if (p.hasPhoto) {
-              <app-photo-view [photoId]="p.photoId" [version]="p.blurCount ?? 0" [geometry]="detail()?.geometry" [width]="p.width" [height]="p.height"
+              <app-photo-view [target]="view().target" [photoId]="p.photoId" [version]="p.blurCount ?? 0" [geometry]="detail()?.geometry" [width]="p.width" [height]="p.height"
                               [scaleFound]="p.scaleFound" [pxPerCm]="p.pxPerCm" [lengthCm]="p.lengthCm" [widthCm]="p.widthCm" data-test="panel-photo" />
             }
             @if (size(); as s) {

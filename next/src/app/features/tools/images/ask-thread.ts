@@ -28,7 +28,7 @@ export function askState(row: AskRow): { pill: string; tone: 'warn' | 'crit' | '
 }
 
 /**
- * Ask about this image (design types-ask): the question box, then the thread. A draft answer names the prompt, its version,
+ * Ask about this image (design types-ask): the thread, then the question box at its foot. A draft answer names the prompt, its version,
  * the model and how long it took, with Copy and Add to the visit note; a question that asks for a diagnosis, a fracture, a
  * stage, a depth, findings or a treatment is not answered -- the fixed reply comes back from the API and no model is asked.
  * Questions and answers are kept with the image and shown in its Details.
@@ -41,38 +41,23 @@ export function askState(row: AskRow): { pill: string; tone: 'warn' | 'crit' | '
     :host { display: block; padding: 0; min-width: 0; }
     .at-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 0.75rem; padding: 0.875rem 1rem; border-bottom: 1px solid var(--border-subtle); }
     .at-h h2 { margin: 0; font-size: 0.9375rem; font-weight: 600; }
-    .at-box { display: flex; gap: 0.5rem; padding: 0.75rem 1rem; border-bottom: 1px solid var(--border-subtle); background: var(--surface-inset); }
+    .at-box { display: flex; gap: 0.5rem; padding: 0.75rem 1rem; border-top: 1px solid var(--border-subtle); background: var(--surface-inset); }
     .at-box .search-field { flex: 1 1 auto; min-width: 0; }
     .at-q { display: grid; grid-template-columns: 2rem minmax(0, 1fr); gap: 0.75rem; padding: 0.875rem 1rem; border-bottom: 1px solid var(--border-subtle); }
-    .at-q:last-child { border-bottom: 0; }
     .at-av { width: 2rem; height: 2rem; border-radius: var(--radius-full); display: grid; place-items: center; font-size: 0.6875rem; font-weight: 600;
-      background: var(--surface-sunken); color: var(--text-secondary); }
-    .at-av.ai { background: var(--info-soft); color: var(--pill-info-fg); }
+      background: var(--color-brand-600); color: var(--on-solid); }
+    .at-av.ai { background: var(--surface-sunken); color: var(--text-secondary); }
     .at-meta { font-size: 0.75rem; color: var(--text-muted); }
     .at-ans { margin-top: 0.5rem; padding: 0.625rem 0.75rem; border-radius: var(--radius-lg); font-size: 0.875rem; line-height: 1.55;
       border: 1px solid var(--border-subtle); background: var(--surface-raised); white-space: pre-wrap; overflow-wrap: anywhere; }
     .at-ans.refused { border-color: color-mix(in oklab, var(--warn-text) 30%, transparent); background: var(--pill-warn-bg); }
     .at-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-top: 0.5rem; }
-    .at-foot { padding: 0.5rem 1rem 0.875rem; font-size: 0.75rem; color: var(--text-muted); border-top: 1px solid var(--border-subtle); }
+    .at-foot { padding: 0.5rem 1rem 0.875rem; font-size: 0.75rem; color: var(--text-muted); }
     .at-empty { padding: 1rem; font-size: 0.8125rem; color: var(--text-muted); }
   `,
   template: `
     @if (!compact()) {
       <div class="at-h"><h2>Ask about this image</h2><span class="at-meta">Answers describe what is visible. They are drafts and never a diagnosis.</span></div>
-    }
-    @if (askOn()) {
-      <form class="at-box" (submit)="$event.preventDefault(); send()">
-        <div class="search-field">
-          <app-icon name="chat" size="0.95em" />
-          <input class="input" [placeholder]="compact() ? 'Ask about what is visible…' : 'Ask about what is visible: colours, edges, image quality…'"
-                 [value]="question()" (input)="question.set($any($event.target).value)" [disabled]="busy()" maxlength="500"
-                 aria-label="A question about this image" data-test="ask-input" />
-        </div>
-        <button type="submit" class="btn btn-primary btn-sm" [disabled]="busy() || !question().trim()" data-test="ask-send">
-          @if (busy()) { <app-icon name="refresh" [busy]="true" /> } @else { <app-icon name="send" /> }Ask</button>
-      </form>
-    } @else {
-      <p class="at-empty m-0" data-test="ask-off">Ask is off in this workspace. An administrator switches it on in AI settings.</p>
     }
     @for (r of rows(); track r.askId) {
       @let s = state(r);
@@ -106,6 +91,20 @@ export function askState(row: AskRow): { pill: string; tone: 'warn' | 'crit' | '
       </div>
     } @empty {
       @if (askOn()) { <p class="at-empty m-0">No question asked about this image yet.</p> }
+    }
+    @if (askOn()) {
+      <form class="at-box" (submit)="$event.preventDefault(); send()">
+        <div class="search-field">
+          <app-icon name="chat" size="0.95em" />
+          <input class="input" [placeholder]="compact() ? 'Ask about what is visible…' : 'Ask about what is visible: colours, edges, image quality…'"
+                 [value]="question()" (input)="question.set($any($event.target).value)" [disabled]="busy()" maxlength="500"
+                 aria-label="A question about this image" data-test="ask-input" />
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm" [disabled]="busy() || !question().trim()" data-test="ask-send">
+          @if (busy()) { <app-icon name="refresh" [busy]="true" /> } @else { <app-icon name="send" /> }Ask</button>
+      </form>
+    } @else {
+      <p class="at-empty m-0" data-test="ask-off">Ask is off in this workspace. An administrator switches it on in AI settings.</p>
     }
     <div class="at-foot" data-test="ask-foot">Questions about a diagnosis, fracture, stage, depth, findings or treatment get a fixed reply, and no model is asked. Questions and answers are kept with the image and in its Details.</div>
   `,
