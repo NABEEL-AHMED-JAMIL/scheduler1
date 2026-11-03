@@ -1,9 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
 import { Dialog } from '@angular/cdk/dialog';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { NEVER, Observable, of, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
 import { AuthService } from '../../../core/auth/auth.service';
@@ -20,16 +20,17 @@ const LISTED = () => of({ status: 'SUCCESS', message: '', data: [
   { promptId: 2, name: 'Classify', connectionId: 5, connectionName: 'OpenAI', variables: [], runCount: 12, status: 'Inactive' },
 ] });
 
-function screenAt(connection: string | null, answer: () => Observable<unknown> = LISTED) {
+function screenAt(connection: string | null, answer: () => Observable<unknown> = LISTED, tag: string | null = null, post: unknown = () => NEVER) {
   TestBed.resetTestingModule();
   try { localStorage.clear(); } catch { /* none */ }
   TestBed.configureTestingModule({
     providers: [
-      { provide: HttpClient, useValue: { get: answer } },
+      { provide: HttpClient, useValue: { get: answer, post } },
       { provide: Dialog, useValue: {} },
+      { provide: Router, useValue: { navigate: vi.fn(() => Promise.resolve(true)) } },
       { provide: ToastService, useValue: { success: () => {}, error: () => {} } },
       { provide: AuthService, useValue: { canManageAgents: () => true, isPlatformAdmin: () => false, user: signal({ appUserId: 1 }) } },
-      { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: { get: (k: string) => k === 'connection' ? connection : null } } } },
+      { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: { get: (k: string) => k === 'connection' ? connection : k === 'tag' ? tag : null } } } },
     ],
   });
   const screen = TestBed.runInInjectionContext(() => new Prompts());
@@ -89,5 +90,30 @@ describe('Prompts -- loading, empty, error (owner 2026-10-27)', () => {
     const screen = screenAt(null, () => throwError(() => new HttpErrorResponse({ status: 500, error: 'Internal Server Error' })));
     expect(screen.loading()).toBe(false);
     expect(screen.error()).toBe('The prompts could not be read.');
+  });
+});
+
+describe('Prompts -- built-in prompts (design image-tool-types)', () => {
+  const WITH_BUILT_IN = () => of({ status: 'SUCCESS', message: '', data: [
+    { promptId: 7, name: 'Skin lesion description (built in)', builtIn: true, builtInKey: 'lesion', tags: 'Image review', variables: [], status: 'Active' },
+    { promptId: 8, name: 'Wound photo description · Riverside', tags: 'Image review, wound', variables: [], status: 'Active' },
+    { promptId: 9, name: 'Discharge summary fields', tags: 'letters', variables: [], status: 'Active' },
+  ] });
+
+  it('narrows to the tag a link names, and counts the built-in ones', () => {
+    const screen = screenAt(null, WITH_BUILT_IN, 'Image review');
+    expect(screen.filtered().map(p => p.promptId)).toEqual([7, 8]);
+    expect(screen.summary().builtIn).toBe(1);
+    expect(screen.hasFilters()).toBe(true);
+    screen.clearFilters();
+    expect(screen.filtered().length).toBe(3);
+  });
+
+  it('duplicates a built-in prompt through Image review\'s duplicate', () => {
+    const post = vi.fn(() => of({ status: 'SUCCESS', message: '', data: { promptId: 31 } }));
+    const screen = screenAt(null, WITH_BUILT_IN, null, post);
+    screen.duplicate(screen.prompts()[0]);
+    expect(post).toHaveBeenCalledWith(expect.stringContaining('/imageReviewAi.json/duplicate'), { promptId: 7 });
+    expect(TestBed.inject(Router).navigate).toHaveBeenCalledWith(['/pipelines/prompts', 31, 'edit']);
   });
 });

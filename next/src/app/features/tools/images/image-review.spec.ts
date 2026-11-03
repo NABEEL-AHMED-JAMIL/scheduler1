@@ -5,6 +5,7 @@ import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/route
 import { NEVER, of } from 'rxjs';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { ImageApi } from './image.api';
+import { ImageAiApi } from './image-ai';
 import { ImageList } from './image-list';
 import { PhotoView } from './photo-view';
 import { DEFAULT_IMAGE_LIMITS, PhotoSummary, fileProblem, listPill, pctText, sizeParts, stateAdvice, subLine, trendWords } from './image.model';
@@ -49,19 +50,22 @@ describe('Image review rules (owner-approved design 2026-11-03)', () => {
   });
 });
 
-function list() {
+function list(canChange = false) {
   TestBed.resetTestingModule();
   const api = {
-    limits: () => of({ status: 'SUCCESS', data: DEFAULT_IMAGE_LIMITS }),
-    list: vi.fn(() => of({ status: 'SUCCESS', data: { rows: [ROW(), ROW({ photoId: 1003, title: 'SV-000169 · W1 right heel', status: 'NO_RULER',
-      scaleFound: false, lengthCm: null, widthCm: null, areaCm2: null, changePct: null, visit: 1, visits: 1 })], total: 2, all: 2,
-      facets: { status: { measured: 1, no_ruler: 1, to_confirm: 1, could_not_read: 0 }, site: { foot: 1, heel: 1 }, patient: { 'SV-000117': 1, 'SV-000169': 1 },
-        by: { me: 2 } } } })),
+    limits: () => of({ status: 'SUCCESS', data: { ...DEFAULT_IMAGE_LIMITS, types: [{ key: 'wound', name: 'Wound', measured: true }, { key: 'xray', name: 'X-ray', measured: false }] } }),
+    list: vi.fn(() => of({ status: 'SUCCESS', data: { rows: [ROW({ imageType: 'wound', imageTypeName: 'Wound' }), ROW({ photoId: 1003, title: 'SV-000169 · W1 right heel', status: 'NO_RULER',
+      scaleFound: false, lengthCm: null, widthCm: null, areaCm2: null, changePct: null, visit: 1, visits: 1 }),
+      ROW({ photoId: 1004, title: 'P-1093 · left forearm', status: 'UNMEASURED', imageType: 'xray', imageTypeName: 'X-ray', typeSuggested: true, measuredType: false,
+        lengthCm: null, widthCm: null, areaCm2: null, sinceFirstPct: null, changePct: null, visit: 1, visits: 1, patientRef: 'P-1093' })], total: 3, all: 3,
+      facets: { type: { wound: 2, xray: 1 }, status: { measured: 1, unmeasured: 1, no_ruler: 1, to_confirm: 1, could_not_read: 0 }, site: { foot: 1, heel: 1 },
+        patient: { 'SV-000117': 1, 'SV-000169': 1 }, by: { me: 2 } } } })),
     image: () => NEVER, one: () => NEVER, compare: () => NEVER,
   };
   TestBed.configureTestingModule({ providers: [
     provideRouter([]),
     { provide: ImageApi, useValue: api },
+    { provide: ImageAiApi, useValue: { types: () => of({ status: 'SUCCESS', data: { types: [], canChange } }) } },
     { provide: Dialog, useValue: { open: vi.fn(() => ({ closed: of(undefined) })) } },
     { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn() } },
     { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({}) } } },
@@ -84,6 +88,23 @@ describe('Image review list', () => {
     expect(el.querySelector('[data-facet="site"]')!.textContent).toContain('Heel');
     expect(el.querySelector('[data-facet="status"]')!.textContent).not.toContain('Could not read');
     expect(el.querySelector('[data-facet="by"]')!.textContent).not.toContain('Others');
+  });
+
+  it('shows the Image type facet and column, Description only, and the suggested badge', () => {
+    const { el } = list();
+    expect(el.querySelector('[data-facet="type"]')!.textContent).toContain('X-ray');
+    const xray = el.querySelector('[data-photo-row="1004"]')!;
+    expect(xray.querySelector('[data-test="row-type"]')!.textContent).toContain('X-ray');
+    expect(xray.querySelector('[data-test="row-type"]')!.textContent).toContain('suggested');
+    expect(xray.textContent).toContain('Description only');
+    expect(el.querySelector('[data-facet="status"]')!.textContent).toContain('Description only');
+    expect([...el.querySelectorAll('[data-test="strip-type"] option')].map(o => o.textContent!.trim())).toEqual(['Choose, or let AI suggest', 'Wound', 'X-ray']);
+    expect(el.querySelector('[data-test="open-types"]')).not.toBeNull();
+  });
+
+  it('shows AI settings only to someone who may change it', () => {
+    expect(list(false).el.querySelector('[data-test="ai-settings"]')).toBeNull();
+    expect(list(true).el.querySelector('[data-test="ai-settings"]')).not.toBeNull();
   });
 
   it('asks the server again with a facet picked', () => {
