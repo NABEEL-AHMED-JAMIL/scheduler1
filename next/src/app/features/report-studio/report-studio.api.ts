@@ -213,6 +213,11 @@ export class ReportStudioApi {
     return ReportStudioApi.data$(this.http.post<ApiResponse<PreviewResult>>(`${this.previews}/outline`, body));
   }
 
+  /** Feature 15: the definition laid out as the PDF and read for what a black-and-white fax would lose (advisory). */
+  faxCheck(body: Record<string, unknown>): Observable<PreviewResult> {
+    return ReportStudioApi.data$(this.http.post<ApiResponse<PreviewResult>>(`${this.previews}/faxCheck`, body));
+  }
+
   previewPdf(body: Record<string, unknown>): Observable<HttpResponse<Blob>> {
     return this.http.post(`${this.previews}/pdf`, body, { responseType: 'blob', observe: 'response' });
   }

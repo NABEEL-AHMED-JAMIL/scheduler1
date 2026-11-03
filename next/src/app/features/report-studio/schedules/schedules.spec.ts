@@ -134,6 +134,17 @@ describe('the schedule calls', () => {
       .flush({ status: 'SUCCESS', data: {} });
   });
 
+  it('asks for the fax check of the first report (feature 15) and reads its checks', () => {
+    const b = blankSchedule();
+    let checks: unknown[] = [];
+    api.faxCheck(b).subscribe(r => (checks = r.checks));
+    const fax = http.expectOne(`${API_BASE}/reportGenerate.json/scheduleFaxCheck`);
+    expect(fax.request.method).toBe('POST');
+    expect(fax.request.body).toEqual(b);
+    fax.flush({ status: 'SUCCESS', data: { checks: [{ level: 'WARNING', about: 'fax', text: 'Fax check · Lab values: Text in 7 pt…' }] } });
+    expect(checks).toEqual([{ level: 'WARNING', about: 'fax', text: 'Fax check · Lab values: Text in 7 pt…' }]);
+  });
+
   it('the list shows each schedule\'s state, next run and last run', async () => {
     const f = TestBed.createComponent(ReportSchedules);
     f.detectChanges();

@@ -233,6 +233,18 @@
         @if (showAsNote(); as note) {
           <div class="rs-banner rs-banner-info rsd-canvas-note" role="status" data-show-as-note><app-icon name="info" class="shrink-0" /><span class="min-w-0 flex-1 text-sm">{{ note }}</span></div>
         }
+        @if (showAs() === 'fax') {
+          @if (faxProblems()?.length) {
+            <app-rs-data-problems kind="fax" [problems]="faxProblems()!" [blocks]="blocks()" [selectedId]="selected()" (selected)="select($event)" />
+          } @else {
+            <div class="rs-banner rsd-canvas-note" [class.rs-banner-ok]="faxProblems()?.length === 0" [class.rs-banner-info]="faxProblems() === null"
+                 role="status" data-fax-status>
+              <app-icon [name]="faxError() ? 'alert' : faxProblems()?.length === 0 ? 'checkCircle' : 'info'" class="shrink-0" />
+              <span class="min-w-0 flex-1 text-sm">{{ faxStatus() }}</span>
+              @if (faxError()) { <button type="button" class="btn btn-default btn-sm shrink-0" (click)="checkFax(true, true)"><app-icon name="refresh" />Try again</button> }
+            </div>
+          }
+        }
         @if (previewDef()) {
           <div class="rs-banner rs-banner-info rsd-canvas-note" role="status" data-ai-preview-banner><app-icon name="sparkle" class="shrink-0" />
             <span class="min-w-0 flex-1 text-sm">The AI's proposal, shown on the page. Nothing in the draft changes until you accept it; outlined blocks are new or changed.</span></div>
@@ -334,6 +346,10 @@
             </div>
             <label class="field"><span class="label">Main colour</span>
               <input class="input rsd-colour" type="color" [ngModel]="themeSetting('primaryColor') || primaryDefault()" (change)="setTheme('primaryColor', $any($event.target).value.toUpperCase())" [disabled]="!editable()" aria-label="Main colour" /></label>
+            <label class="rsd-check" data-fax-safe>
+              <input type="checkbox" class="checkbox" [checked]="faxSafe()" [disabled]="!editable()" (change)="setFaxSafe($any($event.target).checked)" />
+              <span>Fax-safe: black text and rules, patterns instead of colours in charts</span>
+            </label>
           </section>
           <section class="rsd-props-group" aria-label="Watermark">
             <h3 class="rsd-eyebrow">Watermark</h3>

@@ -176,6 +176,11 @@ export class SchedulesApi {
       { params: { checkFolder: String(checkFolder) } }));
   }
 
+  /** Feature 15: the fax check of the first report a run now would make, as checks before it runs (advisory). */
+  faxCheck(body: ScheduleBody): Observable<{ checks: PlanCheck[] }> {
+    return SchedulesApi.data$(this.http.post<ApiResponse<{ checks: PlanCheck[] }>>(`${this.base}/scheduleFaxCheck`, body));
+  }
+
   /** "Make the first 3 now (test)": report {@code index} (0 to 2) as a preview PDF. */
   test(body: ScheduleBody, index: number): Observable<HttpResponse<Blob>> {
     return this.http.post(`${this.base}/scheduleTest`, body, { params: { index: String(index) }, responseType: 'blob', observe: 'response' });

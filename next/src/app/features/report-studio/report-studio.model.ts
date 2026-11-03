@@ -240,6 +240,8 @@ export interface PreviewResult {
   /** Feature 6, the outline's answer: the pages the PDF lays out to, and the page each component starts on. */
   pages?: number;
   components?: { id: string; page: number }[];
+  /** Feature 15, the fax check's answer: what a black-and-white fax would lose, by component (advisory warnings). */
+  fax?: Problem[];
 }
 
 /** What media drew for a barcode: its symbology, content, modules, module size and printed size. */

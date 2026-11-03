@@ -263,8 +263,9 @@
           <ul class="sp-checks">
             @for (t of todo(); track t) { <li class="is-todo"><app-icon name="info" />{{ t }}</li> }
             @for (c of checks(); track c.text) {
-              <li [class.is-ok]="c.level === 'OK'" [class.is-warn]="c.level === 'WARNING'" [class.is-crit]="c.level === 'ERROR'">
-                <app-icon [name]="c.level === 'OK' ? 'checkCircle' : c.level === 'ERROR' ? 'xCircle' : 'alert'" />{{ c.text }}</li>
+              <li [class.is-ok]="c.level === 'OK' && c.about !== 'fax-pending'" [class.is-todo]="c.about === 'fax-pending'" [class.is-warn]="c.level === 'WARNING'"
+                  [class.is-crit]="c.level === 'ERROR'" [attr.data-fax-check]="c.about.startsWith('fax') ? '' : null">
+                <app-icon [name]="c.about === 'fax-pending' ? 'info' : c.level === 'OK' ? 'checkCircle' : c.level === 'ERROR' ? 'xCircle' : 'alert'" />{{ c.text }}</li>
             } @empty { @if (!todo().length) { <li class="is-todo"><app-icon name="info" />The checks run when the template and data are chosen.</li> } }
           </ul>
         </section>

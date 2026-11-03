@@ -29,6 +29,14 @@ const NEXT_STEP: Record<string, string> = {
   QR_CONTENT_INVALID: 'Change what the QR code opens, or the value it reads.',
   FILTER_PARTIAL: 'Check the block\'s "Show only rows where" filter against the data.',
   REPEAT_CAPPED: 'Filter the list, or split the report: a block repeats at most 1,000 times.',
+  // Reports redesign, feature 15: the fax check (advisory).
+  FAX_SMALL_TEXT: 'Choose a larger size for the block, or a larger text size in Page settings.',
+  FAX_LIGHT_TEXT: 'Choose a darker colour, or tick Fax-safe in Page settings.',
+  FAX_COLOUR_ONLY: 'Add a word or a mark (High, ▲) beside the colour, or use the bold Text style for the rule.',
+  FAX_THIN_RULE: 'Make the line at least 0.5 pt.',
+  FAX_LIGHT_RULE: 'Darken the rule colour, or tick Fax-safe in Page settings.',
+  FAX_DARK_IMAGE: 'Use a lighter picture, or leave pictures out of copies that are faxed.',
+  FAX_CHART_COLOURS: 'Tick Fax-safe in Page settings (patterns instead of colours), or show the figures as a table under the chart.',
 };
 
 /** Problems about the data: its bindings and its contract, or any that names a field. */
@@ -37,8 +45,8 @@ export function isDataProblem(p: Problem): boolean {
 }
 
 /** The data problems as rows, blocking ones first, each with the block it is about (when it is on the page). */
-export function dataProblems(problems: Problem[], blocks: Block[]): DataProblemRow[] {
-  const rows = problems.filter(isDataProblem).map<DataProblemRow>(p => {
+export function dataProblems(problems: Problem[], blocks: Block[], all = false): DataProblemRow[] {
+  const rows = problems.filter(p => all || isDataProblem(p)).map<DataProblemRow>(p => {
     const at = p.componentId ? find(blocks, p.componentId) : null;
     return {
       severity: p.severity,
@@ -65,7 +73,9 @@ export const SHOWN = 4;
   imports: [Icon, NgTemplateOutlet],
   template: `
     @if (rows().length) {
-      <section class="rs-banner dpr" [class.rs-banner-crit]="blocking()" [class.rs-banner-warn]="!blocking()" aria-label="Problems with the data" data-data-problems>
+      <section class="rs-banner dpr" [class.rs-banner-crit]="blocking()" [class.rs-banner-warn]="!blocking()"
+               [attr.aria-label]="kind() === 'fax' ? 'Fax check' : 'Problems with the data'" [attr.data-data-problems]="kind() === 'data' ? '' : null"
+               [attr.data-fax-problems]="kind() === 'fax' ? '' : null">
         <div class="dpr-head">
           <app-icon name="alert" [class]="blocking() ? 'icon-crit shrink-0' : 'icon-warn shrink-0'" />
           <h2 class="text-sm font-semibold flex-1 min-w-0">{{ heading() }}</h2>
@@ -126,15 +136,18 @@ export class DataProblems {
   readonly withData = input(true);
   readonly selectedId = input<string | null>(null);
   readonly selected = output<string>();
+  /** Feature 15: 'fax' lists the fax check's findings (every one given, advisory) under their own heading. */
+  readonly kind = input<'data' | 'fax'>('data');
 
   readonly shown = SHOWN;
   readonly open = signal(true);
   readonly all = signal(false);
-  readonly rows = computed(() => dataProblems(this.problems(), this.blocks()));
+  readonly rows = computed(() => dataProblems(this.problems(), this.blocks(), this.kind() === 'fax'));
   readonly visible = computed(() => (this.all() ? this.rows() : this.rows().slice(0, SHOWN)));
   readonly blocking = computed(() => this.rows().some(r => r.severity === 'ERROR'));
   readonly heading = computed(() => {
     const n = this.rows().length;
+    if (this.kind() === 'fax') return `Fax check: ${n} thing${n === 1 ? '' : 's'} a black-and-white fax would lose (advisory)`;
     return `${n} problem${n === 1 ? '' : 's'} with ${this.withData() ? 'the test data' : 'the bindings'}${this.blocking() ? ': a report cannot be made with it' : ''}`;
   });
 }

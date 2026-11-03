@@ -261,6 +261,15 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
   /** Reports redesign: the page shown as on screen, as printed, or as a black-and-white fax. */
   readonly showAs = signal<ShowAs>('screen');
   readonly showAsNote = computed(() => showAsNote(this.showAs()));
+  /** Feature 15: the fax check, run while the page is shown as a fax -- what a black-and-white fax would lose, by block. */
+  readonly faxProblems = signal<Problem[] | null>(null);
+  readonly faxBusy = signal(false);
+  readonly faxError = signal('');
+  private faxFor = '';
+  private faxTimer: ReturnType<typeof setTimeout> | null = null;
+  readonly faxStatus = computed(() => this.faxError() ? this.faxError()
+    : this.faxBusy() || this.faxProblems() === null ? 'Checking what a black-and-white fax would lose…'
+    : 'Fax check: nothing on these pages would be lost on a black-and-white fax.');
   /** The problems listed over the canvas (the data's), and the other checks (in the status bar's Checks). */
   readonly dataProblemCount = computed(() => this.problems().filter(isDataProblem).length);
   readonly otherProblemCount = computed(() => this.problems().length - this.dataProblemCount());
@@ -325,6 +334,11 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
       if (this.drawTimer) clearTimeout(this.drawTimer);
       if (this.saveTimer) clearTimeout(this.saveTimer);
       if (this.outlineTimer) clearTimeout(this.outlineTimer);
+      if (this.faxTimer) clearTimeout(this.faxTimer);
+    });
+    // Feature 15: showing the page as a fax checks it for a fax (once a definition and data are unchanged).
+    effect(() => {
+      if (this.showAs() === 'fax') untracked(() => this.checkFax(true));
     });
     // The selection's outline follows the block when the page is drawn again, zoomed or resized.
     effect(() => {
@@ -849,6 +863,7 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
         this.checkedAt.set(new Date());
         if (r.html) this.canvas.set(splitCanvas(r.html));
         if (this.tab() === 'layers' && (this.outlinePages() === null || this.outlineStale())) this.countPages();
+        if (this.showAs() === 'fax') this.checkFax();
         if (!this.fitted) { this.fitted = true; requestAnimationFrame(() => this.fitIfWider()); }
       },
       error: e => {
@@ -858,6 +873,38 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
         if (body['source'] && LOST_DATA.includes(err.code)) { this.loseTestData(err.message); return; }
         this.drawError.set(err.message);
         if (err.problems.length) this.problems.set(err.problems);
+      },
+    });
+  }
+
+  // ---------------------------------------------------------------- the fax check (reports redesign, feature 15)
+
+  /** Checks the page for a fax (soon, or now), unless the definition and data are the ones last checked. */
+  checkFax(now = false, force = false): void {
+    if (this.faxTimer) clearTimeout(this.faxTimer);
+    this.faxTimer = setTimeout(() => this.runFaxCheck(force), now ? 0 : OUTLINE_MS);
+  }
+
+  /** Lays the page out for the fax check now; with the same definition and data as last time, only when forced. */
+  runFaxCheck(force: boolean): void {
+    const def = this.previewDef() ?? this.def();
+    if (!def || this.showAs() !== 'fax') return;
+    const body: Record<string, unknown> = { definition: def };
+    if (this.testSource()) { body['source'] = this.testSource(); body['rootPath'] = this.testRoot(); }
+    const key = JSON.stringify(body);
+    if (!force && key === this.faxFor && this.faxProblems() !== null) return;
+    this.faxBusy.set(true);
+    this.faxError.set('');
+    this.api.faxCheck(body).subscribe({
+      next: r => {
+        this.faxBusy.set(false);
+        this.faxFor = key;
+        if (r.fax === undefined) { this.faxProblems.set(null); this.faxError.set('The fax check runs once the template has no errors.'); return; }
+        this.faxProblems.set(r.fax);
+      },
+      error: e => {
+        this.faxBusy.set(false);
+        this.faxError.set(studioError(e, 'The fax check could not run.').message);
       },
     });
   }
@@ -1403,6 +1450,18 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
   themeSetting(key: string): string {
     const theme = (this.def()?.template['theme'] ?? {}) as Record<string, unknown>;
     return theme[key] === undefined ? '' : String(theme[key]);
+  }
+
+  /** Feature 15: the theme's fax-safe switch (the whole report prints for a black-and-white fax). */
+  readonly faxSafe = computed(() => ((this.def()?.template['theme'] ?? {}) as Record<string, unknown>)['faxSafe'] === true);
+
+  setFaxSafe(on: boolean): void {
+    this.edit((_blocks, def) => {
+      const theme = { ...((def.template['theme'] ?? {}) as Record<string, unknown>) };
+      if (on) theme['faxSafe'] = true; else delete theme['faxSafe'];
+      def.template['theme'] = theme;
+      return true;
+    }, 'theme:faxSafe');
   }
 
   setTheme(key: string, value: string): void {

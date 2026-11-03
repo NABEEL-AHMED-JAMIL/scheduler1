@@ -20,7 +20,7 @@ import { DataSourceRow, TemplateRow } from '../report-studio.model';
 import { Meaning, ReportLibraryApi } from '../report-library.api';
 import { RsTimePipe, rsTime, zoneCity } from '../rs-time.pipe';
 import {
-  CHANNEL_WORDS, DAYS, DAY_WORDS, Day, RUN_WORDS, RunDetail, STATE_WORDS, ScheduleBody, ScheduleDetail, SchedulePlan, SchedulesApi,
+  CHANNEL_WORDS, DAYS, DAY_WORDS, Day, RUN_WORDS, PlanCheck, RunDetail, STATE_WORDS, ScheduleBody, ScheduleDetail, SchedulePlan, SchedulesApi,
   blankSchedule, placeholders, runTone, scheduleTone,
 } from './schedules.api';
 import { SchedTestThumb } from './test-thumb';
@@ -211,7 +211,7 @@ export class ReportSchedulePage implements OnInit {
     const provisional = !splitReady(this.body());
     this.api.plan(forPlan(this.body()), checkFolder).subscribe({
       next: p => { if (asked === this.planAsked) { this.plan.set(provisional ? { ...p, reportsPlanned: undefined, firstReports: [], exampleName: undefined } : p);
-        this.planning.set(false); } },
+        this.planning.set(false); this.askFax(p); } },
       error: e => { if (asked === this.planAsked) { this.planError.set(studioError(e, 'The plan could not be made.').message); this.planning.set(false); } },
     });
   }
@@ -401,8 +401,32 @@ export class ReportSchedulePage implements OnInit {
       cost: p?.reportsPlanned != null ? `about ${p.reportsPlanned} report${p.reportsPlanned === 1 ? '' : 's'} a run, billed as reports generated` : '',
     };
   });
+  /**
+   * Feature 15: the fax check of the first report, asked once the plan has a report to make and again only when what the
+   * report is made of changes (the template, its version, the data and its rows) -- a layout is not made on every edit.
+   */
+  readonly faxChecks = signal<PlanCheck[]>([]);
+  private faxKey = '';
+  private faxAsked = 0;
+
+  private askFax(p: SchedulePlan): void {
+    const b = forPlan(this.body());
+    const key = JSON.stringify({ template: b.template, data: b.data, split: b.split });
+    const ready = (p.firstReports ?? []).length > 0 && !p.checks.some(c => c.level === 'ERROR' && ['template', 'data', 'fields', 'spec'].includes(c.about));
+    if (!ready) { this.faxChecks.set([]); this.faxKey = ''; return; }
+    if (key === this.faxKey) return;
+    this.faxKey = key;
+    const asked = ++this.faxAsked;
+    this.faxChecks.set([{ level: 'OK', about: 'fax-pending', text: 'Fax check: reading the first report…' }]);
+    this.api.faxCheck(b).subscribe({
+      next: r => { if (asked === this.faxAsked) this.faxChecks.set(r.checks ?? []); },
+      error: e => { if (asked === this.faxAsked) { this.faxKey = ''; this.faxChecks.set([{ level: 'WARNING', about: 'fax',
+        text: `Fax check: ${studioError(e, 'it could not run.').message}` }]); } },
+    });
+  }
+
   readonly checks = computed(() => {
-    const out = [...(this.plan()?.checks ?? [])];
+    const out = [...(this.plan()?.checks ?? []), ...this.faxChecks()];
     const ok = this.testedOk();
     if (ok !== null) out.push({ level: ok ? 'OK' : 'ERROR', about: 'test', text: ok ? `${this.tests().length} test report${this.tests().length === 1 ? '' : 's'} made without problems`
       : 'A test report has problems: open it to see them.' });

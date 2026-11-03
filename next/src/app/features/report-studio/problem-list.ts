@@ -79,6 +79,10 @@ const TITLES: Record<string, string> = {
   TEMPLATE_INVALID: 'The template has a problem', SNAPSHOT_TOO_LARGE: 'The data is too large', LIMIT_EXCEEDED: 'Over a limit',
   // MIG-428: a fixed person's signature next to an approval.
   FIXED_SIGNATURE_NEAR_APPROVAL: "One person's signature beside an approval",
+  // Reports redesign, feature 15: the fax check.
+  FAX_SMALL_TEXT: 'Text too small for a fax', FAX_LIGHT_TEXT: 'Light text a fax prints white', FAX_COLOUR_ONLY: 'Meaning carried by colour alone',
+  FAX_THIN_RULE: 'Lines too thin for a fax', FAX_LIGHT_RULE: 'Light lines a fax loses', FAX_DARK_IMAGE: 'A picture a fax prints dark',
+  FAX_CHART_COLOURS: 'Chart series told apart by colour',
 };
 
 /** A problem's title, as the drawing heads each box ("Required field missing: quality.readmission_target"). */
