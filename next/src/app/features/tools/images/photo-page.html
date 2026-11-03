@@ -1,7 +1,8 @@
 <div class="page-tool">
   @if (detail(); as d) {
     <app-page-header [title]="d.title" [crumb]="crumb()" [hub]="false">
-      @if (mpill(); as m) { <span pills [class]="'pill pill-' + m.tone" data-test="page-status">@if (m.icon) { <app-icon [name]="m.icon" size="0.85em" /> }{{ m.label }}</span> }
+      @if (typeLabel()) { <span pills class="pill pill-neutral" data-test="page-type"><app-icon [name]="typeIcon()" size="0.85em" />{{ typeLabel() }}@if (d.typeSuggested) { · suggested }</span> }
+      @if (measured() || d.status === 'REFUSED') { @if (mpill(); as m) { <span pills [class]="'pill pill-' + m.tone" data-test="page-status">@if (m.icon) { <app-icon [name]="m.icon" size="0.85em" /> }{{ m.label }}</span> } }
       @if (tab() !== 'compare' && dpill(); as dp) { <span pills [class]="'pill pill-' + dp.tone" data-test="page-description-status">{{ dp.label }}</span> }
       @if (tab() === 'compare') {
         <p meta class="pg-meta" data-test="page-meta">{{ compareMeta() }}</p>
@@ -49,10 +50,18 @@
     @if (d.status === 'REFUSED') {
       <section class="card p-4 mt-5" data-test="photo-refused"><app-photo-state [photo]="d" (remove)="remove()" (upload)="another()" /></section>
     } @else {
+      @if (!measured()) {
+        <div class="ir-only mt-4" role="note" data-test="description-only"><app-icon name="info" />
+          <span><b>Description only · no size · not a diagnosis.</b> {{ onlyText() }}</span></div>
+      }
       <nav class="tabs mt-4" role="tablist" aria-label="The photo">
-        <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'measurement'" [attr.aria-selected]="tab() === 'measurement'" (click)="open('measurement')" data-tab="measurement">Measurement</button>
+        @if (measured()) {
+          <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'measurement'" [attr.aria-selected]="tab() === 'measurement'" (click)="open('measurement')" data-tab="measurement">Measurement</button>
+        }
         <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'description'" [attr.aria-selected]="tab() === 'description'" (click)="open('description')" data-tab="description">
           Description @if (d.descriptionStatus === 'DRAFT') { <span class="pill pill-warn ml-1" style="height:1.125rem">draft</span> }</button>
+        <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'ask'" [attr.aria-selected]="tab() === 'ask'" (click)="open('ask')" data-tab="ask">
+          Ask @if (asks()?.length) { <span class="pg-count">{{ asks()!.length }}</span> }</button>
         <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'compare'" [attr.aria-selected]="tab() === 'compare'" (click)="open('compare')" data-tab="compare">
           Compare <span class="pg-count">{{ d.visits || 1 }}</span></button>
         <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'privacy'" [attr.aria-selected]="tab() === 'privacy'" (click)="open('privacy')" data-tab="privacy">Privacy</button>
@@ -92,6 +101,7 @@
                 @if (comparison(); as c) {
                   <div class="ir-card-b">
                     @if (c.sizedCount) { <app-area-chart [rows]="c.photos" kind="full" /> }
+                    @else if (!measured()) { <p class="text-sm text-[color:var(--text-muted)] m-0">{{ typeLabel() || 'This type' }} is described only, never measured, so there is no size to chart.</p> }
                     @else { <p class="text-sm text-[color:var(--text-muted)] m-0">No photo of this wound has a ruler yet, so there is no size to chart.</p> }
                   </div>
                   <table class="pg-t">
@@ -111,13 +121,41 @@
             </div>
           </div>
         }
+        @case ('ask') {
+          <div class="dg">
+            <section class="card p-0 min-w-0 overflow-hidden">
+              <div class="ir-sunken">
+                <app-photo-view [photoId]="d.photoId" [version]="d.blurCount ?? 0" [geometry]="d.geometry" [width]="d.width" [height]="d.height"
+                                [overlays]="measured() ? ['outline'] : []" [hideNoRuler]="true" />
+              </div>
+            </section>
+            <app-ask-thread [photo]="d" [askOn]="askOn()" [initial]="asks()" (asked)="asks.set($event)" (toNote)="addToNote($event)" (referral)="actions.pipeline(d)" />
+          </div>
+        }
         @case ('description') {
           <div class="dg">
-            <app-description-card [photo]="d" (changed)="onChanged($event)" />
+            @if (!measured()) {
+              <section class="card p-0 min-w-0 overflow-hidden" data-test="description-photo">
+                <div class="ir-sunken">
+                  <app-photo-view [photoId]="d.photoId" [version]="d.blurCount ?? 0" [width]="d.width" [height]="d.height" [overlays]="[]" [hideNoRuler]="true" />
+                </div>
+              </section>
+              <div class="col">
+                <app-description-card [photo]="d" [type]="type()" (changed)="onChanged($event)" />
+                <ng-container [ngTemplateOutlet]="howWritten" />
+              </div>
+            } @else {
+              <app-description-card [photo]="d" [type]="type()" (changed)="onChanged($event)" />
+              <ng-container [ngTemplateOutlet]="howWritten" />
+            }
+          </div>
+          <ng-template #howWritten>
             <section class="card p-0">
               <div class="ir-card-h"><h3>How it was written</h3></div>
               <div class="ir-card-b">
                 <dl class="kv">
+                  @if (typeLabel()) { <dt>Image type</dt><dd>{{ typeLabel() }}{{ d.typeSuggested ? ' (suggested by AI, a draft)' : '' }}</dd> }
+                  @if (d.descriptionPromptName) { <dt>Prompt</dt><dd>{{ d.descriptionPromptName }}@if (d.descriptionPromptVersion != null) { v{{ d.descriptionPromptVersion }} }</dd> }
                   <dt>Model</dt><dd>{{ d.descriptionModel || '—' }} (local)</dd>
                   <dt>Drafted</dt><dd>{{ d.describedAt ? (d.describedAt | serverTime: 'recent') : '—' }}</dd>
                   <dt>Confirmed</dt><dd>{{ d.confirmedAt ? (d.confirmedByName || 'a nurse') + ', ' + (d.confirmedAt | serverTime: 'recent') : 'Not yet' }}</dd>
@@ -125,7 +163,7 @@
                 <p class="text-xs text-[color:var(--text-muted)] mt-3 mb-0">A local vision model reads the photo only. It never sizes, stages or diagnoses; a field it is unsure of is left empty. Only a confirmed description goes into a visit note or a report.</p>
               </div>
             </section>
-          </div>
+          </ng-template>
         }
         @case ('privacy') {
           <div class="dg">
@@ -169,6 +207,12 @@
                     <select id="pd-site" class="input" (change)="setField('bodyPart', $any($event.target).value)">
                       @for (b of bodyParts; track b) { <option [value]="b" [selected]="f.bodyPart === b">{{ siteWords[b] }}</option> }
                     </select></div>
+                  <div class="field"><label class="label" for="pd-type">Image type</label>
+                    <select id="pd-type" class="input" (change)="setField('imageType', $any($event.target).value)" data-test="details-type">
+                      @if (!f.imageType) { <option value="" selected>Choose a type</option> }
+                      @for (t of typeChoices(); track t.key) { <option [value]="t.key" [selected]="f.imageType === t.key">{{ t.name }}</option> }
+                    </select>
+                    @if (d.typeSuggested) { <p class="field-note text-[color:var(--text-muted)]">Suggested by AI at upload, a draft: your choice wins.</p> }</div>
                   <div class="field"><label class="label" for="pd-taken">Taken</label>
                     <app-taken-field inputId="pd-taken" [max]="nowLocal" [value]="f.takenAt" (valueChange)="setField('takenAt', $event)" /></div>
                   <div class="field pg-wide"><label class="label" for="pd-where">Where exactly</label>
@@ -191,6 +235,22 @@
                 <dt>Sent on</dt><dd>{{ d.documents ? 'Documents (document ' + (d.documents.ocrDocumentId ?? '…') + ')' : '' }}{{ d.documents && d.reportAsset ? ' · ' : '' }}{{ d.reportAsset ? 'Report Studio (' + (d.reportAsset.label || 'image') + ')' : '' }}{{ !d.documents && !d.reportAsset ? 'Not yet' : '' }}</dd>
               </dl>
             </div>
+          </section>
+          <section class="card p-0 mt-4" data-test="details-asks">
+            <div class="ir-card-h"><h3>Questions asked</h3><span class="ir-end text-xs text-[color:var(--text-muted)]">{{ asks()?.length ?? 0 }}</span></div>
+            @if (asks()?.length) {
+              <table class="pg-t">
+                <thead><tr><th>Asked</th><th>Question</th><th>Answer</th><th>How</th></tr></thead>
+                <tbody>
+                  @for (a of asks(); track a.askId) {
+                    <tr [attr.data-ask-row]="a.askId"><td class="whitespace-nowrap">{{ a.askedAt ? (a.askedAt | serverTime: 'recent') : '—' }}@if (a.askedByName) { · {{ a.askedByName }} }</td>
+                      <td>{{ a.question }}</td>
+                      <td>{{ a.status === 'held' ? 'Held, not shown' : a.answer || a.message || '—' }}</td>
+                      <td class="text-xs text-[color:var(--text-secondary)]">{{ a.status === 'refused' ? 'Not answered · fixed reply · no model was asked' : a.status === 'ok' ? 'Draft · ' + (a.model || 'local model') : a.status }}</td></tr>
+                  }
+                </tbody>
+              </table>
+            } @else { <div class="ir-card-b"><p class="text-sm text-[color:var(--text-muted)] m-0">No question asked about this image yet. Ask one in the Ask tab.</p></div> }
           </section>
         }
         @default {
@@ -235,6 +295,7 @@
                         <span class="ml-auto font-medium" [class.ir-down]="d.sinceFirstPct < 0" [class.ir-up]="d.sinceFirstPct > 0" data-test="size-trend">{{ trendWords(d.sinceFirstPct) }}</span></div>
                       @if (comparison(); as c) { <app-area-chart class="mt-2" [rows]="c.photos" kind="spark" /> }
                     }
+                    @if (target()) { <p class="text-xs text-[color:var(--text-secondary)] mt-3 mb-0" data-test="size-target">Target: <b>{{ target() }}</b>{{ target() === 'dark region' ? ' on skin' : '' }} (the outline).</p> }
                     <div class="ir-info mt-3"><app-icon name="info" /><span>Sizes come only from the ruler in the photo ({{ d.pxPerCm?.toFixed(1) }} px per cm). A photo without a ruler gets no size; it is never estimated.</span></div>
                   </div>
                 } @else {
@@ -246,7 +307,7 @@
                   </div>
                 }
               </section>
-              @if (d.status !== 'TOO_DARK') { <app-description-card [photo]="d" (changed)="onChanged($event)" /> }
+              @if (d.status !== 'TOO_DARK') { <app-description-card [photo]="d" [type]="type()" (changed)="onChanged($event)" /> }
             </div>
           </div>
         }

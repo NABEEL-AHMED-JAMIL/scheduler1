@@ -9,23 +9,27 @@ import { ImageApi } from './image.api';
 import { DOWNLOADS, ImageActions } from './image-actions';
 import { AreaChart, DescriptionCard, PhotoState } from './photo-parts';
 import { PhotoView } from './photo-view';
+import { AskThread } from './ask-thread';
+import { ImageTypesStore } from './image-ai';
 import {
-  Comparison, PhotoDetail, PhotoSummary, descriptionPill, measurePill, pctText, sizeParts, stateAdvice, trendWords,
+  Comparison, PhotoDetail, PhotoSummary, descriptionPill, isMeasuredPhoto, measurePill, pctText, sizeParts, stateAdvice, targetWords, trendWords,
+  typeName,
 } from './image.model';
 
 const POLL_MS = 4000;
-type PanelTab = 'measurement' | 'description' | 'compare';
+type PanelTab = 'measurement' | 'description' | 'ask' | 'compare';
 
 /**
  * The selected photo in the list's side panel (design image-a): its status pills, the title and "Visit 3 · taken 23 Oct, 10:12 ·
  * location and camera details removed", Measurement / Description / Compare N, the photo with its outline and ruler, length ·
  * width · area, the line "Measured in code against the ruler. No ruler, no size: never estimated.", and Next steps -- Open,
  * Confirm description, Send to Documents, ⋮ (Download, Add to a report, Start a pipeline, Delete). A photo that could not be
- * measured or taken says why and what to do (design image-states).
+ * measured or taken says why and what to do (design image-states). Per image type (design types-list): the type before the
+ * taken time, the target in the measured pill ("Measured · dark region"), Ask; a type never measured has no Measurement tab.
  */
 @Component({
   selector: 'app-photo-panel',
-  imports: [Icon, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, PhotoView, DescriptionCard, PhotoState, AreaChart],
+  imports: [Icon, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, PhotoView, DescriptionCard, PhotoState, AreaChart, AskThread],
   styleUrls: ['../tools-panel.css', './images.css'],
   styles: `
     .pp-cmp { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; }
@@ -53,15 +57,23 @@ type PanelTab = 'measurement' | 'description' | 'compare';
       </div>
     } @else {
       <div class="tabs tp-tabs" role="tablist" aria-label="The selected photo">
-        <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'measurement'" [attr.aria-selected]="tab() === 'measurement'" (click)="tab.set('measurement')">Measurement</button>
-        <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'description'" [attr.aria-selected]="tab() === 'description'" (click)="tab.set('description')">Description</button>
+        @if (measured()) {
+          <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'measurement'" [attr.aria-selected]="tab() === 'measurement'" (click)="tab.set('measurement')" data-panel-tab="measurement">Measurement</button>
+        }
+        <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'description'" [attr.aria-selected]="tab() === 'description'" (click)="tab.set('description')" data-panel-tab="description">Description</button>
+        <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'ask'" [attr.aria-selected]="tab() === 'ask'" (click)="tab.set('ask')" data-panel-tab="ask">Ask</button>
         <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'compare'" [attr.aria-selected]="tab() === 'compare'" (click)="openCompare()">
           Compare <span class="text-xs text-[color:var(--text-muted)]">{{ p.visits || 1 }}</span></button>
       </div>
       <div class="tp-body">
         @switch (tab()) {
           @case ('description') {
-            @if (detail(); as d) { <app-description-card [photo]="d" [bare]="true" [compact]="true" (changed)="onChanged($event)" /> }
+            @if (!measured() && p.hasPhoto) { <app-photo-view [photoId]="p.photoId" [version]="p.blurCount ?? 0" [width]="p.width" [height]="p.height" [overlays]="[]" [hideNoRuler]="true" /> }
+            @if (detail(); as d) { <app-description-card [photo]="d" [type]="type()" [bare]="true" [compact]="true" (changed)="onChanged($event)" /> }
+            @if (!measured()) { <div class="ir-line"><app-icon name="info" size="0.95em" />Description only · no size · not a diagnosis.</div> }
+          }
+          @case ('ask') {
+            @if (detail(); as d) { <app-ask-thread [photo]="d" [compact]="true" [askOn]="askOn()" /> }
           }
           @case ('compare') {
             @if (comparison(); as c) {
@@ -93,7 +105,7 @@ type PanelTab = 'measurement' | 'description' | 'compare';
             } @else if (p.status === 'MEASURING') {
               <p class="text-sm m-0"><app-icon name="refresh" [busy]="true" size="0.9em" /> Measuring against the ruler…</p>
             }
-            <div class="ir-line"><app-icon name="shieldCheck" size="0.95em" />Measured in code against the ruler. No ruler, no size: never estimated.</div>
+            <div class="ir-line"><app-icon name="shieldCheck" size="0.95em" />Measured in code against the ruler{{ target() && p.imageType && p.imageType !== 'wound' ? ' (' + target() + (target() === 'dark region' ? ' on skin' : '') + ')' : '' }}. No ruler, no size: never estimated.</div>
           }
         }
         <div class="tp-next" data-test="next-steps">
@@ -130,10 +142,12 @@ export class PhotoPanel {
   private readonly api = inject(ImageApi);
   readonly actions = inject(ImageActions);
   private readonly when = new ServerTimePipe(inject(LOCALE_ID));
+  private readonly types = inject(ImageTypesStore);
 
   readonly summary = input.required<PhotoSummary>();
   readonly canSend = input(false);
   readonly canReport = input(false);
+  readonly askOn = input(true);
   readonly closed = output<void>();
   /** Something the list shows changed (confirmed, sent, deleted): it reads its rows again. */
   readonly changed = output<void>();
@@ -154,13 +168,21 @@ export class PhotoPanel {
     const d = this.detail();
     return d && d.photoId === this.summary().photoId ? d : (this.summary() as PhotoDetail);
   });
-  readonly mpill = computed(() => measurePill(this.view()));
+  readonly measured = computed(() => isMeasuredPhoto(this.view()));
+  readonly type = computed(() => this.types.of(this.view().imageType));
+  readonly target = computed(() => targetWords(this.view().target ?? this.type()?.target) || this.type()?.targetLabel || '');
+  /** "Measured · dark region" for a type other than a wound (design types-list). */
+  readonly mpill = computed(() => {
+    const p = this.view(), pill = measurePill(p);
+    return p.status === 'MEASURED' && p.imageType && p.imageType !== 'wound' && this.target() ? { ...pill, label: `${pill.label} · ${this.target()}` } : pill;
+  });
   readonly dpill = computed(() => descriptionPill(this.view()));
   readonly size = computed(() => sizeParts(this.view()));
   readonly advice = computed(() => stateAdvice(this.view()));
   readonly meta = computed(() => {
     const p = this.view();
     const parts: string[] = [];
+    if (typeName(p)) parts.push(typeName(p) + (p.typeSuggested ? ' (suggested)' : ''));
     if (p.visit && p.patientRef) parts.push(`Visit ${p.visit}`);
     if (p.takenAt) parts.push(`taken ${this.when.transform(p.takenAt, 'recent')}`);
     if (p.status !== 'REFUSED') parts.push('location and camera details removed');
@@ -173,7 +195,7 @@ export class PhotoPanel {
       const id = this.summary().photoId;
       untracked(() => {
         this.comparison.set(null);
-        if (this.detail()?.photoId !== id) { this.detail.set(null); this.tab.set('measurement'); }
+        if (this.detail()?.photoId !== id) { this.detail.set(null); this.tab.set(isMeasuredPhoto(this.summary()) ? 'measurement' : 'description'); }
         this.read(id);
       });
     });
@@ -187,6 +209,7 @@ export class PhotoPanel {
       next: r => {
         if (r.status !== API_SUCCESS || !r.data) return;
         this.detail.set(r.data);
+        if (!isMeasuredPhoto(r.data) && this.tab() === 'measurement') this.tab.set('description');
         if (r.data.status === 'MEASURING' || r.data.descriptionStatus === 'PENDING') this.timer = setTimeout(() => this.read(id), POLL_MS);
       },
       error: () => undefined,

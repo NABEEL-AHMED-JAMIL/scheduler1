@@ -2,6 +2,7 @@ import { Component, DestroyRef, LOCALE_ID, OnInit, computed, effect, inject, inp
 import { Router } from '@angular/router';
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
+import { NgTemplateOutlet } from '@angular/common';
 import { Subscription, firstValueFrom } from 'rxjs';
 import { API_SUCCESS } from '../../../core/api/api.config';
 import { AuthService } from '../../../core/auth/auth.service';
@@ -18,15 +19,17 @@ import { ImageApi } from './image.api';
 import { DOWNLOADS, ImageActions, messageOf } from './image-actions';
 import { AreaChart, DescriptionCard, PhotoState } from './photo-parts';
 import { DrawMode, Overlay, PhotoView } from './photo-view';
+import { AskThread, askRows } from './ask-thread';
+import { ImageTypesStore, neverText } from './image-ai';
 import {
-  BlurRegion, BodyPart, Comparison, DEFAULT_IMAGE_LIMITS, ImageLimits, PhotoDetail, SITE_WORDS, descriptionPill, measurePill, pctText,
-  sizeParts, stateAdvice, trendWords,
+  AskRow, BlurRegion, BodyPart, Comparison, DEFAULT_IMAGE_LIMITS, ImageLimits, PhotoDetail, SITE_WORDS, descriptionPill, fieldLabel, isMeasuredPhoto,
+  measurePill, pctText, sizeParts, stateAdvice, targetWords, trendWords, typeIcon, typeName,
 } from './image.model';
 import { localNow } from './upload-sheet';
 import { TakenField } from './taken-field';
 
 const POLL_MS = 4000;
-export type PhotoTab = 'measurement' | 'description' | 'compare' | 'privacy' | 'details';
+export type PhotoTab = 'measurement' | 'description' | 'ask' | 'compare' | 'privacy' | 'details';
 type Shown = 'outline' | 'ruler' | 'photo';
 
 /**
@@ -35,11 +38,14 @@ type Shown = 'outline' | 'ruler' | 'photo';
  * Download, ⋮ and Send to Documents as a visit note; then Measurement · Description (draft) · Compare · Privacy · Details.
  * Measurement: the photo large (Outline / Ruler / Photo only, Adjust outline, Blur a region) beside "Size, measured in code" with
  * the area's trend and the Description card. Compare: the same wound's photos side by side, the area chart and its table.
+ * Per image type (design image-tool-types): a skin lesion's Measurement says its target (dark region); an X-ray, a slide or
+ * another photo has no Measurement tab, and its banner reads "Description only · no size · not a diagnosis". Ask about this
+ * image is its own tab, and its questions are listed in Details.
  */
 @Component({
   selector: 'app-photo-page',
   imports: [PageHeader, Icon, Segmented, ServerTimePipe, AppLoading, InlineStatus, CdkMenu, CdkMenuItem, CdkMenuTrigger, PhotoView, DescriptionCard,
-    PhotoState, AreaChart, TakenField],
+    PhotoState, AreaChart, TakenField, AskThread, NgTemplateOutlet],
   templateUrl: './photo-page.html',
   styleUrls: ['./images.css'],
   styles: `
@@ -76,6 +82,7 @@ export class PhotoPage implements OnInit {
   private readonly auth = inject(AuthService, { optional: true });
   private readonly when = new ServerTimePipe(inject(LOCALE_ID));
   private readonly view = viewChild<PhotoView>('big');
+  readonly types = inject(ImageTypesStore);
 
   readonly id = input.required<number>();
   readonly initialTab = input<PhotoTab>('measurement');
@@ -93,7 +100,8 @@ export class PhotoPage implements OnInit {
   readonly mode = signal<DrawMode>('view');
   readonly boxes = signal<BlurRegion[]>([]);
   readonly busy = signal(false);
-  readonly form = signal<{ patientRef: string; woundLabel: string; bodyPart: BodyPart; siteDetail: string; note: string; takenAt: string } | null>(null);
+  readonly form = signal<{ patientRef: string; woundLabel: string; bodyPart: BodyPart; siteDetail: string; note: string; takenAt: string; imageType: string } | null>(null);
+  readonly asks = signal<AskRow[] | null>(null);
   private load: Subscription | null = null;
   private timer: ReturnType<typeof setTimeout> | null = null;
 
@@ -105,6 +113,28 @@ export class PhotoPage implements OnInit {
   readonly shownOptions: { id: Shown; label: string }[] = [{ id: 'outline', label: 'Outline' }, { id: 'ruler', label: 'Ruler' }, { id: 'photo', label: 'Photo only' }];
   readonly compareOptions: { id: 'on' | 'off'; label: string }[] = [{ id: 'on', label: 'Outline on' }, { id: 'off', label: 'Photos only' }];
 
+  readonly measured = computed(() => { const d = this.detail(); return d ? isMeasuredPhoto(d) : true; });
+  readonly type = computed(() => this.types.of(this.detail()?.imageType));
+  readonly typeLabel = computed(() => { const d = this.detail(); return d ? typeName(d) : ''; });
+  readonly typeIcon = computed(() => typeIcon(this.detail()?.imageType, this.type()?.baseKey));
+  readonly target = computed(() => targetWords(this.detail()?.target ?? this.type()?.target) || this.type()?.targetLabel || '');
+  /** The types the Details tab offers: the ones offered here, and the photo's own even when it is not any more. */
+  readonly typeChoices = computed(() => {
+    const offered = (this.limits().types?.length ? this.limits().types! : this.types.types().filter(t => t.offered)).map(t => ({ key: t.key, name: t.name }));
+    const d = this.detail();
+    if (d?.imageType && !offered.some(t => t.key === d.imageType)) offered.push({ key: d.imageType, name: typeName(d) });
+    return offered;
+  });
+  /** "An X-ray has no paper ruler… It never reports fractures, findings…": the banner over a type that is never measured. */
+  readonly onlyText = computed(() => {
+    const t = this.type();
+    const never = neverText(t?.never);
+    const name = this.typeLabel() || 'This image';
+    return `${t?.description ? t.description.replace(/\.?$/, '.') + ' ' : ''}${name} is not measured: sizes come only from a paper ruler in the photo, and there is none to read.`
+      + (never ? ` This tool never reports ${never}.` : '');
+  });
+  readonly askOn = computed(() => this.limits().askOn ?? true);
+  readonly label = fieldLabel;
   readonly mpill = computed(() => this.detail() ? measurePill(this.detail()!) : null);
   readonly dpill = computed(() => this.detail() ? descriptionPill(this.detail()!) : null);
   readonly size = computed(() => this.detail() ? sizeParts(this.detail()!) : null);
@@ -127,7 +157,9 @@ export class PhotoPage implements OnInit {
     const keep = this.detail()?.keepDays ?? 30;
     const first = c?.photos[0]?.takenAt ? instantOf(c.photos[0].takenAt) : null;
     const inside = !!first && Date.now() - first.getTime() <= keep * 86_400_000;
-    return `${n} ${n === 1 ? 'photo' : 'photos'} of this wound${inside ? ` in ${keep} days` : ''} · each measured in code against its own ruler`;
+    const noun = (this.detail()?.imageType ?? 'wound') === 'wound' ? 'wound' : (this.typeLabel() || 'image').toLowerCase();
+    const how = this.measured() ? ' · each measured in code against its own ruler' : ' · described only, never measured';
+    return `${n} ${n === 1 ? 'photo' : 'photos'} of this ${noun}${inside ? ` in ${keep} days` : ''}${how}`;
   });
   readonly compareRows = computed(() => (this.comparison()?.photos ?? []).slice(-3));
 
@@ -142,6 +174,7 @@ export class PhotoPage implements OnInit {
   }
 
   ngOnInit(): void {
+    this.types.load();
     this.api.limits().subscribe({
       next: r => { if (r.status === API_SUCCESS && r.data && Array.isArray(r.data.formats)) this.limits.set({ ...DEFAULT_IMAGE_LIMITS, ...r.data }); },
       error: () => undefined,
@@ -163,9 +196,30 @@ export class PhotoPage implements OnInit {
   }
 
   private set(d: PhotoDetail): void {
+    const first = this.detail()?.photoId !== d.photoId;
     this.detail.set(d);
+    // A type that is never measured has no Measurement tab: its page opens on the description.
+    if (!isMeasuredPhoto(d) && this.tab() === 'measurement') this.tab.set('description');
+    if (first) this.readAsks(d.photoId);
     if (this.timer) clearTimeout(this.timer);
     if (d.status === 'MEASURING' || d.descriptionStatus === 'PENDING') this.timer = setTimeout(() => this.read(d.photoId), POLL_MS);
+  }
+
+  readAsks(id = this.id()): void {
+    this.api.asks(id).subscribe({ next: r => { if (r.status === API_SUCCESS) this.asks.set(askRows(r.data)); }, error: () => undefined });
+  }
+
+  /** A draft answer, added to the photo's note (the visit note carries it), marked as a draft and with the model that wrote it. */
+  async addToNote(row: AskRow): Promise<void> {
+    const d = this.detail();
+    if (!d || !row.answer) return;
+    this.startForm();
+    const f = this.form()!;
+    const line = `Asked: ${row.question} Answer (draft, not a diagnosis${row.model ? ', ' + row.model : ''}): ${row.answer}`;
+    const note = f.note.trim() ? `${f.note.trim()}\n${line}` : line;
+    const done = await this.actions.call(() => this.api.edit(d.photoId, { ...f, note, imageType: undefined, takenAt: f.takenAt || undefined }),
+      'The answer could not be added to the note.');
+    if (done) { this.onChanged(done); this.toast.success('Added to the visit note, as a draft answer.'); }
   }
 
   readCompare(): void {
@@ -290,10 +344,10 @@ export class PhotoPage implements OnInit {
     if (!d) return;
     const taken = d.takenAt ? this.when.transform(d.takenAt, "yyyy-MM-dd'T'HH:mm") ?? '' : '';
     this.form.set({ patientRef: d.patientRef ?? '', woundLabel: d.woundLabel ?? '', bodyPart: (d.bodyPart ?? 'other') as BodyPart,
-      siteDetail: d.siteDetail ?? '', note: d.note ?? '', takenAt: taken });
+      siteDetail: d.siteDetail ?? '', note: d.note ?? '', takenAt: taken, imageType: d.imageType ?? '' });
   }
 
-  setField(key: 'patientRef' | 'woundLabel' | 'bodyPart' | 'siteDetail' | 'note' | 'takenAt', value: string): void {
+  setField(key: 'patientRef' | 'woundLabel' | 'bodyPart' | 'siteDetail' | 'note' | 'takenAt' | 'imageType', value: string): void {
     const f = this.form();
     if (f) this.form.set({ ...f, [key]: value });
   }
@@ -302,7 +356,10 @@ export class PhotoPage implements OnInit {
     const d = this.detail(), f = this.form();
     if (!d || !f) return;
     this.busy.set(true);
-    const done = await this.actions.call(() => this.api.edit(d.photoId, { ...f, takenAt: f.takenAt || undefined }), 'The details could not be saved.');
+    // The person's type wins over the suggestion; only a change is sent, so an unchanged suggestion stays marked as one.
+    const typeChanged = !!f.imageType && f.imageType !== (d.imageType ?? '');
+    const done = await this.actions.call(() => this.api.edit(d.photoId, { ...f, imageType: typeChanged ? f.imageType : undefined, takenAt: f.takenAt || undefined }),
+      'The details could not be saved.');
     this.busy.set(false);
     if (done) { this.onChanged(done); this.startForm(); this.toast.success('Saved.'); }
   }

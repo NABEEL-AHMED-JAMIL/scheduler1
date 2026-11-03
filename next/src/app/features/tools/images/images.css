@@ -23,3 +23,8 @@
 .ir-sunken { padding: 1rem; background: var(--surface-sunken); }
 .ir-draw { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; padding: 0.5rem 0.875rem; background: var(--pill-warn-bg);
   border-bottom: 1px solid var(--border-subtle); font-size: 0.8125rem; }
+/* A type that is never measured (design types-xray): "Description only · no size · not a diagnosis". */
+.ir-only { display: flex; gap: 0.5rem; align-items: flex-start; padding: 0.625rem 0.875rem; border-radius: var(--radius-lg); font-size: 0.8125rem; line-height: 1.45;
+  border: 1px solid color-mix(in oklab, var(--warn-text) 30%, transparent); background: var(--pill-warn-bg); color: var(--text-primary); }
+.ir-only app-icon { flex: none; margin-top: 0.125rem; color: var(--warn-text); }
+.ir-type { display: inline-flex; align-items: center; gap: 0.3125rem; font-size: 0.8125rem; white-space: nowrap; }

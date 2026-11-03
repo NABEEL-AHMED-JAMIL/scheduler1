@@ -3,14 +3,18 @@ import { Router } from '@angular/router';
 import { Icon } from '../../../shared/ui/icon';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { ImageActions } from './image-actions';
+import { ImageType, neverText } from './image-ai';
 import {
-  CompareRow, DRAFT_LABEL, Description, DescriptionField, FIELDS, FIELD_LABELS, NOT_SURE, PhotoDetail, fieldValue, stateAdvice,
+  CompareRow, DRAFT_LABEL, Description, DescriptionField, NOT_SURE, PhotoDetail, fieldLabel, fieldValue, photoFields, stateAdvice, typeName,
 } from './image.model';
 
 /**
  * The description, everywhere it shows (design image-a-detail, image-states): always "Draft · not a diagnosis" until a nurse
  * confirms it; a field the model was unsure of reads "Not sure: please fill in". Confirm, Edit (the fields, then Confirm) or
- * Discard. Describing… while the local model reads the photo; off or failed said in a line, with Describe again.
+ * Discard. Describing… while the local model reads the photo; off or failed said in a line, with Describe again. The fields
+ * are the photo's type's (design image-tool-types: a lesion's colour, border, shape and surface; an X-ray's body part, view,
+ * image quality and markers), labelled from their keys; the type's warning (X-ray: local models are weak) is said above the
+ * actions, and the byline says which type, prompt version and model wrote it.
  */
 @Component({
   selector: 'app-description-card',
@@ -29,6 +33,10 @@ import {
     .fld input { width: 100%; }
     .dc-acts { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
     .dc-note { margin: 0.75rem 0 0; font-size: 0.75rem; color: var(--text-muted); }
+    .dc-warn { display: flex; gap: 0.5rem; align-items: flex-start; margin-top: 0.75rem; padding: 0.5rem 0.75rem; border-radius: var(--radius-lg);
+      background: var(--pill-warn-bg); color: var(--text-primary); font-size: 0.75rem; line-height: 1.45; }
+    .dc-warn app-icon { flex: none; margin-top: 0.0625rem; color: var(--warn-text); }
+    .dc-by { margin: 0.5rem 0 0; font-size: 0.75rem; color: var(--text-muted); }
   `,
   template: `
     @let d = photo();
@@ -64,10 +72,10 @@ import {
       }
       @if (showFields()) {
         <dl class="fld">
-          @for (f of fields; track f) {
-            <dt>{{ labels[f] }}</dt>
+          @for (f of fields(); track f) {
+            <dt>{{ label(f) }}</dt>
             @if (editing()) {
-              <dd><input class="input input-sm" [value]="draft()[f] ?? ''" [placeholder]="notSure" [attr.aria-label]="labels[f]"
+              <dd><input class="input input-sm" [value]="draft()[f] ?? ''" [placeholder]="notSure" [attr.aria-label]="label(f)"
                          (input)="set(f, $any($event.target).value)" [attr.data-field]="f" /></dd>
             } @else if (value(f); as v) { <dd [attr.data-field]="f">{{ v }}</dd> }
             @else { <dd class="ns" [attr.data-field]="f">{{ notSure }}</dd> }
@@ -76,9 +84,14 @@ import {
         @if (d.descriptionStatus === 'CONFIRMED' && !editing()) {
           <p class="dc-note">Confirmed by {{ d.confirmedByName || 'a nurse' }}{{ d.confirmedAt ? ', ' + (d.confirmedAt | serverTime: 'recent') : '' }}. It goes into a visit note or a report as written here.</p>
         } @else if (unsure().length && !editing()) {
-          <p class="dc-note">The vision model was unsure about {{ unsure().length }} of 4 fields, so it left them empty rather than guess. It is a draft and not a diagnosis; a nurse confirms it.{{ compact() ? '' : ' The size above is from the ruler and is not affected.' }}</p>
+          <p class="dc-note">The vision model was unsure about {{ unsure().length }} of {{ fields().length }} fields, so it left them empty rather than guess. It is a draft and not a diagnosis; a clinician confirms it.{{ compact() || !sized() ? '' : ' The size above is from the ruler and is not affected.' }}</p>
+        } @else if (!editing() && never()) {
+          <p class="dc-note" data-test="description-never">Describes what is visible. It never says {{ never() }}; a clinician decides.</p>
         } @else if (!editing()) {
-          <p class="dc-note">Written by a local vision model from the photo only. A nurse confirms or edits it before it goes into a note or a report.</p>
+          <p class="dc-note">Written by a local vision model from the photo only. A clinician confirms or edits it before it goes into a note or a report.</p>
+        }
+        @if (type()?.note; as note) {
+          <div class="dc-warn" data-test="type-note"><app-icon name="alert" size="0.95em" /><span>{{ note }}</span></div>
         }
         <div class="dc-acts">
           @if (editing()) {
@@ -97,6 +110,7 @@ import {
             <button type="button" class="btn btn-default btn-sm" (click)="edit()" data-test="description-edit"><app-icon name="edit" />Edit</button>
           }
         </div>
+        @if (byline()) { <p class="dc-by" data-test="description-byline">{{ byline() }}</p> }
       }
     </div>
   `,
@@ -107,17 +121,30 @@ export class DescriptionCard {
   /** Without its own heading (the panel's tab, the states page's card). */
   readonly bare = input(false);
   readonly compact = input(false);
+  /** The photo's type, for its warning, what it never says, and the byline. */
+  readonly type = input<ImageType | null>(null);
   readonly changed = output<PhotoDetail>();
 
-  readonly fields = FIELDS;
-  readonly labels = FIELD_LABELS;
+  readonly fields = computed(() => photoFields(this.photo()));
+  readonly label = fieldLabel;
   readonly notSure = NOT_SURE;
   readonly draftLabel = DRAFT_LABEL;
   readonly editing = signal(false);
   readonly busy = signal(false);
   readonly draft = signal<Description>({});
   readonly shown = computed(() => this.photo().description ?? this.photo().descriptionDraft ?? null);
-  readonly unsure = computed(() => FIELDS.filter(f => !fieldValue(this.shown(), f)));
+  readonly unsure = computed(() => this.fields().filter(f => !fieldValue(this.shown(), f)));
+  readonly sized = computed(() => this.photo().areaCm2 != null);
+  readonly never = computed(() => { const t = this.type(); return t && (t.baseKey ?? t.key) !== 'wound' ? neverText(t.never) : ''; });
+  /** "Skin lesion · Skin lesion description (built in) v1 on qwen3.5:9b". */
+  readonly byline = computed(() => {
+    const d = this.photo();
+    if (!d.descriptionModel && !d.descriptionPromptName) return '';
+    const name = typeName(d) || this.type()?.name || '';
+    const prompt = d.descriptionPromptName ? `${d.descriptionPromptName}${d.descriptionPromptVersion != null ? ' v' + d.descriptionPromptVersion : ''}` : '';
+    const how = [prompt, d.descriptionModel ? `on ${d.descriptionModel}` : ''].filter(Boolean).join(' ');
+    return [name, how].filter(Boolean).join(' · ');
+  });
   readonly showFields = computed(() => this.editing() || ((this.photo().descriptionStatus === 'DRAFT' || this.photo().descriptionStatus === 'CONFIRMED') && !!this.shown()));
 
   value(f: DescriptionField): string | null {
@@ -130,7 +157,7 @@ export class DescriptionCard {
 
   edit(): void {
     const s = this.shown() ?? {};
-    this.draft.set({ woundBed: s.woundBed ?? '', moisture: s.moisture ?? '', edges: s.edges ?? '', around: s.around ?? '' });
+    this.draft.set(Object.fromEntries(this.fields().map(f => [f, s[f] ?? ''])));
     this.editing.set(true);
   }
 
