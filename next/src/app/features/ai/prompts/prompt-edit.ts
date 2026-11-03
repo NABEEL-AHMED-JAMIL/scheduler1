@@ -13,7 +13,7 @@ import { Combobox } from '../../../shared/ui/combobox';
 import { Dialog } from '@angular/cdk/dialog';
 import { ObjectPicker, PickedObject, objectPickerConfig } from '../../../shared/ui/object-picker';
 import { ModelConnection } from '../ai-providers';
-import { Prompt, PromptRun, PromptVariable, placeholdersOf } from './prompt-model';
+import { DUPLICATE_PROMPT_URL, Prompt, PromptRun, PromptVariable, placeholdersOf } from './prompt-model';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { SENSITIVITY_LEVELS, SENSITIVITY_TEXT } from '../../../shared/ui/sensitivity';
 import { ManagedBanner } from '../../../shared/ui/managed-banner';
@@ -55,6 +55,10 @@ export class PromptEdit implements OnInit {
   private readonly auth = inject(AuthService);
   /** MIG-254: a MANAGED workspace's prompts are our team's to change (and to try): shown, not saved. */
   readonly locked = computed(() => this.auth.builderLocked());
+  /** A platform prompt (builtIn): shown read-only; Duplicate to edit makes the workspace's own copy. */
+  readonly builtIn = computed(() => !!this.loaded()?.builtIn);
+  readonly readOnly = computed(() => this.locked() || this.builtIn());
+  readonly duplicating = signal(false);
   private readonly dialog = inject(Dialog);
 
   readonly isEdit = computed(() => !!this.promptId());
@@ -290,6 +294,21 @@ export class PromptEdit implements OnInit {
     });
   }
 
+  duplicate(): void {
+    const id = this.loaded()?.promptId;
+    if (!id) return;
+    this.duplicating.set(true);
+    this.http.post<ApiResponse<{ promptId: number }>>(`${API_BASE}${DUPLICATE_PROMPT_URL}`, { promptId: id }).subscribe({
+      next: r => {
+        this.duplicating.set(false);
+        if (r.status !== API_SUCCESS || !r.data?.promptId) { this.toast.error(r.message || 'The prompt could not be duplicated.'); return; }
+        this.toast.success('Copied into this workspace: this is your copy, an ordinary prompt with versions.');
+        void this.router.navigate(['/pipelines/prompts', r.data.promptId, 'edit']);
+      },
+      error: err => { this.duplicating.set(false); this.toast.error(err?.error?.message || 'The prompt could not be duplicated.'); },
+    });
+  }
+
   loadRuns(): void {
     if (!this.promptId()) return;
     this.runsState.start();
@@ -358,7 +377,7 @@ export class PromptEdit implements OnInit {
   }
 
   save(activate: boolean): void {
-    if (this.locked()) return;
+    if (this.readOnly()) return;
     // Editing, with nothing read back: saving would create a prompt, not a version of this one.
     if (this.isEdit() && !this.loaded()) return;
     if (!this.valid()) return;

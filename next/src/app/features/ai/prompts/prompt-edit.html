@@ -7,15 +7,23 @@
           {{ isEdit() ? (loaded()?.name || 'Prompt') : 'New prompt' }}
           @if (isPlatformAdmin() && isEdit() && workspaceName()) { <span class="pill pill-neutral" title="Workspace">{{ workspaceName() }}</span> }
           @if (loaded(); as p) { <span class="pill pill-neutral mono">v{{ p.version }}</span> <span class="pill" [class]="'pill ' + (p.status === 'Active' ? 'pill-ok' : 'pill-neutral')">{{ p.status }}</span> }
+          @if (builtIn()) { <span class="pill pill-neutral" data-test="prompt-platform">Platform</span> }
         </h1>
         <p class="page-subtitle">
           Instructions, a message with <span class="mono">{{ '{{' }}variables{{ '}}' }}</span>, and the shape of the answer.
           Try it runs what is on this page with the samples; nothing is saved until you say so.
         </p>
       </div>
+      @if (builtIn() && !locked()) {
+        <div><button type="button" class="btn btn-primary btn-sm" (click)="duplicate()" [disabled]="duplicating()" data-test="prompt-duplicate"><app-icon name="copy" />Duplicate to edit</button></div>
+      }
     </div>
   </app-page-header>
   <app-managed-banner what="prompts" />
+  @if (builtIn()) {
+    <div class="card p-3 mb-4 flex items-start gap-2 text-sm" role="note" data-test="prompt-built-in"><app-icon name="lock" class="shrink-0 mt-0.5" />
+      <span>Part of the platform. Read-only: duplicate it to change the wording; your copy is an ordinary prompt with versions. The platform's fixed rules are added in code to it and to every copy.</span></div>
+  }
 
   @if (loading()) {
     <div class="card p-12 text-center text-sm text-[color:var(--text-muted)]"><div class="spinner mx-auto mb-3" role="status" aria-label="Loading"></div>Loading…</div>
@@ -32,7 +40,7 @@
       <!-- ── Definition ─────────────────────────────────────────────────────────────── -->
       <form [formGroup]="form" class="card p-4 form-stack min-w-0" (ngSubmit)="save(true)">
         <!-- MIG-254: read-only in a MANAGED workspace (an unstyled block fieldset: .form-lock). -->
-        <fieldset class="form-lock" [disabled]="locked()">
+        <fieldset class="form-lock" [disabled]="readOnly()">
         <!-- UX review 2026-10-12 (A3, A4, PR1): grouped -- what it is, the model it runs on (temperature and max tokens with
              the connection and model), what it says, and the answer -- instead of one long ungrouped form. -->
         <app-section [number]="1" title="About it" [level]="3">
@@ -205,10 +213,10 @@
              then the primary on the right -- not from the page's header. -->
         <app-actions-bar class="-mx-4 -mb-4 rounded-b-card" [state]="form.dirty ? 'Unsaved changes' : 'No changes'" label="Save the prompt">
             <a routerLink="/pipelines/prompts" class="btn btn-ghost btn-sm">Cancel</a>
-            <button type="button" class="btn btn-default btn-sm" (click)="save(false)" [disabled]="saving() || !!loadError() || locked()">
+            <button type="button" class="btn btn-default btn-sm" (click)="save(false)" [disabled]="saving() || !!loadError() || readOnly()">
               {{ isEdit() ? 'Save as v' + ((loaded()?.version ?? 0) + 1) : 'Save draft' }}
             </button>
-            <button type="button" class="btn btn-primary btn-sm" (click)="save(true)" [disabled]="saving() || !!loadError() || locked()">
+            <button type="button" class="btn btn-primary btn-sm" (click)="save(true)" [disabled]="saving() || !!loadError() || readOnly()">
               @if (saving()) { <app-icon name="refresh" class="spin" /> }Save &amp; activate
             </button>
         </app-actions-bar>

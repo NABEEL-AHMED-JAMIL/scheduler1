@@ -3,7 +3,7 @@ import { HttpClient } from '@angular/common/http';
 
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { AuthService } from '../../../core/auth/auth.service';
 import { ToastService } from '../../../shared/ui/toast.service';
@@ -14,7 +14,7 @@ import { StatTile } from '../../../shared/ui/stat-tile';
 import { ViewToggle } from '../../../shared/ui/view-toggle';
 import { MineFilter, isMine } from '../../../shared/ui/mine-filter';
 import { confirmWith } from '../../../shared/ui/confirm';
-import { Prompt } from './prompt-model';
+import { DUPLICATE_PROMPT_URL, Prompt, tagsOf } from './prompt-model';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { ManagedBanner } from '../../../shared/ui/managed-banner';
 import { PageHeader } from '../../../shared/ui/page-header';
@@ -26,7 +26,9 @@ import { createLoadState } from '../../../shared/ui/loading';
 /**
  * Prompts: what a step says to a model. Readable by everyone who can open the page (a
  * person must see what the step on their task says); New, Edit, Try it and Delete are
- * gated on auth.canManageAgents, since a try spends the workspace's tokens.
+ * gated on auth.canManageAgents, since a try spends the workspace's tokens. A built-in prompt (the platform's, builtIn) is
+ * marked Platform and read-only: Duplicate to edit copies it into the workspace (design image-tool-types). ?tag= narrows the
+ * list to a tag (Image review's types link here with tag Image review).
  */
 @Component({
   selector: 'app-prompts',
@@ -39,6 +41,7 @@ export class Prompts implements OnInit {
   private readonly toast = inject(ToastService);
   private readonly auth = inject(AuthService);
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
 
   readonly view = signal<'table' | 'cards'>('table');
   readonly prompts = signal<Prompt[]>([]);
@@ -51,6 +54,9 @@ export class Prompts implements OnInit {
   readonly outputFilter = signal('');
   readonly connectionFilter = signal('');
   readonly onlyMine = signal(false);
+  readonly tagFilter = signal('');
+  readonly duplicating = signal<number | null>(null);
+  readonly tagsOf = tagsOf;
   readonly canManage = computed(() => this.auth.canManageAgents());
   readonly isPlatformAdmin = computed(() => this.auth.isPlatformAdmin());
 
@@ -62,6 +68,7 @@ export class Prompts implements OnInit {
       && (!this.outputFilter() || p.outputMode === this.outputFilter())
       && (!this.connectionFilter() || String(p.connectionId ?? '') === this.connectionFilter())
       && (!this.onlyMine() || isMine(p, myId))
+      && (!this.tagFilter() || tagsOf(p).some(t => t.toLowerCase() === this.tagFilter().toLowerCase()))
       && (!q || `${p.name} ${p.description ?? ''} ${p.connectionName ?? ''} ${p.effectiveModel ?? ''} ${p.variables.map(v => v.name).join(' ')}`.toLowerCase().includes(q)));
   });
   /** Owner 2026-10-27: every column that holds a value sorts; the list keeps the API's order until one is picked. */
@@ -80,7 +87,8 @@ export class Prompts implements OnInit {
   });
   /** The rows on screen, in the chosen order -- the cards follow it too. */
   readonly sorted = computed(() => this.sort.apply(this.filtered()));
-  readonly hasFilters = computed(() => !!this.search().trim() || !!this.statusFilter() || !!this.outputFilter() || !!this.connectionFilter() || this.onlyMine());
+  readonly hasFilters = computed(() => !!this.search().trim() || !!this.statusFilter() || !!this.outputFilter() || !!this.connectionFilter() || this.onlyMine()
+    || !!this.tagFilter());
 
   /**
    * The connection a link from Model connections narrowed the list to, by name, so the toolbar
@@ -97,6 +105,7 @@ export class Prompts implements OnInit {
     return {
       total: list.length,
       active: list.filter(p => p.status === 'Active').length,
+      builtIn: list.filter(p => p.builtIn).length,
       json: list.filter(p => p.outputMode === 'json').length,
       runs: list.reduce((n, p) => n + (p.runCount ?? 0), 0),
       failing: list.filter(p => p.lastRunStatus === 'failed' || p.lastRunStatus === 'review').length,
@@ -106,6 +115,8 @@ export class Prompts implements OnInit {
   ngOnInit(): void {
     const connection = this.route.snapshot.queryParamMap.get('connection');
     if (connection) this.connectionFilter.set(connection);
+    const tag = this.route.snapshot.queryParamMap.get('tag');
+    if (tag) this.tagFilter.set(tag);
     this.load();
   }
 
@@ -121,7 +132,22 @@ export class Prompts implements OnInit {
     });
   }
 
-  clearFilters(): void { this.search.set(''); this.statusFilter.set(''); this.outputFilter.set(''); this.connectionFilter.set(''); this.onlyMine.set(false); }
+  clearFilters(): void { this.search.set(''); this.statusFilter.set(''); this.outputFilter.set(''); this.connectionFilter.set(''); this.onlyMine.set(false); this.tagFilter.set(''); }
+
+  /** A built-in prompt copied into the workspace, then opened to edit. */
+  duplicate(p: Prompt): void {
+    if (!p.promptId) return;
+    this.duplicating.set(p.promptId);
+    this.http.post<ApiResponse<{ promptId: number }>>(`${API_BASE}${DUPLICATE_PROMPT_URL}`, { promptId: p.promptId }).subscribe({
+      next: r => {
+        this.duplicating.set(null);
+        if (r.status !== API_SUCCESS || !r.data?.promptId) { this.toast.error(r.message || 'The prompt could not be duplicated.'); return; }
+        this.toast.success(`${p.name} is copied into this workspace: edit your copy.`);
+        void this.router.navigate(['/pipelines/prompts', r.data.promptId, 'edit']);
+      },
+      error: err => { this.duplicating.set(null); this.toast.error(err?.error?.message || 'The prompt could not be duplicated.'); },
+    });
+  }
 
   toggle(p: Prompt): void {
     const next = p.status === 'Active' ? 'Inactive' : 'Active';

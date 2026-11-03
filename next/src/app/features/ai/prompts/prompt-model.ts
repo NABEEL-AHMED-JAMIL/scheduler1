@@ -41,7 +41,18 @@ export interface Prompt {
   createdBy?: number;
   createdByName?: string | null;
   updatedByName?: string | null;
+  /** A platform prompt (Image review's built-in descriptions): read-only, duplicated to edit. */
+  builtIn?: boolean;
+  builtInKey?: string | null;
 }
+
+/** A prompt's tags ("Image review, wound") as a list. */
+export function tagsOf(p: Pick<Prompt, 'tags'>): string[] {
+  return (p.tags ?? '').split(',').map(t => t.trim()).filter(Boolean);
+}
+
+/** Copies a built-in prompt into the workspace (ai-service's Image review settings own the built-in ones). */
+export const DUPLICATE_PROMPT_URL = '/imageReviewAi.json/duplicate';
 
 /** One call, as aiPrompt.json/try and /runs return it. */
 export interface PromptRun {
