@@ -1,5 +1,5 @@
 import {
-  Component, DestroyRef, ElementRef, OnInit, computed, effect, inject, input, signal, viewChild, viewChildren,
+  Component, DestroyRef, ElementRef, OnInit, computed, effect, inject, input, model, output, signal, viewChild, viewChildren,
 } from '@angular/core';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { Icon } from '../../shared/ui/icon';
@@ -64,6 +64,16 @@ const RAIL_PAGES = 24;
     .rv-page canvas { background: var(--paper); box-shadow: 0 2px 10px color-mix(in oklab, var(--text-primary) 14%, transparent); flex: none; }
     .rv-html { width: 100%; height: 80vh; border: 0; background: var(--paper); border-radius: 0 0 var(--radius-card) var(--radius-card); }
     .rv-msg { padding: 5rem 1rem; text-align: center; }
+    /* Feature 16: the comment layer -- numbered pins over the page, and a crosshair while a place is being picked. */
+    .rv-sheet { position: relative; flex: none; line-height: 0; }
+    .rv-sheet.is-commenting { cursor: crosshair; }
+    .rv-pin { position: absolute; transform: translate(-50%, -50%); width: 1.5rem; height: 1.5rem; border-radius: var(--radius-full);
+      border: 2px solid var(--paper); background: var(--accent-mark-strong); color: var(--on-solid); cursor: pointer; padding: 0;
+      box-shadow: 0 1px 4px color-mix(in oklab, var(--text-primary) 30%, transparent); }
+    .rv-pin > span { display: block; font-size: 0.6875rem; font-weight: 600; line-height: 1; }
+    .rv-pin.is-resolved { background: var(--text-muted); }
+    .rv-pin.is-on { outline: 2px solid var(--text-primary); outline-offset: 1px; }
+    .rv-pick { display: flex; align-items: center; gap: 0.375rem; font-size: 0.75rem; color: var(--text-secondary); }
   `],
   template: `
     <nav class="rv-rail" aria-label="Pages">
@@ -109,6 +119,10 @@ const RAIL_PAGES = 24;
           }
           <button type="button" class="btn btn-default btn-icon btn-sm" (click)="print()" aria-label="Print" title="Print"><app-icon name="printer" /></button>
         }
+        @if (canComment() && format() === 'PDF' && count()) {
+          <button type="button" class="btn btn-sm" [class.btn-primary]="commenting()" [class.btn-default]="!commenting()" [attr.aria-pressed]="commenting()"
+                  (click)="commenting.set(!commenting())" data-test="viewer-comment"><app-icon name="chat" />{{ commenting() ? 'Pick a place…' : 'Comment' }}</button>
+        }
         <button type="button" class="btn btn-default btn-icon btn-sm" (click)="fullScreen()" aria-label="Full screen" title="Full screen"><app-icon name="maximize" /></button>
       </div>
       @if (error()) {
@@ -121,7 +135,13 @@ const RAIL_PAGES = 24;
       } @else {
         <div class="rv-page" #scroller>
           @if (!count()) { <div class="rv-msg"><div class="spinner mx-auto" role="status" aria-label="Loading"></div><p class="text-sm text-[color:var(--text-muted)] mt-2">Opening the report…</p></div> }
-          <canvas #canvas [class.hidden]="!count()" [attr.aria-label]="'Page ' + page() + ' of ' + count()" role="img"></canvas>
+          <div class="rv-sheet" [class.is-commenting]="commenting()" (click)="place($event)">
+            <canvas #canvas [class.hidden]="!count()" [attr.aria-label]="'Page ' + page() + ' of ' + count()" role="img"></canvas>
+            @for (p of pagePins(); track p.id) {
+              <button type="button" class="rv-pin" [class.is-resolved]="!p.open" [class.is-on]="selectedPin() === p.id" [style.left.%]="p.x * 100"
+                      [style.top.%]="p.y * 100" [attr.aria-label]="'Comment ' + p.n" (click)="$event.stopPropagation(); pinOpened.emit(p.id)"><span>{{ p.n }}</span></button>
+            }
+          </div>
         </div>
       }
     </div>
@@ -135,6 +155,15 @@ export class ReportViewer implements OnInit {
   /** What the facts line says beside the size: "signed after approval", "signed". */
   readonly note = input('');
   readonly tenantId = input<number | null>(null);
+  /** Feature 16: the comment layer -- whether this reader may comment, the threads' pins, the one selected. */
+  readonly canComment = input(false);
+  readonly pins = input<{ id: string; n: number; page: number; x: number; y: number; open: boolean }[]>([]);
+  readonly selectedPin = input<string | null>(null);
+  /** While on, a click on the page picks the place of a new comment (page, and x and y as a share of the page). */
+  readonly commenting = model(false);
+  readonly pinned = output<{ page: number; x: number; y: number }>();
+  readonly pinOpened = output<string>();
+  readonly pagePins = computed(() => this.pins().filter(p => p.page === this.page()));
 
   private readonly api = inject(ReportStudioApi);
   private readonly sanitizer = inject(DomSanitizer);
@@ -331,6 +360,19 @@ export class ReportViewer implements OnInit {
       setTimeout(() => { frame.remove(); URL.revokeObjectURL(url); }, 60_000);
     };
     document.body.appendChild(frame);
+  }
+
+  /** Feature 16: a click on the page while picking a place: where, as a share of the page's width and height. */
+  place(e: MouseEvent): void {
+    if (!this.commenting()) return;
+    const canvas = this.canvasRef()?.nativeElement;
+    if (!canvas) return;
+    const box = canvas.getBoundingClientRect();
+    if (!box.width || !box.height) return;
+    const x = Math.min(1, Math.max(0, (e.clientX - box.left) / box.width));
+    const y = Math.min(1, Math.max(0, (e.clientY - box.top) / box.height));
+    this.commenting.set(false);
+    this.pinned.emit({ page: this.page(), x: Math.round(x * 100000) / 100000, y: Math.round(y * 100000) / 100000 });
   }
 
   fullScreen(): void {

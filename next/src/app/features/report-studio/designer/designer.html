@@ -230,6 +230,7 @@
             <button type="button" class="btn btn-default btn-sm shrink-0" (click)="draw(true)"><app-icon name="refresh" />Try again</button></div>
         }
         <app-rs-data-problems [problems]="problems()" [blocks]="blocks()" [withData]="!!testSource()" [selectedId]="selected()" (selected)="select($event)" />
+        <app-rs-template-comments [comments]="reviewComments()" [blocks]="blocks()" [selectedId]="selected()" (selected)="select($event)" />
         @if (showAsNote(); as note) {
           <div class="rs-banner rs-banner-info rsd-canvas-note" role="status" data-show-as-note><app-icon name="info" class="shrink-0" /><span class="min-w-0 flex-1 text-sm">{{ note }}</span></div>
         }

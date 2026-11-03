@@ -81,6 +81,36 @@ export interface TemplateFeatures {
 export interface Meaning { code: string; words: string; }
 export interface Meanings { meanings: Meaning[]; firstDefault: string; finalDefault: string; }
 
+/** Reports redesign, feature 16: a person mentioned in a review comment. */
+export interface ReviewMention { userId: number; name: string; }
+
+/**
+ * A review comment on a report version: a thread's first comment (pinned to a point of a page or to a block) or a reply.
+ * Its words come masked from the server for a reader without See personal data (masked: true).
+ */
+export interface ReviewComment {
+  commentId: string; version: number; text: string; masked: boolean; about: 'REPORT' | 'TEMPLATE'; authorId: number; authorName: string;
+  createdAt: string; replyTo?: string; page?: number; x?: number; y?: number; componentId?: string; componentLabel?: string;
+  mentions: ReviewMention[]; resolvedAt?: string; resolvedByName?: string; sentBackAt?: string; mine?: boolean; mayResolve?: boolean;
+  replies?: ReviewComment[];
+}
+
+/** A version's review comments: its threads, how many are open, what the reader may do, and the blocks to pin to. */
+export interface ReviewComments {
+  reportId: string; version: number; label: string; masked: boolean; threads: ReviewComment[]; open: number; total: number;
+  may: { comment: boolean; resolveAny: boolean; why?: string };
+  blocks: { id: string; type: string; label: string }[];
+}
+
+/** A new comment: on a page point or a block (a new thread), or a reply. */
+export interface NewComment {
+  reportId: string; version: number; text: string; page?: number; x?: number; y?: number; componentId?: string; about?: 'TEMPLATE';
+  mentions?: number[]; replyTo?: string;
+}
+
+/** An open review comment about a template's block, of a report made from it (the designer's list). */
+export interface TemplateComment extends ReviewComment { reportLabel: string; templateVersion: number; link: string; }
+
 export interface BulkResult { reportId: string; version?: number; ok: boolean; stage?: string; signed?: boolean; code?: string; message?: string;
   notSignedReason?: string; }
 export interface BulkAnswer { results: BulkResult[]; approved: number; refused: number; }
@@ -204,6 +234,33 @@ export class ReportLibraryApi {
       });
       return () => inner.unsubscribe();
     });
+  }
+
+  /** Feature 16: a version's review comments (masked on the server without See personal data). */
+  comments(reportId: string, version: number): Observable<ReviewComments> {
+    return ReportLibraryApi.data$(this.http.get<ApiResponse<ReviewComments>>(`${this.library}/comments`,
+      { params: { reportId, version: String(version) } }));
+  }
+
+  /** Feature 16: a new comment or a reply; answers the version's comments as they are now. */
+  addComment(body: NewComment): Observable<ReviewComments> {
+    return ReportLibraryApi.data$(this.http.post<ApiResponse<ReviewComments>>(`${this.library}/comment`, body));
+  }
+
+  /** Feature 16: a thread resolved. */
+  resolveComment(commentId: string): Observable<ReviewComments> {
+    return ReportLibraryApi.data$(this.http.post<ApiResponse<ReviewComments>>(`${this.library}/commentResolve`, { commentId }));
+  }
+
+  /** Feature 16: who may be mentioned on a report. */
+  commentPeople(reportId: string): Observable<{ people: ReviewMention[] }> {
+    return ReportLibraryApi.data$(this.http.get<ApiResponse<{ people: ReviewMention[] }>>(`${this.library}/commentPeople`, { params: { reportId } }));
+  }
+
+  /** Feature 16: the open review comments about a template's blocks (the designer). */
+  templateComments(templateId: string): Observable<{ templateId: string; masked: boolean; comments: TemplateComment[] }> {
+    return ReportLibraryApi.data$(this.http.get<ApiResponse<{ templateId: string; masked: boolean; comments: TemplateComment[] }>>(
+      `${this.library}/templateComments`, { params: { templateId } }));
   }
 
   meanings(): Observable<Meanings> {

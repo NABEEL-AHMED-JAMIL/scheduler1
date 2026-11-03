@@ -1,5 +1,5 @@
 import { plainHint } from '../../shared/ui/plain-words';
-import { Component, DestroyRef, OnInit, computed, inject, input, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, effect, inject, input, signal, untracked, viewChild } from '@angular/core';
 import { Dialog } from '@angular/cdk/dialog';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -35,13 +35,14 @@ import { idOf, idValue } from '../../shared/ui/advanced-options';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { askReason } from '../../shared/ui/reason';
 import { ReportViewer } from './report-viewer';
-import { DeidentifiedStatus, Meaning, ReportLibraryApi, TemplateFeatures } from './report-library.api';
+import { CommentAnchor, ReportComments, pinsOf } from './report-comments';
+import { DeidentifiedStatus, Meaning, ReportLibraryApi, ReviewComment, ReviewComments, TemplateFeatures } from './report-library.api';
 import { ReportDeliveries, SchedulesApi } from './schedules/schedules.api';
 import { Stage, reportStages } from './report-stages';
 import { encodeQr } from './designer/qr-encoder';
 import { qrPath } from './designer/qr-inspector';
 
-type Tab = 'approval' | 'details' | 'activity' | 'access' | 'again';
+type Tab = 'approval' | 'comments' | 'details' | 'activity' | 'access' | 'again';
 
 /**
  * One report (MIG-403, MIG-404; the owner-approved screen 6, Figma frame 6; page report-library): the current version --
@@ -53,7 +54,7 @@ type Tab = 'approval' | 'details' | 'activity' | 'access' | 'again';
 @Component({
   selector: 'app-report-page',
   imports: [PageHeader, Icon, RsTimePipe, LoadError, ProblemList, RouterLink, FormsModule, PageLimitActions, AppLoading, InlineStatus, AdvancedSelect,
-    CdkMenu, CdkMenuItem, CdkMenuTrigger, ReportViewer],
+    CdkMenu, CdkMenuItem, CdkMenuTrigger, ReportViewer, ReportComments],
   templateUrl: './report-page.html',
   styleUrl: './report-page.css',
 })
@@ -179,8 +180,75 @@ export class ReportPage implements OnInit {
   });
   readonly sortedVersions = computed(() => this.versionSort.apply(this.r()?.versions ?? []));
 
+  // ---------------------------------------------------------------- feature 16: comments while reviewing
+
+  /** A comment's link (?comment=) opens its thread; ?comments=1 opens the tab. */
+  readonly comment = input<string | undefined>();
+  readonly comments = input<string | undefined>();
+  readonly commentsData = signal<ReviewComments | null>(null);
+  readonly commentAnchor = signal<CommentAnchor | null>(null);
+  readonly selectedComment = signal<string | null>(null);
+  readonly resolvedShown = signal(false);
+  readonly picking = signal(false);
+  private readonly viewer = viewChild(ReportViewer);
+  private commentOpened = false;
+  /** Whoever opens the report in the library comments on it (the server says so per version: may.comment). */
+  readonly mayComment = computed(() => !this.auth.isPlatformAdmin() && (this.commentsData()?.may.comment ?? false));
+  readonly pins = computed(() => pinsOf(this.commentsData(), this.resolvedShown()));
+  readonly openComments = computed(() => this.commentsData()?.open ?? 0);
+
+  private loadComments(reportId: string, version: number): void {
+    this.library.comments(reportId, version).subscribe({
+      next: d => {
+        this.commentsData.set(d);
+        const wanted = this.comment();
+        if (!this.commentOpened && (wanted || this.comments() === '1')) {
+          this.commentOpened = true;
+          this.tab.set('comments');
+          const t = wanted ? d.threads.find(x => x.commentId === wanted || x.replies?.some(r => r.commentId === wanted)) : undefined;
+          if (t) { this.resolvedShown.set(!!t.resolvedAt); this.goToThread(t); }
+        }
+      },
+      error: () => this.commentsData.set(null),
+    });
+  }
+
+  /** The viewer picked a place: the Comments tab opens with it as the new comment's place. */
+  onPinned(at: CommentAnchor): void {
+    this.commentAnchor.set(at);
+    this.tab.set('comments');
+  }
+
+  /** A pin on the page was clicked: its thread is selected in the Comments tab. */
+  openThread(id: string): void {
+    this.selectedComment.set(id);
+    this.tab.set('comments');
+  }
+
+  /** A thread was opened in the panel: the viewer turns to its page. */
+  goToThread(t: ReviewComment): void {
+    this.selectedComment.set(t.commentId);
+    if (t.page) this.viewer()?.go(t.page);
+  }
+
+  startPick(): void {
+    this.picking.set(true);
+  }
+
   constructor() {
     inject(DestroyRef).onDestroy(() => this.poll?.unsubscribe());
+    // The shown version's comments: for the viewer's pins and the tab's count.
+    effect(() => {
+      const v = this.shownVersion();
+      const r = this.r();
+      untracked(() => {
+        if (!r || !v || v.downloadable === false) { this.commentsData.set(null); return; }
+        if (this.commentsData()?.reportId === r.reportId && this.commentsData()?.version === v.version) return;
+        this.commentsData.set(null);
+        this.commentAnchor.set(null);
+        this.loadComments(r.reportId, v.version);
+      });
+    });
   }
 
   ngOnInit(): void {
@@ -390,12 +458,21 @@ export class ReportPage implements OnInit {
   async sendBack(v: ReportVersionRow): Promise<void> {
     const r = this.r();
     if (!r) return;
+    const open = this.commentsData()?.version === v.version ? this.openComments() : 0;
+    const carried = open ? ` Its ${open} open comment${open === 1 ? '' : 's'} go${open === 1 ? 'es' : ''} back with it.` : '';
     const note = await askReason(this.dialog, { title: `Send ${r.label} v${v.version} back?`, label: 'Why',
-      hint: 'The person who asked for the approval reads it; the version stays as it is and is not signed.', confirmLabel: 'Send back', required: true });
+      hint: `The person who asked for the approval reads it; the version stays as it is and is not signed.${carried}`, confirmLabel: 'Send back', required: true });
     if (!note) return;
     this.approving.set(true);
     this.api.rejectVersion(r.reportId, v.version, note).subscribe({
-      next: () => { this.approving.set(false); this.toast.success(`v${v.version} was sent back; ${v.review?.requestedByName ?? 'the person who asked'} is told why.`); this.load(); },
+      next: res => {
+        this.approving.set(false);
+        const n = (res as { openComments?: number }).openComments ?? 0;
+        this.toast.success(`v${v.version} was sent back${n ? ` with ${n} open comment${n === 1 ? '' : 's'}` : ''}; ${v.review?.requestedByName ?? 'the person who asked'} is told why.`);
+        this.load();
+        this.commentsData.set(null);
+        this.loadComments(r.reportId, v.version);
+      },
       error: e => { this.approving.set(false); this.toast.error(studioError(e).message); },
     });
   }

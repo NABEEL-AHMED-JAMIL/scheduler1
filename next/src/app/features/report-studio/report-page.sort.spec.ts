@@ -34,7 +34,10 @@ function page(api: Record<string, unknown>) {
     // people(): the approvers' names upstream reads on open (an empty list here).
     { provide: ReportStudioApi, useValue: { people: () => of([]), version: () => NEVER, ...api } },
     { provide: ReportLibraryApi, useValue: { meanings: () => of({ meanings: [], firstDefault: 'REVIEWED', finalDefault: 'RELEASE' }),
-      deidentified: () => of({ available: false, personalFields: [], rules: { dates: 'shift', freeText: true, picturesLeftOut: 0 }, snapshotKept: true }) } },
+      deidentified: () => of({ available: false, personalFields: [], rules: { dates: 'shift', freeText: true, picturesLeftOut: 0 }, snapshotKept: true }),
+      // Feature 16: the shown version's review comments (none here).
+      comments: (reportId: string, version: number) => of({ reportId, version, label: 'RPT', masked: false, threads: [], open: 0, total: 0,
+        may: { comment: true, resolveAny: false }, blocks: [] }) } },
     { provide: AuthService, useValue: { canOpen: () => true, isPlatformAdmin: () => false, user: signal({ appUserId: 4640, tenantName: 'Riverside' }) } },
     { provide: Dialog, useValue: { open: vi.fn() } },
     { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }] });

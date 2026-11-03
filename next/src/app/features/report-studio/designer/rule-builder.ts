@@ -29,9 +29,9 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}/;
       <div class="rsr-head">
         <span class="label">Show when</span>
         @if (mode() === 'rules') {
-          <button type="button" class="btn btn-ghost btn-sm" (click)="toText()" [disabled]="readonly()">Edit as text</button>
+          <button type="button" class="btn btn-default btn-xs" (click)="toText()" [disabled]="readonly()">Edit as text</button>
         } @else {
-          <button type="button" class="btn btn-ghost btn-sm" (click)="toRules()" [disabled]="readonly() || !textRules()"
+          <button type="button" class="btn btn-default btn-xs" (click)="toRules()" [disabled]="readonly() || !textRules()"
                   [attr.title]="textRules() ? null : 'The builder cannot show this expression'">Use the builder</button>
         }
       </div>
@@ -124,7 +124,7 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}/;
     .rsr-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; min-height: 1.75rem; }
     .rsr-head .label { margin-bottom: 0; }
     .rsr-row { display: flex; flex-direction: column; gap: 0.25rem; padding: 0.375rem; border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-md); background: var(--surface); }
+      border-radius: var(--radius-md); background: var(--surface-raised); }
     .rsr-line { display: flex; align-items: center; gap: 0.25rem; min-width: 0; }
     .rsr-test { flex: 0 0 7.5rem; }
   `,

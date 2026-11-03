@@ -121,7 +121,9 @@
           }
           @if (outputsOf(v).length && hasPdf(v)) {
             @for (key of [v.versionId]; track key) {
-              <app-report-viewer [reportId]="r.reportId" [version]="v.version" [hasHtml]="hasHtml(v)" [note]="viewerNote(v)" [attr.data-version]="v.version" />
+              <app-report-viewer [reportId]="r.reportId" [version]="v.version" [hasHtml]="hasHtml(v)" [note]="viewerNote(v)" [attr.data-version]="v.version"
+                                 [canComment]="mayComment()" [pins]="pins()" [selectedPin]="selectedComment()" [(commenting)]="picking"
+                                 (pinned)="onPinned($event)" (pinOpened)="openThread($event)" />
             }
           } @else {
             <section class="card p-4 text-sm text-[color:var(--text-muted)]">
@@ -139,6 +141,7 @@
         <section class="card">
           <div class="tabs px-3" role="tablist" aria-label="Report sections">
             <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'approval'" [attr.aria-selected]="tab() === 'approval'" (click)="tabTo('approval')">Approval</button>
+            <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'comments'" [attr.aria-selected]="tab() === 'comments'" (click)="tabTo('comments')" data-test="tab-comments">Comments@if (commentsData(); as cd) { <span class="rs-count">{{ cd.open }}</span> }</button>
             <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'details'" [attr.aria-selected]="tab() === 'details'" (click)="tabTo('details')">Details</button>
             <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'activity'" [attr.aria-selected]="tab() === 'activity'" (click)="tabTo('activity')">Activity <span class="rs-count">{{ r.activity.length }}</span></button>
             <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'access'" [attr.aria-selected]="tab() === 'access'" (click)="tabTo('access')">Access</button>
@@ -207,6 +210,16 @@
                         </div></li>
                     </ul>
                     <p class="text-xs text-[color:var(--text-muted)] mt-2">Approving adds the approver's signature picture where the template asks for it, and a digital signature to the PDF (workspace certificate). Any later change to the file breaks it.</p>
+                  }
+                } @else { <p class="text-sm text-[color:var(--text-muted)] py-3">No version yet.</p> }
+              }
+              @case ('comments') {
+                @if (shownVersion(); as v) {
+                  @if (v.downloadable === false) {
+                    <p class="text-sm text-[color:var(--text-muted)] py-3">{{ v.refusal || 'This report is sensitive: its comments, as its files, need Download sensitive files.' }}</p>
+                  } @else {
+                    <app-report-comments [reportId]="r.reportId" [version]="v.version" [(data)]="commentsData" [(anchor)]="commentAnchor"
+                                         [(selected)]="selectedComment" [(resolvedShown)]="resolvedShown" (pick)="startPick()" (opened)="goToThread($event)" />
                   }
                 } @else { <p class="text-sm text-[color:var(--text-muted)] py-3">No version yet.</p> }
               }

@@ -32,6 +32,8 @@ import {
 import { PageFrame } from './page-frame';
 import { Palette, groupPalette } from './palette';
 import { DataProblems, isDataProblem } from './data-problems';
+import { TemplateComments } from './template-comments';
+import { ReportLibraryApi, TemplateComment } from '../report-library.api';
 import { ShowAs, ShowAsSwitch, showAsNote } from './show-as';
 import { PropChange, PropertiesPanel, TONES } from './properties';
 import { OutlineHead, pageLabels } from './outline-panel';
@@ -79,7 +81,8 @@ const DRAW_MS = 300;
 @Component({
   selector: 'app-report-designer',
   imports: [Icon, LoadError, ProblemList, PropertiesPanel, PageFrame, FormsModule, RouterLink, UpperCasePipe, CdkDrag, CdkDragPreview, CdkDropList,
-    CdkDropListGroup, WorkspaceSelect, AiPanel, AppLoading, InlineStatus, AdvancedSelect, Palette, DataProblems, ShowAsSwitch, OutlineHead],
+    CdkDropListGroup, WorkspaceSelect, AiPanel, AppLoading, InlineStatus, AdvancedSelect, Palette, DataProblems, ShowAsSwitch, OutlineHead,
+    TemplateComments],
   templateUrl: './designer.html',
   styleUrl: './designer.css',
 })
@@ -414,6 +417,7 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
         this.redoStack.set([]);
         this.saveState.set(this.editable() ? 'saved' : 'readonly');
         this.savedAt.set(t.draft?.updatedAt ? this.hhmm(t.draft.updatedAt) : null);
+        this.loadReviewComments(t.templateId);
         if (!this.testSource() && t.samples.length && !this.isPlatformAdmin()) {
           this.testSource.set({ connector: 'SAMPLE', sampleId: t.samples[0].sampleId });
           this.testLabel.set(`Test sample · ${t.samples[0].name}`);
@@ -875,6 +879,17 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
         if (err.problems.length) this.problems.set(err.problems);
       },
     });
+  }
+
+  // ---------------------------------------------------------------- review comments about the template (feature 16)
+
+  private readonly library = inject(ReportLibraryApi);
+  /** The open review comments reviewers made about this template's blocks, on the reports made with it. */
+  readonly reviewComments = signal<TemplateComment[]>([]);
+
+  private loadReviewComments(templateId: string): void {
+    if (this.isPlatformAdmin() || !this.auth.canOpen('report-library')) return;
+    this.library.templateComments(templateId).subscribe({ next: r => this.reviewComments.set(r.comments), error: () => this.reviewComments.set([]) });
   }
 
   // ---------------------------------------------------------------- the fax check (reports redesign, feature 15)

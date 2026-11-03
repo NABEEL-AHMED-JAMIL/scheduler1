@@ -81,7 +81,7 @@ describe('the rule builder of "Show only when"', () => {
     const p = panel({ id: 'c1', type: 'conditional', when: 'primary.wound.stage >= 4', children: [] });
     expect(advancedSelects(p.fixture).find(s => s.ariaLabel() === 'Rule 1 field')!.options().map(o => o.value))
       .toEqual(['primary.patient_id', 'primary.wound.stage', 'primary.wound.site']);
-    (p.el.querySelector('button.btn-default') as HTMLButtonElement).click();
+    ([...p.el.querySelectorAll('button')].find(b => b.textContent!.trim() === 'Rule') as HTMLButtonElement).click();
     p.fixture.detectChanges();
     p.field('Rule 2 field', 'primary.wound.site');
     p.write('Rule 2 test', 'contains');
