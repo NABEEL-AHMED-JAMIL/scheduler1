@@ -1,4 +1,5 @@
 /** Image review (the third Tools page, owner-approved design 2026-11-03): what media-service's /imageReview.json answers. */
+import { formatSize } from '../../../shared/ui/format-size';
 
 export type PhotoStatus = 'MEASURING' | 'MEASURED' | 'NO_RULER' | 'NO_REGION' | 'TOO_DARK' | 'NOT_READ' | 'REFUSED';
 export type DescriptionStatus = 'NONE' | 'PENDING' | 'DRAFT' | 'CONFIRMED' | 'DISCARDED' | 'FAILED' | 'OFF';
@@ -231,7 +232,7 @@ export function trendWords(pct: number | null | undefined, prefix = 'area'): str
 
 /** The photo's second line in the list: "visit 3 · wound-SV-000117-v3.jpg", or the refusal's size. */
 export function subLine(p: PhotoSummary): string {
-  if (p.status === 'REFUSED') return p.fileSize != null ? `${(p.fileSize / (1024 * 1024)).toFixed(1)} MB` : p.fileName;
+  if (p.status === 'REFUSED') return p.fileSize ? formatSize(p.fileSize) : '';
   const parts: string[] = [];
   if (p.visit && p.patientRef) parts.push(`visit ${p.visit}`);
   if (p.note) parts.push(p.note);

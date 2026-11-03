@@ -1,7 +1,5 @@
 import { Component, computed, inject, input, output, signal } from '@angular/core';
-import { DatePipe } from '@angular/common';
 import { Router } from '@angular/router';
-import { instantOf } from '../../../core/instant';
 import { Icon } from '../../../shared/ui/icon';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { ImageActions } from './image-actions';
@@ -223,7 +221,7 @@ export class PhotoState {
  */
 @Component({
   selector: 'app-area-chart',
-  imports: [DatePipe],
+  imports: [ServerTimePipe],
   styles: `:host { display: block; } svg { width: 100%; display: block; overflow: visible; }`,
   template: `
     @if (points().length) {
@@ -232,7 +230,7 @@ export class PhotoState {
           <polyline [attr.points]="line()" fill="none" stroke="var(--ok-text)" stroke-width="2.5" />
           @for (p of points(); track p.id) {
             <circle [attr.cx]="p.x" [attr.cy]="p.y" r="4" fill="var(--ok-text)" />
-            <text [attr.x]="p.tx" y="58" font-size="9" fill="var(--text-muted)" [attr.text-anchor]="p.anchor">{{ p.at | date: 'd MMM' }} · {{ p.area.toFixed(1) }}</text>
+            <text [attr.x]="p.tx" y="58" font-size="9" fill="var(--text-muted)" [attr.text-anchor]="p.anchor">{{ p.at | serverTime: 'day' }} · {{ p.area.toFixed(1) }}</text>
           }
         </svg>
       } @else {
@@ -240,7 +238,7 @@ export class PhotoState {
           <g stroke="var(--border-subtle)">@for (g of grid(); track g.v) { <line x1="30" x2="350" [attr.y1]="g.y" [attr.y2]="g.y" /> }</g>
           <g font-size="10" fill="var(--text-muted)">
             @for (g of grid(); track g.v) { <text [attr.x]="g.v >= 10 ? 4 : 8" [attr.y]="g.y + 4">{{ g.v }}</text> }
-            @for (p of points(); track p.id) { <text [attr.x]="p.x" y="134" text-anchor="middle">{{ p.at | date: 'd MMM' }}</text> }
+            @for (p of points(); track p.id) { <text [attr.x]="p.x" y="134" text-anchor="middle">{{ p.at | serverTime: 'day' }}</text> }
           </g>
           <polyline [attr.points]="line()" fill="none" stroke="var(--ok-text)" stroke-width="2.5" />
           <g fill="var(--surface-raised)" stroke="var(--ok-text)" stroke-width="2.5">
@@ -276,7 +274,7 @@ export class AreaChart {
     return rows.map((r, i) => {
       const x = spark ? (n === 1 ? 150 : 10 + i * 280 / (n - 1)) : (n === 1 ? 190 : 50 + i * 280 / (n - 1));
       const y = spark ? (maxA === minA ? 30 : 10 + (maxA - (r.areaCm2 ?? 0)) / (maxA - minA) * 38) : 110 - (r.areaCm2 ?? 0) / this.top() * 90;
-      return { id: r.photoId, x, y, area: r.areaCm2 ?? 0, at: instantOf(r.takenAt ?? '') ?? null,
+      return { id: r.photoId, x, y, area: r.areaCm2 ?? 0, at: r.takenAt ?? null,
         tx: x, anchor: i === 0 && n > 1 ? 'start' : i === n - 1 && n > 1 ? 'end' : 'middle' };
     });
   });

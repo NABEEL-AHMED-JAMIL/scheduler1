@@ -42,7 +42,7 @@
           <table class="tx-t il-t" [class.tx-busy]="listState.pending()">
             <thead><tr>
               <th class="il-c-th"><span class="sr-only">Photo</span></th><th>Patient · site</th><th class="il-c-size">Size (in code)</th>
-              <th class="tx-num il-c-chg">Change</th><th class="il-c-st">Status</th><th class="il-c-by">By</th><th class="il-c-taken">Taken</th>
+              <th class="tx-num il-c-chg" title="The area's change since this wound's first photo with a size">Change</th><th class="il-c-st">Status</th><th class="il-c-by">By</th><th class="il-c-taken">Taken</th>
             </tr></thead>
             <tbody>
               @for (r of rows(); track r.photoId) {
@@ -63,7 +63,7 @@
                     @else { <span class="text-[color:var(--text-secondary)]">—</span> }
                   </td>
                   <td class="tx-num">
-                    @if (r.changePct != null) { <span [class.il-down]="r.changePct < 0" [class.il-up]="r.changePct > 0">{{ pctText(r.changePct) }}</span> }
+                    @if (r.sinceFirstPct != null) { <span [class.il-down]="r.sinceFirstPct < 0" [class.il-up]="r.sinceFirstPct > 0" [title]="'Area since ' + (r.firstAt | serverTime: 'day')">{{ pctText(r.sinceFirstPct) }}</span> }
                     @else if (size) { <span class="text-[color:var(--text-muted)]">first</span> }
                     @else { <span class="text-[color:var(--text-muted)]">—</span> }
                   </td>

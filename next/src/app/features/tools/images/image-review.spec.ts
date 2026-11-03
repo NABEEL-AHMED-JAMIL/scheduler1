@@ -38,6 +38,8 @@ describe('Image review rules (owner-approved design 2026-11-03)', () => {
     expect(subLine(ROW())).toBe('visit 3 · wound-SV-000117-v3.jpg');
     expect(subLine(ROW({ visit: 2 }))).toBe('visit 2');
     expect(subLine(ROW({ status: 'REFUSED', fileSize: 31.8 * 1024 * 1024 }))).toBe('31.8 MB');
+    expect(subLine(ROW({ status: 'REFUSED', fileSize: 50 }))).toBe('50 B');
+    expect(subLine(ROW({ status: 'REFUSED', fileSize: 0 }))).toBe('');
   });
 
   it('holds the limits before a file is sent', () => {
@@ -74,11 +76,14 @@ describe('Image review list', () => {
   it('shows the size in code, the change and the facets with counts', () => {
     const { text, el } = list();
     expect(text()).toContain('3.0 × 1.9 cm · 4.1 cm²');
-    expect(text()).toContain('−37%');
+    expect(text()).toContain('−56%');
+    expect(text()).not.toContain('−37%');
     expect(text()).toContain('No ruler: no size');
     expect(text()).toContain('location and camera details are removed on upload');
     expect(el.querySelector('[data-facet="status"]')!.textContent).toContain('Description to confirm');
     expect(el.querySelector('[data-facet="site"]')!.textContent).toContain('Heel');
+    expect(el.querySelector('[data-facet="status"]')!.textContent).not.toContain('Could not read');
+    expect(el.querySelector('[data-facet="by"]')!.textContent).not.toContain('Others');
   });
 
   it('asks the server again with a facet picked', () => {

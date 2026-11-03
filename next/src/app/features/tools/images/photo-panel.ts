@@ -39,7 +39,7 @@ type PanelTab = 'measurement' | 'description' | 'compare';
     <div class="tp-h">
       <div class="tp-top">
         <span [class]="'pill pill-' + mpill().tone" data-test="panel-status">@if (mpill().icon) { <app-icon [name]="mpill().icon!" size="0.85em" /> }{{ mpill().label }}</span>
-        @if (dpill(); as d) { <span [class]="'pill pill-' + d.tone">{{ d.tone === 'warn' ? 'Description is a draft' : d.label }}</span> }
+        @if (dpill(); as d) { <span [class]="'pill pill-' + d.tone">{{ d.label }}</span> }
         <button type="button" class="btn btn-ghost btn-icon btn-xs tp-x" aria-label="Close" (click)="closed.emit()"><app-icon name="close" /></button>
       </div>
       <h2 data-test="panel-title">{{ p.title }}</h2>

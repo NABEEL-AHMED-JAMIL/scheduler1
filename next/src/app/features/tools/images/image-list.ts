@@ -110,11 +110,10 @@ export class ImageList implements OnInit {
   readonly groups = computed<FacetGroup[]>(() => {
     const c = this.counts(), p = this.picks();
     return [
-      { key: 'status', title: 'Status', options: facetOptions(c.status, STATUS_WORDS, p['status'] ?? [], ['measured', 'no_ruler', 'to_confirm', 'could_not_read'])
-        .filter(o => o.value !== 'measuring' || o.count > 0) },
+      { key: 'status', title: 'Status', options: facetOptions(c.status, STATUS_WORDS, p['status'] ?? []) },
       { key: 'site', title: 'Body site', options: facetOptions(c.site, SITE_WORDS, p['site'] ?? []) },
       { key: 'patient', title: 'Patient', options: facetOptions(c.patient, {}, p['patient'] ?? [], [], v => v || 'Unknown') },
-      { key: 'by', title: 'Made by', options: facetOptions(c.by, BY_WORDS, p['by'] ?? [], ['me', 'others']) },
+      { key: 'by', title: 'Made by', options: facetOptions(c.by, BY_WORDS, p['by'] ?? []) },
     ];
   });
   readonly pages = computed(() => Math.max(1, Math.ceil(this.total() / this.pageSize())));
