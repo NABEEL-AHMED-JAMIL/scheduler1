@@ -1387,6 +1387,22 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
 
   // ---------------------------------------------------------------- reports redesign, features 11 and 12
 
+  /**
+   * The data contract's labels by path, for the rule builder's field picker (as the record reads a field: a contract path
+   * written from the dataset's list -- primary[*].wound.stage -- is also kept as wound.stage).
+   */
+  readonly contractLabels = computed<Record<string, string>>(() => {
+    const t = (this.def() as { template?: { dataContract?: { fields?: { path?: string; label?: string }[] } } } | null)?.template;
+    const out: Record<string, string> = {};
+    for (const f of t?.dataContract?.fields ?? []) {
+      if (!f.path || !f.label?.trim()) continue;
+      out[f.path] = f.label.trim();
+      const inRecord = f.path.replace(/^[A-Za-z_][A-Za-z0-9_]*\[(\*|0)\]\./, '');
+      if (inRecord !== f.path) out[inRecord] = f.label.trim();
+    }
+    return out;
+  });
+
   /** Feature 12: the fields a person may tag personal (the contract's, and those the blocks read). */
   readonly personalRows = computed(() => personalRows(this.def(), this.blocks(), this.names(), this.sample()));
   readonly personalCount = computed(() => this.personalRows().filter(r => r.personal).length);

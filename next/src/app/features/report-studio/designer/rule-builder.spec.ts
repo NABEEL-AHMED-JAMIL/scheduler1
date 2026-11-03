@@ -156,3 +156,15 @@ describe('the rule builder of "Show only when"', () => {
     expect(p.status()).toBe('Pick test data to see which records it shows for.');
   });
 });
+
+describe('the rule builder\'s field picker (owner review 2026-11-03)', () => {
+  it('names a field by its contract label, else its last part in words; the path and the type go beside it', async () => {
+    const { fieldLabel, typeWord } = await import('./rule-builder');
+    expect(fieldLabel({ path: 'primary.summary.worsening_count', type: 'number', label: 'Wounds worsening' })).toBe('Wounds worsening');
+    expect(fieldLabel({ path: 'primary.summary.worsening_count', type: 'number' })).toBe('Worsening count');
+    expect(fieldLabel({ path: 'item.woundStage', type: 'number' })).toBe('Wound stage');
+    expect(fieldLabel({ path: 'primary.visits[].area', type: 'number' })).toBe('Area');
+    expect([typeWord('integer'), typeWord('boolean'), typeWord('datetime'), typeWord('string'), typeWord('list')])
+      .toEqual(['Number', 'Yes/no', 'Date', 'Text', 'List']);
+  });
+});

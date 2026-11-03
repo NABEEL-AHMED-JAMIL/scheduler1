@@ -7,7 +7,22 @@ import {
 } from './rule-expr';
 
 /** A field the builder offers: the path it writes (primary.wound.stage, item.stage) and the data's type for it. */
-export interface RuleField { path: string; type: string; }
+export interface RuleField { path: string; type: string; label?: string | null; }
+
+/** A field's name as people read it: the data contract's label, else its last part in words ("worsening_count" -> "Worsening count"). */
+export function fieldLabel(f: RuleField): string {
+  if (f.label?.trim()) return f.label.trim();
+  const last = f.path.replace(/\[[^\]]*\]/g, '').split('.').filter(Boolean).pop() ?? f.path;
+  const words = last.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ').trim().toLowerCase();
+  return words ? words[0].toUpperCase() + words.slice(1) : f.path;
+}
+
+/** The type as the picker's tag says it. */
+export function typeWord(type: string): string {
+  const t = (type || '').toLowerCase();
+  return t === 'integer' || t === 'number' ? 'Number' : t === 'boolean' ? 'Yes/no' : t === 'date' || t === 'datetime' ? 'Date'
+    : t === 'list' || t === 'array' ? 'List' : t === 'object' ? 'Group' : 'Text';
+}
 
 /** One test record the rules are counted over: the record the primary dataset reads, and a repeat's item when inside one. */
 export interface RuleContext { record: unknown; scopes: Record<string, unknown>; }
@@ -184,7 +199,9 @@ export class RuleBuilder {
     }
   }
 
-  readonly fieldOptions = computed<AdvancedOption[]>(() => this.fields().map(f => ({ value: f.path, label: f.path, mono: true, sample: f.type })));
+  /** The field picker: the field's name, its path under it, its type as a tag; search finds either. */
+  readonly fieldOptions = computed<AdvancedOption[]>(() => this.fields().map(f => ({ value: f.path, label: fieldLabel(f), description: f.path,
+    badge: typeWord(f.type), badgeTone: 'neutral', keywords: `${f.path} ${f.type}` })));
 
   /** The expression the current rows write, or null while a row is not complete. */
   readonly rowsExpression = computed(() => {

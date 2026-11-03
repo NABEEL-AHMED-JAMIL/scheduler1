@@ -781,6 +781,8 @@ export class PropertiesPanel {
   readonly readonly = input(false);
   /** The test data's schema, its first record and its shape (an inspect of the designer's test data). */
   readonly fields = input<SchemaField[]>([]);
+  /** The data contract's labels by field path (as the contract writes it), for the rule builder's picker. */
+  readonly fieldLabels = input<Record<string, string>>({});
   readonly sample = input<unknown>(undefined);
   readonly tree = input<TreeNode | undefined>(undefined);
   /** The primary dataset's names (its id, and its alias when it starts at the root); the first is written in new bindings. */
@@ -1119,7 +1121,9 @@ export class PropertiesPanel {
   readonly ruleScope = computed<{ fields: RuleField[]; contexts: RuleContext[]; noun: string; note?: string; total: number | null }>(() => {
     const b = this.block();
     const records = this.records();
-    const primaryFields: RuleField[] = scalars(this.fields()).map(f => ({ path: `${this.primary()}.${f.path}`, type: f.type }));
+    const labels = this.fieldLabels();
+    const labelOf = (path: string) => labels[path] ?? labels[path.replace(/\[\]/g, '[*]')] ?? labels[path.replace(/\[(\*)?\]/g, '')] ?? null;
+    const primaryFields: RuleField[] = scalars(this.fields()).map(f => ({ path: `${this.primary()}.${f.path}`, type: f.type, label: labelOf(f.path) }));
     const repeats: Block[] = [];
     let at = b ? find(this.blocks(), b.id) : null;
     for (let guard = 0; at?.parent && guard < 50; guard++) {

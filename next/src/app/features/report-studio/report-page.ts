@@ -518,9 +518,10 @@ export class ReportPage implements OnInit {
   /** The viewer's note beside the size: whether this PDF is signed. */
   viewerNote(v: ReportVersionRow): string {
     if (v.void) return 'VOID copy';
-    if (v.approval?.signed) return 'signed';
+    if (v.approval?.signed) return `signed · ${rsTime(v.approval.approvedAt, 'date') ?? ''}`.replace(/ · $/, '');
     if (v.approval) return 'approved, not signed';
-    return this.hasPdf(v) ? 'signed after approval' : '';
+    // Owner review 2026-11-03: not approved yet, so not signed -- say what will happen, never "signed".
+    return this.hasPdf(v) ? 'will be signed when approved' : '';
   }
 
   /** Initials for an approver's round badge. */

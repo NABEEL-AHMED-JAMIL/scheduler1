@@ -176,3 +176,15 @@ describe('the public verify page (feature 1)', () => {
       .toBe('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
   });
 });
+
+describe('the report viewer\'s note (owner review 2026-11-03)', () => {
+  it('never says signed before the approval', async () => {
+    const { ReportPage } = await import('./report-page');
+    const note = (v: Partial<ReportVersionRow>) => ReportPage.prototype.viewerNote.call(
+      { hasPdf: () => true } as unknown as InstanceType<typeof ReportPage>, version(v));
+    expect(note({})).toBe('will be signed when approved');
+    expect(note({ approval: { signed: true, approvedAt: '2026-11-02T23:16:00Z' } as never })).toMatch(/^signed · \d{1,2} Nov 2026$/);
+    expect(note({ approval: { signed: false } as never })).toBe('approved, not signed');
+    expect(note({ void: { reason: 'x' } })).toBe('VOID copy');
+  });
+});
