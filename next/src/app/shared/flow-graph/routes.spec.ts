@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { branchNames, branchOfSteps, branchRefs, mergeHeads } from './routes';
-import { pipelineEdges } from './flow-adapters';
+import { pipelineEdges, runGraph, stepSummary } from './flow-adapters';
 import { outputColumns, inputColumns } from '../../features/tasks/steps/steps.model';
 
 /** MIG-450: a Route's branches as the engine reads them -- which branch a step is in, what a Merge stacks, how the flow draws it. */
@@ -43,5 +43,20 @@ describe('A Route\'s branches', () => {
     expect(outputColumns(definition, 1)).toEqual(['id', 'priority', 'branch']);
     expect(inputColumns(definition, 2)).toEqual(['id', 'priority', 'branch']);
     expect(outputColumns(definition, 4)).toEqual(['id', 'priority', 'branch', 'second_opinion']);
+  });
+
+  it('says a Route\'s branches on its node', () => {
+    expect(stepSummary(steps[1])).toEqual([{ label: 'Branches', value: 'urgent · routine' }]);
+  });
+
+  it('draws a run\'s branch from its Route with the branch\'s own rows', () => {
+    const run = [
+      { key: 'triage', task: 'route', status: 'Completed', recordsOut: 5, reads: [],
+        datasets: [{ name: 'branch urgent', rowCount: 2 }, { name: 'branch routine', rowCount: 3 }] },
+      { key: 'opinion', task: 'compute', status: 'Completed', recordsOut: 2, reads: ['triage.urgent'] },
+      { key: 'together', task: 'merge', status: 'Completed', recordsOut: 5, reads: ['opinion', 'triage.routine'] },
+    ];
+    expect(runGraph(run, 'rows').edges.map(e => `${e.from}>${e.to}:${e.label}`))
+      .toEqual(['triage>opinion:urgent · 2 rows', 'opinion>together:2 rows', 'triage>together:routine · 3 rows']);
   });
 });

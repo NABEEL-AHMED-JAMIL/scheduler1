@@ -1,4 +1,4 @@
-import { branchRefs, isMerge, mergeHeads } from './routes';
+import { branchNames, branchRefs, isMerge, mergeHeads } from './routes';
 import { FlowEdge, FlowMetric, FlowNode, FlowNodeKind, FlowTone } from './flow-graph.model';
 import { formatDuration } from '../ui/time-format';
 
@@ -256,6 +256,8 @@ export type StepNameLookup = (format: string, value: unknown, step: PipelineStep
  * "#1072" until the name is read.
  */
 export function stepSummary(step: PipelineStepLike, max = 2, schema?: SchemaLike | null, names?: StepNameLookup): FlowMetric[] {
+  // MIG-450: a Route says its branches by name, Otherwise last ("1 items" told nothing).
+  if (step.task === 'route' && max > 0) return [{ label: 'Branches', value: branchNames(step).join(' · ') }];
   const out: FlowMetric[] = [];
   for (const [name, value] of Object.entries(step.config ?? {})) {
     const property = schema?.properties?.[name];
@@ -431,8 +433,21 @@ export function runGraph<S extends RunStepLike>(steps: readonly S[], basis: MapB
   // ZT-P9: from the steps each one reads when Core says so (a read after a read stands alone; a join and an append draw
   // every source); an older answer without them is drawn as before, each step from the one before it.
   const known = steps.some(s => Array.isArray(s.reads));
+  // MIG-450: a read of a Route's branch ("triage.urgent") is drawn from the Route, with the branch's own rows.
+  const branchEdge = (ref: string, to: S): FlowEdge | null => {
+    const dot = ref.indexOf('.');
+    const route = dot > 0 ? byKey.get(ref.slice(0, dot)) : undefined;
+    if (!route) return null;
+    const branch = ref.slice(dot + 1);
+    const rows = (route as { datasets?: { name: string; rowCount?: number | null }[] }).datasets?.find(d => d.name === `branch ${branch}`)?.rowCount;
+    return { from: route.key, to: to.key, label: rows != null ? `${branch} · ${countText(rows)} ${rows === 1 ? 'row' : 'rows'}` : branch,
+      tone: route.status === 'Failed' ? 'crit' : null };
+  };
   const edges: FlowEdge[] = known
-    ? steps.flatMap(s => (s.reads ?? []).map(k => byKey.get(k)).filter((f): f is S => !!f).map(f => edge(f, s)))
+    ? steps.flatMap(s => (s.reads ?? []).map(k => {
+      const from = byKey.get(k);
+      return from ? edge(from, s) : branchEdge(k, s);
+    }).filter((e): e is FlowEdge => !!e))
     : steps.slice(1).map((s, i) => edge(steps[i], s));
   return { nodes, edges, hot };
 }
