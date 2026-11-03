@@ -66,7 +66,7 @@ test.describe('Reports redesign phase 5: rule builder, fax check, review comment
   test.beforeAll(async ({ request }) => {
     admin = await sessionFor(request, 'admin');
     const made = await data(`import ${NAME}`, await request.post(`${api}/reportTemplate.json/create`,
-      { headers: authOf(admin), data: { from: 'IMPORT', name: NAME, definition: definition(NAME) } }));
+      { headers: authOf(admin), data: { from: 'IMPORT', name: NAME, tags: ['test'], definition: definition(NAME) } }));
     templateId = made.templateId;
     await data(`publish ${NAME}`, await request.post(`${api}/reportPublish.json/publish?templateId=${templateId}`,
       { headers: authOf(admin), data: { revision: made.draft.revision, changeSummary: 'E2E phase 5' } }));

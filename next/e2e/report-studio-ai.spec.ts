@@ -29,7 +29,7 @@ test.describe('Report Studio: the AI assistant (live)', () => {
   test.beforeAll(async ({ request }) => {
     admin = await sessionFor(request, 'admin');
     const made = await (await request.post(`${api}/reportTemplate.json/create`,
-      { headers: authOf(admin), data: { from: 'IMPORT', name: NAME, definition: woundDefinition(NAME) } })).json();
+      { headers: authOf(admin), data: { from: 'IMPORT', name: NAME, tags: ['test'], definition: woundDefinition(NAME) } })).json();
     templateId = made.data.templateId;
     const kept = await request.post(`${api}/reportTemplate.json/sample/save?templateId=${templateId}`, {
       headers: authOf(admin),

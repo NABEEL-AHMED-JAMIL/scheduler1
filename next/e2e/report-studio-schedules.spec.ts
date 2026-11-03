@@ -61,7 +61,7 @@ test.describe('Report schedules: make, test, run, approve and deliver (live)', (
     admin = await sessionFor(request, 'admin');
     reviewer = await sessionFor(request, 'user');
     const made = await data(`import ${TEMPLATE}`, await request.post(`${api}/reportTemplate.json/create`,
-      { headers: authOf(admin), data: { from: 'IMPORT', name: TEMPLATE, definition: visitTemplate(TEMPLATE) } }));
+      { headers: authOf(admin), data: { from: 'IMPORT', name: TEMPLATE, tags: ['test'], definition: visitTemplate(TEMPLATE) } }));
     templateId = made.templateId;
     await data(`publish ${TEMPLATE}`, await request.post(`${api}/reportPublish.json/publish?templateId=${templateId}`,
       { headers: authOf(admin), data: { revision: made.draft.revision, changeSummary: 'E2E' } }));
