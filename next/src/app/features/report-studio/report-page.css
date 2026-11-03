@@ -79,3 +79,7 @@
 .rsp-qr-svg { width: 4.75rem; height: 4.75rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); }
 .rsp-qr-light { fill: var(--qr-paper); }
 .rsp-qr-dark { fill: var(--qr-ink); }
+
+/* Feature 16: five tabs (Comments joined them) stay on one line; on a narrow card the row scrolls rather than wraps. */
+.rsp-tabs { flex-wrap: nowrap; overflow-x: auto; gap: 0; }
+.rsp-tabs > .tab { white-space: nowrap; padding-left: 0.625rem; padding-right: 0.625rem; }

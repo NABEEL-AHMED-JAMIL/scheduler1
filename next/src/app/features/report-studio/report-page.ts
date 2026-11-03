@@ -217,6 +217,8 @@ export class ReportPage implements OnInit {
   onPinned(at: CommentAnchor): void {
     this.commentAnchor.set(at);
     this.tab.set('comments');
+    // Where the side card is under the report (a narrow screen), the new comment's box is brought into view.
+    setTimeout(() => document.querySelector('[data-test="report-comments"] textarea')?.scrollIntoView({ block: 'center', behavior: 'smooth' }));
   }
 
   /** A pin on the page was clicked: its thread is selected in the Comments tab. */
@@ -233,6 +235,8 @@ export class ReportPage implements OnInit {
 
   startPick(): void {
     this.picking.set(true);
+    // The page to click may be above the card (a narrow screen): it is brought into view.
+    setTimeout(() => document.querySelector('.rv-sheet')?.scrollIntoView({ block: 'center', behavior: 'smooth' }));
   }
 
   constructor() {
