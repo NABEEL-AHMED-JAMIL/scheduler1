@@ -11,14 +11,14 @@
 //   public/developer/openapi-v1.yaml, openapi-v1.json                  the contract, to download
 //   public/developer/postman-collection-v1.json                        a Postman v2.1 collection made from it
 //
-// YAML is read with js-yaml through npx (`npx --yes js-yaml@4`), so the console takes no dependency for it. Needs a Node
+// YAML is read with js-yaml, a dev dependency of the console (owner 2026-11-03: no download at run time). Needs a Node
 // that strips TypeScript types (22.18+ or 23.6+): the examples come from src/app/features/developer/openapi.ts, the
 // same generator the reference page uses.
-import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import yaml from 'js-yaml';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const platform = resolve(root, process.env.ETL_PLATFORM || '../../etl-platform');
@@ -51,9 +51,7 @@ const sha256 = text => createHash('sha256').update(text).digest('hex');
 const read = rel => readFileSync(join(api, rel), 'utf8');
 
 const yamlText = read('openapi-v1.yaml');
-const spec = JSON.parse(execFileSync('npx', ['--yes', 'js-yaml@4', join(api, 'openapi-v1.yaml')], {
-  cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024,
-}));
+const spec = yaml.load(yamlText);
 
 /** An event type's `$ref`s into the OpenAPI document (`../openapi-v1.yaml#/...`) as local ones the portal resolves. */
 function localRefs(value) {
