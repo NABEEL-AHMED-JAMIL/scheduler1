@@ -314,7 +314,8 @@ export class UploadSheet {
       try {
         const r = await firstValueFrom(this.api.suggest(i.file));
         const s = r.status === API_SUCCESS ? r.data : null;
-        if (!s || s.status === 'skipped') { this.patch(k, { pre: 'skipped' }); continue; }
+        // Skipped (HEIC) or failed (the model took longer than the upload sheet waits): suggested after the upload instead.
+        if (!s || s.status === 'skipped' || s.status === 'failed') { this.patch(k, { pre: 'skipped' }); continue; }
         const key = s.status === 'ok' && s.typeKey && this.types().some(t => t.key === s.typeKey) ? s.typeKey : null;
         // The person may have chosen while it was asked: their choice wins.
         const chosen = this.items()[k]?.type ?? '';

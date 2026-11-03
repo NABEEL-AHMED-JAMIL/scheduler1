@@ -26,7 +26,7 @@ import { Icon } from './icon';
       <header class="side-panel-head">
         <div class="min-w-0 flex-1">
           <h2 class="text-base font-semibold truncate">{{ heading() }}</h2>
-          @if (subtitle()) { <p class="text-sm text-[color:var(--text-secondary)] truncate">{{ subtitle() }}</p> }
+          @if (subtitle()) { <p class="text-sm text-[color:var(--text-secondary)]" [class.truncate]="!wrapSubtitle()">{{ subtitle() }}</p> }
         </div>
         <button type="button" class="btn btn-ghost btn-icon btn-sm shrink-0" aria-label="Close" (click)="ref.close()">
           <app-icon name="close" />
@@ -41,6 +41,8 @@ export class SidePanel {
   readonly ref = inject<DialogRef<unknown>>(DialogRef);
   readonly heading = input.required<string>();
   readonly subtitle = input('');
+  /** A subtitle that is a sentence or two (Image review's AI settings) wraps instead of being cut with "…". */
+  readonly wrapSubtitle = input(false);
 }
 
 /**

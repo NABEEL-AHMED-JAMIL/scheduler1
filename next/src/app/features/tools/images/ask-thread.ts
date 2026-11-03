@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
+import { Component, DestroyRef, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { API_SUCCESS } from '../../../core/api/api.config';
 import { Icon } from '../../../shared/ui/icon';
@@ -15,8 +15,14 @@ export function askRows(data: AskRow[] | { rows: AskRow[] } | null | undefined):
   return Array.isArray(data) ? data : data?.rows ?? [];
 }
 
+/** Asked, not answered yet (media answers after the request; the page polls). */
+export function isWaiting(row: AskRow): boolean {
+  return row.status === 'pending' || row.status === 'answering';
+}
+
 /** How an answer is labelled (design types-ask): a draft, or not answered with a fixed reply and no model asked. */
 export function askState(row: AskRow): { pill: string; tone: 'warn' | 'crit' | 'neutral'; meta: string; refused: boolean } {
+  if (isWaiting(row)) return { pill: 'Answering…', tone: 'neutral', meta: 'a local model is reading the image; the answer appears here', refused: false };
   if (row.status === 'refused') return { pill: 'Not answered', tone: 'warn', meta: 'fixed reply · no model was asked', refused: true };
   if (row.status === 'ok') {
     const prompt = row.promptName ? `${row.promptName}${row.promptVersion != null ? ' v' + row.promptVersion : ''}` : '';
@@ -130,15 +136,34 @@ export class AskThread {
   readonly measured = computed(() => isMeasuredPhoto(this.photo()) && this.photo().areaCm2 != null);
   readonly state = askState;
 
+  private readonly destroyRef = inject(DestroyRef);
+  private poll: ReturnType<typeof setTimeout> | null = null;
+
   constructor() {
+    this.destroyRef.onDestroy(() => { if (this.poll) clearTimeout(this.poll); });
     effect(() => {
       const id = this.photo().photoId;
       const given = this.initial();
       untracked(() => {
-        if (given) { this.rows.set(given); return; }
-        this.api.asks(id).subscribe({ next: r => { if (r.status === API_SUCCESS) this.rows.set(askRows(r.data)); }, error: () => undefined });
+        if (given) { this.rows.set(given); this.pollWhileWaiting(); return; }
+        this.reload(id);
       });
     });
+  }
+
+  /** Reads the thread again; while a question waits for its answer, again in 2 s. */
+  private reload(id: number): void {
+    this.api.asks(id).subscribe({
+      next: r => { if (r.status === API_SUCCESS) { this.rows.set(askRows(r.data)); this.asked.emit(this.rows()); } this.pollWhileWaiting(); },
+      error: () => this.pollWhileWaiting(),
+    });
+  }
+
+  private pollWhileWaiting(): void {
+    if (this.poll) { clearTimeout(this.poll); this.poll = null; }
+    if (!this.rows().some(isWaiting)) return;
+    const id = this.photo().photoId;
+    this.poll = setTimeout(() => { this.poll = null; this.reload(id); }, 2000);
   }
 
   initials(r: AskRow): string {
@@ -157,6 +182,7 @@ export class AskThread {
       this.rows.update(list => [...list, r.data!]);
       this.question.set('');
       this.asked.emit(this.rows());
+      this.pollWhileWaiting();
     } catch (err) {
       this.toast.error(messageOf(err) || 'The question could not be asked.');
     } finally {

@@ -385,7 +385,8 @@ export interface AskRow {
   askId: number;
   question: string;
   /** refused: the fixed reply in answer, no model was asked, nothing billed. */
-  status: 'ok' | 'refused' | 'off' | 'failed' | 'held';
+  /** pending / answering: asked, answered after the request (media-2.22); the thread polls. */
+  status: 'pending' | 'answering' | 'ok' | 'refused' | 'off' | 'failed' | 'held';
   answer?: string | null;
   refusedBecause?: string | null;
   model?: string | null;

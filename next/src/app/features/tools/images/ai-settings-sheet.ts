@@ -148,7 +148,7 @@ export function modelLine(m: AiModelOption | null | undefined): string {
     @media (max-width: 760px) { .as-row, .as-side, .as-add { grid-template-columns: minmax(0, 1fr); } }
   `,
   template: `
-    <app-side-panel heading="AI settings for Image review" subtitle="Per image type: which prompt and model write the draft description, and whether it is measured. Sizes come only from the ruler, in code.">
+    <app-side-panel heading="AI settings for Image review" [wrapSubtitle]="true" subtitle="Per image type: which prompt and model write the draft description, and whether it is measured. Sizes come only from the ruler, in code.">
       @if (state.error()) {
         <app-inline-status [error]="state.error()" (retry)="load()" />
       } @else if (!settings()) {

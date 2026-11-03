@@ -8,7 +8,7 @@ import { ImageApi } from './image.api';
 import { AiPromptOption, ImageAiApi, ImageAiSettings, ImageType, measuredText } from './image-ai';
 import { PhotoPage } from './photo-page';
 import { DescriptionCard } from './photo-parts';
-import { AskThread, askState } from './ask-thread';
+import { AskThread, askState, isWaiting } from './ask-thread';
 import { AiSettingsSheet, modelLine, promptsForSide, promptsForType, typeChanges, typeSave } from './ai-settings-sheet';
 import { ImageTypesPage } from './image-types-page';
 import { UploadSheet, takenNote } from './upload-sheet';
@@ -97,6 +97,10 @@ describe('Image types rules (design image-tool-types, contract 2026-11-03)', () 
   it('labels an answer: a draft, or not answered with a fixed reply and no model asked', () => {
     expect(askState(REFUSED_ASK)).toEqual(expect.objectContaining({ pill: 'Not answered', meta: 'fixed reply · no model was asked', refused: true }));
     expect(askState(OK_ASK).pill).toBe('Draft · not a diagnosis');
+    // Asked, answered after the request (media-2.22): "Answering…" until the poll finds the answer.
+    expect(askState({ ...OK_ASK, status: 'pending', answer: null }).pill).toBe('Answering…');
+    expect(isWaiting({ ...OK_ASK, status: 'answering' })).toBe(true);
+    expect(isWaiting(OK_ASK)).toBe(false);
     expect(askState(OK_ASK).meta).toBe('Image question (Riverside) v1 · qwen3.5:9b · 7.8 sec');
   });
 
