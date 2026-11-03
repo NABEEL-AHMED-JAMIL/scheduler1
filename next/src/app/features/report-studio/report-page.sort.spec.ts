@@ -33,7 +33,8 @@ function page(api: Record<string, unknown>) {
   TestBed.configureTestingModule({ providers: [provideZonelessChangeDetection(), provideRouter([]),
     // people(): the approvers' names upstream reads on open (an empty list here).
     { provide: ReportStudioApi, useValue: { people: () => of([]), version: () => NEVER, ...api } },
-    { provide: ReportLibraryApi, useValue: { meanings: () => of({ meanings: [], firstDefault: 'REVIEWED', finalDefault: 'RELEASE' }) } },
+    { provide: ReportLibraryApi, useValue: { meanings: () => of({ meanings: [], firstDefault: 'REVIEWED', finalDefault: 'RELEASE' }),
+      deidentified: () => of({ available: false, personalFields: [], rules: { dates: 'shift', freeText: true, picturesLeftOut: 0 }, snapshotKept: true }) } },
     { provide: AuthService, useValue: { canOpen: () => true, isPlatformAdmin: () => false, user: signal({ appUserId: 4640, tenantName: 'Riverside' }) } },
     { provide: Dialog, useValue: { open: vi.fn() } },
     { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }] });

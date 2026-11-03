@@ -4,7 +4,7 @@ title: PDF/A for archiving and tagged PDF for accessibility
 summary: Make a template's reports PDF/A-2b, the archival format for records kept for years, and tagged PDFs a screen reader can read.
 section: Design
 who: Edit templates; Manage branding for a brand profile's setting
-where: The designer's page settings › Archive and accessibility; Reports › Assets & branding › a brand profile
+where: Reports › Templates (/reports/templates); Reports › Assets & branding (/reports/assets)
 related: rs-designer, rs-branding, rs-approve
 ---
 Two settings change what kind of PDF a template makes. Both are still PDFs: every reader opens them as before.

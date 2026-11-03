@@ -4,7 +4,7 @@ title: A copy without names
 summary: A version of a report with the patient's details taken out — names, record numbers, dates of birth, the dates shifted — for a quality board or a partner that does not need to know who.
 section: Manage
 who: Reports to download a copy; Edit templates to say which fields are personal
-where: A report's Download menu (/reports/library); the designer's page settings
+where: Reports › Library (/reports/library); Reports › Templates (/reports/templates)
 related: rs-versions, rs-designer, rs-schedules, rs-pdf-archive
 ---
 A **copy without names** is the same report with what identifies the patient taken out: the minimum necessary for a
