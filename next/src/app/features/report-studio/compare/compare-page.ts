@@ -240,7 +240,11 @@ export class CompareVersions {
     queueMicrotask(() => {
       for (const side of ['b', 'a', 'o']) {
         const el = this.host.querySelector<HTMLElement>(`[data-page-id="${side}-${target}"]`);
-        el?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+        // Only the pages' own scroller moves: the toolbar and the change list stay where they are.
+        const scroller = el?.closest<HTMLElement>('.cv-scroll');
+        if (el && scroller) {
+          scroller.scrollTo({ top: scroller.scrollTop + el.getBoundingClientRect().top - scroller.getBoundingClientRect().top - 8, behavior: 'smooth' });
+        }
       }
     });
   }
