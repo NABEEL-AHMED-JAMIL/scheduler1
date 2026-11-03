@@ -174,7 +174,7 @@
                             [class.is-hidden]="r.hidden" (click)="select(r.id)">
                       <app-icon [name]="typeIcon(r.type)" class="text-[color:var(--text-muted)]" />
                       <span class="truncate flex-1 text-left">{{ r.label }}</span>
-                      <span class="text-xs text-[color:var(--text-muted)] whitespace-nowrap" [attr.data-page-of]="r.id">{{ typeWord(r.type) }}@if (pageLabels()?.[r.id]; as at) { · {{ at }} }</span>
+                      <span class="text-xs text-[color:var(--text-muted)] whitespace-nowrap truncate max-w-[50%]" [attr.data-page-of]="r.id">@if (pageLabels()?.[r.id]; as at) { {{ at }} · }{{ typeWord(r.type) }}</span>
                     </button>
                   </li>
                 } @empty {

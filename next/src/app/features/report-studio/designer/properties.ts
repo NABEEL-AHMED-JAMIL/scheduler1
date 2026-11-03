@@ -17,7 +17,8 @@ export interface PropField {
   key: string;
   label: string;
   kind: 'text' | 'textarea' | 'number' | 'boolean' | 'enum' | 'binding' | 'listBinding' | 'collection' | 'columns' | 'items'
-    | 'format' | 'style' | 'size' | 'itemField' | 'json' | 'asset' | 'imageSource' | 'filter' | 'rowField' | 'series' | 'object' | 'bands';
+    | 'format' | 'style' | 'size' | 'itemField' | 'json' | 'asset' | 'imageSource' | 'filter' | 'rowField' | 'series' | 'object' | 'bands'
+    | 'path';
   group: 'content' | 'data' | 'format' | 'style' | 'layout';
   options?: string[];
   /** The words for an enum's options, where its own values are not words (QA 2026-10-20: emphasis). */
@@ -68,7 +69,7 @@ const LABELS: Record<string, string> = {
   showText: 'Write the code under the bars', levels: 'Headings down to level', pageNumbers: 'Page numbers in the PDF',
   low: 'Normal from', high: 'Normal up to', lowBinding: 'Normal from (data)', highBinding: 'Normal up to (data)', unit: 'Unit',
   unitBinding: 'Unit (data)', min: 'Scale starts at', max: 'Scale ends at', referenceBands: 'Reference bands (normal ranges)',
-  continuedCaption: 'Later PDF pages start with “(continued)”', groupBy: 'Group rows by',
+  continuedCaption: 'Later PDF pages start with “(continued)”', groupBy: 'Group rows by', totalLabel: 'Total row label',
 };
 
 /** The words for the phase-4 enums. */
@@ -180,7 +181,8 @@ export function fieldsFor(type: string, definitions: Record<string, JsonSchema>)
       field = { key, label, kind: 'object', group, props: s.properties, hint: OBJECT_HINTS[key] };
     else if (key === 'columns' && type === 'imageGrid') field = { key, label: LABELS['columns_grid'], kind: 'enum', group: 'layout', options: ['1', '2', '3', '4', '5', '6'] };
     else if (key === 'binding') field = { key, label, kind: type === 'list' ? 'listBinding' : 'binding', group: 'data' };
-    else if (key.endsWith('Binding') && s.type === 'string') field = { key, label, kind: 'binding', group: 'data' };
+    else if (key.endsWith('Binding') && s.type === 'string') field = { key, label, kind: 'path', group: 'data',
+      hint: 'A field of the data; it wins over the fixed number.' };
     else if (key === 'referenceBands') field = { key, label, kind: 'bands', group: 'content',
       hint: 'Shaded behind the data: a normal range, a caution range. Leave From or To empty for an open end.' };
     else if (key === 'dataset') field = { key, label, kind: 'collection', group: 'data' };
@@ -489,6 +491,13 @@ export function filterRows(rows: unknown[], f: RowFilter | null): unknown[] {
                   </div>
                   @if (f.hint) { <span class="text-xs text-[color:var(--text-muted)]">{{ f.hint }}</span> }
                 </div>
+              }
+              @case ('path') {
+                <label class="field"><span class="label">{{ f.label }}</span>
+                  <input class="input mono text-xs" [value]="text(f.key)" [disabled]="readonly()" list="rsd-scalars" [attr.aria-label]="f.label"
+                         placeholder="{{ primary() }}.ref_low" (change)="set(f.key, $any($event.target).value.trim() || undefined)" />
+                  @if (f.hint) { <span class="text-xs text-[color:var(--text-muted)]">{{ f.hint }}</span> }
+                </label>
               }
               @case ('bands') {
                 <div class="rsd-group flex flex-col gap-1.5" role="group" [attr.aria-label]="f.label">
