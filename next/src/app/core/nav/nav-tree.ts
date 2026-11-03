@@ -238,10 +238,11 @@ export const NAV: NavItem[] = [
       },
       {
         label: 'Tools', path: '/tools', icon: 'settings',
-        hint: 'Convert documents, and turn speech into text',
+        hint: 'Convert documents, turn speech into text, and measure wound photos',
         tabs: [
           { label: 'Document Converter', path: '/tools/converter', pageKey: 'tools-converter', icon: 'file' },
           { label: 'Audio Transcript', path: '/tools/transcript', pageKey: 'tools-transcript', icon: 'volume' },
+          { label: 'Image review', path: '/tools/images', pageKey: 'tools-images', icon: 'image' },
         ],
       },
     ],

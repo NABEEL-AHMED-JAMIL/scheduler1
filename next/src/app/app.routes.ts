@@ -596,6 +596,14 @@ export const routes: Routes = [
         data: { pageKey: 'tools-transcript' },
         canActivate: [pageGuard],
       },
+      {
+        // Image review (owner-approved design 2026-11-03): wound and clinical photos, measured in code against the ruler.
+        path: 'tools/images',
+        title: 'Image review',
+        loadComponent: () => import('./features/tools/images/image-review').then(m => m.ImageReview),
+        data: { pageKey: 'tools-images' },
+        canActivate: [pageGuard],
+      },
       // ---------------------------------------------------------------------------------------------
       // Data (Wave 5; Analytics Studio and Saved Analyses moved here from Object Browser)
       // ---------------------------------------------------------------------------------------------

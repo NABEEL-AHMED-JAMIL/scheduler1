@@ -68,6 +68,7 @@ const PAGE_PATHS: [string, PageKey][] = [
   ['/documents/file-drop', 'objects'],
   ['/tools/converter', 'tools-converter'],
   ['/tools/transcript', 'tools-transcript'],
+  ['/tools/images', 'tools-images'],
   ['/connections/connectors', 'connector-hub'],
   ['/connections/api-collections', 'api-collections'],
   ['/connections/sources', 'sources'],

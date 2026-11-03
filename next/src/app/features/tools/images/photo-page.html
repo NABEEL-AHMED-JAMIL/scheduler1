@@ -1,0 +1,260 @@
+<div class="page-tool">
+  @if (detail(); as d) {
+    <app-page-header [title]="d.title" [crumb]="crumb()" [hub]="false">
+      @if (mpill(); as m) { <span pills [class]="'pill pill-' + m.tone" data-test="page-status">@if (m.icon) { <app-icon [name]="m.icon" size="0.85em" /> }{{ m.label }}</span> }
+      @if (tab() !== 'compare' && dpill(); as dp) { <span pills [class]="'pill pill-' + dp.tone" data-test="page-description-status">{{ dp.label }}</span> }
+      @if (tab() === 'compare') {
+        <p meta class="pg-meta" data-test="page-meta">{{ compareMeta() }}</p>
+      } @else {
+        <p meta class="pg-meta" data-test="page-meta">{{ meta() }} · <span class="mono">{{ d.fileName }}</span>@if (d.status !== 'REFUSED') { · location and camera details removed }</p>
+      }
+
+      @if (tab() === 'compare') {
+        @if (canReport()) {
+          <button type="button" class="btn btn-default btn-sm" (click)="report()" [disabled]="d.inReport || !d.hasPhoto" data-test="add-to-report"><app-icon name="file" />{{ d.inReport ? 'In Report Studio' : 'Add to a report' }}</button>
+        }
+      } @else if (d.hasPhoto) {
+        <button type="button" class="btn btn-default btn-sm" [cdkMenuTriggerFor]="dl" data-test="download"><app-icon name="download" />Download<app-icon name="chevronDown" /></button>
+        <ng-template #dl>
+          <div cdkMenu class="card shadow-xl py-1 min-w-64 text-sm">
+            @for (o of downloads; track o.format) {
+              <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="actions.download(d, o.format)" [attr.data-test]="'download-' + o.format"><app-icon name="download" />{{ o.label }}<span class="pg-ext">.{{ o.ext }}</span></button>
+            }
+          </div>
+        </ng-template>
+        <div data-overflow>
+          <button type="button" class="btn btn-default btn-icon btn-sm" [cdkMenuTriggerFor]="more" aria-label="Add to a report, start a pipeline, delete" data-test="page-more"><app-icon name="dots" /></button>
+        </div>
+      } @else {
+        <button type="button" class="btn btn-default btn-sm" (click)="remove()" data-test="page-remove"><app-icon name="trash" />Remove</button>
+      }
+      <ng-template #more>
+        <div cdkMenu class="card shadow-xl py-1 min-w-64 text-sm">
+          @if (canReport()) {
+            <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="report()" [disabled]="d.inReport" data-test="menu-report"><app-icon name="file" />{{ d.inReport ? 'In Report Studio' : 'Add to a report' }}</button>
+          }
+          <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="actions.pipeline(d)" data-test="menu-pipeline"><app-icon name="layers" />Start a pipeline…</button>
+          @if (d.outlineSource === 'drawn') {
+            <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="remeasure()"><app-icon name="refresh" />Measure again from the photo</button>
+          }
+          <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="remove()" data-test="menu-delete"><app-icon name="trash" class="icon-crit" />Delete photo</button>
+        </div>
+      </ng-template>
+      @if (canSend() && d.hasPhoto) {
+        <button type="button" class="btn btn-primary btn-sm" (click)="send()" [disabled]="d.sentToDocuments" data-test="send-documents">
+          <app-icon name="inbox" />{{ d.sentToDocuments ? 'Sent to Documents' : 'Send to Documents as a visit note' }}</button>
+      }
+    </app-page-header>
+
+    @if (d.status === 'REFUSED') {
+      <section class="card p-4 mt-5" data-test="photo-refused"><app-photo-state [photo]="d" (remove)="remove()" (upload)="another()" /></section>
+    } @else {
+      <nav class="tabs mt-4" role="tablist" aria-label="The photo">
+        <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'measurement'" [attr.aria-selected]="tab() === 'measurement'" (click)="open('measurement')" data-tab="measurement">Measurement</button>
+        <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'description'" [attr.aria-selected]="tab() === 'description'" (click)="open('description')" data-tab="description">
+          Description @if (d.descriptionStatus === 'DRAFT') { <span class="pill pill-warn ml-1" style="height:1.125rem">draft</span> }</button>
+        <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'compare'" [attr.aria-selected]="tab() === 'compare'" (click)="open('compare')" data-tab="compare">
+          Compare <span class="pg-count">{{ d.visits || 1 }}</span></button>
+        <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'privacy'" [attr.aria-selected]="tab() === 'privacy'" (click)="open('privacy')" data-tab="privacy">Privacy</button>
+        <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'details'" [attr.aria-selected]="tab() === 'details'" (click)="open('details')" data-tab="details">Details</button>
+      </nav>
+
+      @switch (tab()) {
+        @case ('compare') {
+          <div class="cg" data-test="compare">
+            <section class="card p-0 min-w-0 overflow-hidden">
+              <div class="ir-card-h"><h2>Same wound over time</h2>
+                <app-segmented class="ir-end" [value]="compareShown()" (valueChange)="compareShown.set($event)" [options]="compareOptions" ariaLabel="Outline" /></div>
+              @if (comparison(); as c) {
+                <div class="three">
+                  @for (r of compareRows(); track r.photoId) {
+                    <div [attr.data-compare]="r.photoId">
+                      @if (r.hasPhoto) {
+                        <app-photo-view [photoId]="r.photoId" [geometry]="r.geometry" [width]="r.width" [height]="r.height" [overlays]="compareShown() === 'on' ? ['outline'] : []"
+                                        [scaleFound]="r.sized" [hideNoRuler]="true" />
+                      }
+                      <div class="cap"><b>{{ day(r.takenAt) }}</b>
+                        <span class="text-[color:var(--text-secondary)] tabular">{{ r.sized ? r.lengthCm!.toFixed(1) + ' × ' + r.widthCm!.toFixed(1) + ' cm · ' + r.areaCm2!.toFixed(1) + ' cm²' : 'no ruler: no size' }}</span>
+                        @if (r.current) { <span class="pill pill-info">this photo</span> }</div>
+                    </div>
+                  }
+                </div>
+              } @else { <div class="p-4"><app-loading shape="rows" label="Loading the wound's photos…" [count]="2" /></div> }
+            </section>
+            <div class="col">
+              <section class="card p-0" data-test="area-card">
+                <div class="ir-card-h"><h3>Area</h3>
+                  @if (comparison()?.sinceFirstPct != null) {
+                    <span class="ir-end font-medium" [class.ir-down]="comparison()!.sinceFirstPct! < 0" [class.ir-up]="comparison()!.sinceFirstPct! > 0" data-test="area-trend">
+                      {{ comparison()!.sinceFirstPct! < 0 ? 'down' : 'up' }} {{ comparison()!.sinceFirstPct! < 0 ? -comparison()!.sinceFirstPct! : comparison()!.sinceFirstPct }}% since {{ day(comparison()!.firstAt) }}</span>
+                  }
+                </div>
+                @if (comparison(); as c) {
+                  <div class="ir-card-b">
+                    @if (c.sizedCount) { <app-area-chart [rows]="c.photos" kind="full" /> }
+                    @else { <p class="text-sm text-[color:var(--text-muted)] m-0">No photo of this wound has a ruler yet, so there is no size to chart.</p> }
+                  </div>
+                  <table class="pg-t">
+                    <thead><tr><th>Date</th><th>L × W</th><th class="num">Area</th><th class="num">Change</th></tr></thead>
+                    <tbody>
+                      @for (r of c.photos; track r.photoId) {
+                        <tr><td>{{ day(r.takenAt) }}</td><td>{{ r.sized ? r.lengthCm!.toFixed(1) + ' × ' + r.widthCm!.toFixed(1) : '—' }}</td>
+                          <td class="num">{{ r.sized ? r.areaCm2!.toFixed(1) : 'no size' }}</td>
+                          <td class="num">@if (r.changePct != null) { <span [class.ir-down]="r.changePct < 0" [class.ir-up]="r.changePct > 0">{{ pctText(r.changePct) }}</span> }
+                            @else { <span class="text-[color:var(--text-muted)]">{{ r.sized ? 'first' : '—' }}</span> }</td></tr>
+                      }
+                    </tbody>
+                  </table>
+                }
+              </section>
+              <div class="ir-info"><app-icon name="info" /><span>Only photos with a ruler are on the chart. Each size uses that photo's own ruler, so photos taken from different distances still compare; keep the ruler flat and beside the wound.</span></div>
+            </div>
+          </div>
+        }
+        @case ('description') {
+          <div class="dg">
+            <app-description-card [photo]="d" (changed)="onChanged($event)" />
+            <section class="card p-0">
+              <div class="ir-card-h"><h3>How it was written</h3></div>
+              <div class="ir-card-b">
+                <dl class="kv">
+                  <dt>Model</dt><dd>{{ d.descriptionModel || '—' }} (local)</dd>
+                  <dt>Drafted</dt><dd>{{ d.describedAt ? (d.describedAt | serverTime: 'recent') : '—' }}</dd>
+                  <dt>Confirmed</dt><dd>{{ d.confirmedAt ? (d.confirmedByName || 'a nurse') + ', ' + (d.confirmedAt | serverTime: 'recent') : 'Not yet' }}</dd>
+                </dl>
+                <p class="text-xs text-[color:var(--text-muted)] mt-3 mb-0">A local vision model reads the photo only. It never sizes, stages or diagnoses; a field it is unsure of is left empty. Only a confirmed description goes into a visit note or a report.</p>
+              </div>
+            </section>
+          </div>
+        }
+        @case ('privacy') {
+          <div class="dg">
+            <section class="card p-0 min-w-0 overflow-hidden">
+              <div class="ir-tool">
+                <button type="button" class="btn btn-sm" [class.btn-primary]="mode() === 'blur'" [class.btn-default]="mode() !== 'blur'" (click)="startBlur()" [disabled]="d.sentToDocuments || d.inReport" data-test="blur-region"><app-icon name="shield" />Blur a region</button>
+                <span class="ir-end">{{ (d.blurCount ?? 0) === 1 ? '1 region blurred' : (d.blurCount ?? 0) + ' regions blurred' }}</span>
+              </div>
+              @if (mode() === 'blur') {
+                <div class="ir-draw" data-test="blur-bar">Drag a box over a face, a tattoo or a name band · {{ boxes().length }} drawn
+                  <button type="button" class="btn btn-primary btn-xs ml-auto" (click)="applyBlur()" [disabled]="!boxes().length || busy()" data-test="blur-apply">Blur {{ boxes().length || '' }}</button>
+                  <button type="button" class="btn btn-ghost btn-xs" (click)="boxes.set([]); mode.set('view')">Cancel</button></div>
+              }
+              <div class="ir-sunken">
+                <app-photo-view #big [photoId]="d.photoId" [version]="d.blurCount ?? 0" [geometry]="d.geometry" [width]="d.width" [height]="d.height"
+                                [overlays]="['outline']" [blurRegions]="mode() === 'blur' ? boxes() : (d.blurRegions ?? [])" [mode]="mode()" (boxDrawn)="boxed($event)" [hideNoRuler]="true" />
+              </div>
+            </section>
+            <section class="card p-0" data-test="privacy-card">
+              <div class="ir-card-h"><h3>Privacy, on every upload</h3><span class="pill pill-ok ir-end">Done</span></div>
+              <div class="ir-card-b">
+                <div class="pg-ok"><app-icon name="checkCircle" />Location, date-time original and camera details removed</div>
+                <p class="text-sm text-[color:var(--text-secondary)] mt-2 mb-0">{{ d.metadataRemoved?.length ? 'This photo carried: ' + d.metadataRemoved!.join(', ') + '. None of it is stored.' : 'This photo carried none of them; nothing of the camera is stored.' }}</p>
+                <p class="text-sm text-[color:var(--text-secondary)] mt-2 mb-0">A face, a tattoo or a name band in view? Draw a box over it and it is blurred in every copy: download, Documents and reports. The original is not kept unblurred.</p>
+                @if (d.sentToDocuments || d.inReport) { <p class="text-xs text-[color:var(--warn-text)] mt-2 mb-0">Already sent on, so a blur here would not reach that copy: blur before sending.</p> }
+              </div>
+            </section>
+          </div>
+        }
+        @case ('details') {
+          <section class="card p-0 mt-5" data-test="details-card">
+            <div class="ir-card-h"><h3>What the photo shows</h3></div>
+            @if (form(); as f) {
+              <div class="ir-card-b">
+                <div class="pg-form">
+                  <div class="field"><label class="label" for="pd-patient">Patient</label>
+                    <input id="pd-patient" class="input" [value]="f.patientRef" (input)="setField('patientRef', $any($event.target).value)" data-test="details-patient" /></div>
+                  <div class="field"><label class="label" for="pd-wound">Wound</label>
+                    <input id="pd-wound" class="input" [value]="f.woundLabel" (input)="setField('woundLabel', $any($event.target).value)" /></div>
+                  <div class="field"><label class="label" for="pd-site">Body site</label>
+                    <select id="pd-site" class="input" (change)="setField('bodyPart', $any($event.target).value)">
+                      @for (b of bodyParts; track b) { <option [value]="b" [selected]="f.bodyPart === b">{{ siteWords[b] }}</option> }
+                    </select></div>
+                  <div class="field"><label class="label" for="pd-taken">Taken</label>
+                    <input id="pd-taken" class="input" type="datetime-local" [max]="nowLocal" [value]="f.takenAt" (input)="setField('takenAt', $any($event.target).value)" /></div>
+                  <div class="field pg-wide"><label class="label" for="pd-where">Where exactly</label>
+                    <input id="pd-where" class="input" [value]="f.siteDetail" (input)="setField('siteDetail', $any($event.target).value)" /></div>
+                  <div class="field pg-wide"><label class="label" for="pd-note">Note</label>
+                    <input id="pd-note" class="input" [value]="f.note" (input)="setField('note', $any($event.target).value)" /></div>
+                </div>
+                <div class="flex gap-2 mt-4"><button type="button" class="btn btn-primary btn-sm" (click)="saveDetails()" [disabled]="busy()" data-test="details-save">Save</button></div>
+              </div>
+            }
+          </section>
+          <section class="card p-0 mt-4">
+            <div class="ir-card-h"><h3>File and measurement</h3></div>
+            <div class="ir-card-b">
+              <dl class="kv">
+                <dt>File</dt><dd><span class="mono">{{ d.fileName }}</span> · {{ size_(d.fileSize) }}@if (d.width) { · {{ d.width }} × {{ d.height }} px }</dd>
+                <dt>From</dt><dd>{{ d.source === 'bucket' ? 'a bucket' : d.source === 'documents' ? 'Documents' : 'an upload' }}, by {{ d.createdByName || '—' }}, {{ d.createdAt ? (d.createdAt | serverTime: 'recent') : '' }}</dd>
+                <dt>Measured</dt><dd>{{ d.measureNote || '—' }}@if (d.outlineSource === 'drawn') { · outline adjusted by hand }</dd>
+                <dt>Kept</dt><dd>{{ keptText(d) }}</dd>
+                <dt>Sent on</dt><dd>{{ d.documents ? 'Documents (document ' + (d.documents.ocrDocumentId ?? '…') + ')' : '' }}{{ d.documents && d.reportAsset ? ' · ' : '' }}{{ d.reportAsset ? 'Report Studio (' + (d.reportAsset.label || 'image') + ')' : '' }}{{ !d.documents && !d.reportAsset ? 'Not yet' : '' }}</dd>
+              </dl>
+            </div>
+          </section>
+        }
+        @default {
+          <div class="dg">
+            <section class="card p-0 min-w-0 overflow-hidden" data-test="measurement-photo">
+              <div class="ir-tool">
+                <app-segmented [value]="shown()" (valueChange)="shown.set($event)" [options]="shownOptions" ariaLabel="What is drawn over the photo" />
+                @if (!advice() || d.status === 'NO_RULER' || d.status === 'NO_REGION') {
+                  <button type="button" class="btn btn-sm" [class.btn-primary]="mode() === 'outline'" [class.btn-default]="mode() !== 'outline'" (click)="adjust()" data-test="adjust-outline"><app-icon name="pen" />Adjust outline</button>
+                }
+                <button type="button" class="btn btn-default btn-sm" (click)="open('privacy'); startBlur()" [disabled]="d.sentToDocuments || d.inReport" data-test="blur-from-measure"><app-icon name="eye" />Blur a region</button>
+                <span class="ir-end">{{ d.outlineSource === 'drawn' ? 'Outline adjusted by hand' : d.outlineSource === 'auto' ? 'Outline found in code' : '' }}</span>
+              </div>
+              @if (mode() === 'outline') {
+                <div class="ir-draw" data-test="outline-bar">Click round the wound to draw its outline; double-click or Done to measure it.
+                  <button type="button" class="btn btn-default btn-xs ml-auto" (click)="undoPoint()">Undo point</button>
+                  <button type="button" class="btn btn-primary btn-xs" (click)="finishOutline()" [disabled]="busy()" data-test="outline-done">Done</button>
+                  <button type="button" class="btn btn-ghost btn-xs" (click)="mode.set('view')">Cancel</button></div>
+              }
+              <div class="ir-sunken">
+                <app-photo-view #big [photoId]="d.photoId" [version]="d.blurCount ?? 0" [geometry]="d.geometry" [width]="d.width" [height]="d.height"
+                                [overlays]="overlays()" [scaleFound]="d.scaleFound" [pxPerCm]="d.pxPerCm" [lengthCm]="d.lengthCm" [widthCm]="d.widthCm"
+                                [mode]="mode()" (outlineDrawn)="outlined($event)" data-test="big-photo" />
+              </div>
+            </section>
+
+            <div class="col">
+              <section class="card p-0" data-test="size-card">
+                <div class="ir-card-h"><h3>Size, measured in code</h3>
+                  @if (d.scaleFound) { <span class="pill pill-ok ir-end"><app-icon name="check" size="0.85em" />Ruler found</span> }
+                  @else if (d.status === 'NO_RULER' || d.status === 'TOO_DARK') { <span class="pill pill-warn ir-end">No ruler</span> }
+                </div>
+                @if (size(); as s) {
+                  <div class="ir-metrics ir-big">
+                    <div><b>{{ d.lengthCm!.toFixed(1) }} cm</b><span>Length</span></div>
+                    <div><b>{{ d.widthCm!.toFixed(1) }} cm</b><span>Width</span></div>
+                    <div><b>{{ s.area }}</b><span>Area ({{ d.outlineSource === 'drawn' ? 'drawn outline' : 'outline' }})</span></div>
+                  </div>
+                  <div class="ir-card-b" style="border-top:1px solid var(--border-subtle)">
+                    @if (d.sinceFirstPct != null) {
+                      <div class="flex text-sm"><span class="text-[color:var(--text-secondary)]">Since {{ day(d.firstAt) }}</span>
+                        <span class="ml-auto font-medium" [class.ir-down]="d.sinceFirstPct < 0" [class.ir-up]="d.sinceFirstPct > 0" data-test="size-trend">{{ trendWords(d.sinceFirstPct) }}</span></div>
+                      @if (comparison(); as c) { <app-area-chart class="mt-2" [rows]="c.photos" kind="spark" /> }
+                    }
+                    <div class="ir-info mt-3"><app-icon name="info" /><span>Sizes come only from the ruler in the photo ({{ d.pxPerCm?.toFixed(1) }} px per cm). A photo without a ruler gets no size; it is never estimated.</span></div>
+                  </div>
+                } @else {
+                  <div class="ir-card-b">
+                    @if (d.status === 'MEASURING') { <p class="text-sm m-0"><app-icon name="refresh" [busy]="true" size="0.9em" /> Measuring against the ruler…</p> }
+                    @else if (advice()) { <app-photo-state [photo]="d" (upload)="another()" (keep)="mode.set('view')" (remove)="remove()" /> }
+                    @if (d.areaPx && d.outlineSource === 'drawn') { <p class="text-sm mt-3 mb-0">Drawn outline: {{ d.areaPx.toLocaleString() }} px. In cm only with a ruler in the photo.</p> }
+                    <div class="ir-info mt-3"><app-icon name="info" /><span>Sizes come only from the ruler in the photo. A photo without a ruler gets no size; it is never estimated.</span></div>
+                  </div>
+                }
+              </section>
+              @if (d.status !== 'TOO_DARK') { <app-description-card [photo]="d" (changed)="onChanged($event)" /> }
+            </div>
+          </div>
+        }
+      }
+    }
+  } @else if (state.error()) {
+    <div class="card p-4 mt-5"><app-inline-status [error]="state.error()" (retry)="read()" /></div>
+  } @else {
+    <div class="mt-5"><app-loading shape="rows" label="Loading the photo…" [count]="4" /></div>
+  }
+</div>

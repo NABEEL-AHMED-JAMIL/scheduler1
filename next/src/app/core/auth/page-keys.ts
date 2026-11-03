@@ -11,7 +11,7 @@
 export type PageKey =
   | 'jobs' | 'tasks' | 'queue' | 'reports'
   | 'objects' | 'analytics' | 'analytics-dashboards'
-  | 'tools-converter' | 'tools-transcript'
+  | 'tools-converter' | 'tools-transcript' | 'tools-images'
   | 'ai-prompts'
   // Wave 4 (MIG-223): Integration > API Collections. Identity already serves and enforces this one.
   | 'api-collections'
@@ -99,6 +99,7 @@ export const PAGE_LABELS: Record<PageKey, string> = {
   'analytics-dashboards': 'Dashboards',
   'tools-converter': 'Document Converter',
   'tools-transcript': 'Audio Transcript',
+  'tools-images': 'Image review',
   'ai-prompts': 'Prompts',
   'api-collections': 'API Collections',
   'sources': 'Sources',

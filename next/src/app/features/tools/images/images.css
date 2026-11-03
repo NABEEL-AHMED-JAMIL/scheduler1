@@ -1,0 +1,25 @@
+/* Image review, Option A (owner-approved design 2026-11-03; image-a, image-a-detail, image-a-compare, image-states). */
+.ir-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 1px solid var(--border-subtle); border-radius: var(--radius-card); }
+.ir-metrics > div { padding: 0.625rem 0.75rem; border-right: 1px solid var(--border-subtle); min-width: 0; }
+.ir-metrics > div:last-child { border-right: 0; }
+.ir-metrics b { display: block; font-size: 1.125rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ir-metrics span { font-size: 0.71875rem; color: var(--text-muted); }
+.ir-metrics.ir-big { border: 0; border-radius: 0; }
+.ir-metrics.ir-big > div { padding: 0.875rem 1rem; }
+.ir-metrics.ir-big b { font-size: 1.375rem; letter-spacing: -0.01em; }
+.ir-metrics.ir-big span { font-size: 0.75rem; }
+.ir-info { display: flex; gap: 0.5rem; align-items: flex-start; padding: 0.625rem 0.75rem; border: 1px solid color-mix(in oklab, var(--color-info-600) 35%, transparent);
+  border-radius: var(--radius-lg); background: var(--info-soft); color: var(--text-primary); font-size: 0.75rem; line-height: 1.45; }
+.ir-info app-icon { flex: none; margin-top: 0.0625rem; color: var(--pill-info-fg); }
+.ir-line { display: flex; align-items: center; gap: 0.25rem; font-size: 0.75rem; color: var(--text-secondary); }
+.ir-down { color: var(--ok-text); }
+.ir-up { color: var(--crit-text); }
+.ir-card-h { display: flex; align-items: center; gap: 0.625rem; padding: 0.875rem 1rem; border-bottom: 1px solid var(--border-subtle); }
+.ir-card-h h2, .ir-card-h h3 { margin: 0; font-size: 0.9375rem; font-weight: 600; }
+.ir-card-h .ir-end { margin-left: auto; }
+.ir-card-b { padding: 1rem; }
+.ir-tool { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; padding: 0.625rem 0.875rem; border-bottom: 1px solid var(--border-subtle); }
+.ir-tool .ir-end { margin-left: auto; font-size: 0.75rem; color: var(--text-muted); }
+.ir-sunken { padding: 1rem; background: var(--surface-sunken); }
+.ir-draw { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; padding: 0.5rem 0.875rem; background: var(--pill-warn-bg);
+  border-bottom: 1px solid var(--border-subtle); font-size: 0.8125rem; }

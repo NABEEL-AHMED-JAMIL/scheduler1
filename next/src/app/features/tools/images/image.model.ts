@@ -235,6 +235,8 @@ export function subLine(p: PhotoSummary): string {
   const parts: string[] = [];
   if (p.visit && p.patientRef) parts.push(`visit ${p.visit}`);
   if (p.note) parts.push(p.note);
+  // The newest visit, or a photo with nothing else to say, names its file.
+  if (!parts.length || (p.visit != null && p.visit === p.visits && p.visit > 1)) parts.push(p.fileName);
   return parts.join(' · ');
 }
 

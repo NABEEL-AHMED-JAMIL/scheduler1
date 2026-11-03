@@ -18,7 +18,7 @@ export interface RetentionHistoryPanelData {
 const LABELS: Record<string, string> = {
   RUN_OUTPUTS: 'Run outputs', RUN_LOGS: 'Run logs', FILES: 'Uploaded files', DOCUMENTS: 'Documents', FORM_SUBMISSIONS: 'Form submissions',
   AI_CONVERSATIONS: 'AI conversations', NOTIFICATIONS: 'Notifications', REPORTS: 'Reports', TRANSCRIPTS: 'Transcripts',
-  RECORDINGS: 'Audio recordings', CONVERSIONS: 'Converted files', AUDIT: 'Audit records',
+  RECORDINGS: 'Audio recordings', CONVERSIONS: 'Converted files', PHOTOS: 'Image review photos', AUDIT: 'Audit records',
 };
 
 /**
