@@ -44,7 +44,7 @@ export function pinsOf(data: ReviewComments | null, showResolved: boolean): { id
           <p class="rc-note" data-comments-masked><app-icon name="lock" />Personal values are shown as •••: reading them needs See personal data.</p>
         }
         @if (d.may.comment) {
-          <form class="rc-new" (submit)="$event.preventDefault(); post()" aria-label="New comment">
+          <form class="rc-new" (submit)="$event.preventDefault(); post()" aria-label="Add a comment">
             <textarea class="input text-sm" rows="3" maxlength="2000" placeholder="What should change? Pin it to the page or a block."
                       aria-label="New comment" [value]="text()" (input)="text.set($any($event.target).value)"></textarea>
             <div class="seg" role="group" aria-label="Pin the comment to">

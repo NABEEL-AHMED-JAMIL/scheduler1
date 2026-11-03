@@ -120,7 +120,7 @@ test.describe('Reports redesign phase 5: rule builder, fax check, review comment
     await page.mouse.click(box.x + box.width * 0.4, box.y + box.height * 0.3);
     await expect(page.locator('[data-comment-anchor]')).toContainText('Page 1');
     await page.getByLabel('New comment').fill('Patient B (fictional): the area does not match the photo; re-measure.');
-    await page.getByRole('button', { name: 'Comment', exact: true }).click();
+    await page.getByRole('form', { name: 'Add a comment' }).getByRole('button', { name: 'Comment', exact: true }).click();
     await expect(page.locator('.rv-pin')).toHaveCount(1);
     await expect(page.locator('[data-thread]').first()).toContainText('the area does not match the photo');
     const listed = await data('comments', await request.get(`${api}/reportLibrary.json/comments?reportId=${reportId}&version=1`, { headers: authOf(admin) }));

@@ -99,7 +99,7 @@ describe('review comments beside a report version (feature 16)', () => {
 
   it('does not let a comment go without its words or its place, and says why a version takes none', () => {
     const { c, el, fixture } = panel(comments({ may: { comment: false, resolveAny: false, why: "The version's files were removed by the workspace's retention policy; its comments went with them." } }));
-    expect(el.querySelector('form[aria-label="New comment"]')).toBeNull();
+    expect(el.querySelector('form[aria-label="Add a comment"]')).toBeNull();
     expect(el.textContent).toContain('retention policy');
     fixture.componentRef.setInput('data', comments());
     fixture.detectChanges();
