@@ -2,6 +2,9 @@
 
 Newest first. Each line: `- date · [Title](#article) · one sentence`.
 
+- 2026-11-03 · [Compare versions](#rs-versions--compare-two-versions) · Two versions of a report side by side, the changes highlighted on the pages, and an exact list of what changed in the data, the template and the approvals.
+- 2026-11-03 · [A copy without names](#rs-copy-without-names) · A report with the patient's details taken out, for a quality board or a partner, from the Download menu or on a schedule.
+- 2026-11-03 · [PDF/A and tagged PDF](#rs-pdf-archive) · A template or brand makes its reports PDF/A-2b for archiving and tagged for screen readers; the approval's signature keeps them so.
 - 2026-11-02 · [Build JSON](#pl-build-json) · A new step shapes rows into nested JSON (objects, lists grouped from many rows, fixed values) with a live preview, and Call API sends it as the request body.
 - 2026-10-27 · [Check ICD-10 codes against the CMS list](#rcp-icd10-code-check) · A recipe: look each claim's diagnosis code up in the CMS ICD-10-CM list, add its description and chapter, and keep the invalid, header and blank codes for review.
 - 2026-10-27 · [Personal data in a request](#apr-my-requests--personal-data-in-a-request) · A form's personal answers are hidden in its approval requests; people with See personal data can show them, and each showing is in the history.

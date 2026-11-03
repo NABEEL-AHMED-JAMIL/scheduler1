@@ -62,6 +62,14 @@ Click **Page settings** in the toolbar (or click outside every block) to set the
 
 > **Note:** Previews always say DRAFT across the page, so a preview is never mistaken for the real report.
 
+## Archive, accessibility and personal data
+Also in the page settings:
+
+- **Archive and accessibility**: the PDF's **Archive format** (PDF/A-2b for records kept for years) and whether it is a
+  **tagged PDF** for screen readers. See [PDF/A and tagged PDF](#rs-pdf-archive).
+- **Personal data**: tick the fields that identify a person, and choose what a copy without names prints instead; the
+  other dates' rule and whether notes are searched for names. See [A copy without names](#rs-copy-without-names).
+
 ## Checks and publishing
 The bar at the bottom reads **Template structure valid** (or **Template has errors**), how many problems the bindings
 have with the test data, and how many data fields the template uses. Click it to see the **Checks**. A draft with

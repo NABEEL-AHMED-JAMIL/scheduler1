@@ -5,7 +5,7 @@ summary: A report schedule — template, data, one report per patient, approval,
 section: Generate
 who: Anyone with Generate reports; the reports are approved by the people the schedule names
 where: Reports › Schedules (/reports/schedules)
-related: rs-create, rs-pipeline, rs-approve, rs-versions
+related: rs-create, rs-pipeline, rs-approve, rs-versions, rs-copy-without-names
 popular: Send a weekly report per patient once it is approved
 ---
 A **report schedule** makes many reports at once, on the days you choose, and sends each one where it needs to go once
@@ -31,7 +31,8 @@ Open **Reports › Schedules** and choose **New schedule**. Name it, then go thr
    needed** (one, or two where the second signs) with what the approval means, and **Not approved in**: after that many
    days the approvers are reminded, and after twice as many you are told.
 5. **Deliver once approved**: the **Report library** always. Then, as you choose: **Email a sign-in link** to people of
-   this workspace, **Put the PDF in a bucket folder**, **Call a webhook**.
+   this workspace, **Put the PDF in a bucket folder**, **Call a webhook**, and **Also a version without names** (each
+   approved report's [copy without names](#rs-copy-without-names), kept with it and saved beside the PDF in the bucket).
 6. **When**: **Once**, **Every day**, **Every week** (on the days you pick) or **Every month** (a day, or the last day), at
    a time in the workspace's time zone. For a pipeline, **Wait for the pipeline if it is still running** (up to 2 hours),
    and **Skip a run when the pipeline has not run again since the last one**.

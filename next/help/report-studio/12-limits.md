@@ -30,7 +30,7 @@ report's page offer what applies:
 How long report files stay is the class **Reports** of the workspace's retention policy, set in **Administration ›
 Data policies** ([Retention](#sec-retention)). After the days you set, retention removes:
 
-- the files of versions a newer version replaced, and
+- the files of versions a newer version replaced (with their copies without names), and
 - the frozen data no kept version uses.
 
 It **never** removes a report's current version, any approved or signed version, a version waiting for approval,

@@ -14,9 +14,10 @@ everything else ([How usage is counted](#bill-usage)).
 |---|---|
 | Generate a report version (by hand or from a pipeline) | one **Documents converted** per version; Cost & usage names the template and the pages, and a pipeline's version counts towards that pipeline's cost |
 | A job retried after a failure | billed once |
+| A [copy without names](#rs-copy-without-names) of a version | one **Documents converted** when it is made (its note says *copy without names*); downloading it again is not billed |
 | The AI designer's proposals | AI usage (tokens) on the workspace's model connection ([What AI costs](#ai-costs)) |
 | Report files kept | storage, measured nightly, like any file |
-| Previews, checks, Verify signature, reading the Library | not billed |
+| Previews, checks, Verify signature, Compare versions, reading the Library | not billed |
 | A job that failed and made no version | not billed |
 
 ## See what reports cost

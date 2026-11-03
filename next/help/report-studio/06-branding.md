@@ -65,6 +65,11 @@ approved settings.
 
 > **Tip:** The colours are checked for contrast: the page says when text and background pass WCAG AA.
 
+## PDF/A and tagged PDF for every template
+A brand profile can make every report it brands **PDF/A-2b** (the archival format) and a **tagged PDF** (read by screen
+readers): turn on **Archive format: PDF/A-2b** and **Accessible: tagged PDF** under the profile's signing setting. A
+template's own choice wins. See [PDF/A and tagged PDF](#rs-pdf-archive).
+
 ## Example
 Summit Valley's custodian (the workspace administrator) uploaded **Dr. Anika Patel signature** and the **Summit Valley
 Medical Center · Clinical records** stamp; Jordan Reyes, the second administrator, approved them. The **Summit Valley
