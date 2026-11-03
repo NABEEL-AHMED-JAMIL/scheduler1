@@ -23,8 +23,13 @@ export interface ImageType {
   offered: boolean;
   /** What it never says ("diagnosis, stage, cause, treatment"). */
   never?: string | string[] | null;
-  /** A warning about the type (X-ray: local models are weak on X-rays). */
+  /** A line about the type: a warning (noteWarning, X-ray: local models are weak) or a plain note (slide: magnification only when printed). */
   note?: string | null;
+  noteWarning?: boolean | null;
+  /** The measurement's own words: measured, "area only"; never measured, why ("no paper ruler. Its scale is in DICOM…"). */
+  measureNote?: string | null;
+  /** The described-only banner's text after "Description only · no size · not a diagnosis." */
+  bannerText?: string | null;
   fields: string[];
   promptId?: number | null;
   promptName?: string | null;
@@ -46,8 +51,12 @@ export interface AiPromptOption {
   builtInKey?: string | null;
   fields: string[];
   fits: boolean;
+  /** Whether it fits the type suggestion (its answer is a type key) or Ask (a question and a photo, a text answer). */
+  fitsSuggest?: boolean | null;
+  fitsAsk?: boolean | null;
   reason?: string | null;
   kind: 'describe' | 'suggest' | 'ask';
+  tags?: string | string[] | null;
 }
 
 /** A model on the platform's list, with what it can do (detected from Ollama) and whether it can be used here. */
@@ -205,11 +214,12 @@ export function neverText(never: string | string[] | null | undefined): string {
   return Array.isArray(never) ? never.join(', ') : never ?? '';
 }
 
-/** The type's measurement in words: "Paper ruler · dark region", or "Never". */
-export function measuredText(t: Pick<ImageType, 'measured' | 'target' | 'targetLabel'>): string {
-  if (!t.measured) return 'Never';
+/** The type's measurement in words: "Paper ruler · red region (area only)", "Never: microscope scale, not a paper ruler", "Never". */
+export function measuredText(t: Pick<ImageType, 'measured' | 'target' | 'targetLabel' | 'measureNote'>): string {
+  const note = (t.measureNote ?? '').trim();
+  if (!t.measured) return note ? `Never: ${note}` : 'Never';
   const label = t.targetLabel || (t.target === 'contrast' ? 'dark region' : t.target === 'red_region' ? 'red region' : '');
-  return label ? `Paper ruler · ${label}` : 'Paper ruler';
+  return (label ? `Paper ruler · ${label}` : 'Paper ruler') + (note ? ` (${note})` : '');
 }
 
 /** A custom type copied from X-ray, a slide or Other photo is never measured, whatever its setting says. */

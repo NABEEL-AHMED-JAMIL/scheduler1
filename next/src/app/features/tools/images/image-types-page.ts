@@ -30,9 +30,11 @@ export const IMAGE_REVIEW_TAG = 'Image review';
     .tc-lock { display: flex; gap: 0.5rem; align-items: flex-start; margin-top: 1rem; padding: 0.75rem 0.875rem; border-radius: var(--radius-lg);
       background: var(--surface-inset); border: 1px solid var(--border-subtle); font-size: 0.8125rem; line-height: 1.5; }
     .tc-lock app-icon { flex: none; margin-top: 0.125rem; color: var(--text-muted); }
-    .tc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(21rem, 1fr)); gap: 1rem; margin-top: 1.25rem; }
+    .tc-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; margin-top: 1.25rem; align-items: stretch; }
+    @media (max-width: 1399px) { .tc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 759px) { .tc-grid { grid-template-columns: minmax(0, 1fr); } }
     .tc { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
-    .tc-photo { aspect-ratio: 16 / 9; background: var(--surface-sunken); border-bottom: 1px solid var(--border-subtle); overflow: hidden; }
+    .tc-photo { height: 10.625rem; background: var(--surface-sunken); border-bottom: 1px solid var(--border-subtle); overflow: hidden; }
     .tc-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
     .tc-b { display: flex; flex-direction: column; gap: 0.75rem; padding: 1rem; flex: 1 1 auto; }
     .tc-h { display: flex; flex-wrap: wrap; align-items: center; gap: 0.375rem; }
@@ -42,12 +44,12 @@ export const IMAGE_REVIEW_TAG = 'Image review';
     .tc dt { color: var(--text-muted); }
     .tc dd { margin: 0; overflow-wrap: anywhere; }
     .tc-chips { display: flex; flex-wrap: wrap; gap: 0.25rem; }
-    .tc-never { color: var(--text-secondary); }
+    .tc-never { color: var(--crit-text); }
+    .tc-plain { margin: 0; font-size: 0.75rem; color: var(--text-muted); }
     .tc-warn { display: flex; gap: 0.5rem; align-items: flex-start; padding: 0.5rem 0.75rem; border-radius: var(--radius-lg); background: var(--pill-warn-bg);
       font-size: 0.75rem; line-height: 1.45; }
     .tc-warn app-icon { flex: none; margin-top: 0.0625rem; color: var(--warn-text); }
-    .tc-foot { margin-top: auto; }
-  `,
+      `,
   template: `
     <div class="page-tool">
       <app-page-header title="Image types" crumb="Image types" [hub]="false"
@@ -77,14 +79,15 @@ export const IMAGE_REVIEW_TAG = 'Image review';
                   @if (!t.offered) { <span class="pill pill-warn">Not offered here</span> }
                   <span class="pill tc-end" [class.pill-ok]="t.measured" [class.pill-neutral]="!t.measured">{{ t.measured ? 'Measured' : 'Not measured' }}</span></div>
                 <dl>
-                  <dt>Measured</dt><dd>{{ measuredText(t) + (!t.measured && t.description ? ': ' + t.description : '') }}</dd>
+                  <dt>Measured</dt><dd data-test="type-measured">{{ measuredText(t) }}</dd>
                   <dt>Fields</dt><dd class="tc-chips">@for (f of t.fields; track f) { <span class="pill pill-neutral mono">{{ f }}</span> } @empty { — }</dd>
                   @if (never(t)) { <dt>Never</dt><dd class="tc-never">{{ never(t) }}</dd> }
                   <dt>Prompt</dt><dd>@if (t.promptName) { <a class="link-inline" routerLink="/pipelines/prompts" [queryParams]="{ tag: tag }" data-test="type-prompt">{{ t.promptName }}</a>@if (t.promptVersion != null) { v{{ t.promptVersion }} } } @else { — }</dd>
                 </dl>
-                @if (t.note) { <div class="tc-warn" data-test="type-note"><app-icon name="alert" size="0.95em" /><span>{{ t.note }}</span></div> }
+                @if (t.note && t.noteWarning) { <div class="tc-warn" data-test="type-note"><app-icon name="alert" size="0.95em" /><span>{{ t.note }}</span></div> }
+                @else if (t.note) { <p class="tc-plain" data-test="type-plain-note">{{ t.note }}</p> }
                 @if (store.canChange()) {
-                  <button type="button" class="btn btn-default btn-sm self-start tc-foot" (click)="duplicate(t)" [disabled]="busy()" data-test="type-duplicate"><app-icon name="copy" />Duplicate to edit</button>
+                  <button type="button" class="btn btn-default btn-sm self-start" (click)="duplicate(t)" [disabled]="busy()" data-test="type-duplicate"><app-icon name="copy" />Duplicate to edit</button>
                 }
               </div>
             </section>

@@ -91,7 +91,8 @@ import {
           <p class="dc-note">Written by a local vision model from the photo only. A clinician confirms or edits it before it goes into a note or a report.</p>
         }
         @if (type()?.note; as note) {
-          <div class="dc-warn" data-test="type-note"><app-icon name="alert" size="0.95em" /><span>{{ note }}</span></div>
+          @if (type()?.noteWarning) { <div class="dc-warn" data-test="type-note"><app-icon name="alert" size="0.95em" /><span>{{ note }}</span></div> }
+          @else { <p class="dc-note" data-test="type-plain-note">{{ note }}</p> }
         }
         <div class="dc-acts">
           @if (editing()) {
