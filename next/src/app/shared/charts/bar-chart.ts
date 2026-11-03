@@ -60,6 +60,33 @@ const CHAR_PX = 6.2;
 /** Breathing room either side, so two labels never touch even when both just fit. */
 const LABEL_GUTTER = 6;
 
+/**
+ * Owner 2026-11-03: with this few bars every one is named -- a label too wide for its slot wraps onto a second line
+ * ("Hours to each stage" named only every other stage). Past it, or when even a wrapped name will not fit, the axis is
+ * thinned as before.
+ */
+const WRAP_MAX_BARS = 12;
+/** The extra line a wrapped label takes, in px (11px type on a 14px line). */
+const LABEL_LINE_PX = 14;
+
+/** How many lines `text` takes wrapped at its spaces, dashes and underscores into `room` px. */
+export function wrappedLines(text: string, room: number): number {
+  const words = (text ?? '').split(/(?<=[\s_\-/])/).map(w => w.trim()).filter(Boolean);
+  let lines = 1;
+  let used = 0;
+  for (const word of words) {
+    const px = word.length * CHAR_PX;
+    if (px + LABEL_GUTTER > room) return Infinity;
+    if (used && used + CHAR_PX + px + LABEL_GUTTER > room) {
+      lines++;
+      used = px;
+    } else {
+      used += (used ? CHAR_PX : 0) + px;
+    }
+  }
+  return lines;
+}
+
 /** The pixels the widest of these strings needs. */
 function widestText(texts: string[]): number {
   let widest = 0;
@@ -230,15 +257,22 @@ export function axisTicks(max: number, whole = true): number[] {
             <!-- Flex, not text-align: a line wider than its box overflows to the right whatever
                  text-align says, so the last label hung off the card by a few px. A flex-end item
                  overflows toward the start instead. -->
-            <span class="flex text-[11px] text-[color:var(--text-muted)] w-full h-3.5
+            <span class="flex text-[11px] text-[color:var(--text-muted)] w-full
                          leading-[0.875rem] overflow-visible"
+                  [class.h-3.5]="!wrapLabels()" [class.h-7]="wrapLabels()"
                   [class.justify-center]="bar.align === 'center'"
                   [class.justify-start]="bar.align === 'start'"
                   [class.justify-end]="bar.align === 'end'">
               @if (bar.labelled) {
                 <!-- Short: the thinning above is measured on this string, and a category can be a
                      20,000-character note (owner, 2026-09-28). The whole name is in the hint. -->
-                <span class="whitespace-nowrap">{{ bar.short }}</span>
+                @if (bar.wrapped) {
+                  <!-- Owner 2026-11-03: a few bars are all named; a long name wraps onto two lines in its own slot. -->
+                  <span class="shrink-0 text-center whitespace-normal line-clamp-2" data-test="bar-label-wrapped"
+                        [style.width.px]="slotPx()">{{ bar.wrapped }}</span>
+                } @else {
+                  <span class="whitespace-nowrap">{{ bar.short }}</span>
+                }
               }
             </span>
           </button>
@@ -418,7 +452,10 @@ export class BarChart {
 
   /** The bars' own height: the chart's, less the label line and (when drawn) the value line. */
   private readonly track = computed(() =>
-    Math.max(this.height() - (this.showValues() ? RESERVE_WITH_VALUES : RESERVE_AXIS_ONLY), 18));
+    Math.max(this.height() - (this.showValues() ? RESERVE_WITH_VALUES : RESERVE_AXIS_ONLY) - this.labelExtra(), 18));
+
+  /** The second line a wrapped axis label takes, kept off the bars. */
+  protected readonly labelExtra = computed(() => (this.wrapLabels() ? LABEL_LINE_PX : 0));
 
   /** Each tick with the px above the chart's bottom its gridline sits at: the label line, then its share of the track. */
   protected readonly tickMarks = computed(() => {
@@ -428,7 +465,7 @@ export class BarChart {
     return ticks.map(value => ({
       value,
       figure: format(value),
-      px: RESERVE_AXIS_ONLY + (top > 0 ? Math.round((value / top) * this.track()) : 0),
+      px: RESERVE_AXIS_ONLY + this.labelExtra() + (top > 0 ? Math.round((value / top) * this.track()) : 0),
     }));
   });
 
@@ -523,12 +560,35 @@ export class BarChart {
 
   protected readonly showValues = computed(() => this.valueFormat() !== null);
 
+  /**
+   * The room one label has: the distance between two bars' centres. The bars are spread over the row (justify-around)
+   * and a label overflows its own bar, so this is the row's width over the bars -- not the bar's own capped width
+   * (pitch), which named only every other bar of a five-bar chart in a wide card.
+   */
+  private readonly slot = computed(() => {
+    const count = this.data().length;
+    const width = this.measured();
+    return count && width ? width / count : 0;
+  });
+
+  /** The slot's px less the gutter, for a wrapped label's width. */
+  protected readonly slotPx = computed(() => Math.max(0, Math.floor(this.slot() - LABEL_GUTTER)));
+
+  /** A few bars (WRAP_MAX_BARS) whose names do not fit on one line but do on two: every one is named, wrapped. */
+  protected readonly wrapLabels = computed(() => {
+    const count = this.data().length;
+    const slot = this.slot();
+    if (count < 2 || count > WRAP_MAX_BARS || !slot || this.labelWidth() <= slot) return false;
+    return this.data().every(bar => wrappedLines(shortLabel(bar.name), slot) <= 2);
+  });
+
   /** Label every Nth group, where N is however many bars the WIDEST label is wide. */
   private readonly every = computed(() => {
     const count = this.data().length;
     if (count < 2) return 1;
-    const pitch = this.pitch();
+    const pitch = this.slot();
     if (!pitch) return count > 16 ? Math.ceil(count / 8) : 1;
+    if (this.wrapLabels()) return 1;
     // The widest label decides the spacing for all of them: thinning to fit the average leaves
     // the long ones overlapping their neighbours, which is what "CUST-00111 CUST-00319CUST-00315"
     // along the bottom of a Top-10 chart was.
@@ -576,8 +636,11 @@ export class BarChart {
      * `every` alone let them meet: "31 Aug5 Sep" and "25 Sep30 Sep" on a 31-day card at tablet
      * width. Beside an end the gap is the end label's whole width plus half of the next one's.
      */
-    const pitch = this.pitch();
-    const edge = roomy || !pitch ? every : Math.max(every, Math.ceil((1.5 * this.labelWidth() - pitch / 2) / pitch));
+    const pitch = this.slot();
+    const wrap = this.wrapLabels();
+    // Centred end labels fit the card when every bar is named on one line, or wrapped into its slot.
+    const centred = wrap || (roomy && every === 1);
+    const edge = centred || !pitch ? every : Math.max(every, Math.ceil((1.5 * this.labelWidth() - pitch / 2) / pitch));
     const chosen = new Set<number>([starts[0], last]);
     let previous = starts[0];
     for (const at of starts) {
@@ -614,8 +677,10 @@ export class BarChart {
         // The two outermost labels are pulled inward so they sit over the plot rather than
         // hanging 10px into the card's padding, pointing at nothing.
         // At full bar width a label fits over its own bar, so it stays centred under it.
-        align: !labelled || roomy ? 'center' : index === starts[0] ? 'start' : index === last ? 'end' : 'center',
+        align: !labelled || centred ? 'center' : index === starts[0] ? 'start' : index === last ? 'end' : 'center',
         short: shortLabel(bar.name),
+        // A wrapped name may break after an underscore too ("care_plan_hours"), which CSS alone does not.
+        wrapped: wrap ? shortLabel(bar.name).replace(/([_/])/g, '$1\u200b') : null,
         display: (this.valueFormat() ?? format)(bar.value),
         hint: this.hintFor(bar, this.hintFormat()),
         px: px,

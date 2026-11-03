@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { Component, signal } from '@angular/core';
-import { BarChart, Bar } from './bar-chart';
+import { BarChart, Bar, wrappedLines } from './bar-chart';
 
 @Component({
   imports: [BarChart],
@@ -311,8 +311,13 @@ describe('whether a label fits where it is about to be drawn', () => {
       value: 300_000 - at,
     }));
 
+    // Owner 2026-11-03: eleven bars are a few -- each id wraps at its dash onto two lines in its slot instead of a label
+    // being dropped; none runs into its neighbour.
     const cramped = chartAt(700, customers);
-    expect(cramped.bars().filter(bar => bar.labelled).length).toBeLessThan(11);
+    expect(cramped.bars().every(bar => bar.labelled && bar.wrapped === 'CUST-' + bar.name.slice(5))).toBe(true);
+    // Too narrow even wrapped: thinned by the widest label, as before.
+    const narrow = chartAt(300, customers);
+    expect(narrow.bars().filter(bar => bar.labelled).length).toBeLessThan(11);
 
     // Given room, every label is drawn: the rule is about fit, not a blanket thinning.
     const roomy = chartAt(1600, customers);
@@ -426,5 +431,44 @@ describe('a chart of how long runs took', () => {
   it('leaves a chart of counts as it was', () => {
     const bars = barsFor([{ name: 'x', value: 25 }]);
     expect(bars[0].display).toBe('25');
+  });
+});
+
+/**
+ * Owner 2026-11-03: "Hours to each stage" (five bars in a wide card) named only every other stage -- the labels were
+ * spaced by the bar's capped width (68px) though the bars are spread over the row, 150px apart. A few bars are all
+ * named; a name too wide for its slot wraps onto two lines; only many bars, or names that will not fit even wrapped,
+ * are thinned.
+ */
+describe('a few bars are all named', () => {
+  const stages: Bar[] = ['Triage', 'Labs', 'Imaging', 'Care plan', 'Discharge'].map((name, at) => ({ name, value: at + 1 }));
+  const raw: Bar[] = ['triage_hours', 'labs_hours', 'imaging_hours', 'careplan_hours', 'discharge_hours'].map((name, at) => ({ name, value: at + 1 }));
+
+  it('names every bar when its slot is wide enough, spacing labels by the slot, not the bar', () => {
+    const chart = chartAt(760, raw);
+    expect(chart.bars().every(b => b.labelled)).toBe(true);
+    expect(chart.bars().every(b => b.wrapped === null)).toBe(true);
+    expect(chartAt(760, stages).bars().every(b => b.labelled && b.align === 'center')).toBe(true);
+  });
+
+  it('wraps a name onto two lines rather than dropping a bar, when one line does not fit', () => {
+    const chart = chartAt(400, raw);   // 80px a slot; "discharge_hours" needs 99
+    expect(chart.bars().every(b => b.labelled)).toBe(true);
+    expect((chart as any).wrapLabels()).toBe(true);
+    expect(chart.bars()[3].wrapped).toBe('careplan_​hours');
+  });
+
+  it('thins only many bars, or names that will not fit even wrapped', () => {
+    const many: Bar[] = Array.from({ length: 30 }, (_, at) => ({ name: `category ${at}`, value: at }));
+    expect((chartAt(400, many) as any).wrapLabels()).toBe(false);
+    expect(chartAt(400, many).bars().filter(b => b.labelled).length).toBeLessThan(30);
+    const long: Bar[] = ['Supercalifragilisticexpialidocious', 'b', 'c'].map((name, at) => ({ name, value: at + 1 }));
+    expect((chartAt(150, long) as any).wrapLabels()).toBe(false);
+  });
+
+  it('counts the lines a name wraps to', () => {
+    expect(wrappedLines('Care plan', 80)).toBe(1);
+    expect(wrappedLines('discharge_hours', 80)).toBe(2);
+    expect(wrappedLines('Supercalifragilisticexpialidocious', 80)).toBe(Infinity);
   });
 });
